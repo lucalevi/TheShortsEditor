@@ -27,6 +27,7 @@ make open     # open in Xcode
 - **Time is `CMTime`, never `Double` seconds**, in the model. Edits snap to whole frames (`snappedToFrame`). `CMTime` isn't Codable here, so model types encode it through `StoredTime`.
 - The canvas is fixed at 1080×1920, 30 fps, with a 3:00 maximum. These are constants on `Project`, not settings.
 - Use the macOS 26 `AVVideoComposition.Configuration` APIs. The `AVMutableVideoComposition*` classes are deprecated.
-- Every keyboard shortcut is defined in `EditorCommands` so it also appears in a menu.
+- Every keyboard shortcut is defined in `EditorCommands` so it also appears in a menu. Single keys without modifiers (Space, J/K/L, B, arrows, Delete) are also handled in `EditorKeys`, because a focused control otherwise takes them before the menu does.
+- Files opened from Finder or the Dock are imported by `AppDelegate.application(_:open:)`. The `WindowGroup`'s `handlesExternalEvents` settings exist only so exactly one window gets created and reused. `onOpenURL` drops files when several are opened at once, and a plain `Window` scene isn't created when the app is launched by opening files.
 - User-facing text is plain language without editing jargon ("Fill screen" / "Show all", not "aspect fill").
 - The app is sandboxed. File access comes from drag-and-drop or the Open panel (security-scoped URLs).

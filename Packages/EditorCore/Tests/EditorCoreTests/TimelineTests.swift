@@ -98,7 +98,9 @@ struct TimelineTests {
     @Test func timeFormat() {
         #expect(TimeFormat.string(.zero) == "0:00.0")
         #expect(TimeFormat.string(CMTime(value: 9, timescale: 30)) == "0:00.3")
-        #expect(TimeFormat.string(seconds(75.46)) == "1:15.4")
+        #expect(TimeFormat.string(seconds(75.46)) == "1:15.5")
+        #expect(TimeFormat.string(CMTime(value: 49, timescale: 30)) == "0:01.6")
+        #expect(TimeFormat.string(CMTime(value: 101, timescale: 30)) == "0:03.4")
         #expect(TimeFormat.string(.invalid) == "0:00.0")
     }
 }

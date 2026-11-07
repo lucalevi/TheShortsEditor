@@ -13,9 +13,10 @@ public extension CMTime {
 
 public enum TimeFormat {
     /// "m:ss.t", e.g. "0:07.4". Tenths are precise enough to talk about a Short and easy to read.
+    /// Rounded to the nearest tenth, so the lengths of split clips add up to the original.
     public static func string(_ time: CMTime) -> String {
         guard time.isNumeric, time > .zero else { return "0:00.0" }
-        let tenths = Int(time.convertScale(10, method: .roundTowardZero).value)
+        let tenths = Int(time.convertScale(10, method: .roundHalfAwayFromZero).value)
         return "\(tenths / 600):\(String(format: "%02d", (tenths / 10) % 60)).\(tenths % 10)"
     }
 }

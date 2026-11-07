@@ -6,21 +6,32 @@ struct TheShortsEditorApp: App {
     @State private var model = EditorModel()
 
     var body: some Scene {
-        // One project at a time for now, so a single window rather than a document per window.
-        Window("Shorts Editor", id: "editor") {
+        // One project at a time for now. A WindowGroup rather than a single Window because only a
+        // WindowGroup gets created when the app is launched by opening videos from Finder; "New
+        // Window" is removed so there is never more than one.
+        WindowGroup("Shorts Editor", id: "editor") {
             ContentView(model: model)
                 .frame(minWidth: 1000, minHeight: 680)
                 .onAppear { appDelegate.connect(model) }
+                // Send opened files to this window instead of making a new one per file…
+                .handlesExternalEvents(preferring: ["*"], allowing: ["*"])
         }
+        // …while still creating it when opening files is what launched the app. The files
+        // themselves are imported by the app delegate.
+        .handlesExternalEvents(matching: ["*"])
         .defaultSize(width: 1400, height: 900)
-        .commands { EditorCommands(model: model) }
+        .commands {
+            CommandGroup(replacing: .newItem) {}
+            EditorCommands(model: model)
+        }
     }
 }
 
 /// Receives videos opened with the app from Finder or the Dock and puts them on the timeline.
+/// (SwiftUI's onOpenURL drops files when several are opened at once; this gets them all together.)
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private weak var model: EditorModel?
-    /// Files that arrive before the model exists (when the app is launched by opening them).
+    /// Files that arrive before the window exists, when opening them is what launched the app.
     private var pending: [URL] = []
 
     func connect(_ model: EditorModel) {
@@ -38,5 +49,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         } else {
             pending += urls
         }
+    }
+
+    /// There is only one window, so closing it means being done; this also avoids a running app
+    /// with no window and no obvious way back.
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
+        true
     }
 }

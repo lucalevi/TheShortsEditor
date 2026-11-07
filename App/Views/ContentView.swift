@@ -5,6 +5,7 @@ import SwiftUI
 struct ContentView: View {
     @Bindable var model: EditorModel
     @Environment(\.undoManager) private var undoManager
+    @State private var keys = EditorKeys()
 
     var body: some View {
         VSplitView {
@@ -39,7 +40,10 @@ struct ContentView: View {
                     .help("Show where YouTube's buttons and captions cover your video (⌘')")
             }
         }
-        .onAppear { model.undoManager = undoManager }
+        .onAppear {
+            model.undoManager = undoManager
+            keys.install(for: model)
+        }
         .onChange(of: undoManager) { model.undoManager = undoManager }
         .alert(item: $model.alert) { alert in
             Alert(title: Text(alert.title), message: Text(alert.message))
