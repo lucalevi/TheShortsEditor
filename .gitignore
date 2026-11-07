@@ -3,3 +3,6 @@ build/
 .build/
 .swiftpm/
 xcuserdata/
+Tools/uitest/.bin/
+Tools/uitest/.shots/
+Tools/uitest/.samples/
