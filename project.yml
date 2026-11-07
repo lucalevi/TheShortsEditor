@@ -31,6 +31,15 @@ targets:
         CFBundleName: Shorts Editor
         LSApplicationCategoryType: public.app-category.video
         NSHumanReadableCopyright: "© 2026 Luca Iacolettig"
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        # Lets videos be opened with the app from Finder ("Open With", or dropped on the Dock icon).
+        # Alternate rank: never takes over as the default player for movies.
+        CFBundleDocumentTypes:
+          - CFBundleTypeName: Video
+            CFBundleTypeRole: Viewer
+            LSHandlerRank: Alternate
+            LSItemContentTypes: [public.movie]
     entitlements:
       path: App/TheShortsEditor.entitlements
       properties:

@@ -10,15 +10,16 @@ struct ContentView: View {
         VSplitView {
             HSplitView {
                 MediaBrowserView(model: model)
-                    .frame(minWidth: 200, idealWidth: 250, maxWidth: 400)
+                    .frame(minWidth: 200, idealWidth: 240, maxWidth: 300)
                 ViewerView(model: model)
                     .frame(minWidth: 320, maxWidth: .infinity)
                 InspectorView(model: model)
-                    .frame(minWidth: 220, idealWidth: 260, maxWidth: 360)
+                    .frame(minWidth: 220, idealWidth: 260, maxWidth: 320)
             }
-            .frame(minHeight: 380)
+            .frame(minHeight: 380, maxHeight: .infinity)
+            // A single storyline needs little height; the viewer gets the rest.
             TimelineView(model: model)
-                .frame(minHeight: 170, idealHeight: 220)
+                .frame(minHeight: 150, idealHeight: 180, maxHeight: 260)
         }
         .toolbar {
             ToolbarItemGroup {
