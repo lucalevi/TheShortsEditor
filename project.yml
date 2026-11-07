@@ -1,0 +1,49 @@
+# XcodeGen spec. The .xcodeproj is generated from this file (`make project`); edit this, not the project.
+name: TheShortsEditor
+options:
+  bundleIdPrefix: com.lucalevi
+  deploymentTarget:
+    macOS: "26.0"
+  createIntermediateGroups: true
+packages:
+  EditorCore:
+    path: Packages/EditorCore
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+targets:
+  TheShortsEditor:
+    type: application
+    platform: macOS
+    sources:
+      - App
+    dependencies:
+      - package: EditorCore
+        product: EditorCore
+      - package: EditorCore
+        product: RenderEngine
+    info:
+      path: App/Info.plist
+      properties:
+        CFBundleDisplayName: Shorts Editor
+        CFBundleName: Shorts Editor
+        LSApplicationCategoryType: public.app-category.video
+        NSHumanReadableCopyright: "© 2026 Luca Iacolettig"
+    entitlements:
+      path: App/TheShortsEditor.entitlements
+      properties:
+        com.apple.security.app-sandbox: true
+        com.apple.security.files.user-selected.read-write: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.lucalevi.TheShortsEditor
+        PRODUCT_NAME: Shorts Editor
+        # Signed locally ("Sign to Run Locally") until there is a Developer ID for the .dmg.
+        CODE_SIGN_IDENTITY: "-"
+        CODE_SIGN_STYLE: Manual
+        ENABLE_HARDENED_RUNTIME: YES
+        SWIFT_DEFAULT_ACTOR_ISOLATION: MainActor
+        SWIFT_APPROACHABLE_CONCURRENCY: YES
+        SWIFT_UPCOMING_FEATURE_NONISOLATED_NONSENDING_BY_DEFAULT: YES
