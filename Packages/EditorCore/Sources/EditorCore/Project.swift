@@ -16,6 +16,9 @@ public struct Project: Codable, Equatable, Sendable {
 
     public var assets: [MediaAsset] = []
     public var timeline = Timeline()
+    /// What is said in each source file, for captions. Kept per file, in the file's own time.
+    public var transcripts: [MediaAsset.ID: Transcript] = [:]
+    public var captions = CaptionSettings()
 
     public init() {}
 

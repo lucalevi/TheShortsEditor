@@ -6,37 +6,62 @@ struct MediaBrowserView: View {
     @Bindable var model: EditorModel
 
     var body: some View {
+        List(selection: $model.selectedAssetID) {
+            ForEach(model.project.assets) { asset in
+                MediaRow(asset: asset, thumbnail: model.thumbnails[asset.id])
+                    .tag(asset.id)
+                    .draggable(asset.url)
+            }
+        }
+        .contextMenu(forSelectionType: MediaAsset.ID.self) { ids in
+            Button("Add to Timeline") { ids.forEach(model.appendToTimeline) }
+        } primaryAction: { ids in
+            ids.forEach(model.appendToTimeline)
+        }
+        .overlay {
+            if model.project.assets.isEmpty {
+                ContentUnavailableView {
+                    Label("No Media Yet", systemImage: "film.stack")
+                } description: {
+                    Text("Drop videos here, or click Import.")
+                } actions: {
+                    Button("Import…") { MediaImportPanel.run(model: model, addToTimeline: false) }
+                }
+            }
+        }
+        .dropDestination(for: URL.self) { urls, _ in
+            model.importFiles(urls, addToTimeline: false)
+            return true
+        }
+    }
+}
+
+/// The left panel: imported media, or the captions.
+struct SidebarView: View {
+    @Bindable var model: EditorModel
+
+    var body: some View {
         VStack(spacing: 0) {
-            PanelHeader(title: "Media") {
+            HStack {
+                Picker("Show", selection: $model.sidebar) {
+                    ForEach(EditorModel.Sidebar.allCases) { Text($0.rawValue).tag($0) }
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
                 if model.isImporting { ProgressView().controlSize(.small) }
             }
-            List(selection: $model.selectedAssetID) {
-                ForEach(model.project.assets) { asset in
-                    MediaRow(asset: asset, thumbnail: model.thumbnails[asset.id])
-                        .tag(asset.id)
-                        .draggable(asset.url)
+            .padding(.horizontal, 10)
+            .frame(height: 32)
+            .background(.bar)
+            .overlay(alignment: .bottom) { Divider() }
+
+            Group {
+                switch model.sidebar {
+                case .media: MediaBrowserView(model: model)
+                case .captions: CaptionsView(model: model)
                 }
             }
-            .contextMenu(forSelectionType: MediaAsset.ID.self) { ids in
-                Button("Add to Timeline") { ids.forEach(model.appendToTimeline) }
-            } primaryAction: { ids in
-                ids.forEach(model.appendToTimeline)
-            }
-            .overlay {
-                if model.project.assets.isEmpty {
-                    ContentUnavailableView {
-                        Label("No Media Yet", systemImage: "film.stack")
-                    } description: {
-                        Text("Drop videos here, or click Import.")
-                    } actions: {
-                        Button("Import…") { MediaImportPanel.run(model: model, addToTimeline: false) }
-                    }
-                }
-            }
-            .dropDestination(for: URL.self) { urls, _ in
-                model.importFiles(urls, addToTimeline: false)
-                return true
-            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }
 }

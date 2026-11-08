@@ -44,6 +44,7 @@ public enum CompositionBuilder {
         var sources: [MediaAsset.ID: AVURLAsset] = [:]
         var instructions: [any AVVideoCompositionInstructionProtocol] = []
         var cursor = CMTime.zero
+        let captions = CaptionTrack(project: project)
 
         for clip in project.timeline.clips {
             guard let media = project.asset(id: clip.assetID) else {
@@ -70,13 +71,12 @@ public enum CompositionBuilder {
             }
 
             let (naturalSize, preferredTransform) = try await sourceVideo.load(.naturalSize, .preferredTransform)
-            var layer = AVVideoCompositionLayerInstruction.Configuration(assetTrack: videoTrack)
-            layer.setTransform(clip.framing.transform(naturalSize: naturalSize, preferredTransform: preferredTransform), at: cursor)
-            instructions.append(AVVideoCompositionInstruction(configuration: .init(
-                backgroundColor: CGColor(gray: 0, alpha: 1),
-                layerInstructions: [AVVideoCompositionLayerInstruction(configuration: layer)],
-                timeRange: CMTimeRange(start: cursor, duration: clip.duration)
-            )))
+            instructions.append(ShortsInstruction(
+                timeRange: CMTimeRange(start: cursor, duration: clip.duration),
+                trackID: videoTrack.trackID,
+                transform: clip.framing.transform(naturalSize: naturalSize, preferredTransform: preferredTransform),
+                captions: captions
+            ))
 
             cursor = cursor + clip.duration
         }
@@ -86,6 +86,7 @@ public enum CompositionBuilder {
         }
 
         let videoComposition = AVVideoComposition(configuration: .init(
+            customVideoCompositorClass: ShortsCompositor.self,
             frameDuration: .oneFrame,
             instructions: instructions,
             renderSize: Project.canvasSize

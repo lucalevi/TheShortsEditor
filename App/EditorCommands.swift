@@ -1,3 +1,4 @@
+import EditorCore
 import SwiftUI
 
 /// Menu bar commands. Every keyboard shortcut lives here so it is also discoverable in a menu.
@@ -17,6 +18,20 @@ struct EditorCommands: Commands {
             Button("Delete Clip") { model.deleteSelectedClip() }
                 .keyboardShortcut(.delete, modifiers: [])
                 .disabled(model.selectedClipID == nil)
+        }
+
+        CommandMenu("Captions") {
+            Button("Make Captions") { model.makeCaptions() }
+                .disabled(model.project.timeline.clips.isEmpty || model.captionJob != nil)
+            Toggle("Show Captions", isOn: Binding(
+                get: { model.project.captions.isVisible },
+                set: { model.setCaptionsVisible($0) }
+            ))
+            .disabled(!model.project.hasCaptions)
+            Picker("Style", selection: Binding(get: { model.project.captions.style }, set: { model.setCaptionStyle($0) })) {
+                ForEach(CaptionStyle.allCases) { Text($0.displayName).tag($0) }
+            }
+            .disabled(!model.project.hasCaptions)
         }
 
         CommandMenu("Playback") {

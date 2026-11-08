@@ -11,6 +11,7 @@ struct TimelineView: View {
 
     private let rulerHeight: CGFloat = 24
     private let trackHeight: CGFloat = 72
+    private let captionLaneHeight: CGFloat = 22
     private let leadingInset: CGFloat = 12
 
     private var pointsPerSecond: CGFloat { model.timelineZoom }
@@ -45,6 +46,7 @@ struct TimelineView: View {
                     ZStack(alignment: .topLeading) {
                         ruler
                         clipsRow.offset(y: rulerHeight + 8)
+                        captionLane.offset(y: rulerHeight + 8 + trackHeight + 6)
                         limitMarker
                         playhead
                     }
@@ -148,6 +150,34 @@ struct TimelineView: View {
             }
             .padding(.leading, leadingInset)
         }
+    }
+
+    /// The captions, under the clips they belong to. Click one to go there and fix its words.
+    private var captionLane: some View {
+        ZStack(alignment: .topLeading) {
+            ForEach(model.captionPages) { page in
+                let isCurrent = model.currentCaption?.id == page.id
+                Text(page.text)
+                    .font(.caption2.weight(.medium))
+                    .lineLimit(1)
+                    .padding(.horizontal, 4)
+                    .frame(width: max(CGFloat(page.range.duration.seconds) * pointsPerSecond - 2, 3), height: captionLaneHeight, alignment: .leading)
+                    .background(
+                        Color.orange.opacity(isCurrent ? 0.55 : 0.3),
+                        in: RoundedRectangle(cornerRadius: 4)
+                    )
+                    .clipped()
+                    .offset(x: x(for: page.range.start) + 1)
+                    .onTapGesture {
+                        model.pause()
+                        model.seek(to: page.firstFrame)
+                        model.sidebar = .captions
+                        model.focusedCaptionID = page.id
+                    }
+                    .help(page.text)
+            }
+        }
+        .opacity(model.project.captions.isVisible ? 1 : 0.4)
     }
 
     /// A red line at 3:00, the longest a Short can be.

@@ -3,6 +3,7 @@ import EditorCore
 import Observation
 import RenderEngine
 import SwiftUI
+import Transcription
 
 /// The state of the open Short and everything the views can do to it.
 ///
@@ -22,15 +23,43 @@ final class EditorModel {
     private(set) var isImporting = false
     var alert: AlertMessage?
 
+    /// Which list the left panel shows.
+    var sidebar: Sidebar = .media
+    var captionLanguage = CaptionLanguage.preferred()
+    /// What the caption maker is doing, while it works.
+    private(set) var captionJob: CaptionJob?
+    /// The captions as they appear on the timeline. Updated with every edit.
+    private(set) var captionPages: [CaptionPage] = []
+    /// The caption the user last clicked on the timeline, so the Captions list can show it.
+    var focusedCaptionID: CaptionPage.ID?
+
     let player = AVPlayer()
-    /// The window's undo manager, so Edit ▸ Undo and ⌘Z work. Set by the main view.
-    var undoManager: UndoManager?
+    /// The editor window, set by the main view whenever its window becomes active. Undo goes to
+    /// that window's undo manager, the one Edit ▸ Undo and ⌘Z use. (Opening files from Finder can
+    /// briefly create a second window that then closes, so the first window seen isn't reliable,
+    /// and neither is SwiftUI's environment undo manager.)
+    @ObservationIgnored weak var window: NSWindow?
+    private var undoManager: UndoManager? { (window ?? NSApp.mainWindow)?.undoManager }
 
     @ObservationIgnored private var rebuildTask: Task<Void, Never>?
+    @ObservationIgnored private var captionTask: Task<Void, Never>?
     @ObservationIgnored private var timeObserver: Any?
     @ObservationIgnored private var statusObservation: NSKeyValueObservation?
 
     static let zoomRange: ClosedRange<CGFloat> = 15...400
+
+    enum Sidebar: String, CaseIterable, Identifiable {
+        case media = "Media"
+        case captions = "Captions"
+        var id: String { rawValue }
+    }
+
+    enum CaptionJob: Equatable {
+        /// Downloading the language's speech model, the first time it is used.
+        case downloading(Double)
+        /// Listening to file `index` of `count`.
+        case listening(index: Int, count: Int)
+    }
 
     struct AlertMessage: Identifiable {
         let id = UUID()
@@ -144,6 +173,79 @@ final class EditorModel {
         apply("Move Clip") { $0.timeline.move(clipID, to: index) }
     }
 
+    // MARK: Captions
+
+    /// Transcribes the clips on the timeline that don't have captions in the chosen language yet,
+    /// then shows the captions. The result is one undoable step.
+    func makeCaptions() {
+        guard captionJob == nil else { return }
+        let language = captionLanguage
+        let assets = project.assetsNeedingTranscription(in: language)
+        guard !project.timeline.clips.isEmpty else { return }
+        sidebar = .captions
+        guard !assets.isEmpty else {
+            apply("Show Captions") { $0.captions.isVisible = true }
+            return
+        }
+        captionJob = .downloading(0)
+        captionTask = Task {
+            defer { captionJob = nil }
+            do {
+                try await Transcriber.prepare(language) { fraction in
+                    if case .downloading = self.captionJob { self.captionJob = .downloading(fraction) }
+                }
+                var transcripts: [MediaAsset.ID: Transcript] = [:]
+                for (index, asset) in assets.enumerated() {
+                    try Task.checkCancellation()
+                    captionJob = .listening(index: index + 1, count: assets.count)
+                    transcripts[asset.id] = try await Transcriber.transcribe(asset.url, name: asset.name, language: language)
+                }
+                try Task.checkCancellation()
+                apply("Make Captions") { project in
+                    project.transcripts.merge(transcripts) { $1 }
+                    project.captions.isVisible = true
+                }
+                if !project.hasCaptions {
+                    alert = AlertMessage(
+                        title: "No speech found",
+                        message: "No words in \(language.displayName) were heard in your clips. Check the language, or that the clips have someone talking."
+                    )
+                }
+            } catch is CancellationError {
+                // The user stopped it; nothing changes.
+            } catch {
+                alert = AlertMessage(title: "Captions couldn't be made", message: error.localizedDescription)
+            }
+        }
+    }
+
+    func cancelCaptions() {
+        captionTask?.cancel()
+    }
+
+    func setCaptionsVisible(_ visible: Bool) {
+        apply(visible ? "Show Captions" : "Hide Captions") { $0.captions.isVisible = visible }
+    }
+
+    func setCaptionStyle(_ style: CaptionStyle) {
+        apply("Change Caption Style") { $0.captions.style = style }
+    }
+
+    func setCaptionPosition(_ position: Double) {
+        apply("Move Captions") { $0.captions.verticalPosition = position }
+    }
+
+    /// Replaces the words of a caption with what the user typed.
+    func editCaption(_ page: CaptionPage, text: String) {
+        guard text != page.text else { return }
+        apply("Edit Caption") { $0.replaceWords(page.words.map(\.wordID), in: page.assetID, with: text) }
+    }
+
+    /// The caption on screen at the playhead.
+    var currentCaption: CaptionPage? {
+        CaptionLayout.page(at: currentTime, in: captionPages)
+    }
+
     // MARK: Playback
 
     func togglePlayback() {
@@ -188,6 +290,7 @@ final class EditorModel {
 
     /// Rebuilds the player's content from the project, keeping the playhead where it was.
     private func projectDidChange() {
+        captionPages = CaptionLayout.pages(in: project)
         rebuildTask?.cancel()
         let project = project
         rebuildTask = Task {

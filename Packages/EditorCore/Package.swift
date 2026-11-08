@@ -14,13 +14,17 @@ let package = Package(
     products: [
         .library(name: "EditorCore", targets: ["EditorCore"]),
         .library(name: "RenderEngine", targets: ["RenderEngine"]),
+        .library(name: "Transcription", targets: ["Transcription"]),
     ],
     targets: [
         // Pure project model and edit operations. No AVFoundation, no UI.
         .target(name: "EditorCore"),
         // Builds playable/exportable AVFoundation objects from an EditorCore project.
         .target(name: "RenderEngine", dependencies: ["EditorCore"], swiftSettings: mainActorByDefault),
+        // On-device speech to text (Apple's SpeechAnalyzer), for captions.
+        .target(name: "Transcription", dependencies: ["EditorCore"], swiftSettings: mainActorByDefault),
         .testTarget(name: "EditorCoreTests", dependencies: ["EditorCore"]),
         .testTarget(name: "RenderEngineTests", dependencies: ["RenderEngine"], swiftSettings: mainActorByDefault),
+        .testTarget(name: "TranscriptionTests", dependencies: ["Transcription"], swiftSettings: mainActorByDefault),
     ]
 )

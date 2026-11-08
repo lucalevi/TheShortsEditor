@@ -39,5 +39,7 @@
 	<string>public.app-category.video</string>
 	<key>NSHumanReadableCopyright</key>
 	<string>© 2026 Luca Iacolettig</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Captions are made on this Mac from what is said in your clips.</string>
 </dict>
 </plist>

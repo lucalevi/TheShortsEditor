@@ -24,12 +24,15 @@ targets:
         product: EditorCore
       - package: EditorCore
         product: RenderEngine
+      - package: EditorCore
+        product: Transcription
     info:
       path: App/Info.plist
       properties:
         CFBundleDisplayName: Shorts Editor
         CFBundleName: Shorts Editor
         LSApplicationCategoryType: public.app-category.video
+        NSSpeechRecognitionUsageDescription: Captions are made on this Mac from what is said in your clips.
         NSHumanReadableCopyright: "© 2026 Luca Iacolettig"
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
