@@ -110,4 +110,14 @@ struct ExporterTests {
         #expect(try #require(try await AudioProbe.peak(of: quiet, in: firstSecond)) < ExportReview.silenceThreshold)
         #expect(try await AudioProbe.peak(of: silent, in: firstSecond) == nil)
     }
+
+    @Test func levelsAreMeasuredPerFrame() async throws {
+        let url = try await Fixture.video(width: 180, height: 320, seconds: 2, bgra: red, toneFrom: 1)
+        let levels = try #require(try await AudioProbe.levels(of: url))
+        #expect(abs(levels.decibels.count - 60) <= 2)
+        #expect(levels.decibels[5...25].allSatisfy { $0 < -60 })
+        #expect(levels.decibels[35...55].allSatisfy { $0 > -20 })
+        let silent = try await Fixture.video(width: 180, height: 320, bgra: red)
+        #expect(try await AudioProbe.levels(of: silent) == nil)
+    }
 }

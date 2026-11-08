@@ -7,10 +7,12 @@ struct InspectorView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            PanelHeader(title: model.selectedClip == nil ? "Your Short" : "Clip")
+            PanelHeader(title: model.silenceSession != nil ? "Remove Pauses" : model.selectedClip == nil ? "Your Short" : "Clip")
             ScrollView {
                 Group {
-                    if let clip = model.selectedClip {
+                    if model.silenceSession != nil {
+                        SilencePanel(model: model)
+                    } else if let clip = model.selectedClip {
                         ClipInspector(model: model, clip: clip)
                     } else {
                         ProjectInspector(model: model)

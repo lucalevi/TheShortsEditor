@@ -34,6 +34,12 @@ final class EditorModel {
     var focusedCaptionID: CaptionPage.ID?
     /// Set while the Export sheet is open.
     var exportPhase: ExportPhase?
+    /// Set while the user is choosing which pauses to remove.
+    private(set) var silenceSession: SilenceSession?
+    /// Sound levels of each file, measured once when first needed.
+    @ObservationIgnored private var audioLevels: [MediaAsset.ID: AudioLevels] = [:]
+    /// Where a preview skip is heading, so it isn't started again while the seek lands.
+    @ObservationIgnored private var skipTarget: CMTime?
 
     let player = AVPlayer()
     /// The editor window, set by the main view whenever its window becomes active. Undo goes to
@@ -67,6 +73,12 @@ final class EditorModel {
         case failed(String)
     }
 
+    struct SilenceSession {
+        var isMeasuring = true
+        var settings = SilenceSettings()
+        var plan = SilencePlan(sourceCuts: [:], timelineCuts: [])
+    }
+
     enum CaptionJob: Equatable {
         /// Downloading the language's speech model, the first time it is used.
         case downloading(Double)
@@ -83,7 +95,7 @@ final class EditorModel {
     init() {
         player.actionAtItemEnd = .pause
         timeObserver = player.addPeriodicTimeObserver(forInterval: .oneFrame, queue: .main) { [weak self] time in
-            MainActor.assumeIsolated { self?.currentTime = time }
+            MainActor.assumeIsolated { self?.playheadMoved(to: time) }
         }
         statusObservation = player.observe(\.timeControlStatus) { [weak self] player, _ in
             let playing = player.timeControlStatus != .paused
@@ -311,7 +323,69 @@ final class EditorModel {
         return "\(base) Short.mp4"
     }
 
+    // MARK: Removing pauses
+
+    /// Opens the Remove Pauses panel: measures the sound of the clips (once per file) and plans
+    /// the cuts with settings suggested from the sound itself. Nothing changes until `applySilenceRemoval`.
+    func beginRemovingSilences() {
+        guard silenceSession == nil, !project.timeline.clips.isEmpty else { return }
+        player.pause()
+        silenceSession = SilenceSession()
+        let assets = Dictionary(project.timeline.clips.compactMap { project.asset(id: $0.assetID) }.map { ($0.id, $0) }) { a, _ in a }
+        Task {
+            for asset in assets.values where asset.hasAudio && audioLevels[asset.id] == nil {
+                if let levels = try? await AudioProbe.levels(of: asset.url) {
+                    audioLevels[asset.id] = levels
+                }
+            }
+            guard silenceSession != nil else { return }
+            var settings = SilenceSettings()
+            // Suggest from the file used most on the timeline.
+            let main = project.timeline.clips.max { $0.duration < $1.duration }?.assetID
+            if let main, let levels = audioLevels[main] { settings.threshold = levels.suggestedThreshold.rounded() }
+            silenceSession?.isMeasuring = false
+            updateSilenceSettings(settings)
+        }
+    }
+
+    func updateSilenceSettings(_ settings: SilenceSettings) {
+        guard silenceSession != nil else { return }
+        silenceSession?.settings = settings
+        silenceSession?.plan = SilencePlan.make(for: project, levels: audioLevels, settings: settings)
+    }
+
+    func applySilenceRemoval() {
+        guard let plan = silenceSession?.plan, !plan.isEmpty else { return }
+        silenceSession = nil
+        apply("Remove Pauses") { $0.apply(plan) }
+    }
+
+    func cancelSilenceRemoval() {
+        silenceSession = nil
+    }
+
+    /// Plays from the start, skipping the parts that would be cut.
+    func previewSilenceRemoval() {
+        seek(to: .zero)
+        player.play()
+    }
+
     // MARK: Playback
+
+    private func playheadMoved(to time: CMTime) {
+        currentTime = time
+        // While previewing pause removal, jump over the parts that would be cut.
+        // Compare whole frames: the player reports nanoseconds, and 3.233333333 s is a hair before
+        // a cut ending at 97/30 s, which would otherwise jump to the same place forever.
+        let frame = time.snappedToFrame()
+        if let target = skipTarget, frame < target { return }
+        skipTarget = nil
+        if let cuts = silenceSession?.plan.timelineCuts, player.rate > 0,
+           let cut = cuts.first(where: { $0.containsTime(frame) }) {
+            skipTarget = cut.end
+            seek(to: cut.end)
+        }
+    }
 
     func togglePlayback() {
         if isPlaying {
@@ -356,6 +430,7 @@ final class EditorModel {
     /// Rebuilds the player's content from the project, keeping the playhead where it was.
     private func projectDidChange() {
         captionPages = CaptionLayout.pages(in: project)
+        if let settings = silenceSession?.settings { updateSilenceSettings(settings) }
         rebuildTask?.cancel()
         let project = project
         rebuildTask = Task {

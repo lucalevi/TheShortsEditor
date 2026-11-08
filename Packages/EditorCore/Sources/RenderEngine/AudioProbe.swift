@@ -33,3 +33,54 @@ public enum AudioProbe {
         return peak
     }
 }
+
+public extension AudioProbe {
+    /// How loud the file at `url` is, one value per frame (1/30 s) of its own time, or nil when it
+    /// has no sound. Runs off the main actor; a long file takes a moment.
+    @concurrent
+    static func levels(of url: URL) async throws -> AudioLevels? {
+        let asset = AVURLAsset(url: url)
+        guard let track = try await asset.loadTracks(withMediaType: .audio).first else { return nil }
+        let sampleRate = 48_000
+        let window = sampleRate / Int(Project.frameRate)
+        let reader = try AVAssetReader(asset: asset)
+        let output = AVAssetReaderTrackOutput(track: track, outputSettings: [
+            AVFormatIDKey: kAudioFormatLinearPCM,
+            AVSampleRateKey: sampleRate,
+            AVNumberOfChannelsKey: 1,
+            AVLinearPCMBitDepthKey: 32,
+            AVLinearPCMIsFloatKey: true,
+            AVLinearPCMIsNonInterleaved: false,
+            AVLinearPCMIsBigEndianKey: false,
+        ])
+        reader.add(output)
+        guard reader.startReading() else { throw reader.error ?? CancellationError() }
+
+        var sums: [Double] = []
+        var counts: [Int] = []
+        while let sample = output.copyNextSampleBuffer() {
+            try Task.checkCancellation()
+            // Place the samples by their time, in case the sound doesn't start at zero.
+            let first = Int((CMSampleBufferGetPresentationTimeStamp(sample).seconds * Double(sampleRate)).rounded())
+            guard let block = CMSampleBufferGetDataBuffer(sample) else { continue }
+            var length = 0
+            var pointer: UnsafeMutablePointer<CChar>?
+            guard CMBlockBufferGetDataPointer(block, atOffset: 0, lengthAtOffsetOut: nil, totalLengthOut: &length, dataPointerOut: &pointer) == noErr,
+                  let pointer else { continue }
+            pointer.withMemoryRebound(to: Float.self, capacity: length / 4) { floats in
+                for index in 0..<(length / 4) {
+                    let slot = (first + index) / window
+                    guard slot >= 0 else { continue }
+                    while sums.count <= slot { sums.append(0); counts.append(0) }
+                    sums[slot] += Double(floats[index] * floats[index])
+                    counts[slot] += 1
+                }
+            }
+        }
+        if reader.status == .failed { throw reader.error ?? CancellationError() }
+        return AudioLevels(decibels: zip(sums, counts).map { sum, count in
+            guard count > 0, sum > 0 else { return AudioLevels.silence }
+            return max(Float(10 * log10(sum / Double(count))), AudioLevels.silence)
+        })
+    }
+}

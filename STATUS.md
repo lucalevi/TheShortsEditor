@@ -4,9 +4,19 @@ _Last updated: 2026-11-08. Read this first when picking the project back up, the
 
 ## Where we are
 
-**Stage 1 (foundation) is done** and pushed to https://github.com/lucalevi/TheShortsEditor (public).
-**Stage 2 (auto-captions) is done**, tested on screen and pushed.
-**Stage 3 (export) is done**, tested on screen and pushed.
+Stages 1–4 are done, tested on screen, committed and pushed to https://github.com/lucalevi/TheShortsEditor (public, branch `main`):
+
+| Stage | What | Session |
+|---|---|---|
+| 1 | Foundation: import, viewer, magnetic timeline, framing, playback, undo | 2026-11-07 |
+| 2 | Auto-captions | 2026-11-08 |
+| 3 | Export to a YouTube-ready MP4, with pre-export checks | 2026-11-08 |
+| 4 | Remove Pauses (silence removal) | 2026-11-08 |
+
+**Pick up here:** stage 5, **text overlay** for the hook title (see "What's next"). Suggested shape, following how captions were built:
+1. EditorCore: a `TextOverlay` value (text, style, start/duration on the timeline, vertical position) stored in `Project`, with pure logic and tests. Unlike captions it belongs to the timeline, not a source file, so decide how it moves when clips before it are deleted (simplest: it stays at its time, clamped to the Short's length).
+2. RenderEngine: draw it in `ShortsCompositor` with Core Text, reusing `CaptionRenderer`'s approach, with a fade or pop-in; pixel tests like the caption ones.
+3. App: an "Add Title" button, a lane on the timeline, editing in the inspector; add the "text outside the safe zone" check to `ExportReview`.
 
 What works today:
 - Import videos by drag-and-drop (Media list, viewer, timeline), with **Import…** / **Choose Videos…**, or from Finder (Open With / Dock icon). Files go onto the timeline in order, and the same file is never imported twice.
@@ -25,9 +35,10 @@ What works today:
   - One preset: MP4, H.264 High 1080×1920 30 fps ~12 Mbps, key frame at least every 0.5 s, BT.709, AAC-LC 48 kHz stereo 320 kbps (Apple's AAC maximum; YouTube suggests 384), fast start. Verified with `ffprobe`.
   - Checks (warn, never block): over 3:00, silent first second (measured from the audio), no sound, no captions, captions hidden.
   - Written with `AVAssetReader` + `AVAssetWriter` from the same compositor as the preview, so captions are in the file.
-- 53 automated tests (`make test`): timeline and caption logic, framing math, rendering checked pixel by pixel (including orientation and every caption style), and a real transcription of speech made with `say`.
+- **Remove Pauses** (toolbar button, Clip ▸ Remove Pauses…): measures each file's loudness per frame, suggests what counts as quiet from the sound itself, and marks the parts to cut in red on the timeline. Two sliders ("What counts as a pause", "Room around words"), a summary ("Cuts 0:05.2 in 4 places, new length…"), "Play Without Pauses" (playback skips the cuts), then one undoable edit. Quiet at the very start/end of a clip is cut completely. Captions follow the cuts.
+- 62 automated tests (`make test`, about a minute): timeline, caption, pause and export-check logic; framing math; rendering checked pixel by pixel (orientation, every caption style); export checked for codec, size, AAC and fast start; per-frame sound levels; and a real transcription of speech made with `say`.
 
-Verified on screen: import, Finder open (launch and while running), select, framing switch, split, delete, undo (fixed 2026-11-08, see below), Space play/pause, ruler scrub, closing the window quits. Captions: make, style and position switches, editing a line, jumping from the timeline lane, split/delete with captions following, undo of all of these. Export: checks sheet, save panel, progress, finished state, output checked with ffprobe.
+Verified on screen: import, Finder open (launch and while running), select, framing switch, split, delete, undo (fixed 2026-11-08, see below), Space play/pause, ruler scrub, closing the window quits. Captions: make, style and position switches, editing a line, jumping from the timeline lane, split/delete with captions following, undo of all of these. Export: checks sheet, save panel, progress, finished state, output checked with ffprobe. Remove Pauses: detection on a sample with known pauses, sliders, preview playback, apply, undo.
 **Not yet verified on screen:** J/K/L reverse and fast playback, the clip right-click menu, timeline zoom, drag-and-drop from Finder.
 
 ## Decisions already made (don't re-ask)
@@ -44,8 +55,8 @@ The P0 list from `research/shorts-editor-research.md` §5. Each stage ends with 
 
 1. ~~Auto-captions~~ (done)
 2. ~~Export~~ (done). Still to add with later stages: the "music on a Short over 1:00" check (needs the music lane, step 5), "text outside the safe zone" (needs text overlays, step 4; captions are always kept inside), loudness normalisation (step 5).
-3. **Remove silences** ← next: threshold + padding slider with a preview, applied as normal undoable cuts. `AudioProbe` (RenderEngine) already reads the mixed sound; extend it to levels per short window.
-4. **Text overlay** for the hook title (a few styles, fade/pop-in).
+3. ~~Remove silences~~ (done, as "Remove Pauses").
+4. **Text overlay** ← next (called stage 5 above, since the foundation was stage 1): the hook title (a few styles, fade/pop-in). Draw it in `ShortsCompositor` like captions; add the "text outside the safe zone" export check.
 5. **Audio**: clip volume, fades, a background-music lane with automatic ducking under speech, loudness normalisation on export.
 6. **Save/open projects**: a project file with autosave, security-scoped bookmarks to media, and relinking of missing media. Today the project lives only in memory, so **quitting loses the edit**.
 7. Then P1 from the research: editing by deleting words in the transcript, keyframes/punch-in zoom, auto-reframe of horizontal footage (Vision), speed, loop preview, brand kit.
@@ -60,6 +71,8 @@ The P0 list from `research/shorts-editor-research.md` §5. Each stage ends with 
 - Captions: a whole source file is transcribed even if only part of it is used (fine for Short-length clips, slow for long ones). Lines are grouped by length/pauses/sentence ends; there's no manual "split this caption here" yet. No caption dragging in the viewer (Top/Middle/Bottom only). The test sample is a synthetic voice, so accuracy on real, noisy recordings is untested.
 - Export: the MP4 has edit lists (from B-frames and AAC priming, standard for AVFoundation and iPhone files). YouTube's encoding page says "no edit lists"; untested whether it matters. If an upload ever misbehaves, try `AVVideoAllowFrameReorderingKey: false`. "Closed GOP" isn't verified either (VideoToolbox key frames are normally IDR).
 - Test fixtures with sound must mark the audio input finished as soon as the last chunk is in; otherwise `AVAssetWriter` stalls the video waiting for more audio.
+- Remove Pauses: the shortest pause cut is fixed at 0.3 s (not a slider). Detection is by loudness only, so steady background music or noise above the threshold isn't seen as a pause; lowering "What counts as a pause" is the fix. Clips whose file has no sound are left alone.
+- Playback times from AVPlayer are in nanoseconds; compare them with model times only after `snappedToFrame()` (a skip loop came from this).
 - The Highlight style's green box can blend into green backgrounds.
 - No project saving yet (see step 6).
 - Only video files can be imported (no audio-only files or images yet).
@@ -73,12 +86,14 @@ The terminal needs **Screen Recording** and **Accessibility** permission (both g
 
 ```
 make build
-Tools/uitest/make-samples.sh                       # test clips into Tools/uitest/.samples (incl. talking-sample.mp4 for captions)
+Tools/uitest/make-samples.sh                       # test clips into Tools/uitest/.samples (incl. talking-sample.mp4 for captions, pauses-sample.mp4 for Remove Pauses)
 open -a "$PWD/build/Build/Products/Debug/Shorts Editor.app" Tools/uitest/.samples/*.mp4
 Tools/uitest/ui.sh shot start                      # screenshot → Tools/uitest/.shots/start.png
 Tools/uitest/ui.sh click 470 621                   # real click, window-relative points
 Tools/uitest/ui.sh key b ; Tools/uitest/ui.sh code 49   # B, then Space
 ```
+
+Menu items can be clicked by name, e.g. `osascript -e 'tell application "System Events" to tell process "Shorts Editor" to click menu item "Remove Pauses…" of menu "Clip" of menu bar 1'`. In the Save panel, ⌘⇧G then a path and Return picks the folder.
 
 To check undo: `osascript -e 'tell application "System Events" to tell process "Shorts Editor" to get enabled of menu item 1 of menu "Edit" of menu bar 1'`. To see `NSLog` output, run the binary in `Contents/MacOS` directly (the unified log didn't show it).
 

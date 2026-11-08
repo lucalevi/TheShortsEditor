@@ -22,6 +22,9 @@ struct EditorCommands: Commands {
             Button("Delete Clip") { model.deleteSelectedClip() }
                 .keyboardShortcut(.delete, modifiers: [])
                 .disabled(model.selectedClipID == nil)
+            Divider()
+            Button("Remove Pauses…") { model.beginRemovingSilences() }
+                .disabled(model.project.timeline.clips.isEmpty || model.silenceSession != nil)
         }
 
         CommandMenu("Captions") {

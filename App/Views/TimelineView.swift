@@ -47,6 +47,7 @@ struct TimelineView: View {
                         ruler
                         clipsRow.offset(y: rulerHeight + 8)
                         captionLane.offset(y: rulerHeight + 8 + trackHeight + 6)
+                        pauseCuts.offset(y: rulerHeight + 8)
                         limitMarker
                         playhead
                     }
@@ -178,6 +179,24 @@ struct TimelineView: View {
             }
         }
         .opacity(model.project.captions.isVisible ? 1 : 0.4)
+    }
+
+    /// While choosing pauses to remove: the parts that would be cut, over the clips.
+    @ViewBuilder
+    private var pauseCuts: some View {
+        if let cuts = model.silenceSession?.plan.timelineCuts {
+            ZStack(alignment: .topLeading) {
+                ForEach(Array(cuts.enumerated()), id: \.offset) { _, cut in
+                    Rectangle()
+                        .fill(Color.red.opacity(0.45))
+                        .overlay(Rectangle().strokeBorder(Color.red, lineWidth: 1))
+                        .frame(width: max(CGFloat(cut.duration.seconds) * pointsPerSecond, 1), height: trackHeight)
+                        .offset(x: x(for: cut.start))
+                }
+            }
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
+        }
     }
 
     /// A red line at 3:00, the longest a Short can be.

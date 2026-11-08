@@ -35,6 +35,11 @@ struct ContentView: View {
                     .disabled(model.selectedClipID == nil)
             }
             ToolbarItem {
+                Button("Remove Pauses", systemImage: "waveform.path.badge.minus") { model.beginRemovingSilences() }
+                    .help("Cut out the quiet parts between sentences")
+                    .disabled(model.project.timeline.clips.isEmpty || model.silenceSession != nil)
+            }
+            ToolbarItem {
                 Button("Captions", systemImage: "captions.bubble") { model.sidebar = .captions }
                     .help("Make captions from what is said, and change how they look")
             }
