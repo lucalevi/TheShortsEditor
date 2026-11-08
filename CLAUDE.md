@@ -21,13 +21,13 @@ swift test --filter "TimelineTests/splitSnapsToWholeFrames"
 swift test --filter CompositionBuilderTests
 ```
 
-There is no linter. Tests live only in the package. The app target has none; check app behaviour on screen with `Tools/uitest` (see `STATUS.md`). Render tests write their own fixture videos (`Tests/RenderEngineTests/Fixture.swift`) and check pixels, so they need no media files. The app is signed ad hoc ("Sign to Run Locally"); there is no Developer ID yet.
+There is no linter. Tests live only in the package. The app target has none; check app behaviour on screen with `Tools/uitest` (see `STATUS.md`). Render tests write their own fixture videos, optionally with a tone (`Tests/RenderEngineTests/Fixture.swift`), and check pixels, so they need no media files. Export tests check the written file (codec, size, AAC, fast start). The app is signed ad hoc ("Sign to Run Locally"); there is no Developer ID yet.
 
 ## Architecture
 
 - `Packages/EditorCore`, a Swift package with three libraries:
   - `EditorCore`: the pure value-type model (`Project`, `MediaAsset`, `Timeline`, `Clip`, `Framing`, `SafeZone`, captions in `Captions.swift`). No AVFoundation. All edit logic lives here and is unit tested.
-  - `RenderEngine`: `MediaProbe` (reads files), `CompositionBuilder` (Project → AVComposition + AVVideoComposition) and `ShortsCompositor`, the custom video compositor that draws every frame (clip placed on the canvas with Core Image, then captions drawn by `CaptionRenderer` with Core Text). Preview, thumbnails and export all go through it, so new visual features (text, zoom, reframe) belong there. Main-actor by default; the compositor and renderer are `nonisolated` because AVFoundation calls them on its own queues.
+  - `RenderEngine`: `MediaProbe` (reads files), `CompositionBuilder` (Project → AVComposition + AVVideoComposition) and `ShortsCompositor`, the custom video compositor that draws every frame (clip placed on the canvas with Core Image, then captions drawn by `CaptionRenderer` with Core Text). Preview, thumbnails and export all go through it, so new visual features (text, zoom, reframe) belong there. `Exporter` writes the MP4 (AVAssetReader → AVAssetWriter, YouTube's recommended settings) and `AudioProbe` measures sound levels. Main-actor by default; the compositor and renderer are `nonisolated` because AVFoundation calls them on its own queues.
   - `Transcription`: `Transcriber`, on-device speech to text with Apple's `SpeechAnalyzer`/`SpeechTranscriber`, giving timed words.
 - `App/`: the SwiftUI app. `EditorModel` owns the project, the player and undo. Views are in `App/Views`.
 

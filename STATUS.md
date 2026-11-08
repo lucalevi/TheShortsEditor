@@ -6,6 +6,7 @@ _Last updated: 2026-11-08. Read this first when picking the project back up, the
 
 **Stage 1 (foundation) is done** and pushed to https://github.com/lucalevi/TheShortsEditor (public).
 **Stage 2 (auto-captions) is done**, tested on screen and pushed.
+**Stage 3 (export) is done**, tested on screen and pushed.
 
 What works today:
 - Import videos by drag-and-drop (Media list, viewer, timeline), with **Import…** / **Choose Videos…**, or from Finder (Open With / Dock icon). Files go onto the timeline in order, and the same file is never imported twice.
@@ -19,10 +20,14 @@ What works today:
   - Transcripts are stored per source file, so captions follow split/delete/move automatically. "Update Captions" appears when clips have no captions in the chosen language yet.
   - 5 styles: Bold (current word yellow), Highlight (box behind the current word), One Word, Subtitles (dark box), Simple (shadow). The punchy styles pop in and stay on one line (shrinking a little if needed). Position: Top / Middle / Bottom, always clear of YouTube's overlay areas.
   - Editable list of caption lines (click the words, Return to save). A captions lane under the clips on the timeline; click a caption to jump there.
-  - Drawn by a custom video compositor (`ShortsCompositor`), the same path for preview and (future) export.
-- 45 automated tests (`make test`): timeline and caption logic, framing math, rendering checked pixel by pixel (including orientation and every caption style), and a real transcription of speech made with `say`.
+  - Drawn by a custom video compositor (`ShortsCompositor`), the same path for preview and export.
+- **Export** (toolbar button, File ▸ Export Short… ⌘E): a sheet runs checks first, then a save panel, progress with Stop (removes the partial file), and "Show in Finder".
+  - One preset: MP4, H.264 High 1080×1920 30 fps ~12 Mbps, key frame at least every 0.5 s, BT.709, AAC-LC 48 kHz stereo 320 kbps (Apple's AAC maximum; YouTube suggests 384), fast start. Verified with `ffprobe`.
+  - Checks (warn, never block): over 3:00, silent first second (measured from the audio), no sound, no captions, captions hidden.
+  - Written with `AVAssetReader` + `AVAssetWriter` from the same compositor as the preview, so captions are in the file.
+- 53 automated tests (`make test`): timeline and caption logic, framing math, rendering checked pixel by pixel (including orientation and every caption style), and a real transcription of speech made with `say`.
 
-Verified on screen: import, Finder open (launch and while running), select, framing switch, split, delete, undo (fixed 2026-11-08, see below), Space play/pause, ruler scrub, closing the window quits. Captions: make, style and position switches, editing a line, jumping from the timeline lane, split/delete with captions following, undo of all of these.
+Verified on screen: import, Finder open (launch and while running), select, framing switch, split, delete, undo (fixed 2026-11-08, see below), Space play/pause, ruler scrub, closing the window quits. Captions: make, style and position switches, editing a line, jumping from the timeline lane, split/delete with captions following, undo of all of these. Export: checks sheet, save panel, progress, finished state, output checked with ffprobe.
 **Not yet verified on screen:** J/K/L reverse and fast playback, the clip right-click menu, timeline zoom, drag-and-drop from Finder.
 
 ## Decisions already made (don't re-ask)
@@ -38,8 +43,8 @@ Verified on screen: import, Finder open (launch and while running), select, fram
 The P0 list from `research/shorts-editor-research.md` §5. Each stage ends with tests and an on-screen check.
 
 1. ~~Auto-captions~~ (done)
-2. **Export** ← next. `PlayableComposition` already holds everything an `AVAssetExportSession`/`AVAssetWriter` needs; the custom compositor draws captions in export too.: one YouTube-Shorts preset (H.264/HEVC MP4 1080×1920, AAC 48 kHz, Fast Start) with progress. Verify the output with `ffprobe`. Pre-export checks: over 3:00, music on a Short over 1:00 (Content ID block risk), text outside the safe zone, silent first second.
-3. **Remove silences**: threshold + padding slider with a preview, applied as normal undoable cuts.
+2. ~~Export~~ (done). Still to add with later stages: the "music on a Short over 1:00" check (needs the music lane, step 5), "text outside the safe zone" (needs text overlays, step 4; captions are always kept inside), loudness normalisation (step 5).
+3. **Remove silences** ← next: threshold + padding slider with a preview, applied as normal undoable cuts. `AudioProbe` (RenderEngine) already reads the mixed sound; extend it to levels per short window.
 4. **Text overlay** for the hook title (a few styles, fade/pop-in).
 5. **Audio**: clip volume, fades, a background-music lane with automatic ducking under speech, loudness normalisation on export.
 6. **Save/open projects**: a project file with autosave, security-scoped bookmarks to media, and relinking of missing media. Today the project lives only in memory, so **quitting loses the edit**.
@@ -53,6 +58,8 @@ The P0 list from `research/shorts-editor-research.md` §5. Each stage ends with 
 
 - Undo was silently broken before 2026-11-08: opening files from Finder briefly creates a second window, and the model had attached to its undo manager. Now the model asks its window (re-set each time the window becomes active) for the undo manager at every edit.
 - Captions: a whole source file is transcribed even if only part of it is used (fine for Short-length clips, slow for long ones). Lines are grouped by length/pauses/sentence ends; there's no manual "split this caption here" yet. No caption dragging in the viewer (Top/Middle/Bottom only). The test sample is a synthetic voice, so accuracy on real, noisy recordings is untested.
+- Export: the MP4 has edit lists (from B-frames and AAC priming, standard for AVFoundation and iPhone files). YouTube's encoding page says "no edit lists"; untested whether it matters. If an upload ever misbehaves, try `AVVideoAllowFrameReorderingKey: false`. "Closed GOP" isn't verified either (VideoToolbox key frames are normally IDR).
+- Test fixtures with sound must mark the audio input finished as soon as the last chunk is in; otherwise `AVAssetWriter` stalls the video waiting for more audio.
 - The Highlight style's green box can blend into green backgrounds.
 - No project saving yet (see step 6).
 - Only video files can be imported (no audio-only files or images yet).

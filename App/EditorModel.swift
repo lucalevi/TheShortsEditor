@@ -32,6 +32,8 @@ final class EditorModel {
     private(set) var captionPages: [CaptionPage] = []
     /// The caption the user last clicked on the timeline, so the Captions list can show it.
     var focusedCaptionID: CaptionPage.ID?
+    /// Set while the Export sheet is open.
+    var exportPhase: ExportPhase?
 
     let player = AVPlayer()
     /// The editor window, set by the main view whenever its window becomes active. Undo goes to
@@ -43,6 +45,7 @@ final class EditorModel {
 
     @ObservationIgnored private var rebuildTask: Task<Void, Never>?
     @ObservationIgnored private var captionTask: Task<Void, Never>?
+    @ObservationIgnored private var exportTask: Task<Void, Never>?
     @ObservationIgnored private var timeObserver: Any?
     @ObservationIgnored private var statusObservation: NSKeyValueObservation?
 
@@ -52,6 +55,16 @@ final class EditorModel {
         case media = "Media"
         case captions = "Captions"
         var id: String { rawValue }
+    }
+
+    enum ExportPhase: Equatable {
+        /// Running the checks before export.
+        case checking
+        /// Showing what the checks found; the user decides whether to go on.
+        case review([ExportIssue])
+        case exporting(Double)
+        case finished(URL)
+        case failed(String)
     }
 
     enum CaptionJob: Equatable {
@@ -244,6 +257,58 @@ final class EditorModel {
     /// The caption on screen at the playhead.
     var currentCaption: CaptionPage? {
         CaptionLayout.page(at: currentTime, in: captionPages)
+    }
+
+    // MARK: Export
+
+    /// Opens the Export sheet and runs the checks.
+    func beginExport() {
+        guard !project.timeline.clips.isEmpty, exportPhase == nil else { return }
+        player.pause()
+        exportPhase = .checking
+        let project = project
+        exportTask = Task {
+            let firstSecond = CMTimeRange(start: .zero, duration: min(CMTime(value: 1, timescale: 1), project.duration))
+            let peak: Float?
+            do {
+                peak = try await AudioProbe.peak(of: project, in: firstSecond)
+            } catch {
+                peak = 1  // Couldn't measure: skip that check rather than claim silence.
+            }
+            guard exportPhase == .checking else { return }
+            exportPhase = .review(ExportReview.issues(for: project, openingPeak: peak))
+        }
+    }
+
+    /// Writes the Short to `url`, showing progress in the Export sheet.
+    func export(to url: URL) {
+        let project = project
+        exportPhase = .exporting(0)
+        exportTask = Task {
+            do {
+                try await Exporter.export(project, to: url) { fraction in
+                    if case .exporting = self.exportPhase { self.exportPhase = .exporting(fraction) }
+                }
+                exportPhase = .finished(url)
+            } catch is CancellationError {
+                exportPhase = nil
+            } catch {
+                exportPhase = .failed(error.localizedDescription)
+            }
+        }
+    }
+
+    /// Stops a running export (removing the partial file) or closes the sheet.
+    func endExport() {
+        exportTask?.cancel()
+        exportTask = nil
+        exportPhase = nil
+    }
+
+    /// A file name for the export, from the first clip's name.
+    var suggestedExportName: String {
+        let base = project.timeline.clips.first.flatMap { project.asset(id: $0.assetID)?.name } ?? "My"
+        return "\(base) Short.mp4"
     }
 
     // MARK: Playback

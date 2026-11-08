@@ -9,6 +9,10 @@ struct EditorCommands: Commands {
         CommandGroup(after: .newItem) {
             Button("Import Media…") { MediaImportPanel.run(model: model, addToTimeline: false) }
                 .keyboardShortcut("i")
+            Divider()
+            Button("Export Short…") { model.beginExport() }
+                .keyboardShortcut("e")
+                .disabled(model.project.timeline.clips.isEmpty || model.exportPhase != nil)
         }
 
         CommandMenu("Clip") {

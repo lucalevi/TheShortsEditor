@@ -42,6 +42,11 @@ struct ContentView: View {
                 Toggle("Overlay Areas", systemImage: "rectangle.dashed", isOn: $model.showsSafeZone)
                     .help("Show where YouTube's buttons and captions cover your video (⌘')")
             }
+            ToolbarItem {
+                Button("Export", systemImage: "square.and.arrow.up") { model.beginExport() }
+                    .help("Save your Short as a video file, ready for YouTube (⌘E)")
+                    .disabled(model.project.timeline.clips.isEmpty)
+            }
         }
         .onAppear {
             keys.install(for: model)
@@ -49,6 +54,9 @@ struct ContentView: View {
         .background {
             // Edits are undone through the window's own undo manager (see EditorModel.window).
             WindowReader { window in model.window = window }
+        }
+        .sheet(isPresented: Binding(get: { model.exportPhase != nil }, set: { if !$0 { model.endExport() } })) {
+            ExportSheet(model: model)
         }
         .alert(item: $model.alert) { alert in
             Alert(title: Text(alert.title), message: Text(alert.message))
