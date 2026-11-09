@@ -1,5 +1,6 @@
 import AVFoundation
 import EditorCore
+import ImageIO
 import Observation
 import RenderEngine
 import SwiftUI
@@ -12,13 +13,11 @@ import Transcription
 @Observable
 final class EditorModel {
     private(set) var project = Project()
-    /// The file this Short is saved in. Nil until it is given a name; until then it is kept in
-    /// `ProjectStore.untitledURL`. Either way every change is saved a moment after it is made.
-    private(set) var documentURL: URL? {
-        didSet { window?.representedURL = documentURL }
-    }
-    /// Named projects opened lately, for File ▸ Open Recent.
-    private(set) var recentProjects: [URL] = ProjectStore.recentProjects
+    /// The Short open in the editor (its file in the library), nil on the home window. Every
+    /// change is saved to it a moment after it is made.
+    @ObservationIgnored private var openShortID: UUID?
+    private var openShortName = ""
+    @ObservationIgnored private var openShortCreated = Date.now
     /// Media used in the Short whose files can't be found (moved, renamed elsewhere, deleted).
     private(set) var missingAssets: Set<MediaAsset.ID> = []
     /// What is selected on the timeline: any mix of clips, titles and the music.
@@ -115,9 +114,7 @@ final class EditorModel {
     /// that window's undo manager, the one Edit ▸ Undo and ⌘Z use. (Opening files from Finder can
     /// briefly create a second window that then closes, so the first window seen isn't reliable,
     /// and neither is SwiftUI's environment undo manager.)
-    @ObservationIgnored weak var window: NSWindow? {
-        didSet { window?.representedURL = documentURL }
-    }
+    @ObservationIgnored weak var window: NSWindow?
     @ObservationIgnored private var autosaveTask: Task<Void, Never>?
     @ObservationIgnored private var hasUnsavedChanges = false
     @ObservationIgnored private var didReportSaveError = false
@@ -243,6 +240,8 @@ final class EditorModel {
             return
         }
         guard !urls.isEmpty else { return }
+        // Media opened or dropped on the home window starts a new Short with it.
+        if screen == .home { newShort() }
         isImporting = true
         Task {
             var probed: [MediaAsset] = []
@@ -683,26 +682,41 @@ final class EditorModel {
         timelineZoom = min(max(timelineZoom * factor, Self.zoomRange.lowerBound), Self.zoomRange.upperBound)
     }
 
-    // MARK: Saving and opening
+    // MARK: The home window and saving
 
-    /// The name shown in the window's title.
-    var documentName: String {
-        documentURL?.deletingPathExtension().lastPathComponent ?? "Untitled Short"
+    enum Screen { case home, editor }
+
+    /// The home window with every Short, or the editor with one of them.
+    private(set) var screen: Screen = .home
+
+    /// Every Short in the library, for the home window, newest change first.
+    private(set) var shorts: [ShortEntry] = []
+    /// Posters of the Shorts, made from their first second.
+    private(set) var posters: [UUID: CGImage] = [:]
+    @ObservationIgnored private var posterTask: Task<Void, Never>?
+
+    /// The open Short's name, shown in the title bar. Renaming it there renames the Short.
+    var shortName: String {
+        get { openShortName }
+        set { renameOpenShort(to: newValue) }
     }
 
-    /// Writes the Short to its file now (or to the unnamed Short's place), if anything changed.
+    /// The name shown in the window's title.
+    var documentName: String { screen == .home ? "Shorts" : openShortName }
+
+    /// Writes the open Short to the library now, if anything changed. A Short with nothing in it
+    /// isn't kept.
     func saveNow() {
         autosaveTask?.cancel()
         autosaveTask = nil
-        guard hasUnsavedChanges else { return }
-        let url = documentURL ?? ProjectStore.untitledURL
-        if documentURL == nil, project.assets.isEmpty {
-            try? FileManager.default.removeItem(at: url)
+        guard hasUnsavedChanges, let id = openShortID else { return }
+        if project.assets.isEmpty {
+            try? FileManager.default.removeItem(at: ProjectStore.fileURL(for: id))
             hasUnsavedChanges = false
             return
         }
         do {
-            try ProjectStore.write(project, to: url)
+            try ProjectStore.write(project, to: ProjectStore.fileURL(for: id), name: openShortName, created: openShortCreated)
             hasUnsavedChanges = false
             didReportSaveError = false
         } catch {
@@ -724,117 +738,175 @@ final class EditorModel {
         }
     }
 
-    /// File ▸ Save: names the Short the first time, otherwise just saves it now.
+    /// File ▸ Save: everything is saved as you work; this just does it now.
     func save() {
-        if documentURL == nil {
-            saveAs()
-        } else {
+        hasUnsavedChanges = true
+        saveNow()
+    }
+
+    /// File ▸ Save a Copy…: writes the Short to a file anywhere, e.g. as a backup or for another
+    /// Mac. The Short in the app stays as it is.
+    func saveCopy() {
+        let panel = NSSavePanel()
+        panel.allowedContentTypes = [.shortsProject]
+        panel.nameFieldStringValue = "\(openShortName).\(ProjectFile.fileExtension)"
+        panel.canCreateDirectories = true
+        panel.message = "Save a copy of this Short as a file. Open it on another Mac with File ▸ Open…"
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        do {
+            try ProjectStore.write(project, to: url, name: openShortName, created: openShortCreated)
+        } catch {
+            alert = AlertMessage(title: "The copy couldn't be saved", message: error.localizedDescription)
+        }
+    }
+
+    /// At launch: brings older projects into the library, then shows the home window.
+    func restoreLastSession() {
+        ProjectStore.moveOldProjectsIntoLibrary()
+        showHome()
+    }
+
+    /// Back to the home window (the "All Shorts" button): the open Short is saved first.
+    func showHome() {
+        player.pause()
+        saveNow()
+        if let id = openShortID, project.assets.isEmpty {
+            // A Short left empty isn't kept.
+            try? FileManager.default.removeItem(at: ProjectStore.fileURL(for: id))
+        }
+        openShortID = nil
+        load(Project(), name: "", created: .now)
+        screen = .home
+        refreshShorts()
+    }
+
+    /// File ▸ New Short, or the New Short tile: an empty Short, open in the editor.
+    func newShort() {
+        if screen == .editor { showHome() }
+        openShortID = UUID()
+        load(Project(), name: ShortsLibrary.newName(existing: shorts.map(\.name)), created: .now)
+        screen = .editor
+    }
+
+    /// Opens a Short from the home window.
+    func openShort(_ id: UUID) {
+        let file: ProjectFile
+        do {
+            file = try ProjectStore.readFile(ProjectStore.fileURL(for: id))
+        } catch {
+            alert = AlertMessage(title: "This Short can't be opened", message: error.localizedDescription)
+            return
+        }
+        if screen == .editor { showHome() }
+        openShortID = id
+        load(file.project, name: file.name ?? ShortsLibrary.defaultName, created: file.created ?? .now)
+        screen = .editor
+    }
+
+    /// File ▸ Open…: a Short saved as a file is added to the library and opened.
+    func openProjectPanel() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.shortsProject]
+        panel.allowsMultipleSelection = false
+        panel.message = "Choose a Short saved as a file. It will be added to your Shorts."
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        openProject(url)
+    }
+
+    /// A project file opened from Finder, dropped, or chosen: it becomes a Short in the library.
+    func openProject(_ url: URL) {
+        if screen == .editor { showHome() }
+        do {
+            let id = try ProjectStore.importProject(at: url, existingNames: shorts.map(\.name))
+            refreshShorts()
+            openShort(id)
+        } catch {
+            alert = AlertMessage(title: "“\(url.deletingPathExtension().lastPathComponent)” can't be opened", message: error.localizedDescription)
+        }
+    }
+
+    func renameShort(_ id: UUID, to typed: String) {
+        guard let name = ShortsLibrary.cleanedName(typed) else { return }
+        if id == openShortID {
+            renameOpenShort(to: name)
+            return
+        }
+        do {
+            try ProjectStore.rename(id, to: name)
+        } catch {
+            alert = AlertMessage(title: "The Short couldn't be renamed", message: error.localizedDescription)
+        }
+        refreshShorts()
+    }
+
+    private func renameOpenShort(to typed: String) {
+        guard let name = ShortsLibrary.cleanedName(typed), name != openShortName else { return }
+        openShortName = name
+        if !project.assets.isEmpty {
             hasUnsavedChanges = true
             saveNow()
         }
     }
 
-    /// Asks where to save the Short and keeps working on that file from then on.
-    @discardableResult
-    func saveAs() -> Bool {
-        let panel = NSSavePanel()
-        panel.allowedContentTypes = [.shortsProject]
-        panel.nameFieldStringValue = documentURL?.lastPathComponent
-            ?? "\(project.timeline.clips.first.flatMap { project.asset(id: $0.assetID)?.name } ?? "My Short").\(ProjectFile.fileExtension)"
-        panel.canCreateDirectories = true
-        panel.message = "Your Short is saved as you work. Choose its name and where to keep it."
-        guard panel.runModal() == .OK, let url = panel.url else { return false }
+    func duplicateShort(_ id: UUID) {
+        guard let entry = shorts.first(where: { $0.id == id }) else { return }
         do {
-            try ProjectStore.write(project, to: url)
+            _ = try ProjectStore.duplicate(id, as: ShortsLibrary.copyName(of: entry.name, existing: shorts.map(\.name)))
         } catch {
-            alert = AlertMessage(title: "Your Short couldn't be saved", message: error.localizedDescription)
-            return false
+            alert = AlertMessage(title: "The Short couldn't be copied", message: error.localizedDescription)
         }
-        if documentURL == nil { try? FileManager.default.removeItem(at: ProjectStore.untitledURL) }
-        documentURL = url
-        hasUnsavedChanges = false
-        ProjectStore.noteOpened(url)
-        recentProjects = ProjectStore.recentProjects
-        return true
+        refreshShorts()
     }
 
-    /// Before leaving an unnamed Short that has something in it: offers to save it.
-    /// Returns false when the user cancels.
-    private func confirmLeavingUntitled() -> Bool {
-        guard documentURL == nil, !project.assets.isEmpty else { return true }
+    /// Asks first, then moves the Shorts to the Trash.
+    func deleteShorts(_ ids: Set<UUID>) {
+        let names = shorts.filter { ids.contains($0.id) }.map(\.name)
+        guard !names.isEmpty else { return }
         let alert = NSAlert()
-        alert.messageText = "Do you want to save this Short?"
-        alert.informativeText = "It hasn't been given a name yet. If you don't save it, it will be lost."
-        alert.addButton(withTitle: "Save…")
-        alert.addButton(withTitle: "Don't Save")
+        alert.messageText = names.count == 1 ? "Delete “\(names[0])”?" : "Delete \(names.count) Shorts?"
+        alert.informativeText = "Your videos, pictures and sounds stay where they are. Only the edit is deleted."
+        alert.addButton(withTitle: "Delete").hasDestructiveAction = true
         alert.addButton(withTitle: "Cancel")
-        switch alert.runModal() {
-        case .alertFirstButtonReturn:
-            return saveAs()
-        case .alertSecondButtonReturn:
-            autosaveTask?.cancel()
-            hasUnsavedChanges = false
-            try? FileManager.default.removeItem(at: ProjectStore.untitledURL)
-            return true
-        default:
-            return false
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        for id in ids { ProjectStore.delete(id) }
+        refreshShorts()
+    }
+
+    /// Reads the library again, and makes posters for Shorts that changed since theirs.
+    func refreshShorts() {
+        shorts = ProjectStore.libraryEntries()
+        posterTask?.cancel()
+        let entries = shorts
+        posterTask = Task {
+            for entry in entries {
+                guard !Task.isCancelled else { return }
+                if posters[entry.id] == nil, let url = ProjectStore.freshPoster(for: entry),
+                   let source = CGImageSourceCreateWithURL(url as CFURL, nil),
+                   let image = CGImageSourceCreateImageAtIndex(source, 0, nil) {
+                    posters[entry.id] = image
+                    continue
+                }
+                guard ProjectStore.freshPoster(for: entry) == nil, entry.clipCount > 0,
+                      let project = try? ProjectStore.read(ProjectStore.fileURL(for: entry.id)),
+                      let image = try? await ProjectPoster.image(of: project) else { continue }
+                guard !Task.isCancelled else { return }
+                ProjectStore.writePoster(image, for: entry.id)
+                posters[entry.id] = image
+            }
         }
-    }
-
-    /// File ▸ New Short.
-    func newShort() {
-        guard confirmLeavingUntitled() else { return }
-        saveNow()
-        load(Project(), from: nil)
-    }
-
-    /// File ▸ Open…
-    func openProjectPanel() {
-        let panel = NSOpenPanel()
-        panel.allowedContentTypes = [.shortsProject]
-        panel.allowsMultipleSelection = false
-        panel.message = "Choose a Short to open"
-        guard panel.runModal() == .OK, let url = panel.url else { return }
-        openProject(url)
-    }
-
-    func openProject(_ url: URL) {
-        guard url.standardizedFileURL != documentURL?.standardizedFileURL else { return }
-        let opened: Project
-        do {
-            opened = try ProjectStore.read(url)
-        } catch {
-            alert = AlertMessage(title: "“\(url.deletingPathExtension().lastPathComponent)” can't be opened", message: error.localizedDescription)
-            return
-        }
-        guard confirmLeavingUntitled() else { return }
-        saveNow()
-        load(opened, from: url)
-    }
-
-    /// At launch: reopens the Short that was open when the app quit.
-    func restoreLastSession() {
-        if let url = ProjectStore.lastOpenProject, let opened = try? ProjectStore.read(url) {
-            load(opened, from: url)
-        } else if ProjectStore.hasUntitled, let opened = try? ProjectStore.read(ProjectStore.untitledURL) {
-            load(opened, from: nil)
-        }
-    }
-
-    func clearRecentProjects() {
-        ProjectStore.clearRecents()
-        recentProjects = []
     }
 
     /// Replaces the whole Short (opening another one): not an edit, so undo starts afresh.
-    private func load(_ opened: Project, from url: URL?) {
+    private func load(_ opened: Project, name: String, created: Date) {
         autosaveTask?.cancel()
         hasUnsavedChanges = false
         captionTask?.cancel()
         silenceSession = nil
         player.pause()
         project = opened
-        documentURL = url
+        openShortName = name
+        openShortCreated = created
+        if let id = openShortID { posters[id] = nil }
         selection = nil
         selectedAssetID = nil
         focusedCaptionID = nil
@@ -846,12 +918,6 @@ final class EditorModel {
         currentTime = .zero
         undoManager?.removeAllActions()
         for asset in project.assets { loadPreviews(for: asset) }
-        if let url {
-            ProjectStore.noteOpened(url)
-        } else {
-            ProjectStore.noteUntitledOpen()
-        }
-        recentProjects = ProjectStore.recentProjects
         projectDidChange(autosave: false)
     }
 

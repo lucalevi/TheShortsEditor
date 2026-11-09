@@ -1,10 +1,37 @@
 import SwiftUI
 
-/// The editor window: media on the left, the vertical viewer in the middle, details on the right,
-/// and the timeline across the bottom.
+/// The app's one window: the home window with every Short, or the editor with one of them.
 struct ContentView: View {
     @Bindable var model: EditorModel
     @State private var keys = EditorKeys()
+
+    var body: some View {
+        Group {
+            switch model.screen {
+            case .home: HomeView(model: model)
+            case .editor: EditorView(model: model)
+            }
+        }
+        .onAppear {
+            keys.install(for: model)
+        }
+        .background {
+            // Edits are undone through the window's own undo manager (see EditorModel.window).
+            WindowReader { window in model.window = window }
+        }
+        .sheet(isPresented: Binding(get: { model.exportPhase != nil }, set: { if !$0 { model.endExport() } })) {
+            ExportSheet(model: model)
+        }
+        .alert(item: $model.alert) { alert in
+            Alert(title: Text(alert.title), message: Text(alert.message))
+        }
+    }
+}
+
+/// The editor: media on the left, the vertical viewer in the middle, details on the right, and
+/// the timeline across the bottom.
+struct EditorView: View {
+    @Bindable var model: EditorModel
 
     var body: some View {
         VSplitView {
@@ -22,6 +49,15 @@ struct ContentView: View {
                 .frame(minHeight: 230, idealHeight: 255, maxHeight: 330)
         }
         .toolbar {
+            ToolbarItem(placement: .navigation) {
+                Button("All Shorts", systemImage: "chevron.backward") { model.showHome() }
+                    .labelStyle(.titleAndIcon)
+                    .help("Back to all your Shorts. This one is saved (⇧⌘0)")
+            }
+            ToolbarItem(placement: .navigation) {
+                ShortNameField(model: model)
+            }
+            ToolbarSpacer(.flexible)
             ToolbarItemGroup {
                 Button("Import", systemImage: "square.and.arrow.down") {
                     MediaImportPanel.run(model: model, addToTimeline: false)
@@ -70,21 +106,47 @@ struct ContentView: View {
                     .disabled(model.project.timeline.clips.isEmpty)
             }
         }
-        .navigationTitle(model.documentName)
-        .navigationSubtitle(model.documentURL == nil && !model.project.assets.isEmpty ? "Kept on this Mac · ⌘S to name it" : "")
-        .onAppear {
-            keys.install(for: model)
+        .navigationTitle(model.shortName)
+        // The name is shown (and renamed) by ShortNameField instead.
+        .toolbar(removing: .title)
+    }
+}
+
+/// The open Short's name in the toolbar. Click it to rename the Short; Return or clicking away
+/// keeps the new name, Escape goes back to the old one.
+private struct ShortNameField: View {
+    @Bindable var model: EditorModel
+    @State private var typed = ""
+    @FocusState private var focused: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            TextField("Name", text: $typed)
+                .textFieldStyle(.plain)
+                .font(.headline)
+                .focused($focused)
+                .frame(width: 200)
+                .onSubmit { commit() }
+                .onExitCommand {
+                    typed = model.shortName
+                    focused = false
+                }
+                .onChange(of: focused) { if !focused { commit() } }
+                .help("Click to rename this Short")
+                .accessibilityLabel("Short name")
+            Text(model.project.assets.isEmpty ? "Add videos to start" : "Saved as you work")
+                .font(.caption)
+                .foregroundStyle(.secondary)
         }
-        .background {
-            // Edits are undone through the window's own undo manager (see EditorModel.window).
-            WindowReader { window in model.window = window }
-        }
-        .sheet(isPresented: Binding(get: { model.exportPhase != nil }, set: { if !$0 { model.endExport() } })) {
-            ExportSheet(model: model)
-        }
-        .alert(item: $model.alert) { alert in
-            Alert(title: Text(alert.title), message: Text(alert.message))
-        }
+        .padding(.leading, 6)
+        .onAppear { typed = model.shortName }
+        .onChange(of: model.shortName) { if !focused { typed = model.shortName } }
+    }
+
+    private func commit() {
+        // Text fields hand their old value back as focus leaves; only take what was typed while focused.
+        model.shortName = typed
+        typed = model.shortName
     }
 }
 

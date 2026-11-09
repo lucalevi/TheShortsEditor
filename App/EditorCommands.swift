@@ -12,23 +12,18 @@ struct EditorCommands: Commands {
                 .keyboardShortcut("n")
             Button("Open…") { model.openProjectPanel() }
                 .keyboardShortcut("o")
-            Menu("Open Recent") {
-                ForEach(model.recentProjects, id: \.self) { url in
-                    Button(url.deletingPathExtension().lastPathComponent) { model.openProject(url) }
-                }
-                if !model.recentProjects.isEmpty {
-                    Divider()
-                    Button("Clear Menu") { model.clearRecentProjects() }
-                }
-            }
-            .disabled(model.recentProjects.isEmpty)
+            Button("All Shorts") { model.showHome() }
+                .keyboardShortcut("0", modifiers: [.command, .shift])
+                .disabled(model.screen == .home)
         }
 
         CommandGroup(replacing: .saveItem) {
             Button("Save") { model.save() }
                 .keyboardShortcut("s")
-            Button("Save As…") { model.saveAs() }
+                .disabled(model.screen == .home)
+            Button("Save a Copy…") { model.saveCopy() }
                 .keyboardShortcut("s", modifiers: [.command, .shift])
+                .disabled(model.screen == .home || model.project.assets.isEmpty)
             Divider()
             Button("Import Media…") { MediaImportPanel.run(model: model, addToTimeline: false) }
                 .keyboardShortcut("i")

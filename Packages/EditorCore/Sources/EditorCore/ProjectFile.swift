@@ -16,11 +16,18 @@ public struct ProjectFile: Codable, Equatable, Sendable {
     public var project: Project
     /// Per asset, bookmark data for its file (missing when it couldn't be made).
     public var bookmarks: [MediaAsset.ID: Data]
+    /// The Short's name, shown on the home window. Files saved before the home window have none
+    /// (their file name is used).
+    public var name: String?
+    /// When the Short was first made.
+    public var created: Date?
 
-    public init(project: Project, bookmarks: [MediaAsset.ID: Data] = [:]) {
+    public init(project: Project, bookmarks: [MediaAsset.ID: Data] = [:], name: String? = nil, created: Date? = nil) {
         version = Self.currentVersion
         self.project = project
         self.bookmarks = bookmarks
+        self.name = name
+        self.created = created
     }
 
     public enum ReadError: LocalizedError, Equatable {

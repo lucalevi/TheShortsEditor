@@ -19,6 +19,8 @@ final class EditorKeys {
     }
 
     private static func handle(_ event: NSEvent, _ model: EditorModel) -> Bool {
+        // The home window has no timeline: its keys go to its own views.
+        guard model.screen == .editor else { return false }
         // ⌘A outside a text field selects everything on the timeline (Edit ▸ Select All).
         if event.modifierFlags.intersection([.command, .control, .option, .shift]) == .command,
            event.charactersIgnoringModifiers == "a",

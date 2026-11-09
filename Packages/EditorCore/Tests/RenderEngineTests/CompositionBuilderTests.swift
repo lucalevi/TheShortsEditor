@@ -270,3 +270,17 @@ struct MissingMediaTests {
         #expect(built.musicEnvelope.isEmpty)
     }
 }
+
+@MainActor
+struct ProjectPosterTests {
+    @Test func posterIsAFrameOfTheShort() async throws {
+        let url = try await Fixture.video(width: 180, height: 320, seconds: 3, bgra: (0, 0, 255, 255))
+        var project = Project()
+        project.appendClip(of: project.addAsset(try await MediaProbe.probe(url)))
+        #expect(ProjectPoster.time(in: project) == CMTime(value: 1, timescale: 1))
+        let image = try await ProjectPoster.image(of: project)
+        #expect(image.width == 360 && image.height == 640)
+        let middle = Fixture.pixel(image, x: 180, y: 320)
+        #expect(middle.r > 200 && middle.g < 60 && middle.b < 60)
+    }
+}

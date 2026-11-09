@@ -1,5 +1,7 @@
+import CoreMedia
 import EditorCore
 import Foundation
+import ImageIO
 import UniformTypeIdentifiers
 
 extension UTType {
@@ -7,20 +9,23 @@ extension UTType {
     static let shortsProject = UTType(exportedAs: "com.lucalevi.shortseditor.project")
 }
 
-/// Reads and writes project files, and remembers which ones were open.
+/// Reads and writes project files, and keeps the library of Shorts shown on the home window.
 ///
 /// The app is sandboxed: it may only open files the user handed it. To open media (and recent
 /// projects) again after a restart, it keeps security-scoped bookmarks, made while it had access.
 @MainActor
 enum ProjectStore {
-    /// Where a Short that hasn't been given a name is kept, so quitting never loses it.
-    static var untitledURL: URL {
+    /// The app's own folder in its container.
+    static var appFolder: URL {
         let folder = URL.applicationSupportDirectory.appending(path: "Shorts Editor", directoryHint: .isDirectory)
         try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        return folder.appending(path: "Untitled.\(ProjectFile.fileExtension)")
+        return folder
     }
 
-    static var hasUntitled: Bool { FileManager.default.fileExists(atPath: untitledURL.path) }
+    /// Where the unnamed Short was kept before the home window existed (moved into the library).
+    private static var legacyUntitledURL: URL {
+        appFolder.appending(path: "Untitled.\(ProjectFile.fileExtension)")
+    }
 
     /// Bookmarks already made or read, by file location, so saving doesn't remake them each time
     /// and a missing file keeps the bookmark it had.
@@ -28,12 +33,12 @@ enum ProjectStore {
 
     // MARK: Reading and writing
 
-    static func write(_ project: Project, to url: URL) throws {
+    static func write(_ project: Project, to url: URL, name: String? = nil, created: Date? = nil) throws {
         var saved: [MediaAsset.ID: Data] = [:]
         for asset in project.assets {
             if let data = bookmark(for: asset.url) { saved[asset.id] = data }
         }
-        let data = try ProjectFile(project: project, bookmarks: saved).encoded()
+        let data = try ProjectFile(project: project, bookmarks: saved, name: name, created: created).encoded()
         let access = url.startAccessingSecurityScopedResource()
         defer { if access { url.stopAccessingSecurityScopedResource() } }
         do {
@@ -48,9 +53,14 @@ enum ProjectStore {
     /// Reads a project, finding its media through the saved bookmarks (and following files that
     /// were renamed or moved on the same disk).
     static func read(_ url: URL) throws -> Project {
+        try readFile(url).project
+    }
+
+    /// Reads a project file with its name and date, its media found through the saved bookmarks.
+    static func readFile(_ url: URL) throws -> ProjectFile {
         let access = url.startAccessingSecurityScopedResource()
         defer { if access { url.stopAccessingSecurityScopedResource() } }
-        let file = try ProjectFile.decode(Data(contentsOf: url))
+        var file = try ProjectFile.decode(Data(contentsOf: url))
         var project = file.project
         for asset in project.assets {
             guard let data = file.bookmarks[asset.id] else { continue }
@@ -66,7 +76,8 @@ enum ProjectStore {
             }
             if !stale { bookmarks[resolved] = data }
         }
-        return project
+        file.project = project
+        return file
     }
 
     private static func bookmark(for url: URL) -> Data? {
@@ -76,40 +87,116 @@ enum ProjectStore {
         return data
     }
 
-    // MARK: Recent projects
+    // MARK: The library (every Short, shown on the home window)
 
-    private static let recentsKey = "RecentProjects"
-    private static let openKey = "OpenProject"
-    private static let recentLimit = 8
-
-    /// Named projects opened lately, newest first, that can still be found.
-    static var recentProjects: [URL] {
-        (UserDefaults.standard.array(forKey: recentsKey) as? [Data] ?? []).compactMap(resolve)
+    /// Where every Short is kept: one project file per Short, named by its id, and its poster.
+    static var libraryFolder: URL {
+        let folder = appFolder.appending(path: "Shorts", directoryHint: .isDirectory)
+        try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        return folder
     }
 
-    /// Remembers a named project as open (to reopen at the next launch) and recent.
-    static func noteOpened(_ url: URL) {
-        guard let data = try? url.bookmarkData(options: .withSecurityScope, includingResourceValuesForKeys: nil, relativeTo: nil) else { return }
-        UserDefaults.standard.set(data, forKey: openKey)
-        var recents = (UserDefaults.standard.array(forKey: recentsKey) as? [Data] ?? []).filter {
-            resolve($0)?.standardizedFileURL != url.standardizedFileURL
+    static func fileURL(for id: UUID) -> URL {
+        libraryFolder.appending(path: "\(id.uuidString).\(ProjectFile.fileExtension)")
+    }
+
+    static func posterURL(for id: UUID) -> URL {
+        libraryFolder.appending(path: "\(id.uuidString).jpg")
+    }
+
+    /// Every Short in the library, newest change first. Files that can't be read are left out.
+    static func libraryEntries() -> [ShortEntry] {
+        let files = (try? FileManager.default.contentsOfDirectory(at: libraryFolder, includingPropertiesForKeys: [.contentModificationDateKey])) ?? []
+        return files.compactMap { url -> ShortEntry? in
+            guard url.pathExtension == ProjectFile.fileExtension,
+                  let id = UUID(uuidString: url.deletingPathExtension().lastPathComponent),
+                  let data = try? Data(contentsOf: url),
+                  let file = try? ProjectFile.decode(data) else { return nil }
+            let modified = (try? url.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .now
+            return ShortEntry(id: id, name: file.name ?? ShortsLibrary.defaultName, created: file.created ?? modified,
+                              modified: modified, duration: file.project.duration,
+                              clipCount: file.project.timeline.clips.count)
         }
-        recents.insert(data, at: 0)
-        UserDefaults.standard.set(Array(recents.prefix(recentLimit)), forKey: recentsKey)
+        .sorted { $0.modified > $1.modified }
     }
 
-    /// The unnamed Short is open: next launch reopens that instead.
-    static func noteUntitledOpen() {
-        UserDefaults.standard.removeObject(forKey: openKey)
+    /// The poster saved for a Short, if it is newer than the Short's last change.
+    static func freshPoster(for entry: ShortEntry) -> URL? {
+        let url = posterURL(for: entry.id)
+        guard let date = try? url.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate,
+              date >= entry.modified else { return nil }
+        return url
     }
 
-    /// The named project that was open when the app last quit, if it can still be found.
-    static var lastOpenProject: URL? {
-        (UserDefaults.standard.data(forKey: openKey)).flatMap(resolve)
+    static func writePoster(_ image: CGImage, for id: UUID) {
+        let url = posterURL(for: id)
+        guard let destination = CGImageDestinationCreateWithURL(url as CFURL, UTType.jpeg.identifier as CFString, 1, nil) else { return }
+        CGImageDestinationAddImage(destination, image, [kCGImageDestinationLossyCompressionQuality: 0.8] as CFDictionary)
+        CGImageDestinationFinalize(destination)
     }
 
-    static func clearRecents() {
-        UserDefaults.standard.removeObject(forKey: recentsKey)
+    /// Removes a Short from the library: into the Trash when the sandbox allows it, so a mistake
+    /// can be undone from Finder.
+    static func delete(_ id: UUID) {
+        let url = fileURL(for: id)
+        if (try? FileManager.default.trashItem(at: url, resultingItemURL: nil)) == nil {
+            try? FileManager.default.removeItem(at: url)
+        }
+        try? FileManager.default.removeItem(at: posterURL(for: id))
+    }
+
+    /// Changes only the name saved in a Short's file.
+    static func rename(_ id: UUID, to name: String) throws {
+        let url = fileURL(for: id)
+        var file = try ProjectFile.decode(Data(contentsOf: url))
+        file.name = name
+        try file.encoded().write(to: url, options: .atomic)
+    }
+
+    /// Copies a Short (file and poster) under a new id and name.
+    static func duplicate(_ id: UUID, as name: String) throws -> UUID {
+        var file = try ProjectFile.decode(Data(contentsOf: fileURL(for: id)))
+        file.name = name
+        file.created = .now
+        let copy = UUID()
+        try file.encoded().write(to: fileURL(for: copy), options: .atomic)
+        try? FileManager.default.copyItem(at: posterURL(for: id), to: posterURL(for: copy))
+        return copy
+    }
+
+    /// Brings a project file from elsewhere (Finder, the Open panel) into the library as a new
+    /// Short. Its media bookmarks are kept, so the media opens as before.
+    static func importProject(at url: URL, existingNames: [String]) throws -> UUID {
+        let access = url.startAccessingSecurityScopedResource()
+        defer { if access { url.stopAccessingSecurityScopedResource() } }
+        var file = try ProjectFile.decode(Data(contentsOf: url))
+        let base = file.name ?? url.deletingPathExtension().lastPathComponent
+        file.name = ShortsLibrary.newName(base: base, existing: existingNames)
+        file.created = file.created ?? .now
+        let id = UUID()
+        try file.encoded().write(to: fileURL(for: id), options: .atomic)
+        return id
+    }
+
+    /// Once, after updating from a version without the home window: the unnamed Short and the
+    /// projects opened lately become Shorts in the library.
+    static func moveOldProjectsIntoLibrary() {
+        let defaults = UserDefaults.standard
+        guard !defaults.bool(forKey: "MovedIntoLibrary") else { return }
+        defaults.set(true, forKey: "MovedIntoLibrary")
+        var names = libraryEntries().map(\.name)
+        let recents = (defaults.array(forKey: "RecentProjects") as? [Data] ?? []).compactMap(resolve)
+        for url in recents {
+            if let id = try? importProject(at: url, existingNames: names) {
+                names.append((try? ProjectFile.decode(Data(contentsOf: fileURL(for: id))))?.name ?? "")
+            }
+        }
+        if FileManager.default.fileExists(atPath: legacyUntitledURL.path),
+           (try? importProject(at: legacyUntitledURL, existingNames: names)) != nil {
+            try? FileManager.default.removeItem(at: legacyUntitledURL)
+        }
+        defaults.removeObject(forKey: "RecentProjects")
+        defaults.removeObject(forKey: "OpenProject")
     }
 
     private static func resolve(_ data: Data) -> URL? {
@@ -120,4 +207,14 @@ enum ProjectStore {
         defer { if access { url.stopAccessingSecurityScopedResource() } }
         return FileManager.default.fileExists(atPath: url.path) ? url : nil
     }
+}
+
+/// A Short as listed on the home window.
+struct ShortEntry: Identifiable, Equatable {
+    let id: UUID
+    var name: String
+    var created: Date
+    var modified: Date
+    var duration: CMTime
+    var clipCount: Int
 }

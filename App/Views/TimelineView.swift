@@ -139,6 +139,7 @@ struct TimelineView: View {
                         playhead
                         marqueeRectangle
                     }
+                    .coordinateSpace(.named(Self.contentSpace))
                     .frame(width: max(geometry.size.width, contentWidth), height: max(geometry.size.height, contentHeight), alignment: .topLeading)
                 }
                 .scrollPosition($scrollPosition)
@@ -159,6 +160,20 @@ struct TimelineView: View {
             if model.isPlaying, !(visibleRect.minX...visibleRect.maxX).contains(playheadX) {
                 scrollPosition.scrollTo(point: CGPoint(x: max(0, playheadX - 40), y: visibleRect.minY))
             }
+        }
+    }
+
+    /// Coordinates of the whole timeline content, the same ones `time(at:)` understands.
+    private static let contentSpace = "timelineContent"
+
+    /// A plain click on an item (not ⌘/⇧) also moves the playhead to where it was clicked, as in CapCut or iMovie.
+    private func clickTap(_ select: @escaping (EditorModel.Selection?, NSEvent.ModifierFlags) -> Void) -> some Gesture {
+        SpatialTapGesture(coordinateSpace: .named(Self.contentSpace)).onEnded { value in
+            let modifiers = NSEvent.modifierFlags
+            select(nil, modifiers)
+            guard modifiers.isDisjoint(with: [.command, .shift]) else { return }
+            model.pause()
+            model.seek(to: time(at: value.location.x))
         }
     }
 
@@ -188,7 +203,12 @@ struct TimelineView: View {
     private var marqueeArea: some View {
         Color.clear
             .contentShape(Rectangle())
-            .gesture(DragGesture(minimumDistance: 0)
+            .gesture(emptySpaceGesture)
+    }
+
+    /// Click: deselect and move the playhead. Drag: select with a rectangle.
+    private var emptySpaceGesture: some Gesture {
+        DragGesture(minimumDistance: 0, coordinateSpace: .named(Self.contentSpace))
                 .onChanged { value in
                     let rect = CGRect(x: min(value.startLocation.x, value.location.x),
                                       y: min(value.startLocation.y, value.location.y),
@@ -202,13 +222,15 @@ struct TimelineView: View {
                     selection.select(items(in: rect), adding: adding)
                     model.timelineSelection = selection
                 }
-                .onEnded { _ in
+                .onEnded { value in
                     if marquee == nil, NSEvent.modifierFlags.isDisjoint(with: [.command, .shift]) {
                         model.selection = nil   // a plain click on empty space
+                        model.pause()           // ...also moves the playhead there
+                        model.seek(to: time(at: value.location.x))
                     }
                     marquee = nil
                     marqueeBase = nil
-                })
+                }
     }
 
     @ViewBuilder
@@ -460,6 +482,7 @@ struct TimelineView: View {
             Color.clear
                 .frame(width: max(contentWidth, 1), height: overlaysHeight)
                 .contentShape(Rectangle())
+                .gesture(emptySpaceGesture)
                 .dropDestination(for: URL.self) { urls, location in
                     model.importFiles(urls, to: .overlay(at: time(at: location.x)))
                     return true
@@ -506,14 +529,13 @@ struct TimelineView: View {
         .frame(width: max(width(of: length) - 2, 6), height: overlayRowHeight)
         .offset(x: x(for: start) + 1, y: CGFloat(row) * (overlayRowHeight + rowGap))
         .zIndex(blockDrag?.item == item ? 1 : 0)
-        .onTapGesture {
-            let modifiers = NSEvent.modifierFlags
+        .gesture(clickTap { _, modifiers in
             if modifiers.isDisjoint(with: [.command, .shift]) {
                 model.selectOverlay(overlay.id)
             } else {
                 model.click(item, modifiers: modifiers)
             }
-        }
+        })
         .gesture(DragGesture(minimumDistance: 3)
             .onChanged { value in
                 updateBlockDrag(item, kind: .move, points: value.translation.width, start: overlay.start, duration: overlay.duration)
@@ -550,14 +572,13 @@ struct TimelineView: View {
                 .frame(width: max(width(of: length) - 2, 6), height: titleRowHeight)
                 .offset(x: x(for: start) + 1, y: CGFloat(rows[title.id] ?? 0) * (titleRowHeight + 2))
                 .zIndex(blockDrag?.item == item ? 1 : 0)
-                .onTapGesture {
-                    let modifiers = NSEvent.modifierFlags
+                .gesture(clickTap { _, modifiers in
                     if modifiers.isDisjoint(with: [.command, .shift]) {
                         model.selectTitle(title.id)
                     } else {
                         model.click(item, modifiers: modifiers)
                     }
-                }
+                })
                 .gesture(DragGesture(minimumDistance: 3).onChanged { value in
                     updateBlockDrag(item, kind: .move, points: value.translation.width, start: title.start, duration: title.duration)
                 }.onEnded { _ in
@@ -653,6 +674,7 @@ struct TimelineView: View {
             Color.clear
                 .frame(width: max(contentWidth, 1), height: soundsHeight)
                 .contentShape(Rectangle())
+                .gesture(emptySpaceGesture)
                 .dropDestination(for: URL.self) { urls, location in
                     model.importFiles(urls, to: .sound(at: time(at: location.x)))
                     return true
@@ -711,10 +733,9 @@ struct TimelineView: View {
             .contentShape(Rectangle())
             .offset(x: x(for: start) + 1, y: CGFloat(row) * (soundRowHeight + 2))
             .zIndex(blockDrag?.item == item ? 1 : 0)
-            .onTapGesture {
-                let modifiers = NSEvent.modifierFlags
+            .gesture(clickTap { _, modifiers in
                 if modifiers.isDisjoint(with: [.command, .shift]) { model.selectSound(sound.id) } else { model.click(item, modifiers: modifiers) }
-            }
+            })
             .gesture(DragGesture(minimumDistance: 3)
                 .onChanged { value in updateBlockDrag(item, kind: .move, points: value.translation.width, start: sound.start, duration: sound.duration) }
                 .onEnded { _ in endBlockDrag() })
@@ -792,7 +813,7 @@ struct TimelineView: View {
                 .frame(width: width, height: musicLaneHeight)
                 .contentShape(Rectangle())
                 .offset(x: leadingInset + 1)
-                .onTapGesture { model.click(.music, modifiers: NSEvent.modifierFlags) }
+                .gesture(clickTap { _, modifiers in model.click(.music, modifiers: modifiers) })
                 .contextMenu {
                     deleteButton(for: .music, single: "Remove Music")
                 }
