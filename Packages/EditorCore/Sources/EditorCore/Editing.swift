@@ -210,8 +210,10 @@ public extension Project {
         let offset = time - overlay.start
         guard offset >= Clip.minimumDuration, overlay.duration - offset >= Clip.minimumDuration else { return nil }
         let isImage = asset(id: overlay.clip.assetID)?.isImage == true
-        let second = overlay.clip.piece(sourceStart: isImage ? overlay.clip.sourceStart : overlay.clip.sourceTime(atOffset: offset), duration: overlay.duration - offset)
+        var second = overlay.clip.piece(sourceStart: isImage ? overlay.clip.sourceStart : overlay.clip.sourceTime(atOffset: offset), duration: overlay.duration - offset)
+        second.keepFades(isFirst: false, isLast: true)
         overlays[index].clip.duration = offset
+        overlays[index].clip.keepFades(isFirst: true, isLast: false)
         overlays.insert(Overlay(clip: second, start: time, layout: overlay.layout, followsClip: overlay.followsClip), at: index + 1)
         return second.id
     }
@@ -348,12 +350,15 @@ public struct SoundClip: Identifiable, Codable, Equatable, Sendable {
     public var isVoiceOver: Bool
     /// Moves with the main clip under its start (see `Project.followClips(from:)`).
     public var followsClip: Bool
+    /// The main clip whose sound this is, when it was detached from it (`Project.detachSound(of:)`).
+    public var detachedFrom: Clip.ID?
 
-    public init(clip: Clip, start: CMTime, isVoiceOver: Bool = false, followsClip: Bool = true) {
+    public init(clip: Clip, start: CMTime, isVoiceOver: Bool = false, followsClip: Bool = true, detachedFrom: Clip.ID? = nil) {
         self.clip = clip
         self.start = start
         self.isVoiceOver = isVoiceOver
         self.followsClip = followsClip
+        self.detachedFrom = detachedFrom
     }
 
     public var id: Clip.ID { clip.id }
@@ -367,7 +372,7 @@ public struct SoundClip: Identifiable, Codable, Equatable, Sendable {
         return audible.duration > .zero ? audible : nil
     }
 
-    private enum CodingKeys: String, CodingKey { case clip, start, isVoiceOver, followsClip }
+    private enum CodingKeys: String, CodingKey { case clip, start, isVoiceOver, followsClip, detachedFrom }
 
     public init(from decoder: any Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -375,6 +380,7 @@ public struct SoundClip: Identifiable, Codable, Equatable, Sendable {
         start = try c.decodeTime(forKey: .start)
         isVoiceOver = try c.decodeIfPresent(Bool.self, forKey: .isVoiceOver) ?? false
         followsClip = try c.decodeIfPresent(Bool.self, forKey: .followsClip) ?? true
+        detachedFrom = try c.decodeIfPresent(UUID.self, forKey: .detachedFrom)
     }
 
     public func encode(to encoder: any Encoder) throws {
@@ -383,6 +389,7 @@ public struct SoundClip: Identifiable, Codable, Equatable, Sendable {
         try c.encode(time: start, forKey: .start)
         try c.encode(isVoiceOver, forKey: .isVoiceOver)
         try c.encode(followsClip, forKey: .followsClip)
+        try c.encodeIfPresent(detachedFrom, forKey: .detachedFrom)
     }
 }
 
@@ -448,9 +455,11 @@ public extension Project {
         let sound = sounds[index]
         let offset = time - sound.start
         guard offset >= Clip.minimumDuration, sound.duration - offset >= Clip.minimumDuration else { return nil }
-        let second = sound.clip.piece(sourceStart: sound.clip.sourceTime(atOffset: offset), duration: sound.duration - offset)
+        var second = sound.clip.piece(sourceStart: sound.clip.sourceTime(atOffset: offset), duration: sound.duration - offset)
+        second.keepFades(isFirst: false, isLast: true)
         sounds[index].clip.duration = offset
-        sounds.insert(SoundClip(clip: second, start: time, isVoiceOver: sound.isVoiceOver, followsClip: sound.followsClip), at: index + 1)
+        sounds[index].clip.keepFades(isFirst: true, isLast: false)
+        sounds.insert(SoundClip(clip: second, start: time, isVoiceOver: sound.isVoiceOver, followsClip: sound.followsClip, detachedFrom: sound.detachedFrom), at: index + 1)
         return second.id
     }
 

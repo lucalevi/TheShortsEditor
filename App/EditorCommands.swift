@@ -159,8 +159,12 @@ struct EditorCommands: Commands {
             .keyboardShortcut("r", modifiers: [.command, .option])
             .disabled(model.project.timeline.clips.isEmpty)
             Menu("Add Sound Effect") {
-                ForEach(SoundEffect.allCases) { effect in
-                    Button(effect.displayName) { model.addSoundEffect(effect) }
+                ForEach(SoundEffectGroup.allCases) { group in
+                    Menu(group.displayName) {
+                        ForEach(group.effects) { effect in
+                            Button(effect.displayName) { model.addSoundEffect(effect) }
+                        }
+                    }
                 }
             }
             .disabled(model.project.timeline.clips.isEmpty)
@@ -183,6 +187,19 @@ struct EditorCommands: Commands {
                 Button("Mute Clip") {}.disabled(true)
                 Button("Clean Up Voice") {}.disabled(true)
             }
+            Button("Detach Sound") { model.detachSound() }
+                .keyboardShortcut("b", modifiers: [.command, .option])
+                .disabled(model.detachableClips.isEmpty)
+            Button("Add Volume Point at Playhead") { model.addVolumePointAtPlayhead() }
+                .disabled(model.project.timeline.locate(model.currentTime) == nil)
+            Menu("Voice Effect") {
+                Button("None") { model.setVoiceEffect(nil, for: model.selectedClips.map(\.id)) }
+                Divider()
+                ForEach(VoiceEffect.allCases) { effect in
+                    Button(effect.displayName) { model.setVoiceEffect(effect, for: model.selectedClips.map(\.id)) }
+                }
+            }
+            .disabled(model.selectedClips.isEmpty)
         }
 
         CommandMenu("Playback") {

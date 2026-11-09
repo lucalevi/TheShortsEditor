@@ -408,6 +408,11 @@ public extension Project {
                 clip.volume = source.volume
                 clip.isMuted = source.isMuted
                 clip.cleansVoice = source.cleansVoice
+                clip.fadeIn = source.fadeIn
+                clip.fadeOut = source.fadeOut
+                clip.voiceEffect = source.voiceEffect
+                clip.equalizer = source.equalizer
+                clip.copyVolumeKeys(from: source)
             }
         }
     }
@@ -429,6 +434,7 @@ public extension Project {
             if kinds.contains(.sound) {
                 clip.volume = 1
                 clip.cleansVoice = false
+                clip.resetSoundShaping()
                 if isMain || isSound { clip.isMuted = false }
             }
         }
@@ -444,7 +450,7 @@ public extension Project {
         }
         if !clip.keyframes.isEmpty { kinds.insert(.motion) }
         if clip.speed != 1 { kinds.insert(.speed) }
-        if clip.volume != 1 || clip.cleansVoice || (isMain && clip.isMuted) { kinds.insert(.sound) }
+        if clip.volume != 1 || clip.cleansVoice || clip.hasSoundShaping || (isMain && clip.isMuted) { kinds.insert(.sound) }
         return kinds
     }
 

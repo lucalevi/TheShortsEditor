@@ -2,6 +2,7 @@
 # Drives the running app for on-screen checks. Needs Screen Recording + Accessibility for the terminal.
 #   ui.sh click X Y [count]      real mouse click, X/Y in points relative to the window's top-left
 #   ui.sh rclick X Y             right-click (context menu)
+#   ui.sh optclick X Y           click with ⌥ held
 #   ui.sh drag X1 Y1 X2 Y2
 #   ui.sh move X Y                pointer to X Y without clicking (hover, skimming)
 #   ui.sh hold X1 Y1 X2 Y2 / ui.sh release X Y   drag and keep the button down (to screenshot a drag), then let go
@@ -24,6 +25,7 @@ osascript -e 'tell application "Shorts Editor" to activate'; sleep 0.4
 case $1 in
   click) $BIN/mouse click $(($WX+$2)) $(($WY+$3)) $4 ;;
   rclick) $BIN/mouse rclick $(($WX+$2)) $(($WY+$3)) ;;
+  optclick) $BIN/mouse optclick $(($WX+$2)) $(($WY+$3)) ;;
   drag) $BIN/mouse drag $(($WX+$2)) $(($WY+$3)) $(($WX+$4)) $(($WY+$5)) ;;
   hold) $BIN/mouse hold $(($WX+$2)) $(($WY+$3)) $(($WX+$4)) $(($WY+$5)) ;;
   release) $BIN/mouse release $(($WX+$2)) $(($WY+$3)) ;;

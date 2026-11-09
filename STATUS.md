@@ -1,6 +1,6 @@
 # Project status
 
-_Last updated: 2026-11-09 (Stage A). Read this first when picking the project back up, then update it at the end of each session._
+_Last updated: 2026-11-09 (Stage D). Read this first when picking the project back up, then update it at the end of each session._
 
 ## Where we are
 
@@ -16,9 +16,24 @@ Stages 1–7 are done, tested on screen, committed and pushed to https://github.
 | 6 | Audio: clip volume, music with ducking, loudness on export | 2026-11-09 |
 | 7 | Save/open projects, autosave, missing media | 2026-11-09 |
 
-**Pick up here (2026-11-09, latest):** Stage A of the iMovie list ("iMovie's grammar", `research/imovie/imovie-reverse-engineering.md`) is built, tested and checked on screen, **not committed yet** (the user commits). Next in the suggested order: **Stage D** (sound like iMovie: volume line on clips, fade handles, detach audio, voice effects), then C (transitions and time), B (look), E (media and finishing), F (one-click Shorts). Ask the user which one. Test footage and a closed scratch iMovie library are in `~/Movies/ShortsEditorResearch` (safe to delete). The on-screen checks left test Shorts "My Short 5"–"My Short 9" in the library (safe to delete from the home window).
+**Pick up here (2026-11-09, latest):** Stage D of the iMovie list ("Sound like iMovie, smarter", `research/imovie/imovie-reverse-engineering.md`) is built, tested and checked on screen, **not committed yet** (the user commits). Stage A is committed (d46eb5e). Next in the suggested order: C (transitions and time), B (look), E (media and finishing), F (one-click Shorts). Ask the user which one. Test footage and a closed scratch iMovie library are in `~/Movies/ShortsEditorResearch` (safe to delete). The on-screen checks left test Shorts "My Short 5"–"My Short 9" in the library (safe to delete from the home window).
 
-### Stage A: iMovie's grammar (2026-11-09): done, not committed
+### Stage D: sound like iMovie (2026-11-09): done, not committed
+
+Model in `EditorCore/SoundShaping.swift` (`SoundShapingTests`, 14 tests); `RenderEngine/SoundProcessor.swift` and the volume ramps in `CompositionBuilder` (`SoundShapingRenderTests`, 6); app in `App/EditorModel+Sound.swift`, `App/Views/VolumeLineEditor.swift`, `App/Views/SoundShapingViews.swift`.
+1. **Volume line** on every main clip and every sound on the sound row (yellow, over the waveform; 100% is halfway up). Drag it up or down: 1% per point, in 5% steps, with a "Volume 80%" label. **⌥-click** adds a point (`Clip.volumeKeys`, in source time, so points survive split/trim; a point's level multiplies the clip's volume). The first point also pins the line at the clip's start and end, so dragging a point makes a dip or bump. ⌥-click a point to remove it; Remove Points in the inspector and the clip's right-click menu; Sound ▸ Add Volume Point at Playhead.
+2. **Fades** (`Clip.fadeIn/fadeOut`, up to 5 s): white handles at the top corners of the selected clip's waveform (13 pt in from the edges, clear of the trim grips), or the Fades sliders in the inspector. Split, Remove Pauses and ranges keep the fade in on the first piece and the fade out on the last. A range's volume still fades over 0.2 s where it continues the same recording (`AudioMix.storylineEnvelope`).
+3. **Too loud**: where the file's loudness × the clip's volume line goes over −6 dBFS (RMS per frame), the waveform bars are red and full height, the clip shows a warning triangle, and the inspector says how many seconds may crackle.
+4. **Detach Sound** (⌥⌘B, Sound menu, inspector, clip right-click): the clip's sound becomes a "Sound of …" item on the sound row (`SoundClip.detachedFrom`) with its volume, fades, points and effect; the clip shows "Sound detached" and plays silent (`Clip.soundDetached`). Trim or move the item for **J/L cuts** (sound starting before the picture or carrying on after). Its sound still lowers the music. "Bring Sound Back" removes the item and unmutes the clip.
+5. **Voice effects** (Robot, Chipmunk, Deep, Telephone, Radio, Echo, Megaphone, Underwater) and **Tone** presets (Clearer voice, Fuller music, Less bass), in the inspector and Sound ▸ Voice Effect. Made offline like voice clean-up: `SoundProcessor` renders a processed copy (AVAudioEngine: time-pitch, EQ, delay, reverb, plus ring modulation and overdrive by hand) into Caches, keyed by file + recipe, from the cleaned-up copy if the clip uses one. The change is applied once the copy is made (progress in the inspector). Missing copies (another Mac, cleared cache, voice clean-up switched later) are remade after each rebuild (`prepareMissingProcessedSounds`).
+6. **Sound effects library**: 34 synthesized effects in six groups (Whooshes, Hits, Risers, Taps and alerts, Cartoon, Ambience), grouped in the Sounds panel and Sound ▸ Add Sound Effect. Ambience sounds are 12 s and quieter.
+7. Copy/Paste Settings ▸ Sound and Reset include fades, points, effect and tone.
+
+Tests: 226 model + 62 render + 3 transcription = 291, all pass. `Tools/uitest/ui.sh optclick X Y` added (⌥-click; `keydrag 58` didn't reliably hold ⌥).
+Verified on screen: dragging the volume line (label, 150%, the warning disappearing below the limit, red bars at 200%), the fade-in handle (1.1 s, the clip's length unchanged), ⌥-click a point and dragging it into a dip, the inspector's sound section, Robot (copy made in Caches, icon on the clip), ⌥⌘B detach (sound row item with fade, points and effect; "Sound detached" on the clip; survives reopening), grouped Sounds panel, Rain added from the menu.
+Not yet verified on screen: the effects and tone **by ear** (render-tested for length, level and bass removal only), trimming a detached sound beyond the picture (J/L cut, unit tested), the Tone picker, volume lines on B-roll (inspector fades only; no line drawn on B-roll blocks), fade-out handle, Bring Sound Back.
+
+### Stage A: iMovie's grammar (2026-11-09): done, committed (d46eb5e)
 
 Model in `EditorCore/Grammar.swift` (`GrammarTests`, 28 tests), app in `App/EditorModel+Grammar.swift`; the volume fade is in `CompositionBuilder`.
 1. **Skimming**: hovering over the timeline shows that moment in the viewer under a white line; the playhead stays put (seeks are "chased", so it stays smooth). Space while skimming plays from the pointer. Hovering over a file in Media shows its frames in the viewer (`MediaProbe.frame`), with a mark on the file's bar. View ▸ Skimming turns it off; View ▸ Audio Skimming (⇧S) plays a tenth of a second of sound at each stop (rough: it briefly runs the player).
@@ -203,7 +218,8 @@ The P0 list from `research/shorts-editor-research.md` §5. Each stage ends with 
 - Keyframes animate placement only (not opacity or volume). The handles' corner squares are kept inside the viewer, so on a picture bigger than the screen they sit at the edge, not at the true corner.
 - Filmstrip and waveform are drawn per clip with Canvas; very long clips at high zoom draw many stills (no tiling yet).
 - Synthetic clicks (`ui.sh`) can leave a SwiftUI pop-up menu open, which blocks Apple events to the app (osascript times out after 2 minutes). Press Escape (`ui.sh code 53`) after using a pop-up.
-- Audio: one song only; it always starts with the Short (no placing it later, no looping a short song). No fades on clip sound and no voice clean-up. Speech for ducking is found by loudness, so a clip with constant loud sound (e.g. its own music) counts as speech throughout. Volume sliders apply when released (no live preview while dragging). AVFoundation's audio mix does boost above 100% (checked: linear in float).
+- Audio: one song only; it always starts with the Short (no placing it later, no looping a short song).
+- Volume line: points move up/down only (not sideways). B-roll has fades and effects in the inspector but no line on its timeline block. "Too loud" uses per-frame RMS (−6 dBFS), not true peaks, so it's a hint. Voice effects are synthesized by me and were never judged by ear; Robot is ring modulation + a short comb, not a vocoder. Processed copies are stereo, play from file time 0 (a video whose sound starts later than its picture would drift slightly, same as voice clean-up), and the echo/reverb tail is cut at the end of the file. Speech for ducking is found by loudness, so a clip with constant loud sound (e.g. its own music) counts as speech throughout. Volume sliders apply when released (no live preview while dragging). AVFoundation's audio mix does boost above 100% (checked: linear in float).
 - `MusicTrack` is a type in Apple's AudioToolbox, hence the model's name `BackgroundMusic`.
 - `SafeZone` margins are approximate (no official YouTube overlay found).
 

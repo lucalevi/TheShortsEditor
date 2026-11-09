@@ -87,10 +87,23 @@ public enum AudioMix {
     /// loudness of their files. A muted clip has none. Ranges are in order and don't overlap.
     public static func speechRanges(in project: Project, levels: [MediaAsset.ID: AudioLevels]) -> [CMTimeRange] {
         var frames: [Int64] = []  // timeline frame numbers with sound
-        var clipStart: Int64 = 0
+        // The main clips, and the sound detached from them (it is still the clips' own sound).
+        var placed: [(clip: Clip, start: CMTime)] = []
+        var cursor = CMTime.zero
         for clip in project.timeline.clips {
+            placed.append((clip, cursor))
+            cursor = cursor + clip.duration
+        }
+        for sound in project.sounds where sound.detachedFrom != nil {
+            if let range = sound.audibleRange(in: project) {
+                var clip = sound.clip
+                clip.duration = range.duration
+                placed.append((clip, sound.start))
+            }
+        }
+        for (clip, start) in placed {
+            let clipStart = start.convertScale(Project.frameRate, method: .roundHalfAwayFromZero).value
             let clipFrames = clip.duration.convertScale(Project.frameRate, method: .roundHalfAwayFromZero).value
-            defer { clipStart += clipFrames }
             guard clip.effectiveVolume > 0, let audio = levels[clip.assetID] else { continue }
             let threshold = max(audio.suggestedThreshold, quietestSpeech)
             let sourceFirst = clip.sourceStart.convertScale(Project.frameRate, method: .roundHalfAwayFromZero).value
@@ -104,7 +117,7 @@ public enum AudioMix {
         let bridge = bridgedGap.convertScale(Project.frameRate, method: .roundHalfAwayFromZero).value
         let shortest = shortestSpeech.convertScale(Project.frameRate, method: .roundHalfAwayFromZero).value
         var runs: [(start: Int64, end: Int64)] = []
-        for frame in frames {
+        for frame in Set(frames).sorted() {
             if let last = runs.last, frame - last.end <= bridge {
                 runs[runs.count - 1].end = frame + 1
             } else {

@@ -72,3 +72,23 @@ if a[1] == "key" {
         usleep(40_000)
     }
 }
+// mouse optclick X Y   (a click with ⌥ held: the flags are set on the events themselves)
+if a[1] == "optclick" {
+    let p = CGPoint(x: n[0], y: n[1])
+    let flags = CGEvent(source: nil)!
+    flags.type = .flagsChanged
+    flags.flags = .maskAlternate
+    flags.post(tap: .cghidEventTap)
+    usleep(60_000)
+    for type in [CGEventType.mouseMoved, .leftMouseDown, .leftMouseUp] {
+        let e = CGEvent(mouseEventSource: nil, mouseType: type, mouseCursorPosition: p, mouseButton: .left)!
+        e.flags = .maskAlternate
+        e.post(tap: .cghidEventTap)
+        usleep(40_000)
+    }
+    let up = CGEvent(source: nil)!
+    up.type = .flagsChanged
+    up.flags = []
+    up.post(tap: .cghidEventTap)
+    usleep(30_000)
+}

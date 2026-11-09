@@ -216,25 +216,27 @@ struct SoundsView: View {
                 }
                 .padding(.vertical, 4)
             }
-            Section("Sound effects") {
-                ForEach(SoundEffect.allCases) { effect in
-                    HStack(spacing: 8) {
-                        Image(systemName: effect.systemImage).frame(width: 20)
-                        VStack(alignment: .leading, spacing: 1) {
-                            Text(effect.displayName)
-                            Text(effect.hint).font(.caption).foregroundStyle(.secondary)
+            ForEach(SoundEffectGroup.allCases) { group in
+                Section(group.displayName) {
+                    ForEach(group.effects) { effect in
+                        HStack(spacing: 8) {
+                            Image(systemName: effect.systemImage).frame(width: 20)
+                            VStack(alignment: .leading, spacing: 1) {
+                                Text(effect.displayName)
+                                Text(effect.hint).font(.caption).foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                            Button("Listen", systemImage: "play.circle") { model.previewSoundEffect(effect) }
+                                .labelStyle(.iconOnly)
+                                .buttonStyle(.borderless)
+                            Button("Add") { model.addSoundEffect(effect) }
+                                .controlSize(.small)
+                                .disabled(model.project.timeline.clips.isEmpty)
+                                .help("Put it on the timeline at the playhead")
                         }
-                        Spacer()
-                        Button("Listen", systemImage: "play.circle") { model.previewSoundEffect(effect) }
-                            .labelStyle(.iconOnly)
-                            .buttonStyle(.borderless)
-                        Button("Add") { model.addSoundEffect(effect) }
-                            .controlSize(.small)
-                            .disabled(model.project.timeline.clips.isEmpty)
-                            .help("Put it on the timeline at the playhead")
+                        .contentShape(Rectangle())
+                        .onTapGesture(count: 2) { model.addSoundEffect(effect) }
                     }
-                    .contentShape(Rectangle())
-                    .onTapGesture(count: 2) { model.addSoundEffect(effect) }
                 }
             }
             let files = model.project.assets.filter { !$0.hasVideo && $0.hasAudio }

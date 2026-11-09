@@ -12,7 +12,7 @@ struct InspectorView: View {
                         : model.timelineSelection.count > 1 ? "\(model.timelineSelection.count) Selected"
                         : model.selectedTitle != nil ? "Title"
                         : model.selectedOverlay != nil ? "Over the Clips"
-                        : model.selectedSound != nil ? (model.selectedSound!.isVoiceOver ? "Voice-Over" : "Sound Effect")
+                        : model.selectedSound != nil ? (model.selectedSound!.isVoiceOver ? "Voice-Over" : model.selectedSound!.detachedFrom != nil ? "Clip Sound" : "Sound Effect")
                         : model.selection == .music && model.project.music != nil ? "Music"
                         : model.selectedClip == nil ? "Your Short" : "Clip")
             ScrollView {
@@ -158,10 +158,14 @@ private struct ClipInspector: View {
                     .id(clip.id)
             }
 
-            ClipSound(model: model, clip: clip, hasSound: asset?.hasAudio ?? false)
-                .id(clip.id)
-            if asset?.hasAudio == true {
-                CleanVoiceToggle(model: model, clips: [clip])
+            if !clip.soundDetached {
+                ClipSound(model: model, clip: clip, hasSound: asset?.hasAudio ?? false)
+                    .id(clip.id)
+            }
+            if asset?.hasAudio == true, asset?.isImage != true {
+                if !clip.soundDetached { CleanVoiceToggle(model: model, clips: [clip]) }
+                SoundShapingSection(model: model, clip: clip, isMain: true)
+                    .id(clip.id)
             }
 
             ClipSettingsButtons(model: model, clipID: clip.id)
@@ -264,6 +268,8 @@ private struct OverlayInspector: View {
                         ClipSound(model: model, clip: overlay.clip, hasSound: true)
                             .id(overlay.id)
                         CleanVoiceToggle(model: model, clips: [overlay.clip])
+                        SoundShapingSection(model: model, clip: overlay.clip)
+                            .id(overlay.id)
                     }
                 }
             }

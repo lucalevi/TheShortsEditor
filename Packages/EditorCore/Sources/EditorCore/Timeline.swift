@@ -25,6 +25,16 @@ public struct Clip: Identifiable, Codable, Equatable, Sendable {
     public var speed: Double
     /// Whether the clip's sound is cleaned up (background noise removed, voice kept).
     public var cleansVoice: Bool
+    /// How long the sound takes to come up at the start and go down at the end (timeline time).
+    public var fadeIn: CMTime
+    public var fadeOut: CMTime
+    /// Points on the volume line, for sound that rises and falls (empty: flat at `volume`).
+    public var volumeKeys: [VolumeKey]
+    public var voiceEffect: VoiceEffect?
+    public var equalizer: SoundEQ?
+    /// The sound has been moved to its own item on the sound row (`SoundClip.detachedFrom`),
+    /// so the clip itself is silent.
+    public var soundDetached: Bool
 
     public static let maxVolume = 2.0
     /// No clip is shorter than this, so it can still be seen and grabbed on the timeline.
@@ -36,7 +46,9 @@ public struct Clip: Identifiable, Codable, Equatable, Sendable {
     public init(
         id: UUID = UUID(), assetID: MediaAsset.ID, sourceStart: CMTime, duration: CMTime, framing: Framing = .fill,
         volume: Double = 1, isMuted: Bool = false, placement: Placement = .identity, keyframes: [Keyframe] = [],
-        background: ClipBackground = .blur, speed: Double = 1, cleansVoice: Bool = false
+        background: ClipBackground = .blur, speed: Double = 1, cleansVoice: Bool = false,
+        fadeIn: CMTime = .zero, fadeOut: CMTime = .zero, volumeKeys: [VolumeKey] = [],
+        voiceEffect: VoiceEffect? = nil, equalizer: SoundEQ? = nil, soundDetached: Bool = false
     ) {
         self.id = id
         self.assetID = assetID
@@ -50,6 +62,12 @@ public struct Clip: Identifiable, Codable, Equatable, Sendable {
         self.background = background
         self.speed = speed
         self.cleansVoice = cleansVoice
+        self.fadeIn = fadeIn
+        self.fadeOut = fadeOut
+        self.volumeKeys = volumeKeys
+        self.voiceEffect = voiceEffect
+        self.equalizer = equalizer
+        self.soundDetached = soundDetached
     }
 
     /// How much of the source the clip shows.
@@ -74,8 +92,8 @@ public struct Clip: Identifiable, Codable, Equatable, Sendable {
         speed == 1 ? duration : CMTimeMultiplyByFloat64(duration, multiplier: 1 / speed)
     }
 
-    /// The volume actually played.
-    public var effectiveVolume: Double { isMuted ? 0 : volume }
+    /// The volume actually played (before the volume line and fades).
+    public var effectiveVolume: Double { isMuted || soundDetached ? 0 : volume }
 
     /// Another piece of the same source with the same settings (framing, sound, placement and
     /// motion), e.g. after a split.
@@ -148,8 +166,10 @@ public struct Timeline: Codable, Equatable, Sendable {
         guard let (index, offset) = locate(time), offset > .zero else { return nil }
         var first = clips[index]
         guard offset < first.duration else { return nil }
-        let second = first.piece(sourceStart: first.sourceTime(atOffset: offset), duration: first.duration - offset)
+        var second = first.piece(sourceStart: first.sourceTime(atOffset: offset), duration: first.duration - offset)
         first.duration = offset
+        first.keepFades(isFirst: true, isLast: false)
+        second.keepFades(isFirst: false, isLast: true)
         clips[index] = first
         clips.insert(second, at: index + 1)
         return second.id
@@ -159,6 +179,7 @@ public struct Timeline: Codable, Equatable, Sendable {
 extension Clip {
     private enum CodingKeys: String, CodingKey {
         case id, assetID, sourceStart, duration, framing, volume, isMuted, placement, keyframes, background, speed, cleansVoice
+        case fadeIn, fadeOut, volumeKeys, voiceEffect, equalizer, soundDetached
     }
 
     public init(from decoder: any Decoder) throws {
@@ -176,6 +197,12 @@ extension Clip {
         background = try c.decodeIfPresent(ClipBackground.self, forKey: .background) ?? .black
         speed = try c.decodeIfPresent(Double.self, forKey: .speed) ?? 1
         cleansVoice = try c.decodeIfPresent(Bool.self, forKey: .cleansVoice) ?? false
+        fadeIn = c.contains(.fadeIn) ? try c.decodeTime(forKey: .fadeIn) : .zero
+        fadeOut = c.contains(.fadeOut) ? try c.decodeTime(forKey: .fadeOut) : .zero
+        volumeKeys = try c.decodeIfPresent([VolumeKey].self, forKey: .volumeKeys) ?? []
+        voiceEffect = try? c.decodeIfPresent(VoiceEffect.self, forKey: .voiceEffect)
+        equalizer = try? c.decodeIfPresent(SoundEQ.self, forKey: .equalizer)
+        soundDetached = try c.decodeIfPresent(Bool.self, forKey: .soundDetached) ?? false
     }
 
     public func encode(to encoder: any Encoder) throws {
@@ -192,5 +219,11 @@ extension Clip {
         try c.encode(background, forKey: .background)
         try c.encode(speed, forKey: .speed)
         try c.encode(cleansVoice, forKey: .cleansVoice)
+        if fadeIn > .zero { try c.encode(time: fadeIn, forKey: .fadeIn) }
+        if fadeOut > .zero { try c.encode(time: fadeOut, forKey: .fadeOut) }
+        if !volumeKeys.isEmpty { try c.encode(volumeKeys, forKey: .volumeKeys) }
+        try c.encodeIfPresent(voiceEffect, forKey: .voiceEffect)
+        try c.encodeIfPresent(equalizer, forKey: .equalizer)
+        if soundDetached { try c.encode(soundDetached, forKey: .soundDetached) }
     }
 }

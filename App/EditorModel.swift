@@ -140,6 +140,10 @@ final class EditorModel {
     }
     /// Files whose voice is being cleaned up, with how far it has got (0…1).
     var voiceCleaning: [MediaAsset.ID: Double] = [:]
+    /// Clips whose voice effect or EQ is being made, with how far it has got (0…1).
+    var soundProcessing: [Clip.ID: Double] = [:]
+    /// Processed sounds being made in the background (`prepareMissingProcessedSounds`).
+    @ObservationIgnored var preparingSounds: Set<String> = []
     /// A clip whose subject is being found for reframing, with how far it has got.
     var reframing: (clipID: Clip.ID, progress: Double)?
     /// While recording a voice-over: counting down, then recording from a time.
@@ -1110,9 +1114,23 @@ final class EditorModel {
                 // The edit a drag in the viewer showed live is now in the composition itself.
                 LivePreview.clearAll()
                 seek(to: time)
+                prepareMissingProcessedSounds()
             } catch {
                 guard !Task.isCancelled else { return }
                 alert = AlertMessage(title: "Playback problem", message: error.localizedDescription)
+            }
+        }
+    }
+
+    /// Rebuilds the player (e.g. once a processed sound is ready) without saving.
+    func refreshPlayback() { projectDidChange(autosave: false) }
+
+    /// The main clips, B-roll and sounds selected on the timeline.
+    var selectedClips: [Clip] {
+        timelineSelection.items.compactMap { item -> Clip? in
+            switch item {
+            case .clip(let id), .overlay(let id), .sound(let id): project.anyClip(id: id)
+            default: nil
             }
         }
     }

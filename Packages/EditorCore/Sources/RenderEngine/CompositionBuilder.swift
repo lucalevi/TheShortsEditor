@@ -55,14 +55,16 @@ public enum CompositionBuilder {
         let captions = CaptionTrack(project: project)
         let titles = TitleTrack(project: project)
         let clipSound = AVMutableAudioMixInputParameters(track: audioTrack)
+        // Volumes, volume lines and fades of the clips, with quick fades where a range of a
+        // recording got another volume.
+        apply(AudioMix.storylineEnvelope(project.timeline.clips), at: .zero, gain: gain, to: clipSound)
 
         // The main clips, back to back.
         var layers: [(range: CMTimeRange, layer: CompositorLayer)] = []
         var cursor = CMTime.zero
-        var previous: Clip?
         for clip in project.timeline.clips {
             let layer = try await media.layer(for: clip, at: cursor, in: videoTrack, isMain: true)
-            if case .track = layer.source, let sourceAudio = try await media.audioTrack(of: clip.assetID, cleaned: clip.cleansVoice) {
+            if case .track = layer.source, !clip.soundDetached, let sourceAudio = try await media.audioTrack(for: clip) {
                 // Audio may be a little shorter than the video; insert only what exists and pad
                 // so the next clip's sound still starts exactly with its picture.
                 let available = try await sourceAudio.load(.timeRange)
@@ -74,15 +76,6 @@ public enum CompositionBuilder {
                     if clip.speed != 1 { audioTrack.scaleTimeRange(CMTimeRange(start: insertAt, duration: range.duration), toDuration: clip.timelineDuration(ofSource: range.duration)) }
                 }
             }
-            if let previous, clip.continues(previous), previous.effectiveVolume != clip.effectiveVolume {
-                // A volume set on part of a recording: fade between the two instead of jumping.
-                let fade = min(CMTime(value: 1, timescale: 5), clip.duration)
-                clipSound.setVolumeRamp(fromStartVolume: Float(previous.effectiveVolume * gain), toEndVolume: Float(clip.effectiveVolume * gain),
-                                        timeRange: CMTimeRange(start: cursor, duration: fade))
-            } else {
-                clipSound.setVolume(Float(clip.effectiveVolume * gain), at: cursor)
-            }
-            previous = clip
             layers.append((CMTimeRange(start: cursor, duration: clip.duration), layer))
             cursor = cursor + clip.duration
         }
@@ -103,8 +96,8 @@ public enum CompositionBuilder {
             let layer = try await media.layer(for: clip, at: overlay.start, in: track, isMain: false)
             overlayLayers.append((range, layer))
 
-            guard case .track = layer.source, !clip.isMuted, clip.volume > 0,
-                  let sourceAudio = try await media.audioTrack(of: clip.assetID, cleaned: clip.cleansVoice) else { continue }
+            guard case .track = layer.source, clip.effectiveVolume > 0,
+                  let sourceAudio = try await media.audioTrack(for: clip) else { continue }
             if rowAudio[row] == nil, let audio = composition.addMutableTrack(withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid) {
                 rowAudio[row] = (audio, AVMutableAudioMixInputParameters(track: audio))
             }
@@ -114,7 +107,7 @@ public enum CompositionBuilder {
             let at = overlay.start + clip.timelineOffset(ofSourceTime: source.start)
             try audio.track.insertTimeRange(source, of: sourceAudio, at: at)
             if clip.speed != 1 { audio.track.scaleTimeRange(CMTimeRange(start: at, duration: source.duration), toDuration: clip.timelineDuration(ofSource: source.duration)) }
-            audio.parameters.setVolume(Float(clip.effectiveVolume * gain), at: overlay.start)
+            apply(overlay.clip.soundEnvelope(), at: overlay.start, gain: gain, to: audio.parameters, within: range)
         }
         for track in rowVideo.values where track.segments.isEmpty { composition.removeTrack(track) }
         mixInputs += rowAudio.values.map(\.parameters)
@@ -124,7 +117,7 @@ public enum CompositionBuilder {
         let soundRows = LanePacking.rows(audible.map { (id: $0.0.id, range: $0.1) })
         var soundTracks: [Int: (track: AVMutableCompositionTrack, parameters: AVMutableAudioMixInputParameters)] = [:]
         for (sound, range) in audible where sound.clip.effectiveVolume > 0 {
-            guard let sourceAudio = try await media.audioTrack(of: sound.clip.assetID, cleaned: sound.clip.cleansVoice) else {
+            guard let sourceAudio = try await media.audioTrack(for: sound.clip) else {
                 if project.asset(id: sound.clip.assetID) != nil { media.reportMissing(sound.clip.assetID) }
                 continue
             }
@@ -140,7 +133,7 @@ public enum CompositionBuilder {
             let at = sound.start + clip.timelineOffset(ofSourceTime: source.start)
             try target.track.insertTimeRange(source, of: sourceAudio, at: at)
             if clip.speed != 1 { target.track.scaleTimeRange(CMTimeRange(start: at, duration: source.duration), toDuration: clip.timelineDuration(ofSource: source.duration)) }
-            target.parameters.setVolume(Float(clip.effectiveVolume * gain), at: sound.start)
+            apply(sound.clip.soundEnvelope(), at: sound.start, gain: gain, to: target.parameters, within: range)
         }
         mixInputs += soundTracks.values.map(\.parameters)
 
@@ -205,11 +198,31 @@ public enum CompositionBuilder {
     /// Where people talk in the Short, from the measured loudness of the clips' files.
     private static func speech(in project: Project) async -> [CMTimeRange] {
         var levels: [MediaAsset.ID: AudioLevels] = [:]
-        for clip in project.timeline.clips where levels[clip.assetID] == nil {
+        for clip in project.timeline.clips + project.sounds.filter({ $0.detachedFrom != nil }).map(\.clip) where levels[clip.assetID] == nil {
             guard let asset = project.asset(id: clip.assetID), asset.hasAudio else { continue }
             levels[clip.assetID] = await LevelCache.levels(of: asset.url)
         }
         return AudioMix.speechRanges(in: project, levels: levels)
+    }
+
+    /// Sets a volume curve (offsets from `start`) on a track's mix, scaled by `gain`, only
+    /// inside `within` when given.
+    private static func apply(_ envelope: [VolumePoint], at start: CMTime, gain: Double, to parameters: AVMutableAudioMixInputParameters,
+                              within: CMTimeRange? = nil) {
+        let limit = within ?? CMTimeRange(start: .zero, duration: .positiveInfinity)
+        for (a, b) in zip(envelope, envelope.dropFirst()) {
+            let range = CMTimeRange(start: start + a.time, end: start + b.time).intersection(limit)
+            guard range.duration > .zero else { continue }
+            let from = a.volume + (b.volume - a.volume) * fraction(range.start - start, a, b)
+            let to = a.volume + (b.volume - a.volume) * fraction(range.end - start, a, b)
+            parameters.setVolumeRamp(fromStartVolume: Float(from * gain), toEndVolume: Float(to * gain), timeRange: range)
+        }
+        if envelope.count == 1, let only = envelope.first { parameters.setVolume(Float(only.volume * gain), at: start + only.time) }
+    }
+
+    private static func fraction(_ time: CMTime, _ a: VolumePoint, _ b: VolumePoint) -> Double {
+        let span = (b.time - a.time).seconds
+        return span > 0 ? min(max((time - a.time).seconds / span, 0), 1) : 0
     }
 
     private static func padToTime(_ track: AVMutableCompositionTrack, _ time: CMTime) {
@@ -240,11 +253,13 @@ private struct MediaSources {
         return asset
     }
 
-    /// The file's sound, or its cleaned-up version (see `VoiceCleaner`) when asked for and made.
-    mutating func audioTrack(of assetID: MediaAsset.ID, cleaned: Bool = false) async throws -> AVAssetTrack? {
-        guard let media = project.asset(id: assetID), media.hasAudio, !media.isImage else { return nil }
-        if cleaned, let url = VoiceCleaner.existingCleanedURL(for: media.url) {
-            let key = "clean|\(url.path)"
+    /// The sound `clip` plays: its file's, cleaned up (see `VoiceCleaner`) and/or through a voice
+    /// effect or EQ (see `SoundProcessor`) when those have been made.
+    mutating func audioTrack(for clip: Clip) async throws -> AVAssetTrack? {
+        guard let media = project.asset(id: clip.assetID), media.hasAudio, !media.isImage else { return nil }
+        let url = SoundProcessor.playedURL(for: clip, media: media)
+        if url != media.url {
+            let key = "played|\(url.path)"
             let asset = cleanedAssets[key] ?? AVURLAsset(url: url)
             cleanedAssets[key] = asset
             if let track = try? await asset.loadTracks(withMediaType: .audio).first { return track }

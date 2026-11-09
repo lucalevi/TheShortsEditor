@@ -138,7 +138,8 @@ struct SoundInspector: View {
         let asset = model.project.asset(id: sound.clip.assetID)
         VStack(alignment: .leading, spacing: 16) {
             VStack(alignment: .leading, spacing: 4) {
-                Label(asset?.name ?? "Missing sound", systemImage: sound.isVoiceOver ? "mic.fill" : "waveform")
+                Label(sound.detachedFrom != nil ? "Sound of \(asset?.name ?? "a clip")" : asset?.name ?? "Missing sound",
+                      systemImage: sound.isVoiceOver ? "mic.fill" : sound.detachedFrom != nil ? "waveform.path" : "waveform")
                     .font(.headline)
                     .lineLimit(2)
                 Text("From \(TimeFormat.string(sound.start)) for \(TimeFormat.string(sound.duration))")
@@ -146,14 +147,24 @@ struct SoundInspector: View {
                     .foregroundStyle(.secondary)
             }
             ClipSoundPublic(model: model, clip: sound.clip)
-            Toggle("It's a voice-over", isOn: Binding(get: { sound.isVoiceOver }, set: { on in
-                model.apply(on ? "Mark as Voice-Over" : "Mark as Sound Effect") { $0.updateSound(sound.id) { $0.isVoiceOver = on } }
-            }))
-            Text("The music is lowered under voice-overs, as under people talking in your clips.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-            if sound.isVoiceOver { CleanVoiceToggle(model: model, clips: [sound.clip]) }
+            if sound.detachedFrom != nil {
+                Text("Detached from its clip. Drag its start earlier to hear it before the picture changes, or its end later to let it carry on over the next clip.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            SoundShapingSection(model: model, clip: sound.clip)
+                .id(sound.id)
+            if sound.detachedFrom == nil {
+                Toggle("It's a voice-over", isOn: Binding(get: { sound.isVoiceOver }, set: { on in
+                    model.apply(on ? "Mark as Voice-Over" : "Mark as Sound Effect") { $0.updateSound(sound.id) { $0.isVoiceOver = on } }
+                }))
+                Text("The music is lowered under voice-overs, as under people talking in your clips.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            if sound.isVoiceOver || sound.detachedFrom != nil { CleanVoiceToggle(model: model, clips: [sound.clip]) }
             FollowClipToggle(model: model, item: .sound(sound.id))
             HStack {
                 Button("Start at Playhead") { model.moveSound(sound.id, to: model.currentTime) }

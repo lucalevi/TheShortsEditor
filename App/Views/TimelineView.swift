@@ -56,7 +56,7 @@ struct TimelineView: View {
     private let titleRowHeight: CGFloat = 22
     private let overlayRowHeight: CGFloat = 40
     private let musicLaneHeight: CGFloat = 30
-    private let soundRowHeight: CGFloat = 26
+    private let soundRowHeight: CGFloat = 34
     private let rowGap: CGFloat = 3
     private let leadingInset: CGFloat = 12
 
@@ -658,10 +658,19 @@ struct TimelineView: View {
             aspect: aspect(of: asset),
             filmstrip: model.filmstrips[clip.assetID],
             levels: model.audioLevels[clip.assetID],
+            tooLoud: model.tooLoudRanges(of: clip),
             pointsPerSecond: pointsPerSecond,
             isSelected: model.isSelected(.clip(clip.id))
         )
         .equatable()
+        .overlay(alignment: .bottom) {
+            if trim == nil, !clip.soundDetached, model.audioLevels[clip.assetID] != nil, slot > 16 {
+                volumeEditor(for: clip, item: .clip(clip.id))
+                    .frame(height: ClipBlock.waveHeight - 2)
+                    .padding(.horizontal, 1)
+                    .padding(.bottom, 1)
+            }
+        }
         .overlay(alignment: .leading) {
             EdgeHandle(edge: .leading, help: "Drag to trim the start of the clip") { dx in
                 updateClipTrim(clip, edge: .start, points: dx)
@@ -724,6 +733,13 @@ struct TimelineView: View {
             }
             Button(model.isPunchedIn([clip]) ? "Remove Punch-In" : "Punch In") { model.togglePunchIn([clip.id]) }
                 .disabled(clip.hasMotion)
+            Divider()
+            if clip.soundDetached {
+                Button("Bring Sound Back") { model.reattachSound(of: clip.id) }
+            } else if model.audioLevels[clip.assetID] != nil {
+                Button("Detach Sound") { model.detachSound(of: [clip.id]) }
+                if !clip.volumeKeys.isEmpty { Button("Remove Volume Points") { model.removeVolumePoints(of: [clip.id]) } }
+            }
             Divider()
             settingsMenuItems(for: .clip(clip.id), clipID: clip.id)
             if model.timelineRange != nil {
@@ -1030,13 +1046,15 @@ struct TimelineView: View {
             .overlay(alignment: .bottom) {
                 if let levels = model.audioLevels[sound.clip.assetID] {
                     WaveformView(levels: levels, sourceStart: sound.clip.sourceTime(atOffset: start - sound.start),
-                                 pointsPerSecond: pointsPerSecond / CGFloat(sound.clip.speed))
-                        .frame(height: soundRowHeight - 12)
+                                 pointsPerSecond: pointsPerSecond / CGFloat(sound.clip.speed),
+                                 tooLoud: model.tooLoudRanges(of: sound.clip).map { CMTimeRange(start: $0.start - (start - sound.start), duration: $0.duration) })
+                        .frame(height: soundRowHeight - 14)
                         .opacity(sound.clip.isMuted ? 0.3 : 0.8)
                 }
             }
             .overlay(alignment: .topLeading) {
-                Label(name, systemImage: sound.isVoiceOver ? "mic.fill" : "waveform")
+                Label(sound.detachedFrom != nil ? "Sound of \(name)" : name,
+                      systemImage: sound.isVoiceOver ? "mic.fill" : sound.detachedFrom != nil ? "waveform.path" : "waveform")
                     .font(.caption2.weight(.medium))
                     .lineLimit(1)
                     .padding(.horizontal, 4)
@@ -1045,6 +1063,13 @@ struct TimelineView: View {
             .overlay {
                 RoundedRectangle(cornerRadius: 4)
                     .strokeBorder(isSelected ? Color.yellow : Color.white.opacity(0.4), lineWidth: isSelected ? 2 : 1)
+            }
+            .overlay(alignment: .bottom) {
+                if blockDrag?.item != item, model.audioLevels[sound.clip.assetID] != nil, width(of: length) > 16 {
+                    volumeEditor(for: sound.clip, item: item)
+                        .frame(height: soundRowHeight - 14)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
             }
             .overlay(alignment: .leading) {
                 EdgeHandle(edge: .leading, help: "Drag to trim the start") { dx in
@@ -1079,6 +1104,21 @@ struct TimelineView: View {
             .accessibilityElement(children: .combine)
             .accessibilityLabel("\(sound.isVoiceOver ? "Voice-over" : "Sound"): \(name)")
             .accessibilityAddTraits(isSelected ? .isSelected : [])
+    }
+
+    /// The volume line over a clip's or sound's waveform.
+    private func volumeEditor(for clip: Clip, item: TimelineItem) -> some View {
+        VolumeLineEditor(
+            clip: clip,
+            pointsPerSecond: pointsPerSecond,
+            showsHandles: model.isSelected(item),
+            onSelect: { model.selection = item },
+            onVolume: { model.setClipVolume(clip.id, $0) },
+            onAddPoint: { model.addVolumePoint(to: clip.id, atOffset: $0) },
+            onPointLevel: { model.setVolumePoint($0, of: clip.id, level: $1) },
+            onRemovePoint: { model.removeVolumePoint($0, of: clip.id) },
+            onFade: { model.setFade($0, to: $1, for: [clip.id]) }
+        )
     }
 
     // MARK: Captions, music, pauses
@@ -1252,12 +1292,17 @@ private struct WaveformView: View {
     let levels: AudioLevels
     let sourceStart: CMTime
     let pointsPerSecond: CGFloat
+    /// Where the sound is loud enough to crackle (offsets from the left edge, in timeline time):
+    /// those bars are drawn red, full height, with a dark top edge.
+    var tooLoud: [CMTimeRange] = []
 
     var body: some View {
         Canvas { context, size in
             let framesPerPoint = Double(Project.frameRate) / Double(pointsPerSecond)
             let first = sourceStart.seconds * Double(Project.frameRate)
             var path = Path()
+            var loud = Path()
+            let loudX = tooLoud.map { (CGFloat($0.start.seconds) * pointsPerSecond, CGFloat($0.end.seconds) * pointsPerSecond) }
             var x: CGFloat = 0
             while x < size.width {
                 let from = Int(first + Double(x) * framesPerPoint)
@@ -1265,10 +1310,15 @@ private struct WaveformView: View {
                 guard from < levels.decibels.count else { break }
                 let loudest = levels.decibels[max(from, 0)..<min(to, levels.decibels.count)].max() ?? AudioLevels.silence
                 let height = CGFloat(min(max((loudest + 50) / 50, 0), 1)) * size.height
-                if height > 0.5 { path.addRect(CGRect(x: x, y: size.height - height, width: 1.5, height: height)) }
+                if loudX.contains(where: { x + 1 >= $0.0 && x < $0.1 }) {
+                    loud.addRect(CGRect(x: x, y: 0, width: 1.5, height: size.height))
+                } else if height > 0.5 {
+                    path.addRect(CGRect(x: x, y: size.height - height, width: 1.5, height: height))
+                }
                 x += 2
             }
             context.fill(path, with: .color(.white.opacity(0.75)))
+            context.fill(loud, with: .color(.red))
         }
     }
 }
@@ -1361,16 +1411,19 @@ private struct ClipBlock: View, Equatable {
     let aspect: CGFloat
     let filmstrip: Filmstrip?
     let levels: AudioLevels?
+    /// Where the sound may crackle, as offsets into the clip.
+    let tooLoud: [CMTimeRange]
     let pointsPerSecond: CGFloat
     let isSelected: Bool
 
     nonisolated static func == (a: ClipBlock, b: ClipBlock) -> Bool {
-        a.clip == b.clip && a.name == b.name && a.aspect == b.aspect && a.pointsPerSecond == b.pointsPerSecond
+        a.clip == b.clip && a.name == b.name && a.tooLoud == b.tooLoud && a.aspect == b.aspect && a.pointsPerSecond == b.pointsPerSecond
             && a.isSelected == b.isSelected && a.levels?.decibels.count == b.levels?.decibels.count
             && a.filmstrip?.images.count == b.filmstrip?.images.count
     }
 
-    private let waveHeight: CGFloat = 18
+    static let waveHeight: CGFloat = 24
+    private var waveHeight: CGFloat { Self.waveHeight }
 
     var body: some View {
         RoundedRectangle(cornerRadius: 6)
@@ -1381,8 +1434,15 @@ private struct ClipBlock: View, Equatable {
                     .opacity(0.85)
             }
             .overlay(alignment: .bottom) {
-                if let levels {
-                    WaveformView(levels: levels, sourceStart: clip.sourceStart, pointsPerSecond: pointsPerSecond / CGFloat(clip.speed))
+                if let levels, clip.soundDetached {
+                    Label("Sound detached", systemImage: "waveform.path")
+                        .font(.caption2)
+                        .frame(maxWidth: .infinity, maxHeight: waveHeight, alignment: .leading)
+                        .padding(.leading, 4)
+                        .background(Color.black.opacity(0.35))
+                        .opacity(levels.decibels.isEmpty ? 0 : 0.8)
+                } else if let levels {
+                    WaveformView(levels: levels, sourceStart: clip.sourceStart, pointsPerSecond: pointsPerSecond / CGFloat(clip.speed), tooLoud: tooLoud)
                         .frame(height: waveHeight - 2)
                         .padding(.bottom, 1)
                         .background(Color.black.opacity(0.35))
@@ -1404,7 +1464,9 @@ private struct ClipBlock: View, Equatable {
                     Text(name).font(.caption.weight(.medium)).lineLimit(1)
                     HStack(spacing: 4) {
                         Text(TimeFormat.string(clip.duration))
-                        if clip.isMuted {
+                        if clip.soundDetached {
+                            // Its sound settings live on the detached sound now.
+                        } else if clip.isMuted {
                             Image(systemName: "speaker.slash.fill").help("Muted")
                         } else if clip.volume != 1 {
                             Text("\(Int((clip.volume * 100).rounded()))%").help("Volume")
@@ -1414,6 +1476,12 @@ private struct ClipBlock: View, Equatable {
                         }
                         if clip.cleansVoice {
                             Image(systemName: "waveform.badge.magnifyingglass").help("Voice cleaned up")
+                        }
+                        if let effect = clip.voiceEffect, !clip.soundDetached {
+                            Image(systemName: effect.systemImage).help("Voice effect: \(effect.displayName)")
+                        }
+                        if !tooLoud.isEmpty, !clip.isMuted {
+                            Image(systemName: "exclamationmark.triangle.fill").help("Too loud in places: it may crackle")
                         }
                         if clip.hasMotion {
                             Image(systemName: "move.3d").help("The picture moves")

@@ -124,10 +124,11 @@ public extension Project {
                 cursor = max(cursor, cut.end)
             }
             if clip.sourceRange.end > cursor { pieces.append(CMTimeRange(start: cursor, end: clip.sourceRange.end)) }
-            var keptAny = false
-            for piece in pieces where piece.duration >= .oneFrame {
-                defer { keptAny = true }
-                clips.append(clip.piece(id: keptAny ? UUID() : clip.id, sourceStart: piece.start, duration: clip.timelineDuration(ofSource: piece.duration).snappedToFrame()))
+            let kept = pieces.filter { $0.duration >= .oneFrame }
+            for (number, piece) in kept.enumerated() {
+                var part = clip.piece(id: number == 0 ? clip.id : UUID(), sourceStart: piece.start, duration: clip.timelineDuration(ofSource: piece.duration).snappedToFrame())
+                part.keepFades(isFirst: number == 0, isLast: number == kept.count - 1)
+                clips.append(part)
             }
         }
         timeline.clips = clips
