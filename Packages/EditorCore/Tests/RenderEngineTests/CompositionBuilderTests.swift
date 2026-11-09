@@ -136,4 +136,91 @@ struct CompositionBuilderTests {
         settings.captions.verticalPosition = 0
         #expect(CaptionTrack(project: settings).top(forHeight: 200) >= SafeZone.top)
     }
+
+    private func titled(_ url: URL, style: TitleStyle = .bold, entrance: TitleEntrance = .none, position: Double = TitlePlacement.top.verticalPosition) async throws -> Project {
+        var project = try await project(with: url, framing: .fill)
+        let id = project.addTitle(at: CMTime(value: 3, timescale: 10), text: "Watch this")
+        project.updateTitle(id) { title in
+            title.style = style
+            title.entrance = entrance
+            title.verticalPosition = position
+            title.start = CMTime(value: 9, timescale: 30)
+            title.duration = CMTime(value: 18, timescale: 30)
+        }
+        return project
+    }
+
+    /// Pixels of the title's own colours: white letters, or the white/yellow line boxes.
+    private func titlePixels(_ image: CGImage, in rect: CGRect) -> Int {
+        var count = 0
+        for y in stride(from: Int(rect.minY), to: Int(rect.maxY), by: 4) {
+            for x in stride(from: Int(rect.minX), to: Int(rect.maxX), by: 4) {
+                let p = Fixture.pixel(image, x: x, y: y)
+                if p.r > 200 && p.g > 180 && p.b < 60 || p.r > 200 && p.g > 200 && p.b > 200 || isBlack(p) { count += 1 }
+            }
+        }
+        return count
+    }
+
+    @Test(arguments: TitleStyle.allCases)
+    func titlesAreDrawnWhereThePreviewSays(style: TitleStyle) async throws {
+        let url = try await Fixture.video(width: 180, height: 320, bgra: red)
+        let project = try await titled(url, style: style)
+        let box = try #require(TitlePreview.frame(of: project.titles[0]))
+        #expect(abs(box.midY - CGFloat(TitlePlacement.top.verticalPosition) * 1920) < 2)
+        let built = try await CompositionBuilder.build(project)
+        let during = try await frame(of: built, at: 0.6)
+        #expect(titlePixels(during, in: box) > 200)
+        // Outside the title the picture is untouched.
+        #expect(isRed(Fixture.pixel(during, x: 540, y: Int(box.maxY) + 60)))
+        let before = try await frame(of: built, at: 0.1)
+        #expect(titlePixels(before, in: box) == 0)
+    }
+
+    @Test func titleStaysOnTheCanvasWhenDraggedToTheEdge() async throws {
+        let url = try await Fixture.video(width: 180, height: 320, bgra: red)
+        let project = try await titled(url, position: 1)
+        let box = try #require(TitlePreview.frame(of: project.titles[0]))
+        #expect(box.maxY <= 1920 && box.minY > 1500)
+        #expect(SafeZone.covers(box))
+        let image = try await frame(of: CompositionBuilder.build(project), at: 0.6)
+        #expect(titlePixels(image, in: box) > 200)
+    }
+
+    @Test func fadingTitleIsFainterAtFirst() async throws {
+        let url = try await Fixture.video(width: 180, height: 320, bgra: red)
+        let built = try await CompositionBuilder.build(try await titled(url, style: .label, entrance: .fade))
+        let box = try #require(TitlePreview.frame(of: try await titled(url, style: .label).titles[0]))
+        let early = try await frame(of: built, at: 0.3 + 1.0 / 30)
+        let solid = try await frame(of: CompositionBuilder.build(try await titled(url, style: .label)), at: 0.3 + 1.0 / 30)
+        #expect(titlePixels(solid, in: box) > 200)
+        #expect(titlePixels(early, in: box) < titlePixels(solid, in: box) / 4)
+        // Half way through the fade-in, the white box is a mix of white and the red video.
+        let half = Fixture.pixel(try await frame(of: built, at: 0.3 + 0.15), x: Int(box.minX) + 4, y: Int(box.midY))
+        #expect(half.r > 200 && half.g > 90 && half.g < 170)
+    }
+
+    @Test func poppingTitleStartsSmaller() async throws {
+        let url = try await Fixture.video(width: 180, height: 320, bgra: red)
+        let at = 0.3 + 1.0 / 30
+        let popping = try await frame(of: CompositionBuilder.build(try await titled(url, style: .label, entrance: .pop)), at: at)
+        let solid = try await frame(of: CompositionBuilder.build(try await titled(url, style: .label)), at: at)
+        let box = try #require(TitlePreview.frame(of: try await titled(url, style: .label).titles[0]))
+        #expect(titlePixels(popping, in: box) < titlePixels(solid, in: box) * 8 / 10)
+        let settled = try await frame(of: CompositionBuilder.build(try await titled(url, style: .label, entrance: .pop)), at: 0.7)
+        #expect(titlePixels(settled, in: box) == titlePixels(solid, in: box))
+    }
+
+    @Test func titleWithoutTextDrawsNothing() {
+        #expect(TitleRenderer.image(text: "  \n ", style: .bold) == nil)
+        #expect(TitlePreview.frame(of: TextOverlay(text: "", start: .zero, duration: .oneFrame)) == nil)
+    }
+
+    @Test func longTitlesWrapWithinTheMaximumWidth() throws {
+        let one = try #require(TitleRenderer.image(text: "Hook", style: .label))
+        let long = try #require(TitleRenderer.image(text: "This is a much longer hook that has to wrap onto more lines", style: .label))
+        #expect(long.height > one.height * 2)
+        let box = try #require(TitlePreview.frame(of: TextOverlay(text: "This is a much longer hook that has to wrap", start: .zero, duration: .oneFrame)))
+        #expect(box.maxX <= Project.canvasSize.width - SafeZone.right)
+    }
 }

@@ -19,7 +19,7 @@ struct ContentView: View {
             .frame(minHeight: 380, maxHeight: .infinity)
             // A single storyline needs little height; the viewer gets the rest.
             TimelineView(model: model)
-                .frame(minHeight: 170, idealHeight: 200, maxHeight: 280)
+                .frame(minHeight: 200, idealHeight: 225, maxHeight: 300)
         }
         .toolbar {
             ToolbarItemGroup {
@@ -30,14 +30,19 @@ struct ContentView: View {
                 Button("Split", systemImage: "scissors") { model.splitAtPlayhead() }
                     .help("Cut the clip at the playhead (B)")
                     .disabled(model.project.timeline.clips.isEmpty)
-                Button("Delete", systemImage: "trash") { model.deleteSelectedClip() }
-                    .help("Remove the selected clip and close the gap (⌫)")
-                    .disabled(model.selectedClipID == nil)
+                Button("Delete", systemImage: "trash") { model.deleteSelection() }
+                    .help("Remove the selected clip or title (⌫)")
+                    .disabled(model.selectedClipID == nil && model.selectedTitleID == nil)
             }
             ToolbarItem {
                 Button("Remove Pauses", systemImage: "waveform.path.badge.minus") { model.beginRemovingSilences() }
                     .help("Cut out the quiet parts between sentences")
                     .disabled(model.project.timeline.clips.isEmpty || model.silenceSession != nil)
+            }
+            ToolbarItem {
+                Button("Title", systemImage: "textformat") { model.addTitle() }
+                    .help("Add text over the video at the playhead, like a hook (⌘T)")
+                    .disabled(model.project.timeline.clips.isEmpty)
             }
             ToolbarItem {
                 Button("Captions", systemImage: "captions.bubble") { model.sidebar = .captions }

@@ -95,7 +95,9 @@ private struct CaptionSettingsForm: View {
                 Text("Style").font(.subheadline.weight(.semibold))
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 96), spacing: 6)], spacing: 6) {
                     ForEach(CaptionStyle.allCases) { style in
-                        StyleChip(style: style, isSelected: settings.style == style) { model.setCaptionStyle(style) }
+                        StyleChip(name: style.displayName, isSelected: settings.style == style, makeImage: { CaptionPreview.image(for: style) }) {
+                            model.setCaptionStyle(style)
+                        }
                     }
                 }
             }
@@ -128,10 +130,11 @@ private struct CaptionSettingsForm: View {
     }
 }
 
-/// A style shown as it really looks, on a dark background.
-private struct StyleChip: View {
-    let style: CaptionStyle
+/// A style shown as it really looks, on a dark background. Used for captions and titles.
+struct StyleChip: View {
+    let name: String
     let isSelected: Bool
+    let makeImage: () -> CGImage?
     let action: () -> Void
 
     @State private var image: CGImage?
@@ -147,7 +150,7 @@ private struct StyleChip: View {
                             Image(decorative: image, scale: 1).resizable().scaledToFit().padding(4)
                         }
                     }
-                Text(style.displayName).font(.caption)
+                Text(name).font(.caption)
             }
             .padding(4)
             .background(isSelected ? Color.accentColor.opacity(0.25) : .clear, in: RoundedRectangle(cornerRadius: 8))
@@ -158,9 +161,9 @@ private struct StyleChip: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(style.displayName)
+        .accessibilityLabel(name)
         .accessibilityAddTraits(isSelected ? .isSelected : [])
-        .task { image = CaptionPreview.image(for: style) }
+        .task { image = makeImage() }
     }
 }
 
@@ -215,7 +218,7 @@ private struct CaptionRow: View {
             .foregroundStyle(isCurrent ? Color.accentColor : .secondary)
             .help("Go to this caption")
 
-            TextField("Caption", text: Binding(get: { isEditing ? draft : page.text }, set: { draft = $0 }), axis: .vertical)
+            TextField("Caption", text: Binding(get: { isEditing ? draft : page.text }, set: { if isEditing { draft = $0 } }), axis: .vertical)
                 .textFieldStyle(.plain)
                 .focused($isEditing)
                 // Return ends editing; the change is saved once, when editing ends.

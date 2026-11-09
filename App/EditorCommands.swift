@@ -19,15 +19,19 @@ struct EditorCommands: Commands {
             Button("Split at Playhead") { model.splitAtPlayhead() }
                 .keyboardShortcut("b", modifiers: [])
                 .disabled(model.project.timeline.clips.isEmpty)
-            Button("Delete Clip") { model.deleteSelectedClip() }
+            Button(model.selectedTitleID != nil ? "Delete Title" : "Delete Clip") { model.deleteSelection() }
                 .keyboardShortcut(.delete, modifiers: [])
-                .disabled(model.selectedClipID == nil)
+                .disabled(model.selectedClipID == nil && model.selectedTitleID == nil)
             Divider()
             Button("Remove Pauses…") { model.beginRemovingSilences() }
                 .disabled(model.project.timeline.clips.isEmpty || model.silenceSession != nil)
         }
 
-        CommandMenu("Captions") {
+        CommandMenu("Text") {
+            Button("Add Title") { model.addTitle() }
+                .keyboardShortcut("t")
+                .disabled(model.project.timeline.clips.isEmpty)
+            Divider()
             Button("Make Captions") { model.makeCaptions() }
                 .disabled(model.project.timeline.clips.isEmpty || model.captionJob != nil)
             Toggle("Show Captions", isOn: Binding(
@@ -35,7 +39,7 @@ struct EditorCommands: Commands {
                 set: { model.setCaptionsVisible($0) }
             ))
             .disabled(!model.project.hasCaptions)
-            Picker("Style", selection: Binding(get: { model.project.captions.style }, set: { model.setCaptionStyle($0) })) {
+            Picker("Caption Style", selection: Binding(get: { model.project.captions.style }, set: { model.setCaptionStyle($0) })) {
                 ForEach(CaptionStyle.allCases) { Text($0.displayName).tag($0) }
             }
             .disabled(!model.project.hasCaptions)

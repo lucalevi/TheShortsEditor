@@ -45,6 +45,7 @@ public enum CompositionBuilder {
         var instructions: [any AVVideoCompositionInstructionProtocol] = []
         var cursor = CMTime.zero
         let captions = CaptionTrack(project: project)
+        let titles = TitleTrack(project: project)
 
         for clip in project.timeline.clips {
             guard let media = project.asset(id: clip.assetID) else {
@@ -75,7 +76,8 @@ public enum CompositionBuilder {
                 timeRange: CMTimeRange(start: cursor, duration: clip.duration),
                 trackID: videoTrack.trackID,
                 transform: clip.framing.transform(naturalSize: naturalSize, preferredTransform: preferredTransform),
-                captions: captions
+                captions: captions,
+                titles: titles
             ))
 
             cursor = cursor + clip.duration

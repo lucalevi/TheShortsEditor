@@ -43,4 +43,9 @@ public enum SafeZone {
             CGRect(x: canvas.width - right, y: rightColumnTop, width: right, height: canvas.height - bottom - rightColumnTop),
         ]
     }
+
+    /// Whether any part of `rect` (canvas pixels, origin at the top left) is in a covered area.
+    public static func covers(_ rect: CGRect) -> Bool {
+        coveredRects.contains { $0.intersects(rect.insetBy(dx: 1, dy: 1)) }
+    }
 }

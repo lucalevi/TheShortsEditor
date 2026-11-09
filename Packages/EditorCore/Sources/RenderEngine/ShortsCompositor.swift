@@ -17,17 +17,20 @@ nonisolated final class ShortsInstruction: NSObject, AVVideoCompositionInstructi
     /// instruction): see `Framing.transform`.
     let transform: CGAffineTransform
     let captions: CaptionTrack
+    let titles: TitleTrack
 
-    init(timeRange: CMTimeRange, trackID: CMPersistentTrackID, transform: CGAffineTransform, captions: CaptionTrack) {
+    init(timeRange: CMTimeRange, trackID: CMPersistentTrackID, transform: CGAffineTransform, captions: CaptionTrack, titles: TitleTrack) {
         self.timeRange = timeRange
         self.trackID = trackID
         self.transform = transform
         self.captions = captions
+        self.titles = titles
         requiredSourceTrackIDs = [NSNumber(value: trackID)]
     }
 }
 
-/// Draws every frame of a Short: the clip's picture placed on the 9:16 canvas, then the captions.
+/// Draws every frame of a Short: the clip's picture placed on the 9:16 canvas, then the titles,
+/// then the captions on top.
 ///
 /// Preview, thumbnails and export all go through this one compositor, so what is seen while
 /// editing is exactly what gets exported.
@@ -42,7 +45,7 @@ nonisolated final class ShortsCompositor: NSObject, AVVideoCompositing, Sendable
 
     // No colour conversion: video values pass through untouched, like the built-in compositor.
     private let context = CIContext(options: [.workingColorSpace: NSNull(), .outputColorSpace: NSNull(), .cacheIntermediates: false])
-    private let captionImages = Mutex<[String: CGImage]>([:])
+    private let overlayImages = Mutex<[String: CGImage]>([:])
 
     func renderContextChanged(_ newRenderContext: AVVideoCompositionRenderContext) {}
 
@@ -61,6 +64,14 @@ nonisolated final class ShortsCompositor: NSObject, AVVideoCompositing, Sendable
             image = CIImage(cvPixelBuffer: source)
                 .transformed(by: Self.flipped(instruction.transform, sourceHeight: height))
                 .composited(over: image)
+        }
+        for state in instruction.titles.states(at: request.compositionTime) {
+            guard state.opacity > 0, let title = titleImage(state.title, scale: state.scale) else { continue }
+            let over = title.composited(over: image)
+            // Fading: blend between the frame without and with the title.
+            image = state.opacity < 1
+                ? image.applyingFilter("CIDissolveTransition", parameters: ["inputTargetImage": over, "inputTime": state.opacity])
+                : over
         }
         if let caption = captionImage(for: instruction.captions, at: request.compositionTime) {
             image = caption.composited(over: image)
@@ -82,16 +93,9 @@ nonisolated final class ShortsCompositor: NSObject, AVVideoCompositing, Sendable
     private func captionImage(for track: CaptionTrack, at time: CMTime) -> CIImage? {
         guard let state = track.state(at: time) else { return nil }
         let key = "\(track.style.rawValue)|\(state.page.id)|\(state.page.text)|\(state.word)"
-        let cgImage = captionImages.withLock { $0[key] } ?? {
-            let made = CaptionRenderer.image(words: state.page.words.map(\.text), currentWord: state.word, style: track.style)
-            if let made {
-                captionImages.withLock { cache in
-                    if cache.count > 64 { cache.removeAll() }
-                    cache[key] = made
-                }
-            }
-            return made
-        }()
+        let cgImage = cachedImage(key) {
+            CaptionRenderer.image(words: state.page.words.map(\.text), currentWord: state.word, style: track.style)
+        }
         guard let cgImage else { return nil }
 
         let size = CGSize(width: cgImage.width, height: cgImage.height)
@@ -108,6 +112,36 @@ nonisolated final class ShortsCompositor: NSObject, AVVideoCompositing, Sendable
         return image.transformed(by: CGAffineTransform(
             translationX: (canvas.width - size.width) / 2,
             y: canvas.height - top - size.height
+        ))
+    }
+
+    private func cachedImage(_ key: String, make: () -> CGImage?) -> CGImage? {
+        if let cached = overlayImages.withLock({ $0[key] }) { return cached }
+        let made = make()
+        if let made {
+            overlayImages.withLock { cache in
+                if cache.count > 64 { cache.removeAll() }
+                cache[key] = made
+            }
+        }
+        return made
+    }
+
+    private func titleImage(_ title: TextOverlay, scale: Double) -> CIImage? {
+        guard let placement = TitleRenderer.placement(of: title),
+              let cgImage = cachedImage("title|\(title.style.rawValue)|\(title.text)", make: { TitleRenderer.image(text: title.text, style: title.style) })
+        else { return nil }
+        let size = CGSize(width: cgImage.width, height: cgImage.height)
+        var image = CIImage(cgImage: cgImage)
+        if scale != 1 {
+            image = image.transformed(by: CGAffineTransform(translationX: -size.width / 2, y: -size.height / 2)
+                .concatenating(CGAffineTransform(scaleX: scale, y: scale))
+                .concatenating(CGAffineTransform(translationX: size.width / 2, y: size.height / 2)))
+        }
+        let canvas = Project.canvasSize
+        return image.transformed(by: CGAffineTransform(
+            translationX: placement.image.minX,
+            y: canvas.height - placement.image.maxY
         ))
     }
 

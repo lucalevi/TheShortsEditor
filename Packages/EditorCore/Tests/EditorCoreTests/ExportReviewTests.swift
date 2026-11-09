@@ -36,4 +36,22 @@ struct ExportReviewTests {
         p.captions.isVisible = false
         #expect(kinds(ExportReview.issues(for: p, openingPeak: 0.5)) == [.captionsHidden])
     }
+
+    @Test func titleUnderYouTubesInterfaceIsAWarning() {
+        var p = project(seconds: 20)
+        p.transcripts[p.assets[0].id] = Transcript(language: .english, words: [Word(text: "hi", start: .zero, duration: CMTime(value: 1, timescale: 2))])
+        let id = p.addTitle(at: .zero, text: "Hook")
+        let clear = CGRect(x: 200, y: 400, width: 600, height: 150)
+        #expect(kinds(ExportReview.issues(for: p, openingPeak: 0.5, titleFrames: [id: clear])).isEmpty)
+        let underTop = CGRect(x: 200, y: 120, width: 600, height: 150)
+        #expect(kinds(ExportReview.issues(for: p, openingPeak: 0.5, titleFrames: [id: underTop])) == [.titleCovered])
+        let underBottom = CGRect(x: 200, y: 1400, width: 600, height: 150)
+        #expect(kinds(ExportReview.issues(for: p, openingPeak: 0.5, titleFrames: [id: underBottom])) == [.titleCovered])
+    }
+
+    @Test func titleAfterTheEndIsMentioned() {
+        var p = project(seconds: 20)
+        p.titles.append(TextOverlay(text: "Gone", start: CMTime(value: 30, timescale: 1), duration: CMTime(value: 2, timescale: 1)))
+        #expect(kinds(ExportReview.issues(for: p, openingPeak: 0.5)) == [.noCaptions, .titleAfterEnd])
+    }
 }

@@ -12,7 +12,15 @@ import Transcription
 @Observable
 final class EditorModel {
     private(set) var project = Project()
-    var selectedClipID: Clip.ID?
+    /// A clip or a title can be selected, never both.
+    var selectedClipID: Clip.ID? {
+        didSet { if selectedClipID != nil { selectedTitleID = nil } }
+    }
+    var selectedTitleID: TextOverlay.ID? {
+        didSet { if selectedTitleID != nil { selectedClipID = nil } }
+    }
+    /// Asks the title inspector to put the cursor in the text (after adding a title). It resets it.
+    var wantsTitleTextFocus = false
     var selectedAssetID: MediaAsset.ID?
     var showsSafeZone = true
     /// Timeline zoom, in points per second.
@@ -111,6 +119,10 @@ final class EditorModel {
 
     var duration: CMTime { project.duration }
 
+    var selectedTitle: TextOverlay? {
+        selectedTitleID.flatMap(project.title(id:))
+    }
+
     // MARK: Editing
 
     /// Applies an edit as one undoable step.
@@ -187,6 +199,16 @@ final class EditorModel {
         selectedClipID = nil
     }
 
+    /// Deletes the selected title, or else the selected clip (⌫).
+    func deleteSelection() {
+        if let id = selectedTitleID {
+            apply("Delete Title") { $0.removeTitle(id) }
+            selectedTitleID = nil
+        } else {
+            deleteSelectedClip()
+        }
+    }
+
     func setFraming(_ framing: Framing, for clipID: Clip.ID) {
         apply("Change Framing") { project in
             guard let index = project.timeline.index(of: clipID) else { return }
@@ -196,6 +218,40 @@ final class EditorModel {
 
     func moveClip(_ clipID: Clip.ID, to index: Int) {
         apply("Move Clip") { $0.timeline.move(clipID, to: index) }
+    }
+
+    // MARK: Titles
+
+    /// Adds a title at the playhead, selects it and puts the cursor in its text.
+    func addTitle() {
+        guard !project.timeline.clips.isEmpty else { return }
+        player.pause()
+        var id: TextOverlay.ID?
+        apply("Add Title") { id = $0.addTitle(at: currentTime, text: "Your title") }
+        guard let id else { return }
+        selectTitle(id)
+        wantsTitleTextFocus = true
+    }
+
+    /// Selects a title and moves the playhead to where it is fully on screen.
+    func selectTitle(_ id: TextOverlay.ID) {
+        selectedTitleID = id
+        guard let title = project.title(id: id), let range = title.visibleRange(in: project) else { return }
+        player.pause()
+        let settled = range.start + min(CMTime(value: 1, timescale: 2), CMTimeMultiplyByRatio(range.duration, multiplier: 1, divisor: 2))
+        if !range.containsTime(currentTime) || currentTime < settled { seek(to: settled) }
+    }
+
+    func editTitle(_ id: TextOverlay.ID, _ actionName: String, _ change: @escaping (inout TextOverlay) -> Void) {
+        apply(actionName) { $0.updateTitle(id, change) }
+    }
+
+    func moveTitle(_ id: TextOverlay.ID, to start: CMTime) {
+        apply("Move Title") { $0.moveTitle(id, to: start) }
+    }
+
+    func setTitleDuration(_ id: TextOverlay.ID, _ duration: CMTime) {
+        apply("Change Title Length") { $0.setTitleDuration(id, duration) }
     }
 
     // MARK: Captions
@@ -288,7 +344,7 @@ final class EditorModel {
                 peak = 1  // Couldn't measure: skip that check rather than claim silence.
             }
             guard exportPhase == .checking else { return }
-            exportPhase = .review(ExportReview.issues(for: project, openingPeak: peak))
+            exportPhase = .review(ExportReview.issues(for: project, openingPeak: peak, titleFrames: TitlePreview.frames(in: project)))
         }
     }
 
@@ -430,6 +486,8 @@ final class EditorModel {
     /// Rebuilds the player's content from the project, keeping the playhead where it was.
     private func projectDidChange() {
         captionPages = CaptionLayout.pages(in: project)
+        if let id = selectedTitleID, project.title(id: id) == nil { selectedTitleID = nil }
+        if let id = selectedClipID, project.timeline.index(of: id) == nil { selectedClipID = nil }
         if let settings = silenceSession?.settings { updateSilenceSettings(settings) }
         rebuildTask?.cancel()
         let project = project

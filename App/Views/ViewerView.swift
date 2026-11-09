@@ -1,5 +1,6 @@
 import AVFoundation
 import EditorCore
+import RenderEngine
 import SwiftUI
 
 /// The 9:16 preview with its transport controls.
@@ -18,6 +19,7 @@ struct ViewerView: View {
                 } else {
                     PlayerView(player: model.player)
                         .overlay { if model.showsSafeZone { SafeZoneOverlay() } }
+                        .overlay { TitleHandles(model: model) }
                         .aspectRatio(canvasAspect, contentMode: .fit)
                         .clipShape(RoundedRectangle(cornerRadius: 4))
                         .shadow(radius: 6)
@@ -99,6 +101,58 @@ private struct SafeZoneOverlay: View {
         }
         .allowsHitTesting(false)
         .accessibilityHidden(true)
+    }
+}
+
+/// Boxes over the titles on screen: click one to select it, drag it up or down to move it.
+/// The selected title has a visible frame; the others show one when the pointer is over them.
+private struct TitleHandles: View {
+    let model: EditorModel
+    @State private var drag: (id: TextOverlay.ID, dy: CGFloat)?
+    @State private var hovered: TextOverlay.ID?
+
+    var body: some View {
+        GeometryReader { geometry in
+            let scale = geometry.size.width / Project.canvasSize.width
+            ForEach(model.project.titlesOnScreen(at: model.currentTime)) { title in
+                if let frame = TitlePreview.frame(of: title) {
+                    let isSelected = model.selectedTitleID == title.id
+                    let dy = drag?.id == title.id ? drag!.dy : 0
+                    let rect = clamped(frame.offsetBy(dx: 0, dy: dy / scale))
+                    RoundedRectangle(cornerRadius: 4)
+                        .strokeBorder(style: StrokeStyle(lineWidth: isSelected ? 2 : 1, dash: isSelected ? [] : [4, 3]))
+                        .foregroundStyle(isSelected ? Color.yellow : Color.white.opacity(hovered == title.id || drag != nil ? 0.9 : 0))
+                        .contentShape(Rectangle())
+                        .frame(width: rect.width * scale, height: rect.height * scale)
+                        .offset(x: rect.minX * scale, y: rect.minY * scale)
+                        .onHover { hovered = $0 ? title.id : (hovered == title.id ? nil : hovered) }
+                        .pointerStyle(.frameResize(position: .top, directions: [.inward, .outward]))
+                        .onTapGesture(count: 2) {
+                            model.selectedTitleID = title.id
+                            model.wantsTitleTextFocus = true
+                        }
+                        .onTapGesture { model.selectedTitleID = title.id }
+                        .gesture(DragGesture(minimumDistance: 2).onChanged { value in
+                            model.pause()
+                            if model.selectedTitleID != title.id { model.selectedTitleID = title.id }
+                            drag = (title.id, value.translation.height)
+                        }.onEnded { value in
+                            drag = nil
+                            let moved = clamped(frame.offsetBy(dx: 0, dy: value.translation.height / scale))
+                            let position = Double(moved.midY / Project.canvasSize.height)
+                            model.editTitle(title.id, "Move Title") { $0.verticalPosition = min(max(position, 0), 1) }
+                        })
+                        .help("Click to edit, drag up or down to move. Double-click to change the words.")
+                }
+            }
+        }
+    }
+
+    /// Keeps a title's box on the canvas, as the renderer does.
+    private func clamped(_ rect: CGRect) -> CGRect {
+        var rect = rect
+        rect.origin.y = min(max(rect.minY, 0), Project.canvasSize.height - rect.height)
+        return rect
     }
 }
 

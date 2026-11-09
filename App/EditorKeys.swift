@@ -31,7 +31,7 @@ final class EditorKeys {
         case 11: model.splitAtPlayhead()           // B
         case 123: model.step(frames: -1)           // ←
         case 124: model.step(frames: 1)            // →
-        case 51, 117: model.deleteSelectedClip()   // ⌫, ⌦
+        case 51, 117: model.deleteSelection()      // ⌫, ⌦
         case 115: model.seek(to: .zero)            // Home
         case 119: model.seek(to: model.duration)   // End
         default: return false

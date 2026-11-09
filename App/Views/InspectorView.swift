@@ -7,11 +7,14 @@ struct InspectorView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            PanelHeader(title: model.silenceSession != nil ? "Remove Pauses" : model.selectedClip == nil ? "Your Short" : "Clip")
+            PanelHeader(title: model.silenceSession != nil ? "Remove Pauses" : model.selectedTitle != nil ? "Title" : model.selectedClip == nil ? "Your Short" : "Clip")
             ScrollView {
                 Group {
                     if model.silenceSession != nil {
                         SilencePanel(model: model)
+                    } else if let title = model.selectedTitle {
+                        TitleInspector(model: model, title: title)
+                            .id(title.id)
                     } else if let clip = model.selectedClip {
                         ClipInspector(model: model, clip: clip)
                     } else {
@@ -61,7 +64,7 @@ private struct ClipInspector: View {
 
             HStack {
                 Button("Split at Playhead", systemImage: "scissors") { model.splitAtPlayhead() }
-                Button("Delete", systemImage: "trash", role: .destructive) { model.deleteSelectedClip() }
+                Button("Delete", systemImage: "trash", role: .destructive) { model.deleteSelection() }
             }
         }
     }
@@ -97,6 +100,7 @@ private struct ProjectInspector: View {
             VStack(alignment: .leading, spacing: 8) {
                 Text("Tips").font(.subheadline.weight(.semibold))
                 Tip(icon: "bolt.fill", text: "Make the very first second the hook. Cut any intro.")
+                Tip(icon: "textformat", text: "Add a title (⌘T) at the start to say what the Short is about.")
                 Tip(icon: "rectangle.dashed", text: "Keep faces and text out of the dimmed areas. YouTube covers them.")
                 Tip(icon: "hand.tap", text: "Click a clip to select it. Click on the timeline to move the playhead.")
             }

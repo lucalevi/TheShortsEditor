@@ -8,10 +8,22 @@ struct TimelineView: View {
     @State private var scrollPosition = ScrollPosition(edge: .leading)
     @State private var visibleX: ClosedRange<CGFloat> = 0...0
     @State private var isDropTargeted = false
+    /// A title being dragged on the timeline: moved, or its length changed from the right edge.
+    @State private var titleDrag: TitleDrag?
+
+    struct TitleDrag {
+        enum Kind { case move, resize }
+        var id: TextOverlay.ID
+        var kind: Kind
+        var seconds: Double
+    }
 
     private let rulerHeight: CGFloat = 24
     private let trackHeight: CGFloat = 72
     private let captionLaneHeight: CGFloat = 22
+    private let titleLaneHeight: CGFloat = 22
+    private var titleLaneY: CGFloat { rulerHeight + 6 }
+    private var clipsY: CGFloat { titleLaneY + titleLaneHeight + 4 }
     private let leadingInset: CGFloat = 12
 
     private var pointsPerSecond: CGFloat { model.timelineZoom }
@@ -45,9 +57,10 @@ struct TimelineView: View {
                 ScrollView(.horizontal) {
                     ZStack(alignment: .topLeading) {
                         ruler
-                        clipsRow.offset(y: rulerHeight + 8)
-                        captionLane.offset(y: rulerHeight + 8 + trackHeight + 6)
-                        pauseCuts.offset(y: rulerHeight + 8)
+                        titleLane.offset(y: titleLaneY)
+                        clipsRow.offset(y: clipsY)
+                        captionLane.offset(y: clipsY + trackHeight + 6)
+                        pauseCuts.offset(y: clipsY)
                         limitMarker
                         playhead
                     }
@@ -144,12 +157,51 @@ struct TimelineView: View {
                         Divider()
                         Button("Delete Clip", role: .destructive) {
                             model.selectedClipID = clip.id
-                            model.deleteSelectedClip()
+                            model.deleteSelection()
                         }
                     }
                 }
             }
             .padding(.leading, leadingInset)
+        }
+    }
+
+    /// The titles, above the clips. Click to select, drag to move, drag the right edge to change the length.
+    private var titleLane: some View {
+        ZStack(alignment: .topLeading) {
+            ForEach(model.project.titles) { title in
+                let drag = titleDrag?.id == title.id ? titleDrag : nil
+                let start = drag?.kind == .move ? max(0, title.start.seconds + drag!.seconds) : title.start.seconds
+                let length = drag?.kind == .resize
+                    ? max(title.duration.seconds + drag!.seconds, TextOverlay.minimumDuration.seconds)
+                    : title.duration.seconds
+                let isAfterEnd = title.visibleRange(in: model.project) == nil
+                TitleBlock(title: title, isSelected: model.selectedTitleID == title.id, isAfterEnd: isAfterEnd) { offset in
+                    titleDrag = TitleDrag(id: title.id, kind: .resize, seconds: Double(offset / pointsPerSecond))
+                } onResizeEnd: { offset in
+                    titleDrag = nil
+                    model.setTitleDuration(title.id, title.duration + CMTime(seconds: Double(offset / pointsPerSecond), preferredTimescale: 600))
+                }
+                .frame(width: max(CGFloat(length) * pointsPerSecond - 2, 6), height: titleLaneHeight)
+                .offset(x: leadingInset + CGFloat(start) * pointsPerSecond + 1)
+                .onTapGesture { model.selectTitle(title.id) }
+                .gesture(DragGesture(minimumDistance: 3).onChanged { value in
+                    if model.selectedTitleID != title.id { model.selectedTitleID = title.id }
+                    titleDrag = TitleDrag(id: title.id, kind: .move, seconds: Double(value.translation.width / pointsPerSecond))
+                }.onEnded { value in
+                    titleDrag = nil
+                    model.moveTitle(title.id, to: title.start + CMTime(seconds: Double(value.translation.width / pointsPerSecond), preferredTimescale: 600))
+                    model.selectTitle(title.id)
+                })
+                .contextMenu {
+                    Button("Start at Playhead") { model.moveTitle(title.id, to: model.currentTime) }
+                    Divider()
+                    Button("Delete Title", role: .destructive) {
+                        model.selectedTitleID = title.id
+                        model.deleteSelection()
+                    }
+                }
+            }
         }
     }
 
@@ -222,6 +274,52 @@ struct TimelineView: View {
         .offset(x: x(for: model.currentTime) - 5, y: rulerHeight - 10)
         .allowsHitTesting(false)
         .accessibilityHidden(true)
+    }
+}
+
+/// One title on the timeline, with a handle on the right edge for changing its length.
+private struct TitleBlock: View {
+    let title: TextOverlay
+    let isSelected: Bool
+    let isAfterEnd: Bool
+    let onResize: (CGFloat) -> Void
+    let onResizeEnd: (CGFloat) -> Void
+
+    var body: some View {
+        RoundedRectangle(cornerRadius: 4)
+            .fill(Color.purple.opacity(isSelected ? 0.6 : 0.35))
+            .overlay(alignment: .leading) {
+                Label(title.text.replacingOccurrences(of: "\n", with: " "), systemImage: "textformat")
+                    .font(.caption2.weight(.medium))
+                    .lineLimit(1)
+                    .padding(.horizontal, 4)
+                    .padding(.trailing, 6)
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 4))
+            .overlay {
+                RoundedRectangle(cornerRadius: 4)
+                    .strokeBorder(isSelected ? Color.yellow : Color.purple.opacity(0.8), lineWidth: isSelected ? 2 : 1)
+            }
+            .overlay(alignment: .trailing) {
+                // The grip for changing the length.
+                Rectangle()
+                    .fill(Color.white.opacity(isSelected ? 0.8 : 0.4))
+                    .frame(width: 2, height: 12)
+                    .padding(.horizontal, 3)
+                    .frame(maxHeight: .infinity)
+                    .contentShape(Rectangle())
+                    .pointerStyle(.frameResize(position: .trailing))
+                    .gesture(DragGesture(minimumDistance: 1, coordinateSpace: .global)
+                        .onChanged { onResize($0.translation.width) }
+                        .onEnded { onResizeEnd($0.translation.width) })
+                    .help("Drag to change how long the title stays")
+            }
+            .opacity(isAfterEnd ? 0.4 : 1)
+            .contentShape(Rectangle())
+            .help(isAfterEnd ? "After the end of your Short, so it won't be seen" : title.text)
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("Title: \(title.text)")
+            .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 }
 

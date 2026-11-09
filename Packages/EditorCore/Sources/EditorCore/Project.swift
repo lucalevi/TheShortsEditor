@@ -19,6 +19,8 @@ public struct Project: Codable, Equatable, Sendable {
     /// What is said in each source file, for captions. Kept per file, in the file's own time.
     public var transcripts: [MediaAsset.ID: Transcript] = [:]
     public var captions = CaptionSettings()
+    /// Text over the video, such as the hook title. Drawn in this order, so later ones are on top.
+    public var titles: [TextOverlay] = []
 
     public init() {}
 

@@ -174,7 +174,7 @@ nonisolated enum CaptionRenderer {
     }
 
     /// The boxes a range of characters takes up, one per line it is on.
-    private static func rects(of range: CFRange, in frame: CTFrame, origin: CGPoint) -> [CGRect] {
+    static func rects(of range: CFRange, in frame: CTFrame, origin: CGPoint) -> [CGRect] {
         let lines = CTFrameGetLines(frame) as! [CTLine]
         var origins = [CGPoint](repeating: .zero, count: lines.count)
         CTFrameGetLineOrigins(frame, CFRange(location: 0, length: 0), &origins)
@@ -198,7 +198,7 @@ nonisolated enum CaptionRenderer {
         return result
     }
 
-    private static func makeFont(size: CGFloat, weight: CGFloat) -> CTFont {
+    static func makeFont(size: CGFloat, weight: CGFloat) -> CTFont {
         let base = CTFontCreateUIFontForLanguage(.system, size, nil)!
         let traits = [kCTFontWeightTrait: weight] as CFDictionary
         let descriptor = CTFontDescriptorCreateCopyWithAttributes(

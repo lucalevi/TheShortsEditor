@@ -1,10 +1,10 @@
 # Project status
 
-_Last updated: 2026-11-08. Read this first when picking the project back up, then update it at the end of each session._
+_Last updated: 2026-11-09. Read this first when picking the project back up, then update it at the end of each session._
 
 ## Where we are
 
-Stages 1–4 are done, tested on screen, committed and pushed to https://github.com/lucalevi/TheShortsEditor (public, branch `main`):
+Stages 1–5 are done, tested on screen, committed and pushed to https://github.com/lucalevi/TheShortsEditor (public, branch `main`):
 
 | Stage | What | Session |
 |---|---|---|
@@ -12,11 +12,9 @@ Stages 1–4 are done, tested on screen, committed and pushed to https://github.
 | 2 | Auto-captions | 2026-11-08 |
 | 3 | Export to a YouTube-ready MP4, with pre-export checks | 2026-11-08 |
 | 4 | Remove Pauses (silence removal) | 2026-11-08 |
+| 5 | Titles (text overlay for the hook) | 2026-11-09 |
 
-**Pick up here:** stage 5, **text overlay** for the hook title (see "What's next"). Suggested shape, following how captions were built:
-1. EditorCore: a `TextOverlay` value (text, style, start/duration on the timeline, vertical position) stored in `Project`, with pure logic and tests. Unlike captions it belongs to the timeline, not a source file, so decide how it moves when clips before it are deleted (simplest: it stays at its time, clamped to the Short's length).
-2. RenderEngine: draw it in `ShortsCompositor` with Core Text, reusing `CaptionRenderer`'s approach, with a fade or pop-in; pixel tests like the caption ones.
-3. App: an "Add Title" button, a lane on the timeline, editing in the inspector; add the "text outside the safe zone" check to `ExportReview`.
+**Pick up here:** stage 6, **Audio** (see "What's next"): clip volume, fades, a background-music lane with ducking under speech, loudness normalisation on export, and the "music on a Short over 1:00" export check.
 
 What works today:
 - Import videos by drag-and-drop (Media list, viewer, timeline), with **Import…** / **Choose Videos…**, or from Finder (Open With / Dock icon). Files go onto the timeline in order, and the same file is never imported twice.
@@ -36,10 +34,18 @@ What works today:
   - Checks (warn, never block): over 3:00, silent first second (measured from the audio), no sound, no captions, captions hidden.
   - Written with `AVAssetReader` + `AVAssetWriter` from the same compositor as the preview, so captions are in the file.
 - **Remove Pauses** (toolbar button, Clip ▸ Remove Pauses…): measures each file's loudness per frame, suggests what counts as quiet from the sound itself, and marks the parts to cut in red on the timeline. Two sliders ("What counts as a pause", "Room around words"), a summary ("Cuts 0:05.2 in 4 places, new length…"), "Play Without Pauses" (playback skips the cuts), then one undoable edit. Quiet at the very start/end of a clip is cut completely. Captions follow the cuts.
-- 62 automated tests (`make test`, about a minute): timeline, caption, pause and export-check logic; framing math; rendering checked pixel by pixel (orientation, every caption style); export checked for codec, size, AAC and fast start; per-frame sound levels; and a real transcription of speech made with `say`.
+- **Titles** (toolbar **Title**, Text ▸ Add Title ⌘T): text over the video, e.g. the hook.
+  - Added at the playhead for 3 s (starts earlier near the end), selected, with its text ready to type. Return saves.
+  - 5 styles: Bold (white, black outline), Label (black on white line boxes), Marker (black on yellow), Dark Box, Simple (shadow). Appears with Pop (grows in with a little bounce), Fade (in and out), or None. Long text wraps by itself.
+  - Position: Top / Middle / Bottom, or drag it up and down in the viewer (click selects, double-click edits the words). It may go anywhere on the canvas; the inspector and the export checks warn when part of it is where YouTube covers the video.
+  - A titles lane above the clips: click to select, drag to move, drag the right edge to change the length; right-click for Start at Playhead / Delete. ⌫ deletes the selected title.
+  - Titles belong to the timeline, not to a file: they stay at their time when clips change. Past the end of the Short they are cut or not shown (dimmed in the lane, with an export tip).
+  - Drawn by `ShortsCompositor` under the captions (`TitleRenderer`), so they're in the export.
+- The old Captions menu is now **Text** (Add Title + the caption items).
+- 80 automated tests (`make test`, about a minute): timeline, caption, pause and export-check logic; framing math; rendering checked pixel by pixel (orientation, every caption style); export checked for codec, size, AAC and fast start; per-frame sound levels; and a real transcription of speech made with `say`.
 
-Verified on screen: import, Finder open (launch and while running), select, framing switch, split, delete, undo (fixed 2026-11-08, see below), Space play/pause, ruler scrub, closing the window quits. Captions: make, style and position switches, editing a line, jumping from the timeline lane, split/delete with captions following, undo of all of these. Export: checks sheet, save panel, progress, finished state, output checked with ffprobe. Remove Pauses: detection on a sample with known pauses, sliders, preview playback, apply, undo.
-**Not yet verified on screen:** J/K/L reverse and fast playback, the clip right-click menu, timeline zoom, drag-and-drop from Finder.
+Verified on screen: import, Finder open (launch and while running), select, framing switch, split, delete, undo (fixed 2026-11-08, see below), Space play/pause, ruler scrub, closing the window quits. Captions: make, style and position switches, editing a line, jumping from the timeline lane, split/delete with captions following, undo of all of these. Export: checks sheet, save panel, progress, finished state, output checked with ffprobe. Remove Pauses: detection on a sample with known pauses, sliders, preview playback, apply, undo. Titles: add (⌘T) with text ready to type, typing + Return, style switch, undo/redo, drag in the viewer into the covered area (warning in inspector and export sheet), Top preset, move and lengthen on the timeline, ⌫ delete.
+**Not yet verified on screen:** J/K/L reverse and fast playback, the clip right-click menu, the title right-click menu, the title length stepper, timeline zoom, drag-and-drop from Finder. The Pop and Fade animations are checked by render tests, not by eye during playback.
 
 ## Decisions already made (don't re-ask)
 
@@ -54,10 +60,10 @@ Verified on screen: import, Finder open (launch and while running), select, fram
 The P0 list from `research/shorts-editor-research.md` §5. Each stage ends with tests and an on-screen check.
 
 1. ~~Auto-captions~~ (done)
-2. ~~Export~~ (done). Still to add with later stages: the "music on a Short over 1:00" check (needs the music lane, step 5), "text outside the safe zone" (needs text overlays, step 4; captions are always kept inside), loudness normalisation (step 5).
+2. ~~Export~~ (done). Still to add with later stages: the "music on a Short over 1:00" check (needs the music lane, step 5), loudness normalisation (step 5).
 3. ~~Remove silences~~ (done, as "Remove Pauses").
-4. **Text overlay** ← next (called stage 5 above, since the foundation was stage 1): the hook title (a few styles, fade/pop-in). Draw it in `ShortsCompositor` like captions; add the "text outside the safe zone" export check.
-5. **Audio**: clip volume, fades, a background-music lane with automatic ducking under speech, loudness normalisation on export.
+4. ~~Text overlay~~ (done, as "Titles", stage 5), with the "text where YouTube covers it" export check.
+5. **Audio** ← next (stage 6): clip volume, fades, a background-music lane with automatic ducking under speech, loudness normalisation on export.
 6. **Save/open projects**: a project file with autosave, security-scoped bookmarks to media, and relinking of missing media. Today the project lives only in memory, so **quitting loses the edit**.
 7. Then P1 from the research: editing by deleting words in the transcript, keyframes/punch-in zoom, auto-reframe of horizontal footage (Vision), speed, loop preview, brand kit.
 
@@ -74,6 +80,8 @@ The P0 list from `research/shorts-editor-research.md` §5. Each stage ends with 
 - Remove Pauses: the shortest pause cut is fixed at 0.3 s (not a slider). Detection is by loudness only, so steady background music or noise above the threshold isn't seen as a pause; lowering "What counts as a pause" is the fix. Clips whose file has no sound are left alone.
 - Playback times from AVPlayer are in nanoseconds; compare them with model times only after `snappedToFrame()` (a skip loop came from this).
 - The Highlight style's green box can blend into green backgrounds.
+- Titles: the text is saved when editing ends (Return or clicking away), so the viewer updates then, not while typing. No snapping when dragging on the timeline. Overlapping titles share one lane row and are drawn on top of each other. One font (the system font) for all styles; no colour picker.
+- SwiftUI text fields hand the old value back to their binding as focus leaves. Editing fields that save on end (caption lines, title text) only accept changes while focused; otherwise what was typed is lost.
 - No project saving yet (see step 6).
 - Only video files can be imported (no audio-only files or images yet).
 - `SafeZone` margins are approximate (no official YouTube overlay found).
