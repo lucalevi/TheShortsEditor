@@ -16,7 +16,7 @@ Stages 1–7 are done, tested on screen, committed and pushed to https://github.
 | 6 | Audio: clip volume, music with ducking, loudness on export | 2026-11-09 |
 | 7 | Save/open projects, autosave, missing media | 2026-11-09 |
 
-**Pick up here:** the P0 list from the research is then complete. Next is P1 (see "What's next"); suggested first: **editing by deleting words in the transcript**, since transcripts already exist per file. Ask the user which P1 item matters most.
+**Pick up here:** the P0 list from the research is complete. Next is P1 (see "What's next"); suggested first: **editing by deleting words in the transcript**, since transcripts already exist per file. Ask the user which P1 item matters most.
 
 What works today:
 - Import videos (and sound files, for music) by drag-and-drop (Media list, viewer, timeline), with **Import…** / **Choose Videos…**, or from Finder (Open With / Dock icon). Files go onto the timeline in order, and the same file is never imported twice.
