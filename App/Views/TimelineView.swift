@@ -76,6 +76,7 @@ struct TimelineView: View {
                 }
             }
             .background(isDropTargeted ? Color.accentColor.opacity(0.08) : Color.clear)
+            .background(Theme.timeline)
             .dropDestination(for: URL.self) { urls, _ in
                 model.importFiles(urls, addToTimeline: true)
                 return true

@@ -16,7 +16,7 @@ struct ViewerView: View {
                 MissingMediaBar(model: model)
             }
             ZStack {
-                Color(nsColor: .underPageBackgroundColor)
+                Theme.viewer
                 if model.project.timeline.clips.isEmpty {
                     emptyState
                 } else {
@@ -109,7 +109,7 @@ private struct TransportBar: View {
         .disabled(model.project.timeline.clips.isEmpty)
         .padding(.vertical, 8)
         .frame(maxWidth: .infinity)
-        .background(.bar)
+        .background(Theme.header)
         .overlay(alignment: .top) { Divider() }
     }
 }

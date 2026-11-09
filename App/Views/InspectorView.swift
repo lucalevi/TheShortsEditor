@@ -30,6 +30,7 @@ struct InspectorView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
+        .background(Theme.panel)
     }
 }
 

@@ -19,6 +19,7 @@ Stages 1–7 are done, tested on screen, committed and pushed to https://github.
 **Pick up here:** the P0 list from the research is complete. Next is P1 (see "What's next"); suggested first: **editing by deleting words in the transcript**, since transcripts already exist per file. Ask the user which P1 item matters most.
 
 What works today:
+- **Dark look** like Final Cut Pro / iMovie: the app always runs in Dark Mode (`AppDelegate`), with flat greys from `App/Views/Theme.swift` (near-black viewer, dark timeline, mid-grey panels, lighter header strips). Not yet seen on screen: Captions panel with captions, Export sheet, Remove Pauses panel.
 - Import videos (and sound files, for music) by drag-and-drop (Media list, viewer, timeline), with **Import…** / **Choose Videos…**, or from Finder (Open With / Dock icon). Files go onto the timeline in order, and the same file is never imported twice.
 - 9:16 viewer (1080×1920, 30 fps) with a toggle for the dimmed areas YouTube's interface covers (`SafeZone`).
 - Magnetic timeline: click a clip to select it and move the playhead there, drag the ruler to scrub, split (**B**), delete with the gap closing (**⌫**), move earlier/later (right-click), zoom.

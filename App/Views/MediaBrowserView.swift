@@ -27,6 +27,7 @@ struct MediaBrowserView: View {
         } primaryAction: { ids in
             ids.forEach(model.appendToTimeline)
         }
+        .scrollContentBackground(.hidden)
         .overlay {
             if model.project.assets.isEmpty {
                 ContentUnavailableView {
@@ -60,8 +61,9 @@ struct SidebarView: View {
                 if model.isImporting { ProgressView().controlSize(.small) }
             }
             .padding(.horizontal, 10)
+            .frame(maxWidth: .infinity)
             .frame(height: 32)
-            .background(.bar)
+            .background(Theme.header)
             .overlay(alignment: .bottom) { Divider() }
 
             Group {
@@ -72,6 +74,7 @@ struct SidebarView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
+        .background(Theme.panel)
     }
 }
 
@@ -148,7 +151,7 @@ struct PanelHeader<Accessory: View>: View {
         }
         .padding(.horizontal, 12)
         .frame(height: 32)
-        .background(.bar)
+        .background(Theme.header)
         .overlay(alignment: .bottom) { Divider() }
     }
 }

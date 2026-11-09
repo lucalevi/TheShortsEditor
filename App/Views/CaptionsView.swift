@@ -180,6 +180,7 @@ private struct CaptionList: View {
                 }
             }
             .listStyle(.plain)
+            .scrollContentBackground(.hidden)
             .onChange(of: model.currentCaption?.id) { _, id in
                 if model.isPlaying, let id { proxy.scrollTo(id, anchor: .center) }
             }
@@ -192,7 +193,7 @@ private struct CaptionList: View {
                     .foregroundStyle(.secondary)
                     .padding(8)
                     .frame(maxWidth: .infinity)
-                    .background(.bar)
+                    .background(Theme.header)
             }
         }
     }

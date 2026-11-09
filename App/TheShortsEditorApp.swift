@@ -48,6 +48,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    func applicationWillFinishLaunching(_ notification: Notification) {
+        // A video editor looks like one: dark greys around the picture, whatever the Mac's setting.
+        NSApp.appearance = NSAppearance(named: .darkAqua)
+    }
+
     func application(_ application: NSApplication, open urls: [URL]) {
         if let model {
             model.importFiles(urls, addToTimeline: true)
