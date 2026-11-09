@@ -7,7 +7,8 @@ import Foundation
 /// asset also carries a security-scoped bookmark, made while the app had access to it.
 public struct ProjectFile: Codable, Equatable, Sendable {
     /// Bumped when the format changes in a way older versions can't read.
-    public static let currentVersion = 1
+    /// 2: overlays (B-roll), pictures, placement and motion.
+    public static let currentVersion = 2
     public static let fileExtension = "shortsproject"
 
     public var version: Int
@@ -52,9 +53,10 @@ public struct ProjectFile: Codable, Equatable, Sendable {
 }
 
 public extension Project {
-    /// The media the project uses (clips or music), in a stable order.
+    /// The media the project uses (clips, overlays or music), in a stable order.
     var usedAssets: [MediaAsset] {
         var ids = Set(timeline.clips.map(\.assetID))
+        ids.formUnion(overlays.map(\.clip.assetID))
         if let music { ids.insert(music.assetID) }
         return assets.filter { ids.contains($0.id) }
     }
@@ -81,7 +83,8 @@ public extension Project {
     /// Whether a file chosen to replace `asset` looks like the same media: same kind and about
     /// the same length. Clips are cut by time, so a different file would play the wrong parts.
     static func isLikelySameMedia(_ asset: MediaAsset, as candidate: MediaAsset) -> Bool {
-        guard asset.hasVideo == candidate.hasVideo else { return false }
+        guard asset.hasVideo == candidate.hasVideo, asset.isImage == candidate.isImage else { return false }
+        if asset.isImage { return true }
         return abs(asset.duration.seconds - candidate.duration.seconds) <= 0.5
     }
 }

@@ -1,36 +1,76 @@
 import AVFoundation
 import EditorCore
+import RenderEngine
 import SwiftUI
 
-/// The storyline: clips back to back, a ruler for scrubbing, and the playhead.
+/// The storyline and everything over and under it: titles, B-roll, the clips, captions and music,
+/// with a ruler for scrubbing and the playhead.
 struct TimelineView: View {
     @Bindable var model: EditorModel
     @State private var scrollPosition = ScrollPosition(edge: .leading)
-    @State private var visibleX: ClosedRange<CGFloat> = 0...0
+    @State private var visibleRect: CGRect = .zero
     @State private var isDropTargeted = false
-    /// A title being dragged on the timeline: moved, or its length changed from the right edge.
-    @State private var titleDrag: TitleDrag?
+    /// A title or B-roll clip being dragged: moved, or one of its edges.
+    @State private var blockDrag: BlockDrag?
+    /// A main clip being dragged to a new place in the storyline.
+    @State private var reorder: Reorder?
+    /// An edge of a main clip being dragged.
+    @State private var clipTrim: ClipTrim?
+    /// Where a dragged edge is sticking, to draw a line there.
+    @State private var snapLine: CMTime?
     /// The rectangle being drawn across the timeline to select what it covers.
     @State private var marquee: CGRect?
     /// The selection when the rectangle was started, which it adds to while ⌘ or ⇧ is held.
     @State private var marqueeBase: TimelineSelection?
 
-    struct TitleDrag {
-        enum Kind { case move, resize }
-        var id: TextOverlay.ID
+    struct BlockDrag {
+        enum Kind { case move, start, end }
+        var item: TimelineItem
         var kind: Kind
-        var seconds: Double
+        /// How far it moved, already stuck to an edge when close to one.
+        var delta: CMTime
     }
+
+    struct Reorder {
+        var id: Clip.ID
+        var dx: CGFloat
+        var destination: Int
+    }
+
+    struct ClipTrim {
+        var id: Clip.ID
+        var edge: ClipEdge
+        var delta: CMTime
+    }
+
+    // MARK: Layout
 
     private let rulerHeight: CGFloat = 24
     private let trackHeight: CGFloat = 72
     private let captionLaneHeight: CGFloat = 22
-    private let titleLaneHeight: CGFloat = 22
+    private let titleRowHeight: CGFloat = 22
+    private let overlayRowHeight: CGFloat = 40
     private let musicLaneHeight: CGFloat = 30
-    private var titleLaneY: CGFloat { rulerHeight + 6 }
-    private var clipsY: CGFloat { titleLaneY + titleLaneHeight + 4 }
-    private var musicY: CGFloat { clipsY + trackHeight + 6 + captionLaneHeight + 4 }
+    private let rowGap: CGFloat = 3
     private let leadingInset: CGFloat = 12
+
+    private var titleRows: [TextOverlay.ID: Int] {
+        LanePacking.rows(model.project.titles.map { (id: $0.id, range: $0.range) })
+    }
+    private var overlayRows: [Clip.ID: Int] {
+        LanePacking.rows(model.project.overlays.map { (id: $0.id, range: $0.range) })
+    }
+    private var titleRowCount: Int { LanePacking.count(titleRows) }
+    private var overlayRowCount: Int { LanePacking.count(overlayRows) }
+
+    private var titlesY: CGFloat { rulerHeight + 6 }
+    private var titlesHeight: CGFloat { CGFloat(titleRowCount) * (titleRowHeight + 2) }
+    private var overlaysY: CGFloat { titlesY + titlesHeight + rowGap }
+    private var overlaysHeight: CGFloat { CGFloat(overlayRowCount) * (overlayRowHeight + rowGap) }
+    private var clipsY: CGFloat { overlaysY + overlaysHeight + 2 }
+    private var captionsY: CGFloat { clipsY + trackHeight + 6 }
+    private var musicY: CGFloat { captionsY + captionLaneHeight + 4 }
+    private var contentHeight: CGFloat { musicY + musicLaneHeight + 12 }
 
     private var pointsPerSecond: CGFloat { model.timelineZoom }
 
@@ -38,8 +78,16 @@ struct TimelineView: View {
         leadingInset + CGFloat(time.seconds) * pointsPerSecond
     }
 
+    private func width(of duration: CMTime) -> CGFloat {
+        CGFloat(duration.seconds) * pointsPerSecond
+    }
+
     private func time(at x: CGFloat) -> CMTime {
         CMTime(seconds: max(0, Double((x - leadingInset) / pointsPerSecond)), preferredTimescale: 600)
+    }
+
+    private func seconds(_ points: CGFloat) -> CMTime {
+        CMTime(seconds: Double(points / pointsPerSecond), preferredTimescale: 600)
     }
 
     var body: some View {
@@ -49,6 +97,15 @@ struct TimelineView: View {
                     Text("\(TimeFormat.string(model.duration)) of 3:00")
                         .monospacedDigit()
                         .foregroundStyle(model.project.isOverMaxDuration ? .red : .secondary)
+                    Divider().frame(height: 14)
+                    Toggle(isOn: $model.snapsToEdges) {
+                        Label("Snapping", systemImage: "arrow.right.and.line.vertical.and.arrow.left")
+                    }
+                    .toggleStyle(.button)
+                    .labelStyle(.iconOnly)
+                    .controlSize(.small)
+                    .help(model.snapsToEdges ? "Snapping is on: dragged edges stick to cuts, other items and the playhead (S)"
+                          : "Snapping is off (S)")
                     Divider().frame(height: 14)
                     Image(systemName: "minus.magnifyingglass").foregroundStyle(.secondary)
                     Slider(value: $model.timelineZoom, in: EditorModel.zoomRange)
@@ -60,26 +117,26 @@ struct TimelineView: View {
                 .font(.callout)
             }
             GeometryReader { geometry in
-                ScrollView(.horizontal) {
+                ScrollView([.horizontal, .vertical]) {
                     ZStack(alignment: .topLeading) {
                         marqueeArea
                         ruler
-                        titleLane.offset(y: titleLaneY)
+                        titleLane.offset(y: titlesY)
+                        overlayLane.offset(y: overlaysY)
                         clipsRow.offset(y: clipsY)
-                        captionLane.offset(y: clipsY + trackHeight + 6)
+                        captionLane.offset(y: captionsY)
                         musicLane.offset(y: musicY)
                         pauseCuts.offset(y: clipsY)
                         limitMarker
+                        snapIndicator
                         playhead
                         marqueeRectangle
                     }
-                    .frame(width: max(geometry.size.width, contentWidth), height: geometry.size.height, alignment: .topLeading)
+                    .frame(width: max(geometry.size.width, contentWidth), height: max(geometry.size.height, contentHeight), alignment: .topLeading)
                 }
                 .scrollPosition($scrollPosition)
-                .onScrollGeometryChange(for: ClosedRange<CGFloat>.self) { scroll in
-                    scroll.visibleRect.minX...scroll.visibleRect.maxX
-                } action: { _, newValue in
-                    visibleX = newValue
+                .onScrollGeometryChange(for: CGRect.self) { $0.visibleRect } action: { _, newValue in
+                    visibleRect = newValue
                 }
             }
             .background(isDropTargeted ? Color.accentColor.opacity(0.08) : Color.clear)
@@ -92,8 +149,8 @@ struct TimelineView: View {
         .onChange(of: model.currentTime) {
             // Keep the playhead in view while playing.
             let playheadX = x(for: model.currentTime)
-            if model.isPlaying, !visibleX.contains(playheadX) {
-                scrollPosition.scrollTo(x: max(0, playheadX - 40))
+            if model.isPlaying, !(visibleRect.minX...visibleRect.maxX).contains(playheadX) {
+                scrollPosition.scrollTo(point: CGPoint(x: max(0, playheadX - 40), y: visibleRect.minY))
             }
         }
     }
@@ -116,6 +173,8 @@ struct TimelineView: View {
             }
         }
     }
+
+    // MARK: Selecting with a rectangle
 
     /// The empty space behind everything: click to deselect, drag to select with a rectangle
     /// (holding ⌘ or ⇧ adds to what is already selected).
@@ -158,10 +217,11 @@ struct TimelineView: View {
         }
     }
 
-    /// The clips, titles and music a rectangle on the timeline touches.
+    /// The clips, overlays, titles and music a rectangle on the timeline touches.
     private func items(in rect: CGRect) -> Set<EditorModel.Selection> {
         let lanes: [(TimelineLane, CGFloat, CGFloat)] = [
-            (.titles, titleLaneY, titleLaneHeight),
+            (.titles, titlesY, titlesHeight),
+            (.overlays, overlaysY, overlaysHeight),
             (.clips, clipsY, trackHeight),
             (.music, musicY, musicLaneHeight),
         ]
@@ -170,6 +230,8 @@ struct TimelineView: View {
         let range = CMTimeRange(start: time(at: rect.minX), end: time(at: rect.maxX))
         return model.project.timelineItems(overlapping: range, in: covered)
     }
+
+    // MARK: Ruler, playhead, markers
 
     /// Seconds along the top. Click or drag here to move the playhead.
     private var ruler: some View {
@@ -198,95 +260,377 @@ struct TimelineView: View {
         [1.0, 2, 5, 10, 15, 30, 60].first { $0 * pointsPerSecond >= 60 } ?? 60
     }
 
+    /// A red line at 3:00, the longest a Short can be.
+    @ViewBuilder
+    private var limitMarker: some View {
+        let limitX = x(for: Project.maxDuration)
+        if limitX < contentWidth {
+            Rectangle()
+                .fill(Color.red.opacity(0.7))
+                .frame(width: 2)
+                .offset(x: limitX)
+                .help("3:00 — the maximum length of a Short")
+        }
+    }
+
+    /// Where a dragged edge is sticking.
+    @ViewBuilder
+    private var snapIndicator: some View {
+        if let snapLine {
+            Rectangle()
+                .fill(Color.yellow)
+                .frame(width: 1)
+                .offset(x: x(for: snapLine))
+                .allowsHitTesting(false)
+                .accessibilityHidden(true)
+        }
+    }
+
+    private var playhead: some View {
+        VStack(spacing: 0) {
+            Image(systemName: "arrowtriangle.down.fill")
+                .font(.system(size: 10))
+                .foregroundStyle(.red)
+            Rectangle().fill(.red).frame(width: 2)
+        }
+        .offset(x: x(for: model.currentTime) - 5, y: rulerHeight - 10)
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+
+    // MARK: Main clips
+
     @ViewBuilder
     private var clipsRow: some View {
-        if model.project.timeline.clips.isEmpty {
-            Text("Drop videos here, or double-click one in Media")
+        let clips = model.project.timeline.clips
+        if clips.isEmpty {
+            Text("Drop videos or pictures here, or double-click one in Media")
                 .foregroundStyle(.secondary)
                 .frame(height: trackHeight)
                 .padding(.leading, leadingInset)
         } else {
-            HStack(spacing: 0) {
-                ForEach(Array(model.project.timeline.clips.enumerated()), id: \.element.id) { index, clip in
-                    ClipBlock(
-                        clip: clip,
-                        name: model.project.asset(id: clip.assetID)?.name ?? "Missing",
-                        thumbnail: model.thumbnails[clip.assetID],
-                        isSelected: model.isSelected(.clip(clip.id))
-                    )
-                    .frame(width: max(CGFloat(clip.duration.seconds) * pointsPerSecond, 2), height: trackHeight)
-                    .onTapGesture { location in
-                        let modifiers = NSEvent.modifierFlags
-                        model.click(.clip(clip.id), modifiers: modifiers)
-                        // ⌘/⇧-clicks only change the selection; a plain click also moves the playhead.
-                        guard modifiers.isDisjoint(with: [.command, .shift]) else { return }
-                        let start = model.project.timeline.startTime(ofClipAt: index)
-                        model.pause()
-                        model.seek(to: start + CMTime(seconds: Double(location.x / pointsPerSecond), preferredTimescale: 600))
+            ZStack(alignment: .topLeading) {
+                HStack(spacing: 0) {
+                    ForEach(Array(clips.enumerated()), id: \.element.id) { index, clip in
+                        clipView(clip, index: index)
                     }
-                    .contextMenu {
-                        Button("Split at Playhead") { model.splitAtPlayhead() }
-                        Picker("Framing", selection: Binding(get: { clip.framing }, set: { model.setFraming($0, for: clip.id) })) {
-                            Text("Fill Screen").tag(Framing.fill)
-                            Text("Show All").tag(Framing.fit)
-                        }
-                        if index > 0 {
-                            Button("Move Earlier") { model.moveClip(clip.id, to: index - 1) }
-                        }
-                        if index < model.project.timeline.clips.count - 1 {
-                            Button("Move Later") { model.moveClip(clip.id, to: index + 1) }
-                        }
-                        Divider()
-                        deleteButton(for: .clip(clip.id), single: "Delete Clip")
-                    }
+                }
+                if let reorder {
+                    // Where the dragged clip will go.
+                    let others = clips.filter { $0.id != reorder.id }
+                    let boundary = others.prefix(reorder.destination).reduce(CMTime.zero) { $0 + $1.duration }
+                    Capsule()
+                        .fill(Color.yellow)
+                        .frame(width: 4, height: trackHeight + 8)
+                        .offset(x: width(of: boundary) - 2, y: -4)
+                        .allowsHitTesting(false)
                 }
             }
             .padding(.leading, leadingInset)
         }
     }
 
-    /// The titles, above the clips. Click to select, drag to move, drag the right edge to change the length.
-    private var titleLane: some View {
-        ZStack(alignment: .topLeading) {
-            ForEach(model.project.titles) { title in
-                let drag = titleDrag?.id == title.id ? titleDrag : nil
-                let start = drag?.kind == .move ? max(0, title.start.seconds + drag!.seconds) : title.start.seconds
-                let length = drag?.kind == .resize
-                    ? max(title.duration.seconds + drag!.seconds, TextOverlay.minimumDuration.seconds)
-                    : title.duration.seconds
-                let isAfterEnd = title.visibleRange(in: model.project) == nil
-                TitleBlock(title: title, isSelected: model.isSelected(.title(title.id)), isAfterEnd: isAfterEnd) { offset in
-                    titleDrag = TitleDrag(id: title.id, kind: .resize, seconds: Double(offset / pointsPerSecond))
-                } onResizeEnd: { offset in
-                    titleDrag = nil
-                    model.setTitleDuration(title.id, title.duration + CMTime(seconds: Double(offset / pointsPerSecond), preferredTimescale: 600))
+    private func clipView(_ clip: Clip, index: Int) -> some View {
+        let slot = max(width(of: clip.duration), 2)
+        let trim = clipTrim?.id == clip.id ? clipTrim : nil
+        let delta = trim.map { width(of: $0.delta) } ?? 0
+        let shown = trim?.edge == .start ? slot - delta : trim?.edge == .end ? slot + delta : slot
+        let isDragged = reorder?.id == clip.id
+        let asset = model.project.asset(id: clip.assetID)
+        return ClipBlock(
+            clip: clip,
+            name: asset?.name ?? "Missing",
+            aspect: aspect(of: asset),
+            filmstrip: model.filmstrips[clip.assetID],
+            levels: model.audioLevels[clip.assetID],
+            pointsPerSecond: pointsPerSecond,
+            isSelected: model.isSelected(.clip(clip.id))
+        )
+        .equatable()
+        .overlay(alignment: .leading) {
+            EdgeHandle(edge: .leading, help: "Drag to trim the start of the clip") { dx in
+                updateClipTrim(clip, edge: .start, points: dx)
+            } onEnd: { endClipTrim() }
+        }
+        .overlay(alignment: .trailing) {
+            EdgeHandle(edge: .trailing, help: "Drag to trim the end of the clip") { dx in
+                updateClipTrim(clip, edge: .end, points: dx)
+            } onEnd: { endClipTrim() }
+        }
+        .frame(width: max(shown, 4), height: trackHeight)
+        .offset(x: trim?.edge == .start ? delta : 0)
+        .offset(x: isDragged ? reorder!.dx : 0, y: isDragged ? -6 : 0)
+        .shadow(color: .black.opacity(isDragged ? 0.5 : 0), radius: 6, y: 3)
+        .zIndex(isDragged || trim != nil ? 1 : 0)
+        .frame(width: slot, height: trackHeight, alignment: .leading)
+        .onTapGesture { location in
+            let modifiers = NSEvent.modifierFlags
+            model.click(.clip(clip.id), modifiers: modifiers)
+            // ⌘/⇧-clicks only change the selection; a plain click also moves the playhead.
+            guard modifiers.isDisjoint(with: [.command, .shift]) else { return }
+            let start = model.project.timeline.startTime(ofClipAt: index)
+            model.pause()
+            model.seek(to: start + seconds(location.x))
+        }
+        .gesture(DragGesture(minimumDistance: 4)
+            .onChanged { value in
+                if reorder == nil {
+                    model.pause()
+                    if !model.isSelected(.clip(clip.id)) { model.selectedClipID = clip.id }
                 }
-                .frame(width: max(CGFloat(length) * pointsPerSecond - 2, 6), height: titleLaneHeight)
-                .offset(x: leadingInset + CGFloat(start) * pointsPerSecond + 1)
+                reorder = Reorder(id: clip.id, dx: value.translation.width, destination: destination(for: clip, index: index, dx: value.translation.width))
+            }
+            .onEnded { value in
+                let target = destination(for: clip, index: index, dx: value.translation.width)
+                reorder = nil
+                if target != index { model.moveClip(clip.id, to: target) }
+            })
+        .contextMenu {
+            Button("Split at Playhead") { model.splitAtPlayhead() }
+            Button("Trim Start to Playhead") { model.trimToPlayhead(removing: .start) }
+            Button("Trim End to Playhead") { model.trimToPlayhead(removing: .end) }
+            Picker("Framing", selection: Binding(get: { clip.framing }, set: { model.setFraming($0, for: clip.id) })) {
+                Text("Fill Screen").tag(Framing.fill)
+                Text("Show All").tag(Framing.fit)
+            }
+            Button(model.isPunchedIn([clip]) ? "Remove Punch-In" : "Punch In") { model.togglePunchIn([clip.id]) }
+                .disabled(clip.hasMotion)
+            Divider()
+            deleteButton(for: .clip(clip.id), single: "Delete Clip")
+        }
+    }
+
+    /// Where a clip dragged by `dx` lands among the others: after every clip whose middle it passed.
+    private func destination(for clip: Clip, index: Int, dx: CGFloat) -> Int {
+        let clips = model.project.timeline.clips
+        let start = width(of: model.project.timeline.startTime(ofClipAt: index))
+        let middle = start + width(of: clip.duration) / 2 + dx
+        var position = CGFloat.zero
+        var count = 0
+        for other in clips {
+            let w = width(of: other.duration)
+            if other.id != clip.id, position + w / 2 < middle { count += 1 }
+            position += w
+        }
+        return count
+    }
+
+    private func updateClipTrim(_ clip: Clip, edge: ClipEdge, points: CGFloat) {
+        model.pause()
+        if !model.isSelected(.clip(clip.id)) { model.selectedClipID = clip.id }
+        guard let range = model.project.timeline.range(of: clip.id),
+              let limits = model.project.trimLimits(for: clip, edge: edge) else { return }
+        let edgeTime = edge == .start ? range.start : range.end
+        var delta = seconds(points)
+        snapLine = nil
+        if let stuck = model.snapped(edgeTime + delta, excluding: .clip(clip.id)) {
+            delta = stuck - edgeTime
+            snapLine = stuck
+        }
+        delta = delta.snappedToFrame().clamped(limits.start, limits.end)
+        clipTrim = ClipTrim(id: clip.id, edge: edge, delta: delta)
+    }
+
+    private func endClipTrim() {
+        if let trim = clipTrim, trim.delta != .zero { model.trimClip(trim.id, edge: trim.edge, by: trim.delta) }
+        clipTrim = nil
+        snapLine = nil
+    }
+
+    private func aspect(of asset: MediaAsset?) -> CGFloat {
+        guard let size = asset?.displaySize, size.height > 0 else { return 9 / 16 }
+        return min(max(size.width / size.height, 0.5), 1.8)
+    }
+
+    // MARK: B-roll
+
+    /// Videos and pictures over the clips. Drag to move, drag an edge to trim, drop files here to
+    /// add them at that time.
+    private var overlayLane: some View {
+        let rows = overlayRows
+        return ZStack(alignment: .topLeading) {
+            Color.clear
+                .frame(width: max(contentWidth, 1), height: overlaysHeight)
+                .contentShape(Rectangle())
+                .dropDestination(for: URL.self) { urls, location in
+                    model.importFiles(urls, to: .overlay(at: time(at: location.x)))
+                    return true
+                }
+                .allowsHitTesting(true)
+            if model.project.overlays.isEmpty {
+                Label("Drop B-roll or pictures here to show them over your clips", systemImage: "rectangle.on.rectangle")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .frame(height: overlayRowHeight)
+                    .offset(x: leadingInset + 4)
+                    .allowsHitTesting(false)
+            }
+            ForEach(model.project.overlays) { overlay in
+                overlayView(overlay, row: rows[overlay.id] ?? 0)
+            }
+        }
+    }
+
+    private func overlayView(_ overlay: Overlay, row: Int) -> some View {
+        let item = TimelineItem.overlay(overlay.id)
+        let (start, length) = shownRange(of: item, start: overlay.start, duration: overlay.duration)
+        let asset = model.project.asset(id: overlay.clip.assetID)
+        return OverlayBlock(
+            overlay: overlay,
+            name: asset?.name ?? "Missing",
+            aspect: aspect(of: asset),
+            filmstrip: model.filmstrips[overlay.clip.assetID],
+            pointsPerSecond: pointsPerSecond,
+            sourceStart: overlay.clip.sourceStart + (start - overlay.start),
+            isSelected: model.isSelected(item),
+            isAfterEnd: overlay.visibleRange(in: model.project) == nil
+        )
+        .overlay(alignment: .leading) {
+            EdgeHandle(edge: .leading, help: "Drag to trim the start") { dx in
+                updateBlockDrag(item, kind: .start, points: dx, start: overlay.start, duration: overlay.duration)
+            } onEnd: { endBlockDrag() }
+        }
+        .overlay(alignment: .trailing) {
+            EdgeHandle(edge: .trailing, help: "Drag to trim the end") { dx in
+                updateBlockDrag(item, kind: .end, points: dx, start: overlay.start, duration: overlay.duration)
+            } onEnd: { endBlockDrag() }
+        }
+        .frame(width: max(width(of: length) - 2, 6), height: overlayRowHeight)
+        .offset(x: x(for: start) + 1, y: CGFloat(row) * (overlayRowHeight + rowGap))
+        .zIndex(blockDrag?.item == item ? 1 : 0)
+        .onTapGesture {
+            let modifiers = NSEvent.modifierFlags
+            if modifiers.isDisjoint(with: [.command, .shift]) {
+                model.selectOverlay(overlay.id)
+            } else {
+                model.click(item, modifiers: modifiers)
+            }
+        }
+        .gesture(DragGesture(minimumDistance: 3)
+            .onChanged { value in
+                updateBlockDrag(item, kind: .move, points: value.translation.width, start: overlay.start, duration: overlay.duration)
+            }
+            .onEnded { _ in endBlockDrag() })
+        .contextMenu {
+            Button("Split at Playhead") {
+                model.selection = item
+                model.splitAtPlayhead()
+            }
+            Button("Start at Playhead") { model.moveOverlay(overlay.id, to: model.currentTime) }
+            Button(overlay.clip.isMuted ? "Turn Sound On" : "Turn Sound Off") { model.setClipMuted(overlay.id, !overlay.clip.isMuted) }
+                .disabled(asset?.hasAudio != true)
+            Divider()
+            deleteButton(for: item, single: "Delete")
+        }
+    }
+
+    // MARK: Titles
+
+    /// The titles, above everything. Click to select, drag to move, drag the right edge to change the length.
+    private var titleLane: some View {
+        let rows = titleRows
+        return ZStack(alignment: .topLeading) {
+            ForEach(model.project.titles) { title in
+                let item = TimelineItem.title(title.id)
+                let (start, length) = shownRange(of: item, start: title.start, duration: title.duration)
+                let isAfterEnd = title.visibleRange(in: model.project) == nil
+                TitleBlock(title: title, isSelected: model.isSelected(item), isAfterEnd: isAfterEnd) { dx in
+                    updateBlockDrag(item, kind: .end, points: dx, start: title.start, duration: title.duration)
+                } onResizeEnd: {
+                    endBlockDrag()
+                }
+                .frame(width: max(width(of: length) - 2, 6), height: titleRowHeight)
+                .offset(x: x(for: start) + 1, y: CGFloat(rows[title.id] ?? 0) * (titleRowHeight + 2))
+                .zIndex(blockDrag?.item == item ? 1 : 0)
                 .onTapGesture {
                     let modifiers = NSEvent.modifierFlags
                     if modifiers.isDisjoint(with: [.command, .shift]) {
                         model.selectTitle(title.id)
                     } else {
-                        model.click(.title(title.id), modifiers: modifiers)
+                        model.click(item, modifiers: modifiers)
                     }
                 }
                 .gesture(DragGesture(minimumDistance: 3).onChanged { value in
-                    if !model.isSelected(.title(title.id)) { model.selectedTitleID = title.id }
-                    titleDrag = TitleDrag(id: title.id, kind: .move, seconds: Double(value.translation.width / pointsPerSecond))
-                }.onEnded { value in
-                    titleDrag = nil
-                    model.moveTitle(title.id, to: title.start + CMTime(seconds: Double(value.translation.width / pointsPerSecond), preferredTimescale: 600))
+                    updateBlockDrag(item, kind: .move, points: value.translation.width, start: title.start, duration: title.duration)
+                }.onEnded { _ in
+                    endBlockDrag()
                     if model.timelineSelection.count <= 1 { model.selectTitle(title.id) }
                 })
                 .contextMenu {
                     Button("Start at Playhead") { model.moveTitle(title.id, to: model.currentTime) }
                     Divider()
-                    deleteButton(for: .title(title.id), single: "Delete Title")
+                    deleteButton(for: item, single: "Delete Title")
                 }
             }
         }
     }
+
+    // MARK: Dragging titles and B-roll
+
+    /// Where a title or overlay is drawn: where it is, or where it is being dragged to.
+    private func shownRange(of item: TimelineItem, start: CMTime, duration: CMTime) -> (CMTime, CMTime) {
+        guard let drag = blockDrag, drag.item == item else { return (start, duration) }
+        switch drag.kind {
+        case .move: return (start + drag.delta, duration)
+        case .start: return (start + drag.delta, duration - drag.delta)
+        case .end: return (start, duration + drag.delta)
+        }
+    }
+
+    private func updateBlockDrag(_ item: TimelineItem, kind: BlockDrag.Kind, points: CGFloat, start: CMTime, duration: CMTime) {
+        model.pause()
+        if !model.isSelected(item) { model.selection = item }
+        var delta = seconds(points)
+        snapLine = nil
+        switch kind {
+        case .move:
+            let moved = max(.zero, start + delta)
+            if let stuck = model.snappedStart(moved, duration: duration, excluding: item) {
+                delta = stuck - start
+                // Draw the line at whichever edge stuck.
+                let targets = Snapping.targets(in: model.project, playhead: model.currentTime, excluding: [item])
+                snapLine = targets.contains(stuck) ? stuck : stuck + duration
+            }
+            delta = max(delta, -start)
+        case .start:
+            if let stuck = model.snapped(start + delta, excluding: item) {
+                delta = stuck - start
+                snapLine = stuck
+            }
+            delta = min(max(delta, -start), duration - Clip.minimumDuration)
+        case .end:
+            if let stuck = model.snapped(start + duration + delta, excluding: item) {
+                delta = stuck - start - duration
+                snapLine = stuck
+            }
+            delta = max(delta, Clip.minimumDuration - duration)
+        }
+        blockDrag = BlockDrag(item: item, kind: kind, delta: delta.snappedToFrame())
+    }
+
+    private func endBlockDrag() {
+        defer {
+            blockDrag = nil
+            snapLine = nil
+        }
+        guard let drag = blockDrag, drag.delta != .zero else { return }
+        switch (drag.item, drag.kind) {
+        case (.title(let id), .move):
+            if let title = model.project.title(id: id) { model.moveTitle(id, to: title.start + drag.delta) }
+        case (.title(let id), .end):
+            if let title = model.project.title(id: id) { model.setTitleDuration(id, title.duration + drag.delta) }
+        case (.overlay(let id), .move):
+            if let overlay = model.project.overlay(id: id) { model.moveOverlay(id, to: overlay.start + drag.delta) }
+        case (.overlay(let id), .start):
+            model.trimOverlay(id, edge: .start, by: drag.delta)
+        case (.overlay(let id), .end):
+            model.trimOverlay(id, edge: .end, by: drag.delta)
+        default:
+            break
+        }
+    }
+
+    // MARK: Captions, music, pauses
 
     /// The captions, under the clips they belong to. Click one to go there and fix its words.
     private var captionLane: some View {
@@ -297,7 +641,7 @@ struct TimelineView: View {
                     .font(.caption2.weight(.medium))
                     .lineLimit(1)
                     .padding(.horizontal, 4)
-                    .frame(width: max(CGFloat(page.range.duration.seconds) * pointsPerSecond - 2, 3), height: captionLaneHeight, alignment: .leading)
+                    .frame(width: max(width(of: page.range.duration) - 2, 3), height: captionLaneHeight, alignment: .leading)
                     .background(
                         Color.orange.opacity(isCurrent ? 0.55 : 0.3),
                         in: RoundedRectangle(cornerRadius: 4)
@@ -320,7 +664,7 @@ struct TimelineView: View {
     @ViewBuilder
     private var musicLane: some View {
         if let range = model.project.musicRange, let song = model.musicAsset {
-            let width = max(CGFloat(range.duration.seconds) * pointsPerSecond - 2, 6)
+            let width = max(width(of: range.duration) - 2, 6)
             let isSelected = model.isSelected(.music)
             RoundedRectangle(cornerRadius: 4)
                 .fill(Color.green.opacity(isSelected ? 0.45 : 0.25))
@@ -373,7 +717,7 @@ struct TimelineView: View {
                     Rectangle()
                         .fill(Color.red.opacity(0.45))
                         .overlay(Rectangle().strokeBorder(Color.red, lineWidth: 1))
-                        .frame(width: max(CGFloat(cut.duration.seconds) * pointsPerSecond, 1), height: trackHeight)
+                        .frame(width: max(width(of: cut.duration), 1), height: trackHeight)
                         .offset(x: x(for: cut.start))
                 }
             }
@@ -381,32 +725,9 @@ struct TimelineView: View {
             .accessibilityHidden(true)
         }
     }
-
-    /// A red line at 3:00, the longest a Short can be.
-    @ViewBuilder
-    private var limitMarker: some View {
-        let limitX = x(for: Project.maxDuration)
-        if limitX < contentWidth {
-            Rectangle()
-                .fill(Color.red.opacity(0.7))
-                .frame(width: 2)
-                .offset(x: limitX)
-                .help("3:00 — the maximum length of a Short")
-        }
-    }
-
-    private var playhead: some View {
-        VStack(spacing: 0) {
-            Image(systemName: "arrowtriangle.down.fill")
-                .font(.system(size: 10))
-                .foregroundStyle(.red)
-            Rectangle().fill(.red).frame(width: 2)
-        }
-        .offset(x: x(for: model.currentTime) - 5, y: rulerHeight - 10)
-        .allowsHitTesting(false)
-        .accessibilityHidden(true)
-    }
 }
+
+// MARK: - Pieces
 
 /// A volume curve drawn across the music: full height is the music's chosen volume, so the dips
 /// under speech and the fades are easy to see.
@@ -428,13 +749,86 @@ private nonisolated struct VolumeLine: Shape {
     }
 }
 
+/// A grip on the left or right edge of a block, for trimming it.
+private struct EdgeHandle: View {
+    let edge: HorizontalEdge
+    let help: String
+    let onChange: (CGFloat) -> Void
+    let onEnd: () -> Void
+
+    var body: some View {
+        Rectangle()
+            .fill(Color.white.opacity(0.001))
+            .frame(width: 8)
+            .overlay {
+                Capsule().fill(Color.white.opacity(0.7)).frame(width: 3, height: 16)
+            }
+            .frame(maxHeight: .infinity)
+            .contentShape(Rectangle())
+            .pointerStyle(.frameResize(position: edge == .leading ? .leading : .trailing))
+            .gesture(DragGesture(minimumDistance: 1, coordinateSpace: .global)
+                .onChanged { onChange($0.translation.width) }
+                .onEnded { _ in onEnd() })
+            .help(help)
+    }
+}
+
+/// Stills along a clip, one after another at the clip's own shape.
+private struct FilmstripView: View {
+    let filmstrip: Filmstrip?
+    let sourceStart: CMTime
+    let pointsPerSecond: CGFloat
+    let aspect: CGFloat
+
+    var body: some View {
+        Canvas { context, size in
+            guard let filmstrip else { return }
+            let tile = max(size.height * aspect, 12)
+            var x: CGFloat = 0
+            while x < size.width {
+                let time = sourceStart + CMTime(seconds: Double((x + tile / 2) / pointsPerSecond), preferredTimescale: 600)
+                if let image = filmstrip.image(at: time) {
+                    context.draw(Image(decorative: image, scale: 1), in: CGRect(x: x, y: 0, width: tile, height: size.height))
+                }
+                x += tile
+            }
+        }
+    }
+}
+
+/// The sound of a clip as bars, from its file's measured loudness.
+private struct WaveformView: View {
+    let levels: AudioLevels
+    let sourceStart: CMTime
+    let pointsPerSecond: CGFloat
+
+    var body: some View {
+        Canvas { context, size in
+            let framesPerPoint = Double(Project.frameRate) / Double(pointsPerSecond)
+            let first = sourceStart.seconds * Double(Project.frameRate)
+            var path = Path()
+            var x: CGFloat = 0
+            while x < size.width {
+                let from = Int(first + Double(x) * framesPerPoint)
+                let to = max(from + 1, Int(first + Double(x + 2) * framesPerPoint))
+                guard from < levels.decibels.count else { break }
+                let loudest = levels.decibels[max(from, 0)..<min(to, levels.decibels.count)].max() ?? AudioLevels.silence
+                let height = CGFloat(min(max((loudest + 50) / 50, 0), 1)) * size.height
+                if height > 0.5 { path.addRect(CGRect(x: x, y: size.height - height, width: 1.5, height: height)) }
+                x += 2
+            }
+            context.fill(path, with: .color(.white.opacity(0.75)))
+        }
+    }
+}
+
 /// One title on the timeline, with a handle on the right edge for changing its length.
 private struct TitleBlock: View {
     let title: TextOverlay
     let isSelected: Bool
     let isAfterEnd: Bool
     let onResize: (CGFloat) -> Void
-    let onResizeEnd: (CGFloat) -> Void
+    let onResizeEnd: () -> Void
 
     var body: some View {
         RoundedRectangle(cornerRadius: 4)
@@ -452,18 +846,7 @@ private struct TitleBlock: View {
                     .strokeBorder(isSelected ? Color.yellow : Color.purple.opacity(0.8), lineWidth: isSelected ? 2 : 1)
             }
             .overlay(alignment: .trailing) {
-                // The grip for changing the length.
-                Rectangle()
-                    .fill(Color.white.opacity(isSelected ? 0.8 : 0.4))
-                    .frame(width: 2, height: 12)
-                    .padding(.horizontal, 3)
-                    .frame(maxHeight: .infinity)
-                    .contentShape(Rectangle())
-                    .pointerStyle(.frameResize(position: .trailing))
-                    .gesture(DragGesture(minimumDistance: 1, coordinateSpace: .global)
-                        .onChanged { onResize($0.translation.width) }
-                        .onEnded { onResizeEnd($0.translation.width) })
-                    .help("Drag to change how long the title stays")
+                EdgeHandle(edge: .trailing, help: "Drag to change how long the title stays", onChange: onResize, onEnd: onResizeEnd)
             }
             .opacity(isAfterEnd ? 0.4 : 1)
             .contentShape(Rectangle())
@@ -474,20 +857,96 @@ private struct TitleBlock: View {
     }
 }
 
-private struct ClipBlock: View {
+/// A video or picture over the clips (B-roll), on its own row.
+private struct OverlayBlock: View {
+    let overlay: Overlay
+    let name: String
+    let aspect: CGFloat
+    let filmstrip: Filmstrip?
+    let pointsPerSecond: CGFloat
+    let sourceStart: CMTime
+    let isSelected: Bool
+    let isAfterEnd: Bool
+
+    var body: some View {
+        RoundedRectangle(cornerRadius: 5)
+            .fill(Color.teal.opacity(0.35))
+            .overlay {
+                FilmstripView(filmstrip: filmstrip, sourceStart: sourceStart, pointsPerSecond: pointsPerSecond, aspect: aspect)
+                    .opacity(0.75)
+            }
+            .overlay(alignment: .topLeading) {
+                HStack(spacing: 3) {
+                    Image(systemName: "rectangle.on.rectangle")
+                    Text(name).lineLimit(1)
+                    if overlay.clip.isMuted { Image(systemName: "speaker.slash.fill").help("No sound") }
+                    if overlay.clip.hasMotion { Image(systemName: "move.3d").help("Moves") }
+                }
+                .font(.caption2.weight(.medium))
+                .padding(.horizontal, 4)
+                .padding(.vertical, 1)
+                .background(.black.opacity(0.45), in: RoundedRectangle(cornerRadius: 3))
+                .padding(3)
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 5))
+            .overlay {
+                RoundedRectangle(cornerRadius: 5)
+                    .strokeBorder(isSelected ? Color.yellow : Color.teal.opacity(0.9), lineWidth: isSelected ? 2 : 1)
+            }
+            .opacity(isAfterEnd ? 0.4 : 1)
+            .contentShape(Rectangle())
+            .help(isAfterEnd ? "After the end of your Short, so it won't be seen"
+                  : "Over the clips: \(name). Drag to move, drag an edge to trim.")
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("Over the clips: \(name)")
+            .accessibilityAddTraits(isSelected ? .isSelected : [])
+    }
+}
+
+/// A clip on the main storyline: stills along it, its sound, and what has been done to it.
+private struct ClipBlock: View, Equatable {
     let clip: Clip
     let name: String
-    let thumbnail: CGImage?
+    let aspect: CGFloat
+    let filmstrip: Filmstrip?
+    let levels: AudioLevels?
+    let pointsPerSecond: CGFloat
     let isSelected: Bool
+
+    nonisolated static func == (a: ClipBlock, b: ClipBlock) -> Bool {
+        a.clip == b.clip && a.name == b.name && a.aspect == b.aspect && a.pointsPerSecond == b.pointsPerSecond
+            && a.isSelected == b.isSelected && a.levels?.decibels.count == b.levels?.decibels.count
+            && a.filmstrip?.images.count == b.filmstrip?.images.count
+    }
+
+    private let waveHeight: CGFloat = 18
 
     var body: some View {
         RoundedRectangle(cornerRadius: 6)
             .fill(Color.accentColor.opacity(0.25))
-            .overlay(alignment: .leading) {
-                Thumbnail(image: thumbnail)
-                    .frame(width: 40)
-                    .clipped()
-                    .opacity(0.9)
+            .overlay(alignment: .top) {
+                FilmstripView(filmstrip: filmstrip, sourceStart: clip.sourceStart, pointsPerSecond: pointsPerSecond, aspect: aspect)
+                    .padding(.bottom, levels == nil ? 0 : waveHeight)
+                    .opacity(0.85)
+            }
+            .overlay(alignment: .bottom) {
+                if let levels {
+                    WaveformView(levels: levels, sourceStart: clip.sourceStart, pointsPerSecond: pointsPerSecond)
+                        .frame(height: waveHeight - 2)
+                        .padding(.bottom, 1)
+                        .background(Color.black.opacity(0.35))
+                        .opacity(clip.isMuted ? 0.3 : 1)
+                }
+            }
+            .overlay(alignment: .bottomLeading) {
+                // Keyframes: where the picture's motion changes.
+                ForEach(clip.visibleKeyframes) { keyframe in
+                    Image(systemName: "diamond.fill")
+                        .font(.system(size: 8))
+                        .foregroundStyle(.yellow)
+                        .shadow(color: .black, radius: 1)
+                        .offset(x: CGFloat((keyframe.time - clip.sourceStart).seconds) * pointsPerSecond - 4, y: -waveHeight - 1)
+                }
             }
             .overlay(alignment: .topLeading) {
                 VStack(alignment: .leading, spacing: 2) {
@@ -499,13 +958,18 @@ private struct ClipBlock: View {
                         } else if clip.volume != 1 {
                             Text("\(Int((clip.volume * 100).rounded()))%").help("Volume")
                         }
+                        if clip.hasMotion {
+                            Image(systemName: "move.3d").help("The picture moves")
+                        } else if clip.placement.scale != 1 {
+                            Image(systemName: "plus.magnifyingglass").help("Zoomed to \(Int((clip.placement.scale * 100).rounded()))%")
+                        }
                     }
                     .font(.caption2)
-                    .foregroundStyle(.secondary)
                 }
-                .padding(.leading, 46)
-                .padding(.top, 6)
-                .padding(.trailing, 4)
+                .padding(.horizontal, 4)
+                .padding(.vertical, 2)
+                .background(.black.opacity(0.45), in: RoundedRectangle(cornerRadius: 4))
+                .padding(4)
             }
             .clipShape(RoundedRectangle(cornerRadius: 6))
             .overlay {
@@ -514,9 +978,9 @@ private struct ClipBlock: View {
             }
             .padding(.horizontal, 1)
             .contentShape(Rectangle())
+            .help("\(name). Drag to move it, drag an edge to trim.")
             .accessibilityElement(children: .combine)
             .accessibilityAddTraits(isSelected ? .isSelected : [])
-            .accessibilityValue(clip.isMuted ? "Muted" : "")
             .accessibilityValue(clip.isMuted ? "Muted" : "")
     }
 }

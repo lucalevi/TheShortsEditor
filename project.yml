@@ -51,6 +51,10 @@ targets:
             CFBundleTypeRole: Viewer
             LSHandlerRank: Alternate
             LSItemContentTypes: [public.audio]
+          - CFBundleTypeName: Picture
+            CFBundleTypeRole: Viewer
+            LSHandlerRank: Alternate
+            LSItemContentTypes: [public.image]
         # Saved Shorts: a JSON file with its own extension, opened by this app.
         UTExportedTypeDeclarations:
           - UTTypeIdentifier: com.lucalevi.shortseditor.project

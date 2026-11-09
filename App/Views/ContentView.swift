@@ -26,13 +26,18 @@ struct ContentView: View {
                 Button("Import", systemImage: "square.and.arrow.down") {
                     MediaImportPanel.run(model: model, addToTimeline: false)
                 }
-                .help("Import videos into Media (⌘I)")
+                .help("Import videos and pictures into Media (⌘I)")
                 Button("Split", systemImage: "scissors") { model.splitAtPlayhead() }
                     .help("Cut the clip at the playhead (B)")
                     .disabled(model.project.timeline.clips.isEmpty)
                 Button("Delete", systemImage: "trash") { model.deleteSelection() }
                     .help("Remove the selected clips, titles or music (⌫)")
                     .disabled(model.timelineSelection.isEmpty)
+            }
+            ToolbarItem {
+                Button("B-roll", systemImage: "rectangle.on.rectangle") { OverlayImportPanel.run(model: model) }
+                    .help("Show videos or pictures over your clips, starting at the playhead")
+                    .disabled(model.project.timeline.clips.isEmpty)
             }
             ToolbarItem {
                 Button("Remove Pauses", systemImage: "waveform.path.badge.minus") { model.beginRemovingSilences() }

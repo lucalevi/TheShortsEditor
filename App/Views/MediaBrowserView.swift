@@ -17,6 +17,10 @@ struct MediaBrowserView: View {
             let assets = ids.compactMap(model.project.asset(id:))
             if assets.contains(where: \.hasVideo) {
                 Button("Add to Timeline") { assets.filter(\.hasVideo).map(\.id).forEach(model.appendToTimeline) }
+                Button("Add Over Clips at Playhead") {
+                    model.importFiles(assets.filter(\.hasVideo).map(\.url), to: .overlay(at: model.currentTime))
+                }
+                .disabled(model.project.timeline.clips.isEmpty)
             }
             if assets.contains(where: { model.missingAssets.contains($0.id) }) {
                 Button("Find Missing Files…") { model.findMissingFiles() }
@@ -33,7 +37,7 @@ struct MediaBrowserView: View {
                 ContentUnavailableView {
                     Label("No Media Yet", systemImage: "film.stack")
                 } description: {
-                    Text("Drop videos or music here, or click Import.")
+                    Text("Drop videos, pictures or music here, or click Import.")
                 } actions: {
                     Button("Import…") { MediaImportPanel.run(model: model, addToTimeline: false) }
                 }
@@ -102,14 +106,20 @@ private struct MediaRow: View {
                         .foregroundStyle(.orange)
                 }
                 HStack(spacing: 6) {
-                    Text(TimeFormat.string(asset.duration))
-                    if asset.hasVideo {
+                    if asset.isImage {
+                        Text("Picture")
+                    } else {
+                        Text(TimeFormat.string(asset.duration))
+                    }
+                    if asset.isImage {
+                        Image(systemName: "photo").help("A still picture")
+                    } else if asset.hasVideo {
                         Image(systemName: asset.displaySize.height > asset.displaySize.width ? "rectangle.portrait" : "rectangle")
                             .help(asset.displaySize.height > asset.displaySize.width ? "Vertical video" : "Horizontal video")
                     } else {
                         Text("Music")
                     }
-                    if !asset.hasAudio {
+                    if !asset.hasAudio, !asset.isImage {
                         Image(systemName: "speaker.slash").help("No sound")
                     }
                 }
@@ -118,7 +128,7 @@ private struct MediaRow: View {
             }
         }
         .padding(.vertical, 2)
-        .help(asset.hasVideo ? "Double-click to add to the timeline" : "Double-click to use as the music")
+        .help(asset.hasVideo ? "Double-click to add to the timeline. Right-click to put it over the clips (B-roll)." : "Double-click to use as the music")
     }
 }
 

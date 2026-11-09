@@ -131,7 +131,7 @@ public extension Project {
     mutating func addTitle(at time: CMTime, text: String) -> TextOverlay.ID {
         let length = duration > .zero ? duration : TextOverlay.defaultDuration
         let wanted = min(TextOverlay.defaultDuration, length)
-        var start = CMTimeClampToRange(time.snappedToFrame(), range: CMTimeRange(start: .zero, duration: length))
+        var start = time.snappedToFrame().clamped(.zero, length)
         if length - start < wanted { start = max(.zero, length - wanted) }
         let title = TextOverlay(text: text, start: start.snappedToFrame(), duration: wanted.snappedToFrame())
         titles.append(title)
@@ -156,7 +156,7 @@ public extension Project {
         let end = duration
         updateTitle(id) { title in
             let latest = max(.zero, end - title.duration)
-            title.start = CMTimeClampToRange(start.snappedToFrame(), range: CMTimeRange(start: .zero, end: latest)).snappedToFrame()
+            title.start = start.snappedToFrame().clamped(.zero, latest).snappedToFrame()
         }
     }
 

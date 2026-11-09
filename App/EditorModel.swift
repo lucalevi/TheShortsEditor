@@ -68,7 +68,13 @@ final class EditorModel {
     private(set) var currentTime: CMTime = .zero
     private(set) var isPlaying = false
     private(set) var thumbnails: [MediaAsset.ID: CGImage] = [:]
+    /// Stills along each file, drawn on its clips.
+    private(set) var filmstrips: [MediaAsset.ID: Filmstrip] = [:]
     private(set) var isImporting = false
+    /// Edges dragged on the timeline stick to cuts, other items and the playhead (S).
+    var snapsToEdges = UserDefaults.standard.object(forKey: "snapsToEdges") as? Bool ?? true {
+        didSet { UserDefaults.standard.set(snapsToEdges, forKey: "snapsToEdges") }
+    }
     var alert: AlertMessage?
 
     /// Which list the left panel shows.
@@ -84,8 +90,8 @@ final class EditorModel {
     var exportPhase: ExportPhase?
     /// Set while the user is choosing which pauses to remove.
     private(set) var silenceSession: SilenceSession?
-    /// Sound levels of the files on the timeline, for Remove Pauses (measured by `LevelCache`).
-    @ObservationIgnored private var audioLevels: [MediaAsset.ID: AudioLevels] = [:]
+    /// Sound levels of the files, for Remove Pauses and the waveforms on clips (measured by `LevelCache`).
+    private(set) var audioLevels: [MediaAsset.ID: AudioLevels] = [:]
     /// Where a preview skip is heading, so it isn't started again while the seek lands.
     @ObservationIgnored private var skipTarget: CMTime?
 
@@ -188,8 +194,24 @@ final class EditorModel {
         projectDidChange()
     }
 
+    /// Where imported files go.
+    enum ImportDestination: Equatable {
+        /// Only into Media.
+        case media
+        /// Also to the end of the timeline (a song becomes the music).
+        case timelineEnd
+        /// Also over the clips, starting at this time (videos and pictures).
+        case overlay(at: CMTime)
+    }
+
     /// Reads the files, adds the usable ones to Media and, if asked, to the end of the timeline.
     func importFiles(_ urls: [URL], addToTimeline: Bool) {
+        importFiles(urls, to: addToTimeline ? .timelineEnd : .media)
+    }
+
+    /// Reads the files, adds the usable ones to Media, and puts them where `destination` says.
+    func importFiles(_ urls: [URL], to destination: ImportDestination) {
+        let addToTimeline = destination == .timelineEnd
         // A project file dropped or opened opens that Short instead.
         if let projectFile = urls.first(where: { $0.pathExtension.lowercased() == ProjectFile.fileExtension }) {
             openProject(projectFile)
@@ -216,10 +238,23 @@ final class EditorModel {
             isImporting = false
 
             let songs = probed.filter { !$0.hasVideo }
-            apply(addToTimeline ? (probed.allSatisfy { !$0.hasVideo } ? "Add Music" : "Add to Timeline") : "Import") { project in
+            var overlayIDs: [Clip.ID] = []
+            let actionName = switch destination {
+            case .media: "Import"
+            case .timelineEnd: probed.allSatisfy { !$0.hasVideo } ? "Add Music" : "Add to Timeline"
+            case .overlay: "Add Over Clips"
+            }
+            apply(actionName) { project in
+                var overlayStart: CMTime?
+                if case .overlay(let time) = destination { overlayStart = time }
                 for asset in probed {
                     let id = project.addAsset(asset)
                     if addToTimeline, asset.hasVideo { project.appendClip(of: id) }
+                    // Several dropped together go one after another.
+                    if let start = overlayStart, asset.hasVideo, let overlayID = project.addOverlay(of: id, at: start) {
+                        overlayIDs.append(overlayID)
+                        overlayStart = project.overlay(id: overlayID)?.end
+                    }
                 }
                 // A sound file dropped on the timeline or viewer becomes the music.
                 if addToTimeline, let song = songs.first, let id = project.assets.first(where: { $0.url.standardizedFileURL == song.url.standardizedFileURL })?.id {
@@ -227,13 +262,12 @@ final class EditorModel {
                 }
             }
             if addToTimeline, !songs.isEmpty { selection = .music }
-            for asset in probed where asset.hasVideo && thumbnails[asset.id] == nil {
-                loadThumbnail(for: asset)
-            }
+            if overlayIDs.count == 1 { selection = .overlay(overlayIDs[0]) }
+            for asset in probed { loadPreviews(for: asset) }
             if !failures.isEmpty {
                 alert = AlertMessage(
                     title: failures.count == 1 ? "This file can't be used" : "These files can't be used",
-                    message: failures.joined(separator: "\n") + "\n\nOnly video and sound files can be added."
+                    message: failures.joined(separator: "\n") + "\n\nOnly videos, pictures and sound files can be added."
                 )
             }
         }
@@ -248,8 +282,14 @@ final class EditorModel {
         }
     }
 
+    /// Cuts the selected overlay at the playhead when it is on screen there, otherwise the main clip (B).
     func splitAtPlayhead() {
         var newID: Clip.ID?
+        if case .overlay(let id)? = selection, project.overlay(id: id)?.range.containsTime(currentTime) == true {
+            apply("Split Clip") { newID = $0.splitOverlay(id, at: currentTime) }
+            if let newID { selection = .overlay(newID) } else { NSSound.beep() }
+            return
+        }
         apply("Split Clip") { newID = $0.timeline.split(at: currentTime) }
         if let newID { selectedClipID = newID } else { NSSound.beep() }
     }
@@ -271,31 +311,27 @@ final class EditorModel {
         } else if let id = selectedTitleID {
             apply("Delete Title") { $0.removeTitle(id) }
             selectedTitleID = nil
+        } else if case .overlay(let id)? = selection {
+            apply("Delete Clip") { $0.removeOverlay(id) }
+            selection = nil
         } else {
             deleteSelectedClip()
         }
     }
 
     func setFraming(_ framing: Framing, for clipID: Clip.ID) {
-        apply("Change Framing") { project in
-            guard let index = project.timeline.index(of: clipID) else { return }
-            project.timeline.clips[index].framing = framing
-        }
+        setFraming(framing, for: [clipID])
     }
 
     func setFraming(_ framing: Framing, for clipIDs: [Clip.ID]) {
         apply("Change Framing") { project in
-            for id in clipIDs {
-                if let index = project.timeline.index(of: id) { project.timeline.clips[index].framing = framing }
-            }
+            for id in clipIDs { project.updateAnyClip(id) { $0.framing = framing } }
         }
     }
 
     func setClipsMuted(_ clipIDs: [Clip.ID], _ muted: Bool) {
         apply(muted ? "Mute Clips" : "Unmute Clips") { project in
-            for id in clipIDs {
-                if let index = project.timeline.index(of: id) { project.timeline.clips[index].isMuted = muted }
-            }
+            for id in clipIDs { project.updateAnyClip(id) { $0.isMuted = muted } }
         }
     }
 
@@ -307,16 +343,16 @@ final class EditorModel {
 
     func setClipVolume(_ clipID: Clip.ID, _ volume: Double) {
         apply("Change Volume") { project in
-            guard let index = project.timeline.index(of: clipID) else { return }
-            project.timeline.clips[index].volume = min(max(volume, 0), Clip.maxVolume)
-            project.timeline.clips[index].isMuted = false
+            project.updateAnyClip(clipID) { clip in
+                clip.volume = min(max(volume, 0), Clip.maxVolume)
+                clip.isMuted = false
+            }
         }
     }
 
     func setClipMuted(_ clipID: Clip.ID, _ muted: Bool) {
         apply(muted ? "Mute Clip" : "Unmute Clip") { project in
-            guard let index = project.timeline.index(of: clipID) else { return }
-            project.timeline.clips[index].isMuted = muted
+            project.updateAnyClip(clipID) { $0.isMuted = muted }
         }
     }
 
@@ -763,11 +799,13 @@ final class EditorModel {
         selectedAssetID = nil
         focusedCaptionID = nil
         thumbnails = [:]
+        filmstrips = [:]
         audioLevels = [:]
+        LivePreview.clearAll()
         missingAssets = []
         currentTime = .zero
         undoManager?.removeAllActions()
-        for asset in project.assets where asset.hasVideo { loadThumbnail(for: asset) }
+        for asset in project.assets { loadPreviews(for: asset) }
         if let url {
             ProjectStore.noteOpened(url)
         } else {
@@ -792,7 +830,7 @@ final class EditorModel {
         panel.canChooseFiles = true
         panel.canChooseDirectories = true
         // Folders must be listed too: with only file types allowed, a folder can't be chosen.
-        panel.allowedContentTypes = [.movie, .audio, .folder]
+        panel.allowedContentTypes = [.movie, .audio, .image, .folder]
         panel.prompt = "Use"
         panel.message = missing.count == 1
             ? "Where is “\(first.url.lastPathComponent)” now? Choose the file, or the folder it is in."
@@ -830,7 +868,7 @@ final class EditorModel {
                     for (id, url) in accepted { project.relink(id, to: url) }
                 }
                 for id in accepted.keys {
-                    if let asset = project.asset(id: id), asset.hasVideo { loadThumbnail(for: asset) }
+                    if let asset = project.asset(id: id) { loadPreviews(for: asset, again: true) }
                 }
             }
             if !rejected.isEmpty {
@@ -868,6 +906,8 @@ final class EditorModel {
                 musicEnvelope = built.musicEnvelope
                 missingAssets = built.missingAssets
                 player.replaceCurrentItem(with: built.makePlayerItem())
+                // The edit a drag in the viewer showed live is now in the composition itself.
+                LivePreview.clearAll()
                 seek(to: time)
             } catch {
                 guard !Task.isCancelled else { return }
@@ -876,10 +916,22 @@ final class EditorModel {
         }
     }
 
-    private func loadThumbnail(for asset: MediaAsset) {
+    /// Makes what is drawn for a file: its thumbnail, the stills along it, and its sound levels.
+    /// `again` makes them anew, e.g. after the file was found somewhere else.
+    private func loadPreviews(for asset: MediaAsset, again: Bool = false) {
+        if again {
+            thumbnails[asset.id] = nil
+            filmstrips[asset.id] = nil
+        }
         Task {
-            if let image = try? await MediaProbe.thumbnail(for: asset.url) {
+            if asset.hasVideo, thumbnails[asset.id] == nil, let image = try? await MediaProbe.thumbnail(for: asset) {
                 thumbnails[asset.id] = image
+            }
+            if asset.hasVideo, filmstrips[asset.id] == nil, let strip = try? await MediaProbe.filmstrip(for: asset) {
+                filmstrips[asset.id] = strip
+            }
+            if asset.hasAudio, audioLevels[asset.id] == nil, let levels = await LevelCache.levels(of: asset.url) {
+                audioLevels[asset.id] = levels
             }
         }
     }

@@ -1,5 +1,6 @@
 import AVFoundation
 import CoreVideo
+import ImageIO
 
 /// Writes small solid-colour videos for tests, so they don't depend on files on disk.
 enum Fixture {
@@ -136,6 +137,27 @@ enum Fixture {
             }
         }
         return buffer
+    }
+
+    /// A PNG picture of one colour, or two (top half, then bottom half).
+    static func picture(width: Int, height: Int, top: (UInt8, UInt8, UInt8), bottom: (UInt8, UInt8, UInt8)? = nil) throws -> URL {
+        let url = FileManager.default.temporaryDirectory.appending(path: "fixture-\(UUID().uuidString).png")
+        let bottom = bottom ?? top
+        var data = [UInt8](repeating: 255, count: width * height * 4)
+        for y in 0..<height {
+            for x in 0..<width {
+                let i = (y * width + x) * 4
+                (data[i], data[i + 1], data[i + 2]) = y < height / 2 ? top : bottom
+            }
+        }
+        let context = CGContext(data: &data, width: width, height: height, bitsPerComponent: 8, bytesPerRow: width * 4,
+                                space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+        guard let image = context.makeImage(),
+              let destination = CGImageDestinationCreateWithURL(url as CFURL, "public.png" as CFString, 1, nil)
+        else { throw WriteError() }
+        CGImageDestinationAddImage(destination, image, nil)
+        guard CGImageDestinationFinalize(destination) else { throw WriteError() }
+        return url
     }
 
     /// How many pixels inside `rect` (origin top left) are close to white.

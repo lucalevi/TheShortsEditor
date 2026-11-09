@@ -51,10 +51,40 @@ struct EditorCommands: Commands {
             Button("Split at Playhead") { model.splitAtPlayhead() }
                 .keyboardShortcut("b", modifiers: [])
                 .disabled(model.project.timeline.clips.isEmpty)
+            Button("Trim Start to Playhead") { model.trimToPlayhead(removing: .start) }
+                .keyboardShortcut("q", modifiers: [])
+                .disabled(model.project.timeline.clips.isEmpty)
+            Button("Trim End to Playhead") { model.trimToPlayhead(removing: .end) }
+                .keyboardShortcut("w", modifiers: [])
+                .disabled(model.project.timeline.clips.isEmpty)
             Button(model.timelineSelection.count > 1 ? "Delete \(model.timelineSelection.count) Items"
                    : model.selection == .music ? "Remove Music" : model.selectedTitleID != nil ? "Delete Title" : "Delete Clip") { model.deleteSelection() }
                 .keyboardShortcut(.delete, modifiers: [])
                 .disabled(model.timelineSelection.isEmpty)
+            Divider()
+            Button("Add Over Clips at Playhead…") { OverlayImportPanel.run(model: model) }
+                .disabled(model.project.timeline.clips.isEmpty)
+            Divider()
+            let selectedClips = model.timelineSelection.items.compactMap { item -> Clip? in
+                switch item {
+                case .clip(let id), .overlay(let id): model.project.anyClip(id: id)
+                default: nil
+                }
+            }
+            Button(model.isPunchedIn(selectedClips) ? "Remove Punch-In" : "Punch In") { model.togglePunchIn(selectedClips.map(\.id)) }
+                .disabled(selectedClips.allSatisfy(\.hasMotion))
+            Button("Punch In on Every Other Cut") { model.punchInOnAlternateCuts() }
+                .disabled(model.project.timeline.clips.count < 2)
+            Menu("Motion") {
+                ForEach(MotionPreset.allCases) { preset in
+                    Button(preset.displayName) { if let clip = model.adjustableClip { model.applyMotion(preset, to: clip.id) } }
+                }
+                Divider()
+                Button("Add Keyframe") { if let clip = model.adjustableClip { model.addKeyframe(to: clip.id) } }
+                Button("Remove Motion") { if let clip = model.adjustableClip { model.removeMotion(from: clip.id) } }
+                    .disabled(model.adjustableClip?.hasMotion != true)
+            }
+            .disabled(model.adjustableClip == nil)
             Divider()
             Button("Remove Pauses…") { model.beginRemovingSilences() }
                 .disabled(model.project.timeline.clips.isEmpty || model.silenceSession != nil)
@@ -120,6 +150,8 @@ struct EditorCommands: Commands {
         CommandGroup(before: .toolbar) {
             Toggle("Show YouTube Overlay Areas", isOn: Binding(get: { model.showsSafeZone }, set: { model.showsSafeZone = $0 }))
                 .keyboardShortcut("'", modifiers: .command)
+            Toggle("Snapping", isOn: Binding(get: { model.snapsToEdges }, set: { model.snapsToEdges = $0 }))
+                .keyboardShortcut("s", modifiers: [])
             Button("Zoom In Timeline") { model.zoom(by: 1.5) }
                 .keyboardShortcut("+", modifiers: .command)
             Button("Zoom Out Timeline") { model.zoom(by: 1 / 1.5) }
@@ -129,17 +161,31 @@ struct EditorCommands: Commands {
     }
 }
 
-/// The standard Open panel, filtered to video and sound files.
+/// The standard Open panel, filtered to videos, pictures and sound files.
 enum MediaImportPanel {
     static func run(model: EditorModel, addToTimeline: Bool) {
         let panel = NSOpenPanel()
-        panel.allowedContentTypes = [.movie, .audio]
+        panel.allowedContentTypes = [.movie, .image, .audio]
         panel.allowsMultipleSelection = true
         panel.canChooseDirectories = false
         panel.prompt = addToTimeline ? "Add to Timeline" : "Import"
-        panel.message = "Choose the videos (or music) for your Short"
+        panel.message = "Choose the videos, pictures (or music) for your Short"
         guard panel.runModal() == .OK else { return }
         model.importFiles(panel.urls, addToTimeline: addToTimeline)
+    }
+}
+
+/// The Open panel for B-roll: the videos or pictures go over the clips at the playhead.
+enum OverlayImportPanel {
+    static func run(model: EditorModel) {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.movie, .image]
+        panel.allowsMultipleSelection = true
+        panel.canChooseDirectories = false
+        panel.prompt = "Add Over Clips"
+        panel.message = "Choose B-roll or pictures to show over your clips, starting at the playhead"
+        guard panel.runModal() == .OK else { return }
+        model.importFiles(panel.urls, to: .overlay(at: model.currentTime))
     }
 }
 

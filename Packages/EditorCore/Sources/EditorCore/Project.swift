@@ -23,8 +23,27 @@ public struct Project: Codable, Equatable, Sendable {
     public var titles: [TextOverlay] = []
     /// The background song, if any. One per Short.
     public var music: BackgroundMusic?
+    /// Pictures over the main clips (B-roll, picture-in-picture). Drawn in this order, so later
+    /// ones are on top.
+    public var overlays: [Overlay] = []
 
     public init() {}
+
+    private enum CodingKeys: String, CodingKey {
+        case assets, timeline, transcripts, captions, titles, music, overlays
+    }
+
+    /// Reads what older versions saved too: anything they didn't have yet starts empty.
+    public init(from decoder: any Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        assets = try c.decode([MediaAsset].self, forKey: .assets)
+        timeline = try c.decode(Timeline.self, forKey: .timeline)
+        transcripts = try c.decodeIfPresent([MediaAsset.ID: Transcript].self, forKey: .transcripts) ?? [:]
+        captions = try c.decodeIfPresent(CaptionSettings.self, forKey: .captions) ?? CaptionSettings()
+        titles = try c.decodeIfPresent([TextOverlay].self, forKey: .titles) ?? []
+        music = try c.decodeIfPresent(BackgroundMusic.self, forKey: .music)
+        overlays = try c.decodeIfPresent([Overlay].self, forKey: .overlays) ?? []
+    }
 
     public var duration: CMTime { timeline.duration }
     public var isOverMaxDuration: Bool { duration > Self.maxDuration }
@@ -45,16 +64,34 @@ public struct MediaAsset: Identifiable, Codable, Equatable, Sendable {
     public var hasAudio: Bool
     /// False for sound files (music), which can't go on the timeline as clips.
     public var hasVideo: Bool
+    /// A still picture (photo, screenshot). It has a picture (`hasVideo`) but no video track, and
+    /// can be shown for any length up to `MediaAsset.imageDuration`.
+    public var isImage: Bool
 
-    public init(id: UUID = UUID(), url: URL, name: String, duration: CMTime, displaySize: CGSize, hasAudio: Bool, hasVideo: Bool = true) {
+    /// The longest a picture can be shown. Pictures are given this as their length, so trimming
+    /// treats them like a very long video.
+    public static let imageDuration = CMTime(value: 3600, timescale: 1)
+    /// How long a picture stays when it is added.
+    public static let imageClipDuration = CMTime(value: 3, timescale: 1)
+
+    public init(id: UUID = UUID(), url: URL, name: String, duration: CMTime, displaySize: CGSize, hasAudio: Bool, hasVideo: Bool = true, isImage: Bool = false) {
         self.id = id
         self.url = url
         self.name = name
-        self.duration = duration
+        self.duration = isImage ? Self.imageDuration : duration
         self.displaySize = displaySize
-        self.hasAudio = hasAudio
-        self.hasVideo = hasVideo
+        self.hasAudio = isImage ? false : hasAudio
+        self.hasVideo = hasVideo || isImage
+        self.isImage = isImage
     }
+
+    /// A picture file of `size` (as it is meant to be seen, i.e. upright).
+    public static func image(url: URL, size: CGSize) -> MediaAsset {
+        MediaAsset(url: url, name: url.deletingPathExtension().lastPathComponent, duration: imageDuration, displaySize: size, hasAudio: false, isImage: true)
+    }
+
+    /// How long a new clip of this media is: the whole video, or a few seconds of a picture.
+    public var defaultClipDuration: CMTime { isImage ? Self.imageClipDuration : duration }
 
     /// The framing a newcomer most likely wants: vertical footage fills the screen, while
     /// horizontal footage is shown whole instead of losing two thirds of the picture.
@@ -90,7 +127,7 @@ public extension Project {
     @discardableResult
     mutating func appendClip(of assetID: MediaAsset.ID) -> Clip.ID? {
         guard let asset = asset(id: assetID), asset.hasVideo, asset.duration > .zero else { return nil }
-        let clip = Clip(assetID: assetID, sourceStart: .zero, duration: asset.duration, framing: asset.defaultFraming)
+        let clip = Clip(assetID: assetID, sourceStart: .zero, duration: asset.defaultClipDuration, framing: asset.defaultFraming)
         timeline.clips.append(clip)
         return clip.id
     }
@@ -98,7 +135,7 @@ public extension Project {
 
 extension MediaAsset {
     private enum CodingKeys: String, CodingKey {
-        case id, url, name, duration, displaySize, hasAudio, hasVideo
+        case id, url, name, duration, displaySize, hasAudio, hasVideo, isImage
     }
 
     public init(from decoder: any Decoder) throws {
@@ -110,6 +147,7 @@ extension MediaAsset {
         displaySize = try c.decode(CGSize.self, forKey: .displaySize)
         hasAudio = try c.decode(Bool.self, forKey: .hasAudio)
         hasVideo = try c.decodeIfPresent(Bool.self, forKey: .hasVideo) ?? true
+        isImage = try c.decodeIfPresent(Bool.self, forKey: .isImage) ?? false
     }
 
     public func encode(to encoder: any Encoder) throws {
@@ -121,5 +159,6 @@ extension MediaAsset {
         try c.encode(displaySize, forKey: .displaySize)
         try c.encode(hasAudio, forKey: .hasAudio)
         try c.encode(hasVideo, forKey: .hasVideo)
+        try c.encode(isImage, forKey: .isImage)
     }
 }

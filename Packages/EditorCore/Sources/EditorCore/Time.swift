@@ -45,3 +45,18 @@ extension KeyedDecodingContainer {
         try decode(StoredTime.self, forKey: key).time
     }
 }
+
+public extension CMTime {
+    /// The same length the other way, e.g. a move to the left.
+    static prefix func - (time: CMTime) -> CMTime {
+        CMTimeMultiply(time, multiplier: -1)
+    }
+}
+
+public extension CMTime {
+    /// Kept between `lower` and `upper`. Unlike `CMTimeClampToRange`, an empty range (lower ==
+    /// upper) gives that time rather than an invalid one.
+    func clamped(_ lower: CMTime, _ upper: CMTime) -> CMTime {
+        Swift.min(Swift.max(self, lower), Swift.max(lower, upper))
+    }
+}

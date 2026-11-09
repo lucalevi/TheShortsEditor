@@ -22,6 +22,7 @@ struct ViewerView: View {
                 } else {
                     PlayerView(player: model.player)
                         .overlay { if model.showsSafeZone { SafeZoneOverlay() } }
+                        .overlay { PictureHandles(model: model) }
                         .overlay { TitleHandles(model: model) }
                         .aspectRatio(canvasAspect, contentMode: .fit)
                         .clipShape(RoundedRectangle(cornerRadius: 4))
@@ -46,7 +47,7 @@ struct ViewerView: View {
                 VStack(spacing: 12) {
                     Image(systemName: "arrow.down.to.line.compact")
                         .font(.system(size: 36))
-                    Text("Drop your videos here to start")
+                    Text("Drop your videos or pictures here to start")
                         .font(.title3)
                     Text("They go straight onto the timeline, in order.")
                         .foregroundStyle(.secondary)
@@ -129,6 +130,206 @@ private struct SafeZoneOverlay: View {
         }
         .allowsHitTesting(false)
         .accessibilityHidden(true)
+    }
+}
+
+/// A box around the selected clip's picture: drag inside to move it, drag a corner (or pinch) to
+/// resize it, drag the knob above it to turn it. Clicking a picture selects it. The change is shown
+/// straight away and becomes one undoable edit when the drag ends.
+private struct PictureHandles: View {
+    let model: EditorModel
+    /// The placement being dragged, shown instead of the clip's own.
+    @State private var dragged: (clipID: Clip.ID, start: Placement, now: Placement)?
+    @State private var guides: (vertical: Bool, horizontal: Bool) = (false, false)
+    @State private var pinchStart: Placement?
+
+    private let canvas = Project.canvasSize
+
+    var body: some View {
+        GeometryReader { geometry in
+            let scale = geometry.size.width / canvas.width
+            ZStack(alignment: .topLeading) {
+                // Clicking the video selects the picture under the pointer.
+                Color.clear
+                    .contentShape(Rectangle())
+                    .onTapGesture { location in selectPicture(at: CGPoint(x: location.x / scale, y: location.y / scale)) }
+                if let clip = model.adjustableClip, let asset = model.project.asset(id: clip.assetID) {
+                    let placement = dragged?.clipID == clip.id ? dragged!.now : model.placementAtPlayhead(of: clip)
+                    let frame = clip.framing.placedFrame(of: asset.displaySize, placement: placement)
+                    box(for: clip, frame: frame, scale: scale, viewSize: geometry.size)
+                }
+                if guides.vertical {
+                    Rectangle().fill(Color.yellow).frame(width: 1, height: geometry.size.height)
+                        .offset(x: geometry.size.width / 2).allowsHitTesting(false)
+                }
+                if guides.horizontal {
+                    Rectangle().fill(Color.yellow).frame(width: geometry.size.width, height: 1)
+                        .offset(y: geometry.size.height / 2).allowsHitTesting(false)
+                }
+            }
+            .coordinateSpace(.named("viewer"))
+        }
+    }
+
+    @ViewBuilder
+    private func box(for clip: Clip, frame: PlacedFrame, scale: CGFloat, viewSize: CGSize) -> some View {
+        let center = CGPoint(x: frame.center.x * scale, y: frame.center.y * scale)
+        let size = CGSize(width: frame.size.width * scale, height: frame.size.height * scale)
+        let angle = Angle.degrees(frame.rotation)
+        Rectangle()
+            .strokeBorder(Color.yellow, lineWidth: 2)
+            .contentShape(Rectangle())
+            .frame(width: size.width, height: size.height)
+            .rotationEffect(angle)
+            .position(center)
+            .gesture(DragGesture(minimumDistance: 1, coordinateSpace: .named("viewer"))
+                .onChanged { value in move(clip, by: value.translation, scale: scale) }
+                .onEnded { _ in finish(clip, actionName: "Move Picture") })
+            .simultaneousGesture(MagnifyGesture()
+                .onChanged { value in pinch(clip, magnification: value.magnification) }
+                .onEnded { _ in
+                    pinchStart = nil
+                    finish(clip, actionName: "Resize Picture")
+                })
+            .pointerStyle(.grabIdle)
+            .help("Drag to move. Drag a corner or pinch to resize. Drag the round knob to turn it.")
+        // Corners: kept inside the viewer, so they can be grabbed even when the picture is bigger.
+        ForEach(0..<4, id: \.self) { corner in
+            let point = clampedInside(cornerPoint(corner, center: center, size: size, angle: angle), viewSize)
+            Rectangle()
+                .fill(Color.yellow)
+                .frame(width: 10, height: 10)
+                .overlay(Rectangle().strokeBorder(Color.black.opacity(0.6), lineWidth: 1))
+                .position(point)
+                .gesture(DragGesture(minimumDistance: 1, coordinateSpace: .named("viewer"))
+                    .onChanged { value in resize(clip, center: center, from: value.startLocation, to: value.location) }
+                    .onEnded { _ in finish(clip, actionName: "Resize Picture") })
+                .pointerStyle(.frameResize(position: corner == 0 ? .topLeading : corner == 1 ? .topTrailing : corner == 2 ? .bottomTrailing : .bottomLeading))
+        }
+        // The knob for turning, above the top edge.
+        let knob = clampedInside(rotated(CGPoint(x: 0, y: -size.height / 2 - 22), by: angle, around: center), viewSize)
+        Circle()
+            .fill(Color.yellow)
+            .frame(width: 12, height: 12)
+            .overlay(Circle().strokeBorder(Color.black.opacity(0.6), lineWidth: 1))
+            .position(knob)
+            .gesture(DragGesture(minimumDistance: 1, coordinateSpace: .named("viewer"))
+                .onChanged { value in rotate(clip, center: center, from: value.startLocation, to: value.location) }
+                .onEnded { _ in finish(clip, actionName: "Turn Picture") })
+            .help("Drag to turn the picture. It sticks to straight angles.")
+    }
+
+    // MARK: Gestures
+
+    private func begin(_ clip: Clip) -> Placement {
+        if let dragged, dragged.clipID == clip.id { return dragged.start }
+        model.pause()
+        let start = model.placementAtPlayhead(of: clip)
+        dragged = (clip.id, start, start)
+        return start
+    }
+
+    private func show(_ clip: Clip, _ placement: Placement) {
+        guard let start = dragged?.start else { return }
+        let placement = placement.normalized
+        dragged = (clip.id, start, placement)
+        model.previewPlacement(placement, for: clip.id)
+    }
+
+    private func move(_ clip: Clip, by translation: CGSize, scale: CGFloat) {
+        let start = begin(clip)
+        var p = start
+        p.offsetX = start.offsetX + translation.width / scale / canvas.width
+        p.offsetY = start.offsetY + translation.height / scale / canvas.height
+        // Stick to the middle of the screen, within a few points.
+        let tolerance = 6 / scale
+        let snapX = abs(p.offsetX * canvas.width) < tolerance
+        let snapY = abs(p.offsetY * canvas.height) < tolerance
+        if snapX { p.offsetX = 0 }
+        if snapY { p.offsetY = 0 }
+        guides = (snapX, snapY)
+        show(clip, p)
+    }
+
+    private func resize(_ clip: Clip, center: CGPoint, from: CGPoint, to: CGPoint) {
+        let start = begin(clip)
+        let before = max(hypot(from.x - center.x, from.y - center.y), 1)
+        let now = hypot(to.x - center.x, to.y - center.y)
+        var p = start
+        p.scale = start.scale * now / before
+        show(clip, p)
+    }
+
+    private func pinch(_ clip: Clip, magnification: CGFloat) {
+        if pinchStart == nil { pinchStart = begin(clip) }
+        guard let start = pinchStart else { return }
+        var p = start
+        p.scale = start.scale * magnification
+        show(clip, p)
+    }
+
+    private func rotate(_ clip: Clip, center: CGPoint, from: CGPoint, to: CGPoint) {
+        let start = begin(clip)
+        let a = atan2(from.y - center.y, from.x - center.x)
+        let b = atan2(to.y - center.y, to.x - center.x)
+        var degrees = start.rotation + (b - a) * 180 / .pi
+        // Stick to straight angles.
+        let nearest = (degrees / 90).rounded() * 90
+        if abs(degrees - nearest) < 4 { degrees = nearest }
+        var p = start
+        p.rotation = degrees
+        show(clip, p)
+    }
+
+    private func finish(_ clip: Clip, actionName: String) {
+        guides = (false, false)
+        guard let dragged, dragged.clipID == clip.id else { return }
+        self.dragged = nil
+        if dragged.now != dragged.start {
+            model.setPlacement(dragged.now, for: clip.id, actionName: actionName)
+        } else {
+            model.previewPlacement(nil, for: clip.id)
+        }
+    }
+
+    // MARK: Selecting by clicking
+
+    /// Selects the topmost picture under `point` (canvas pixels): a B-roll clip, else the main clip.
+    private func selectPicture(at point: CGPoint) {
+        let time = model.currentTime
+        for overlay in model.project.overlaysOnScreen(at: time).reversed() {
+            guard let asset = model.project.asset(id: overlay.clip.assetID) else { continue }
+            let placement = overlay.clip.placement(atSourceTime: overlay.sourceTime(at: time))
+            if contains(overlay.clip.framing.placedFrame(of: asset.displaySize, placement: placement), point) {
+                if model.selection != .overlay(overlay.id) { model.selection = .overlay(overlay.id) }
+                return
+            }
+        }
+        if let clip = model.clipAtPlayhead, model.selection != .clip(clip.id) {
+            model.selection = .clip(clip.id)
+        }
+    }
+
+    private func contains(_ frame: PlacedFrame, _ point: CGPoint) -> Bool {
+        let local = rotated(CGPoint(x: point.x - frame.center.x, y: point.y - frame.center.y), by: .degrees(-frame.rotation), around: .zero)
+        return abs(local.x) <= frame.size.width / 2 && abs(local.y) <= frame.size.height / 2
+    }
+
+    // MARK: Geometry
+
+    private func cornerPoint(_ corner: Int, center: CGPoint, size: CGSize, angle: Angle) -> CGPoint {
+        let x = corner == 0 || corner == 3 ? -size.width / 2 : size.width / 2
+        let y = corner < 2 ? -size.height / 2 : size.height / 2
+        return rotated(CGPoint(x: x, y: y), by: angle, around: center)
+    }
+
+    private func rotated(_ offset: CGPoint, by angle: Angle, around center: CGPoint) -> CGPoint {
+        let r = angle.radians
+        return CGPoint(x: center.x + offset.x * cos(r) - offset.y * sin(r), y: center.y + offset.x * sin(r) + offset.y * cos(r))
+    }
+
+    private func clampedInside(_ point: CGPoint, _ size: CGSize) -> CGPoint {
+        CGPoint(x: min(max(point.x, 8), size.width - 8), y: min(max(point.y, 8), size.height - 8))
     }
 }
 

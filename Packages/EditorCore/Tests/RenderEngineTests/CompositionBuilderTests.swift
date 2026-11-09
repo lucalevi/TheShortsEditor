@@ -52,7 +52,9 @@ struct CompositionBuilderTests {
 
     @Test func fitLeavesBarsAboveAndBelow() async throws {
         let url = try await Fixture.video(width: 320, height: 180, bgra: red)
-        let image = try await frame(of: CompositionBuilder.build(try await project(with: url, framing: .fit)), at: 0.5)
+        var project = try await project(with: url, framing: .fit)
+        project.timeline.clips[0].background = .black
+        let image = try await frame(of: CompositionBuilder.build(project), at: 0.5)
         #expect(isBlack(Fixture.pixel(image, x: 540, y: 50)))
         #expect(isRed(Fixture.pixel(image, x: 540, y: 960)))
     }

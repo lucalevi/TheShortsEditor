@@ -19,3 +19,12 @@ if a[1] == "click" {
     for i in 1...10 { let t = Double(i) / 10; post(.leftMouseDragged, CGPoint(x: p1.x + (p2.x - p1.x) * t, y: p1.y + (p2.y - p1.y) * t)) }
     post(.leftMouseUp, p2)
 }
+// mouse scroll X Y DY   (lines; negative scrolls content up, i.e. shows what is below)
+if a[1] == "scroll" {
+    let p = CGPoint(x: n[0], y: n[1])
+    post(.mouseMoved, p)
+    let e = CGEvent(scrollWheelEvent2Source: nil, units: .line, wheelCount: 1, wheel1: Int32(n[2]), wheel2: 0, wheel3: 0)!
+    e.location = p
+    e.post(tap: .cghidEventTap)
+    usleep(30_000)
+}

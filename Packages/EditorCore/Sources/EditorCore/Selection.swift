@@ -4,12 +4,14 @@ import CoreMedia
 public enum TimelineItem: Hashable, Sendable {
     case clip(Clip.ID)
     case title(TextOverlay.ID)
+    /// A clip over the main clips (B-roll, picture-in-picture).
+    case overlay(Clip.ID)
     case music
 }
 
 /// The rows of the timeline, top to bottom, for picking items with a rectangle.
 public enum TimelineLane: Hashable, Sendable, CaseIterable {
-    case titles, clips, music
+    case titles, overlays, clips, music
 }
 
 /// What is selected on the timeline: any mix of clips, titles and the music.
@@ -80,6 +82,7 @@ public extension Project {
         switch item {
         case .clip(let id): timeline.index(of: id) != nil
         case .title(let id): title(id: id) != nil
+        case .overlay(let id): overlay(id: id) != nil
         case .music: music != nil
         }
     }
@@ -88,6 +91,7 @@ public extension Project {
     var allTimelineItems: Set<TimelineItem> {
         var items = Set(timeline.clips.map { TimelineItem.clip($0.id) })
         items.formUnion(titles.map { .title($0.id) })
+        items.formUnion(overlays.map { .overlay($0.id) })
         if musicRange != nil { items.insert(.music) }
         return items
     }
@@ -107,18 +111,22 @@ public extension Project {
         if lanes.contains(.titles) {
             for title in titles where overlaps(title.start, title.end) { items.insert(.title(title.id)) }
         }
+        if lanes.contains(.overlays) {
+            for overlay in overlays where overlaps(overlay.start, overlay.end) { items.insert(.overlay(overlay.id)) }
+        }
         if lanes.contains(.music), let music = musicRange, overlaps(music.start, music.end) {
             items.insert(.music)
         }
         return items
     }
 
-    /// Removes clips (closing the gaps), titles and the music in one go.
+    /// Removes clips (closing the gaps), overlays, titles and the music in one go.
     mutating func remove(_ items: Set<TimelineItem>) {
         for item in items {
             switch item {
             case .clip(let id): timeline.remove(id)
             case .title(let id): removeTitle(id)
+            case .overlay(let id): removeOverlay(id)
             case .music: music = nil
             }
         }

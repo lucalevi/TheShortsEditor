@@ -1,6 +1,6 @@
 import AppKit
 
-/// Handles the single-key editing shortcuts (Space, J/K/L, B, arrows, Delete, Home/End).
+/// Handles the single-key editing shortcuts (Space, J/K/L, B, Q/W, S, arrows, Delete, Home/End).
 ///
 /// Menu shortcuts alone aren't enough for keys without modifiers: whichever control has keyboard
 /// focus gets them first (Space presses a focused button, arrows move a list selection). The menus
@@ -36,6 +36,9 @@ final class EditorKeys {
         case 40: model.pause()                     // K
         case 37: model.shuttle(forward: true)      // L
         case 11: model.splitAtPlayhead()           // B
+        case 12: model.trimToPlayhead(removing: .start)  // Q
+        case 13: model.trimToPlayhead(removing: .end)    // W
+        case 1: model.snapsToEdges.toggle()        // S
         case 123: model.step(frames: -1)           // ←
         case 124: model.step(frames: 1)            // →
         case 51, 117: model.deleteSelection()      // ⌫, ⌦

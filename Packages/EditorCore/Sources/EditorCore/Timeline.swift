@@ -3,7 +3,7 @@ import Foundation
 
 /// A piece of a source file placed on the timeline.
 public struct Clip: Identifiable, Codable, Equatable, Sendable {
-    public let id: UUID
+    public internal(set) var id: UUID
     public var assetID: MediaAsset.ID
     /// Where in the source file this clip begins.
     public var sourceStart: CMTime
@@ -13,10 +13,22 @@ public struct Clip: Identifiable, Codable, Equatable, Sendable {
     public var volume: Double
     /// Silences the clip without forgetting its volume.
     public var isMuted: Bool
+    /// Moved, resized or turned on top of the framing. Used when the clip has no keyframes.
+    public var placement: Placement
+    /// Motion over time, sorted by time (in the source file's time). Empty for a still picture.
+    public var keyframes: [Keyframe]
+    /// What shows around the picture where it doesn't cover the canvas.
+    public var background: ClipBackground
 
     public static let maxVolume = 2.0
+    /// No clip is shorter than this, so it can still be seen and grabbed on the timeline.
+    public static let minimumDuration = CMTime(value: 3, timescale: Project.frameRate)
 
-    public init(id: UUID = UUID(), assetID: MediaAsset.ID, sourceStart: CMTime, duration: CMTime, framing: Framing = .fill, volume: Double = 1, isMuted: Bool = false) {
+    public init(
+        id: UUID = UUID(), assetID: MediaAsset.ID, sourceStart: CMTime, duration: CMTime, framing: Framing = .fill,
+        volume: Double = 1, isMuted: Bool = false, placement: Placement = .identity, keyframes: [Keyframe] = [],
+        background: ClipBackground = .blur
+    ) {
         self.id = id
         self.assetID = assetID
         self.sourceStart = sourceStart
@@ -24,6 +36,9 @@ public struct Clip: Identifiable, Codable, Equatable, Sendable {
         self.framing = framing
         self.volume = volume
         self.isMuted = isMuted
+        self.placement = placement
+        self.keyframes = keyframes
+        self.background = background
     }
 
     public var sourceRange: CMTimeRange { CMTimeRange(start: sourceStart, duration: duration) }
@@ -31,9 +46,14 @@ public struct Clip: Identifiable, Codable, Equatable, Sendable {
     /// The volume actually played.
     public var effectiveVolume: Double { isMuted ? 0 : volume }
 
-    /// Another piece of the same source with the same settings (framing, sound), e.g. after a split.
+    /// Another piece of the same source with the same settings (framing, sound, placement and
+    /// motion), e.g. after a split.
     public func piece(id: UUID = UUID(), sourceStart: CMTime, duration: CMTime) -> Clip {
-        Clip(id: id, assetID: assetID, sourceStart: sourceStart, duration: duration, framing: framing, volume: volume, isMuted: isMuted)
+        var piece = self
+        piece.id = id
+        piece.sourceStart = sourceStart
+        piece.duration = duration
+        return piece
     }
 }
 
@@ -107,7 +127,7 @@ public struct Timeline: Codable, Equatable, Sendable {
 
 extension Clip {
     private enum CodingKeys: String, CodingKey {
-        case id, assetID, sourceStart, duration, framing, volume, isMuted
+        case id, assetID, sourceStart, duration, framing, volume, isMuted, placement, keyframes, background
     }
 
     public init(from decoder: any Decoder) throws {
@@ -119,6 +139,10 @@ extension Clip {
         framing = try c.decode(Framing.self, forKey: .framing)
         volume = try c.decodeIfPresent(Double.self, forKey: .volume) ?? 1
         isMuted = try c.decodeIfPresent(Bool.self, forKey: .isMuted) ?? false
+        placement = try c.decodeIfPresent(Placement.self, forKey: .placement) ?? .identity
+        keyframes = try c.decodeIfPresent([Keyframe].self, forKey: .keyframes) ?? []
+        // Shorts saved before backgrounds existed had black bars: keep them looking the same.
+        background = try c.decodeIfPresent(ClipBackground.self, forKey: .background) ?? .black
     }
 
     public func encode(to encoder: any Encoder) throws {
@@ -130,5 +154,8 @@ extension Clip {
         try c.encode(framing, forKey: .framing)
         try c.encode(volume, forKey: .volume)
         try c.encode(isMuted, forKey: .isMuted)
+        try c.encode(placement, forKey: .placement)
+        try c.encode(keyframes, forKey: .keyframes)
+        try c.encode(background, forKey: .background)
     }
 }

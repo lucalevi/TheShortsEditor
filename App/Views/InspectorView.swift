@@ -10,6 +10,7 @@ struct InspectorView: View {
             PanelHeader(title: model.silenceSession != nil ? "Remove Pauses"
                         : model.timelineSelection.count > 1 ? "\(model.timelineSelection.count) Selected"
                         : model.selectedTitle != nil ? "Title"
+                        : model.selectedOverlay != nil ? "Over the Clips"
                         : model.selection == .music && model.project.music != nil ? "Music"
                         : model.selectedClip == nil ? "Your Short" : "Clip")
             ScrollView {
@@ -23,6 +24,8 @@ struct InspectorView: View {
                     } else if let title = model.selectedTitle {
                         TitleInspector(model: model, title: title)
                             .id(title.id)
+                    } else if let overlay = model.selectedOverlay {
+                        OverlayInspector(model: model, overlay: overlay)
                     } else if let clip = model.selectedClip {
                         ClipInspector(model: model, clip: clip)
                     } else {
@@ -43,13 +46,20 @@ private struct MultipleInspector: View {
 
     private var clips: [Clip] {
         model.project.timeline.clips.filter { model.isSelected(.clip($0.id)) }
+            + model.project.overlays.map(\.clip).filter { model.isSelected(.overlay($0.id)) }
+    }
+
+    private var mainClips: [Clip] {
+        clips.filter { model.project.timeline.index(of: $0.id) != nil }
     }
 
     private var summary: [String] {
         let items = model.timelineSelection.items
         let titles = items.filter { if case .title = $0 { true } else { false } }.count
+        let overlays = clips.count - mainClips.count
         var parts: [String] = []
-        if !clips.isEmpty { parts.append(clips.count == 1 ? "1 clip" : "\(clips.count) clips") }
+        if !mainClips.isEmpty { parts.append(mainClips.count == 1 ? "1 clip" : "\(mainClips.count) clips") }
+        if overlays > 0 { parts.append(overlays == 1 ? "1 clip over the others" : "\(overlays) clips over the others") }
         if titles > 0 { parts.append(titles == 1 ? "1 title" : "\(titles) titles") }
         if items.contains(.music) { parts.append("the music") }
         return parts
@@ -71,6 +81,23 @@ private struct MultipleInspector: View {
                     Text("Sets every selected clip at once.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                }
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Zoom").font(.subheadline.weight(.semibold))
+                    Button(model.isPunchedIn(clips) ? "Remove Punch-In" : "Punch In", systemImage: "plus.magnifyingglass") {
+                        model.togglePunchIn(clips.map(\.id))
+                    }
+                    if mainClips.count > 1 {
+                        Button("Punch In on Every Other Cut") { model.punchInOnAlternateCuts() }
+                            .help("Zoom in on every other clip from the same recording, so jump cuts look like a change of camera")
+                    }
+                }
+                if !mainClips.isEmpty {
+                    let allBlack = mainClips.allSatisfy { $0.background == .black }
+                    Button(allBlack ? "Blurred Background" : "Black Background") {
+                        model.setBackground(allBlack ? .blur : .black, for: mainClips.map(\.id))
+                    }
+                    .help("What fills the screen around pictures that don't cover it")
                 }
                 Button(allMuted ? "Unmute Clips" : "Mute Clips", systemImage: allMuted ? "speaker.wave.2" : "speaker.slash") {
                     model.setClipsMuted(clips.map(\.id), !allMuted)
@@ -109,21 +136,10 @@ private struct ClipInspector: View {
                 Text("Length \(TimeFormat.string(clip.duration))").foregroundStyle(.secondary)
             }
 
-            VStack(alignment: .leading, spacing: 6) {
-                Text("Framing").font(.subheadline.weight(.semibold))
-                Picker("Framing", selection: Binding(get: { clip.framing }, set: { model.setFraming($0, for: clip.id) })) {
-                    Text("Fill screen").tag(Framing.fill)
-                    Text("Show all").tag(Framing.fit)
-                }
-                .pickerStyle(.segmented)
-                .labelsHidden()
-                Text(clip.framing == .fill
-                     ? "The video covers the whole screen. Edges that don't fit are cropped."
-                     : "The whole video is visible, with black bars where it doesn't reach.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
+            PictureSection(model: model, clip: clip, isMain: true)
+                .id(clip.id)
+
+            MotionSection(model: model, clip: clip)
 
             ClipSound(model: model, clip: clip, hasSound: asset?.hasAudio ?? false)
                 .id(clip.id)
@@ -132,6 +148,7 @@ private struct ClipInspector: View {
                 Button("Split at Playhead", systemImage: "scissors") { model.splitAtPlayhead() }
                 Button("Delete", systemImage: "trash", role: .destructive) { model.deleteSelection() }
             }
+            .controlSize(.small)
         }
     }
 }
@@ -181,6 +198,55 @@ private struct ClipSound: View {
     }
 }
 
+/// A video or picture shown over the main clips (B-roll, picture-in-picture).
+private struct OverlayInspector: View {
+    let model: EditorModel
+    let overlay: Overlay
+
+    private var asset: MediaAsset? { model.project.asset(id: overlay.clip.assetID) }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Thumbnail(image: model.thumbnails[overlay.clip.assetID])
+                .frame(height: 110)
+                .frame(maxWidth: .infinity)
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(asset?.name ?? "Missing media").font(.headline).lineLimit(2)
+                Text("From \(TimeFormat.string(overlay.start)) for \(TimeFormat.string(overlay.duration))")
+                    .monospacedDigit()
+                    .foregroundStyle(.secondary)
+                Text("Shown over the clips below it. Their sound keeps playing.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            PictureSection(model: model, clip: overlay.clip, isMain: false)
+                .id(overlay.id)
+
+            MotionSection(model: model, clip: overlay.clip)
+
+            if asset?.hasAudio == true {
+                VStack(alignment: .leading, spacing: 6) {
+                    Toggle("Play its own sound", isOn: Binding(get: { !overlay.clip.isMuted }, set: { model.setClipMuted(overlay.id, !$0) }))
+                    if !overlay.clip.isMuted {
+                        ClipSound(model: model, clip: overlay.clip, hasSound: true)
+                            .id(overlay.id)
+                    }
+                }
+            }
+
+            HStack {
+                Button("Start at Playhead") { model.moveOverlay(overlay.id, to: model.currentTime) }
+                Button("Delete", systemImage: "trash", role: .destructive) { model.deleteSelection() }
+            }
+            .controlSize(.small)
+        }
+    }
+}
+
 private struct ProjectInspector: View {
     let model: EditorModel
 
@@ -213,7 +279,9 @@ private struct ProjectInspector: View {
                 Tip(icon: "bolt.fill", text: "Make the very first second the hook. Cut any intro.")
                 Tip(icon: "textformat", text: "Add a title (⌘T) at the start to say what the Short is about.")
                 Tip(icon: "rectangle.dashed", text: "Keep faces and text out of the dimmed areas. YouTube covers them.")
-                Tip(icon: "hand.tap", text: "Click a clip to select it. Click on the timeline to move the playhead.")
+                Tip(icon: "hand.tap", text: "Click a clip to select it. Drag it to move it, or drag its edges to trim it.")
+                Tip(icon: "rectangle.on.rectangle", text: "Drop B-roll or pictures on the row above the clips to show them over your clips.")
+                Tip(icon: "plus.magnifyingglass", text: "Punch in on every other cut (Clip menu) to hide jump cuts.")
             }
         }
     }

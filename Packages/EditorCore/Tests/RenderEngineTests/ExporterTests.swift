@@ -34,6 +34,34 @@ struct ExporterTests {
     }
 
     @Test(.timeLimit(.minutes(1)))
+    func exportsPicturesAndBRollWithTheirSound() async throws {
+        // A 2 s video, then a 3 s picture; B-roll with its own sound over the start.
+        let source = try await Fixture.video(width: 180, height: 320, seconds: 2, bgra: red, toneFrom: 0)
+        var project = try await project(source)
+        let photo = project.addAsset(try await MediaProbe.probe(try Fixture.picture(width: 400, height: 300, top: (0, 0, 255))))
+        project.appendClip(of: photo)
+        let broll = project.addAsset(try await MediaProbe.probe(try await Fixture.video(width: 180, height: 320, seconds: 2, bgra: red, toneFrom: 0)))
+        let added = project.addOverlay(of: broll, at: .zero)
+        let id = try #require(added)
+        project.updateOverlay(id) { $0.clip.isMuted = false; $0.clip.placement = Placement(scale: 0.5) }
+
+        let url = outputURL()
+        try await Exporter.export(project, to: url) { _ in }
+        let asset = AVURLAsset(url: url)
+        #expect(abs(try await asset.load(.duration).seconds - 5) < 0.1)
+        #expect(try await asset.loadTracks(withMediaType: .video).count == 1)
+        #expect(try await asset.loadTracks(withMediaType: .audio).count == 1)
+
+        let generator = AVAssetImageGenerator(asset: asset)
+        generator.requestedTimeToleranceBefore = .zero
+        generator.requestedTimeToleranceAfter = .zero
+        // The picture (blue) shows at 3.5 s, over its blurred copy.
+        let frame = try await generator.image(at: CMTime(value: 7, timescale: 2)).image
+        let p = Fixture.pixel(frame, x: 540, y: 960)
+        #expect(p.b > 200 && p.r < 60)
+    }
+
+    @Test(.timeLimit(.minutes(1)))
     func writesAFileYouTubeAccepts() async throws {
         let source = try await Fixture.video(width: 180, height: 320, seconds: 2, bgra: red, toneFrom: 0)
         let url = outputURL()

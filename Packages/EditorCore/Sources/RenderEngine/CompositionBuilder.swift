@@ -49,43 +49,17 @@ public enum CompositionBuilder {
             let audioTrack = composition.addMutableTrack(withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid)
         else { throw BuildError.unreadable("composition") }
 
-        var sources: [MediaAsset.ID: AVURLAsset] = [:]
-        var instructions: [any AVVideoCompositionInstructionProtocol] = []
-        var cursor = CMTime.zero
+        var media = MediaSources(project: project)
         let captions = CaptionTrack(project: project)
         let titles = TitleTrack(project: project)
         let clipSound = AVMutableAudioMixInputParameters(track: audioTrack)
 
-        var missing = Set<MediaAsset.ID>()
-
+        // The main clips, back to back.
+        var layers: [(range: CMTimeRange, layer: CompositorLayer)] = []
+        var cursor = CMTime.zero
         for clip in project.timeline.clips {
-            let media = project.asset(id: clip.assetID)
-            var sourceVideo: AVAssetTrack?
-            var source: AVURLAsset?
-            if let media, media.hasVideo {
-                let asset = sources[media.id] ?? AVURLAsset(url: media.url)
-                sources[media.id] = asset
-                source = asset
-                // A file that was moved or deleted (or can't be opened any more) can't be read.
-                sourceVideo = try? await asset.loadTracks(withMediaType: .video).first
-            }
-            guard media != nil, let source, let sourceVideo else {
-                // Missing media: keep its place, black and silent, so the rest still plays.
-                if let media { missing.insert(media.id) }
-                let black = try await Placeholder.blackVideoTrack()
-                let second = CMTimeRange(start: .zero, duration: CMTime(value: 1, timescale: 1))
-                try videoTrack.insertTimeRange(second, of: black.track, at: cursor)
-                videoTrack.scaleTimeRange(CMTimeRange(start: cursor, duration: second.duration), toDuration: clip.duration)
-                instructions.append(ShortsInstruction(
-                    timeRange: CMTimeRange(start: cursor, duration: clip.duration),
-                    trackID: videoTrack.trackID, transform: .identity, captions: captions, titles: titles
-                ))
-                cursor = cursor + clip.duration
-                continue
-            }
-            try videoTrack.insertTimeRange(clip.sourceRange, of: sourceVideo, at: cursor)
-
-            if let sourceAudio = try await source.loadTracks(withMediaType: .audio).first {
+            let layer = try await media.layer(for: clip, at: cursor, in: videoTrack, isMain: true)
+            if case .track = layer.source, let sourceAudio = try await media.audioTrack(of: clip.assetID) {
                 // Audio may be a little shorter than the video; insert only what exists and pad
                 // so the next clip's sound still starts exactly with its picture.
                 let available = try await sourceAudio.load(.timeRange)
@@ -96,36 +70,66 @@ public enum CompositionBuilder {
                     try audioTrack.insertTimeRange(range, of: sourceAudio, at: insertAt)
                 }
             }
-
             clipSound.setVolume(Float(clip.effectiveVolume * gain), at: cursor)
-
-            let (naturalSize, preferredTransform) = try await sourceVideo.load(.naturalSize, .preferredTransform)
-            instructions.append(ShortsInstruction(
-                timeRange: CMTimeRange(start: cursor, duration: clip.duration),
-                trackID: videoTrack.trackID,
-                transform: clip.framing.transform(naturalSize: naturalSize, preferredTransform: preferredTransform),
-                captions: captions,
-                titles: titles
-            ))
-
+            layers.append((CMTimeRange(start: cursor, duration: clip.duration), layer))
             cursor = cursor + clip.duration
         }
 
+        // Overlays: each row of overlapping ones gets its own video (and sound) track.
         var mixInputs: [AVAudioMixInputParameters] = []
+        let visible = project.overlays.compactMap { overlay in overlay.visibleRange(in: project).map { (overlay, $0) } }
+        let rows = LanePacking.rows(visible.map { (id: $0.0.id, range: $0.1) })
+        var rowVideo: [Int: AVMutableCompositionTrack] = [:]
+        var rowAudio: [Int: (track: AVMutableCompositionTrack, parameters: AVMutableAudioMixInputParameters)] = [:]
+        var overlayLayers: [(range: CMTimeRange, layer: CompositorLayer)] = []
+        for (overlay, range) in visible {
+            let row = rows[overlay.id] ?? 0
+            if rowVideo[row] == nil { rowVideo[row] = composition.addMutableTrack(withMediaType: .video, preferredTrackID: kCMPersistentTrackID_Invalid) }
+            guard let track = rowVideo[row] else { continue }
+            var clip = overlay.clip
+            clip.duration = range.duration  // the part after the end of the Short isn't shown
+            let layer = try await media.layer(for: clip, at: overlay.start, in: track, isMain: false)
+            overlayLayers.append((range, layer))
+
+            guard case .track = layer.source, !clip.isMuted, clip.volume > 0,
+                  let sourceAudio = try await media.audioTrack(of: clip.assetID) else { continue }
+            if rowAudio[row] == nil, let audio = composition.addMutableTrack(withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid) {
+                rowAudio[row] = (audio, AVMutableAudioMixInputParameters(track: audio))
+            }
+            guard let audio = rowAudio[row] else { continue }
+            let source = clip.sourceRange.intersection(try await sourceAudio.load(.timeRange))
+            guard source.duration > .zero else { continue }
+            try audio.track.insertTimeRange(source, of: sourceAudio, at: overlay.start + (source.start - clip.sourceStart))
+            audio.parameters.setVolume(Float(clip.effectiveVolume * gain), at: overlay.start)
+        }
+        for track in rowVideo.values where track.segments.isEmpty { composition.removeTrack(track) }
+        mixInputs += rowAudio.values.map(\.parameters)
+
+        // One instruction for each stretch where the same clips are on screen.
+        var cuts = Set(layers.flatMap { [$0.range.start, $0.range.end] })
+        for (range, _) in overlayLayers { cuts.formUnion([range.start, range.end]) }
+        let times = cuts.filter { $0 <= cursor }.sorted()
+        var instructions: [any AVVideoCompositionInstructionProtocol] = []
+        for (from, to) in zip(times, times.dropFirst()) where to > from {
+            guard let main = layers.first(where: { $0.range.containsTime(from) })?.layer else { continue }
+            let over = overlayLayers.filter { $0.range.containsTime(from) }.map(\.layer)
+            instructions.append(ShortsInstruction(
+                timeRange: CMTimeRange(start: from, end: to), layers: [main] + over, captions: captions, titles: titles
+            ))
+        }
+        var missing = media.missing
+
         if audioTrack.segments.isEmpty {
             composition.removeTrack(audioTrack)
         } else {
-            mixInputs.append(clipSound)
+            mixInputs.insert(clipSound, at: 0)
         }
 
         // The background song, on its own track, with its volume curve.
         var envelope: [VolumePoint] = []
         var songAudio: AVAssetTrack?
         if project.music != nil, project.musicRange != nil, let song = project.asset(id: project.music!.assetID) {
-            // Kept in `sources`: a track is only usable while its asset is alive.
-            let asset = sources[song.id] ?? AVURLAsset(url: song.url)
-            sources[song.id] = asset
-            songAudio = try? await asset.loadTracks(withMediaType: .audio).first
+            songAudio = try? await media.asset(song).loadTracks(withMediaType: .audio).first
             if songAudio == nil { missing.insert(song.id) }
         }
         if let track = project.music, let range = project.musicRange, let songAudio,
@@ -173,5 +177,69 @@ public enum CompositionBuilder {
         if end < time {
             track.insertEmptyTimeRange(CMTimeRange(start: end, end: time))
         }
+    }
+}
+
+/// The files a build reads, opened once each, and the layers made from them.
+@MainActor
+private struct MediaSources {
+    let project: Project
+    /// A track is only usable while its asset is alive, so they are kept for the whole build.
+    private var assets: [MediaAsset.ID: AVURLAsset] = [:]
+    /// Media whose files can't be read.
+    private(set) var missing = Set<MediaAsset.ID>()
+
+    init(project: Project) {
+        self.project = project
+    }
+
+    mutating func asset(_ media: MediaAsset) -> AVURLAsset {
+        if let known = assets[media.id] { return known }
+        let asset = AVURLAsset(url: media.url)
+        assets[media.id] = asset
+        return asset
+    }
+
+    mutating func audioTrack(of assetID: MediaAsset.ID) async throws -> AVAssetTrack? {
+        guard let media = project.asset(id: assetID), media.hasAudio, !media.isImage else { return nil }
+        return try await asset(media).loadTracks(withMediaType: .audio).first
+    }
+
+    /// Puts `clip`'s picture into `track` at `start` and says how to draw it. A picture file is
+    /// drawn by the compositor; missing media is black (main clip) or nothing (overlay). The main
+    /// track always gets something for the whole clip, so the Short keeps its length.
+    mutating func layer(for clip: Clip, at start: CMTime, in track: AVMutableCompositionTrack, isMain: Bool) async throws -> CompositorLayer {
+        func make(_ source: CompositorLayer.Source, _ size: CGSize, _ transform: CGAffineTransform = .identity) -> CompositorLayer {
+            CompositorLayer(source: source, clip: clip, timelineStart: start, naturalSize: size, preferredTransform: transform, isMain: isMain)
+        }
+        let media = project.asset(id: clip.assetID)
+        if let media, media.isImage {
+            if isMain { try await CompositionBuilder.insertBlack(into: track, at: start, duration: clip.duration) }
+            if let image = StillImages.image(at: media.url) {
+                return make(.image(media.url), CGSize(width: image.width, height: image.height))
+            }
+            missing.insert(media.id)
+            return make(.none, Project.canvasSize)
+        }
+        if let media, media.hasVideo, let video = try? await asset(media).loadTracks(withMediaType: .video).first {
+            try track.insertTimeRange(clip.sourceRange, of: video, at: start)
+            let (naturalSize, preferredTransform) = try await video.load(.naturalSize, .preferredTransform)
+            return make(.track(track.trackID), naturalSize, preferredTransform)
+        }
+        // A file that was moved or deleted (or can't be opened any more) can't be read.
+        if let media { missing.insert(media.id) }
+        if isMain { try await CompositionBuilder.insertBlack(into: track, at: start, duration: clip.duration) }
+        return make(.none, Project.canvasSize)
+    }
+}
+
+extension CompositionBuilder {
+    /// Fills a stretch of the main track with black, for a picture or missing media: an empty
+    /// stretch would do inside the Short, but at its end it wouldn't count towards its length.
+    static func insertBlack(into track: AVMutableCompositionTrack, at start: CMTime, duration: CMTime) async throws {
+        let black = try await Placeholder.blackVideoTrack()
+        let second = CMTimeRange(start: .zero, duration: CMTime(value: 1, timescale: 1))
+        try track.insertTimeRange(second, of: black.track, at: start)
+        track.scaleTimeRange(CMTimeRange(start: start, duration: second.duration), toDuration: duration)
     }
 }
