@@ -9,16 +9,32 @@ public struct Clip: Identifiable, Codable, Equatable, Sendable {
     public var sourceStart: CMTime
     public var duration: CMTime
     public var framing: Framing
+    /// How loud the clip's own sound plays: 1 is as recorded, up to `Clip.maxVolume`.
+    public var volume: Double
+    /// Silences the clip without forgetting its volume.
+    public var isMuted: Bool
 
-    public init(id: UUID = UUID(), assetID: MediaAsset.ID, sourceStart: CMTime, duration: CMTime, framing: Framing = .fill) {
+    public static let maxVolume = 2.0
+
+    public init(id: UUID = UUID(), assetID: MediaAsset.ID, sourceStart: CMTime, duration: CMTime, framing: Framing = .fill, volume: Double = 1, isMuted: Bool = false) {
         self.id = id
         self.assetID = assetID
         self.sourceStart = sourceStart
         self.duration = duration
         self.framing = framing
+        self.volume = volume
+        self.isMuted = isMuted
     }
 
     public var sourceRange: CMTimeRange { CMTimeRange(start: sourceStart, duration: duration) }
+
+    /// The volume actually played.
+    public var effectiveVolume: Double { isMuted ? 0 : volume }
+
+    /// Another piece of the same source with the same settings (framing, sound), e.g. after a split.
+    public func piece(id: UUID = UUID(), sourceStart: CMTime, duration: CMTime) -> Clip {
+        Clip(id: id, assetID: assetID, sourceStart: sourceStart, duration: duration, framing: framing, volume: volume, isMuted: isMuted)
+    }
 }
 
 /// The main storyline: clips play back to back with no gaps ("magnetic"), so removing a clip
@@ -81,12 +97,7 @@ public struct Timeline: Codable, Equatable, Sendable {
         guard let (index, offset) = locate(time), offset > .zero else { return nil }
         var first = clips[index]
         guard offset < first.duration else { return nil }
-        let second = Clip(
-            assetID: first.assetID,
-            sourceStart: first.sourceStart + offset,
-            duration: first.duration - offset,
-            framing: first.framing
-        )
+        let second = first.piece(sourceStart: first.sourceStart + offset, duration: first.duration - offset)
         first.duration = offset
         clips[index] = first
         clips.insert(second, at: index + 1)
@@ -96,7 +107,7 @@ public struct Timeline: Codable, Equatable, Sendable {
 
 extension Clip {
     private enum CodingKeys: String, CodingKey {
-        case id, assetID, sourceStart, duration, framing
+        case id, assetID, sourceStart, duration, framing, volume, isMuted
     }
 
     public init(from decoder: any Decoder) throws {
@@ -106,6 +117,8 @@ extension Clip {
         sourceStart = try c.decodeTime(forKey: .sourceStart)
         duration = try c.decodeTime(forKey: .duration)
         framing = try c.decode(Framing.self, forKey: .framing)
+        volume = try c.decodeIfPresent(Double.self, forKey: .volume) ?? 1
+        isMuted = try c.decodeIfPresent(Bool.self, forKey: .isMuted) ?? false
     }
 
     public func encode(to encoder: any Encoder) throws {
@@ -115,5 +128,7 @@ extension Clip {
         try c.encode(time: sourceStart, forKey: .sourceStart)
         try c.encode(time: duration, forKey: .duration)
         try c.encode(framing, forKey: .framing)
+        try c.encode(volume, forKey: .volume)
+        try c.encode(isMuted, forKey: .isMuted)
     }
 }

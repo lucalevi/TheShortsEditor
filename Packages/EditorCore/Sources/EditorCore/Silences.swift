@@ -127,13 +127,7 @@ public extension Project {
             var keptAny = false
             for piece in pieces where piece.duration >= .oneFrame {
                 defer { keptAny = true }
-                clips.append(Clip(
-                    id: keptAny ? UUID() : clip.id,
-                    assetID: clip.assetID,
-                    sourceStart: piece.start,
-                    duration: piece.duration,
-                    framing: clip.framing
-                ))
+                clips.append(clip.piece(id: keptAny ? UUID() : clip.id, sourceStart: piece.start, duration: piece.duration))
             }
         }
         timeline.clips = clips

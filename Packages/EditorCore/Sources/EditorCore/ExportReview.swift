@@ -1,10 +1,11 @@
 import CoreGraphics
+import CoreMedia
 import Foundation
 
 /// Something worth knowing before exporting a Short.
 public struct ExportIssue: Identifiable, Equatable, Sendable {
     public enum Kind: String, Sendable {
-        case tooLong, quietStart, titleCovered, noSound, noCaptions, captionsHidden, titleAfterEnd
+        case tooLong, musicOverOneMinute, quietStart, titleCovered, noSound, noCaptions, captionsHidden, titleAfterEnd
     }
 
     public enum Severity: Sendable {
@@ -36,6 +37,13 @@ public enum ExportReview {
                 kind: .tooLong, severity: .warning,
                 title: "Longer than 3:00",
                 detail: "YouTube will post it as a regular video, not a Short. Trim it to 3:00 or less."
+            ))
+        }
+        if project.musicRange != nil, project.duration > CMTime(value: 60, timescale: 1) {
+            issues.append(ExportIssue(
+                kind: .musicOverOneMinute, severity: .warning,
+                title: "Music on a Short over 1:00",
+                detail: "If the song's owner claims it (Content ID), YouTube blocks Shorts longer than a minute. Use music you made or have the rights to, or keep the Short to 1:00."
             ))
         }
         let covered = project.titles.filter { title in

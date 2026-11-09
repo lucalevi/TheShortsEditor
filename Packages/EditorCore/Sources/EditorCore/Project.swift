@@ -21,6 +21,8 @@ public struct Project: Codable, Equatable, Sendable {
     public var captions = CaptionSettings()
     /// Text over the video, such as the hook title. Drawn in this order, so later ones are on top.
     public var titles: [TextOverlay] = []
+    /// The background song, if any. One per Short.
+    public var music: BackgroundMusic?
 
     public init() {}
 
@@ -41,14 +43,17 @@ public struct MediaAsset: Identifiable, Codable, Equatable, Sendable {
     /// Size as the video is meant to be seen, i.e. after the track's rotation is applied.
     public var displaySize: CGSize
     public var hasAudio: Bool
+    /// False for sound files (music), which can't go on the timeline as clips.
+    public var hasVideo: Bool
 
-    public init(id: UUID = UUID(), url: URL, name: String, duration: CMTime, displaySize: CGSize, hasAudio: Bool) {
+    public init(id: UUID = UUID(), url: URL, name: String, duration: CMTime, displaySize: CGSize, hasAudio: Bool, hasVideo: Bool = true) {
         self.id = id
         self.url = url
         self.name = name
         self.duration = duration
         self.displaySize = displaySize
         self.hasAudio = hasAudio
+        self.hasVideo = hasVideo
     }
 
     /// The framing a newcomer most likely wants: vertical footage fills the screen, while
@@ -84,7 +89,7 @@ public extension Project {
     /// Appends a clip covering the whole of the asset to the end of the timeline.
     @discardableResult
     mutating func appendClip(of assetID: MediaAsset.ID) -> Clip.ID? {
-        guard let asset = asset(id: assetID), asset.duration > .zero else { return nil }
+        guard let asset = asset(id: assetID), asset.hasVideo, asset.duration > .zero else { return nil }
         let clip = Clip(assetID: assetID, sourceStart: .zero, duration: asset.duration, framing: asset.defaultFraming)
         timeline.clips.append(clip)
         return clip.id
@@ -93,7 +98,7 @@ public extension Project {
 
 extension MediaAsset {
     private enum CodingKeys: String, CodingKey {
-        case id, url, name, duration, displaySize, hasAudio
+        case id, url, name, duration, displaySize, hasAudio, hasVideo
     }
 
     public init(from decoder: any Decoder) throws {
@@ -104,6 +109,7 @@ extension MediaAsset {
         duration = try c.decodeTime(forKey: .duration)
         displaySize = try c.decode(CGSize.self, forKey: .displaySize)
         hasAudio = try c.decode(Bool.self, forKey: .hasAudio)
+        hasVideo = try c.decodeIfPresent(Bool.self, forKey: .hasVideo) ?? true
     }
 
     public func encode(to encoder: any Encoder) throws {
@@ -114,5 +120,6 @@ extension MediaAsset {
         try c.encode(time: duration, forKey: .duration)
         try c.encode(displaySize, forKey: .displaySize)
         try c.encode(hasAudio, forKey: .hasAudio)
+        try c.encode(hasVideo, forKey: .hasVideo)
     }
 }

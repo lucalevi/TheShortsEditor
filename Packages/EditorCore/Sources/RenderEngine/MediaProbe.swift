@@ -9,16 +9,23 @@ public enum MediaProbe {
 
         public var errorDescription: String? {
             switch self {
-            case .noVideo: "The file has no video in it."
-            case .empty: "The video is empty."
+            case .noVideo: "The file has no video or sound in it."
+            case .empty: "The file is empty."
             }
         }
     }
 
+    /// Reads a video file, or a sound file (music), which comes back with `hasVideo` false.
     public static func probe(_ url: URL) async throws -> MediaAsset {
         let asset = AVURLAsset(url: url)
         guard let video = try await asset.loadTracks(withMediaType: .video).first else {
-            throw ProbeError.noVideo
+            guard let sound = try await asset.loadTracks(withMediaType: .audio).first else { throw ProbeError.noVideo }
+            let range = try await sound.load(.timeRange)
+            guard range.duration > .zero else { throw ProbeError.empty }
+            return MediaAsset(
+                url: url, name: url.deletingPathExtension().lastPathComponent,
+                duration: range.end, displaySize: .zero, hasAudio: true, hasVideo: false
+            )
         }
         let (timeRange, naturalSize, transform) = try await video.load(.timeRange, .naturalSize, .preferredTransform)
         guard timeRange.duration > .zero else { throw ProbeError.empty }

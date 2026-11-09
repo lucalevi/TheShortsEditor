@@ -67,14 +67,41 @@ enum Fixture {
         return url
     }
 
+    /// A sound file (like a song): a steady tone at `amplitude` (0…1 of full scale) for `seconds`.
+    static func sound(seconds: Int, frequency: Double = 660, amplitude: Double = 0.3) async throws -> URL {
+        let url = FileManager.default.temporaryDirectory.appending(path: "fixture-\(UUID().uuidString).m4a")
+        let writer = try AVAssetWriter(outputURL: url, fileType: .m4a)
+        let input = AVAssetWriterInput(mediaType: .audio, outputSettings: [
+            AVFormatIDKey: kAudioFormatMPEG4AAC, AVSampleRateKey: 48_000, AVNumberOfChannelsKey: 1,
+        ])
+        input.expectsMediaDataInRealTime = false
+        writer.add(input)
+        guard writer.startWriting() else { throw writer.error ?? WriteError() }
+        writer.startSession(atSourceTime: .zero)
+        let frames = 30 * seconds
+        var next = 0
+        while next < frames {
+            if input.isReadyForMoreMediaData {
+                guard input.append(try toneBuffer(frame: next, from: 0, frequency: frequency, amplitude: amplitude)) else { throw writer.error ?? WriteError() }
+                next += 1
+            } else {
+                try await Task.sleep(for: .milliseconds(2))
+            }
+        }
+        input.markAsFinished()
+        await writer.finishWriting()
+        guard writer.status == .completed else { throw writer.error ?? WriteError() }
+        return url
+    }
+
     /// 1/30 s of 48 kHz mono sound: silent before `from` seconds, a tone after.
-    private static func toneBuffer(frame: Int, from: Double) throws -> CMSampleBuffer {
+    private static func toneBuffer(frame: Int, from: Double, frequency: Double = 440, amplitude: Double = 20_000.0 / 32_768) throws -> CMSampleBuffer {
         let count = 1600
         let first = frame * count
         var samples = [Int16](repeating: 0, count: count)
         for i in 0..<count {
             let t = Double(first + i) / 48_000
-            if t >= from { samples[i] = Int16(sin(2 * .pi * 440 * t) * 20_000) }
+            if t >= from { samples[i] = Int16(sin(2 * .pi * frequency * t) * amplitude * 32_767) }
         }
         var description = AudioStreamBasicDescription(
             mSampleRate: 48_000, mFormatID: kAudioFormatLinearPCM,

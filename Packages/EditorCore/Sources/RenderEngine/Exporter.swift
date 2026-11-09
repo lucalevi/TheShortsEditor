@@ -29,8 +29,15 @@ public enum Exporter {
 
     /// Exports `project` to `url`, replacing any file there. `progress` goes from 0 to 1 and is
     /// called on the main actor. Cancelling the task stops the export and removes the partial file.
-    public static func export(_ project: Project, to url: URL, progress: @escaping @MainActor (Double) -> Void = { _ in }) async throws {
-        let built = try await CompositionBuilder.build(project)
+    /// With `evenOutLoudness`, the sound is first measured and then brought to YouTube's level
+    /// (−14 LUFS), without letting peaks clip.
+    public static func export(_ project: Project, to url: URL, evenOutLoudness: Bool = true, progress: @escaping @MainActor (Double) -> Void = { _ in }) async throws {
+        var gain = 1.0
+        if evenOutLoudness, let meter = try await AudioProbe.loudness(of: project) {
+            gain = meter.normalizingGain()
+        }
+        try Task.checkCancellation()
+        let built = try await CompositionBuilder.build(project, gain: gain)
         let composition = built.composition
         let duration = composition.duration
 
@@ -76,6 +83,7 @@ public enum Exporter {
                 AVLinearPCMIsBigEndianKey: false,
             ])
             audioOutput.alwaysCopiesSampleData = false
+            audioOutput.audioMix = built.audioMix
             let audioInput = AVAssetWriterInput(mediaType: .audio, outputSettings: [
                 AVFormatIDKey: kAudioFormatMPEG4AAC,
                 AVSampleRateKey: audioSampleRate,

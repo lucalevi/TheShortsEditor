@@ -14,7 +14,13 @@ struct MediaBrowserView: View {
             }
         }
         .contextMenu(forSelectionType: MediaAsset.ID.self) { ids in
-            Button("Add to Timeline") { ids.forEach(model.appendToTimeline) }
+            let assets = ids.compactMap(model.project.asset(id:))
+            if assets.contains(where: \.hasVideo) {
+                Button("Add to Timeline") { assets.filter(\.hasVideo).map(\.id).forEach(model.appendToTimeline) }
+            }
+            if assets.count == 1, let asset = assets.first, asset.hasAudio {
+                Button(asset.hasVideo ? "Use Its Sound as Music" : "Use as Music") { model.useAsMusic(asset.id) }
+            }
         } primaryAction: { ids in
             ids.forEach(model.appendToTimeline)
         }
@@ -23,7 +29,7 @@ struct MediaBrowserView: View {
                 ContentUnavailableView {
                     Label("No Media Yet", systemImage: "film.stack")
                 } description: {
-                    Text("Drop videos here, or click Import.")
+                    Text("Drop videos or music here, or click Import.")
                 } actions: {
                     Button("Import…") { MediaImportPanel.run(model: model, addToTimeline: false) }
                 }
@@ -72,15 +78,25 @@ private struct MediaRow: View {
 
     var body: some View {
         HStack(spacing: 10) {
-            Thumbnail(image: thumbnail)
-                .frame(width: 44, height: 44)
-                .clipShape(RoundedRectangle(cornerRadius: 6))
+            Group {
+                if asset.hasVideo {
+                    Thumbnail(image: thumbnail)
+                } else {
+                    Rectangle().fill(.quaternary).overlay { Image(systemName: "music.note").font(.title3).foregroundStyle(.secondary) }
+                }
+            }
+            .frame(width: 44, height: 44)
+            .clipShape(RoundedRectangle(cornerRadius: 6))
             VStack(alignment: .leading, spacing: 2) {
                 Text(asset.name).lineLimit(1)
                 HStack(spacing: 6) {
                     Text(TimeFormat.string(asset.duration))
-                    Image(systemName: asset.displaySize.height > asset.displaySize.width ? "rectangle.portrait" : "rectangle")
-                        .help(asset.displaySize.height > asset.displaySize.width ? "Vertical video" : "Horizontal video")
+                    if asset.hasVideo {
+                        Image(systemName: asset.displaySize.height > asset.displaySize.width ? "rectangle.portrait" : "rectangle")
+                            .help(asset.displaySize.height > asset.displaySize.width ? "Vertical video" : "Horizontal video")
+                    } else {
+                        Text("Music")
+                    }
                     if !asset.hasAudio {
                         Image(systemName: "speaker.slash").help("No sound")
                     }
@@ -90,7 +106,7 @@ private struct MediaRow: View {
             }
         }
         .padding(.vertical, 2)
-        .help("Double-click to add to the timeline")
+        .help(asset.hasVideo ? "Double-click to add to the timeline" : "Double-click to use as the music")
     }
 }
 

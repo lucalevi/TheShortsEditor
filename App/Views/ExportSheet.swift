@@ -21,6 +21,16 @@ struct ExportSheet: View {
                 buttons { Button("Cancel", role: .cancel) { model.endExport() } }
             case .review(let issues):
                 IssueList(issues: issues)
+                Divider()
+                VStack(alignment: .leading, spacing: 2) {
+                    Toggle("Even out the loudness", isOn: $model.evensOutLoudness)
+                    Text("Brings the sound to the level YouTube plays Shorts at, so yours isn't quieter than the next one. Recommended.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.leading, 20)
+                }
+                .toggleStyle(.checkbox)
                 buttons {
                     Button("Cancel", role: .cancel) { model.endExport() }
                     Button("Export…") { chooseFile() }
@@ -58,7 +68,8 @@ struct ExportSheet: View {
         VStack(alignment: .leading, spacing: 4) {
             let captions = model.project.hasCaptions && model.project.captions.isVisible
                 ? "captions: \(model.project.captions.style.displayName)" : "no captions"
-            Text("\(TimeFormat.string(model.duration)) · vertical 1080 × 1920 · \(captions)")
+            let music = model.project.musicRange != nil ? " · music" : ""
+            Text("\(TimeFormat.string(model.duration)) · vertical 1080 × 1920 · \(captions)\(music)")
             Text("MP4 file with YouTube's recommended settings (H.264, 30 fps, AAC sound).")
                 .font(.caption)
                 .foregroundStyle(.secondary)

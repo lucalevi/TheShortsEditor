@@ -19,9 +19,9 @@ struct EditorCommands: Commands {
             Button("Split at Playhead") { model.splitAtPlayhead() }
                 .keyboardShortcut("b", modifiers: [])
                 .disabled(model.project.timeline.clips.isEmpty)
-            Button(model.selectedTitleID != nil ? "Delete Title" : "Delete Clip") { model.deleteSelection() }
+            Button(model.selection == .music ? "Remove Music" : model.selectedTitleID != nil ? "Delete Title" : "Delete Clip") { model.deleteSelection() }
                 .keyboardShortcut(.delete, modifiers: [])
-                .disabled(model.selectedClipID == nil && model.selectedTitleID == nil)
+                .disabled(model.selection == nil)
             Divider()
             Button("Remove Pauses…") { model.beginRemovingSilences() }
                 .disabled(model.project.timeline.clips.isEmpty || model.silenceSession != nil)
@@ -43,6 +43,24 @@ struct EditorCommands: Commands {
                 ForEach(CaptionStyle.allCases) { Text($0.displayName).tag($0) }
             }
             .disabled(!model.project.hasCaptions)
+        }
+
+        CommandMenu("Sound") {
+            Button("Add Music…") { MusicImportPanel.run(model: model) }
+                .disabled(model.project.timeline.clips.isEmpty)
+            Button("Remove Music") { model.removeMusic() }
+                .disabled(model.project.music == nil)
+            Toggle("Lower Music While People Talk", isOn: Binding(
+                get: { model.project.music?.lowersUnderSpeech ?? false },
+                set: { on in model.editMusic(on ? "Lower Music Under Speech" : "Keep Music Level") { $0.lowersUnderSpeech = on } }
+            ))
+            .disabled(model.project.music == nil)
+            Divider()
+            if let clip = model.selectedClip {
+                Toggle("Mute Clip", isOn: Binding(get: { clip.isMuted }, set: { model.setClipMuted(clip.id, $0) }))
+            } else {
+                Button("Mute Clip") {}.disabled(true)
+            }
         }
 
         CommandMenu("Playback") {
@@ -78,16 +96,30 @@ struct EditorCommands: Commands {
     }
 }
 
-/// The standard Open panel, filtered to video files.
+/// The standard Open panel, filtered to video and sound files.
 enum MediaImportPanel {
     static func run(model: EditorModel, addToTimeline: Bool) {
         let panel = NSOpenPanel()
-        panel.allowedContentTypes = [.movie]
+        panel.allowedContentTypes = [.movie, .audio]
         panel.allowsMultipleSelection = true
         panel.canChooseDirectories = false
         panel.prompt = addToTimeline ? "Add to Timeline" : "Import"
-        panel.message = "Choose the videos for your Short"
+        panel.message = "Choose the videos (or music) for your Short"
         guard panel.runModal() == .OK else { return }
         model.importFiles(panel.urls, addToTimeline: addToTimeline)
+    }
+}
+
+/// The Open panel for choosing a song. It becomes the music straight away.
+enum MusicImportPanel {
+    static func run(model: EditorModel) {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.audio]
+        panel.allowsMultipleSelection = false
+        panel.canChooseDirectories = false
+        panel.prompt = "Use as Music"
+        panel.message = "Choose a song to play under your Short"
+        guard panel.runModal() == .OK else { return }
+        model.importFiles(panel.urls, addToTimeline: true)
     }
 }

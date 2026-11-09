@@ -43,6 +43,10 @@ targets:
             CFBundleTypeRole: Viewer
             LSHandlerRank: Alternate
             LSItemContentTypes: [public.movie]
+          - CFBundleTypeName: Sound
+            CFBundleTypeRole: Viewer
+            LSHandlerRank: Alternate
+            LSItemContentTypes: [public.audio]
     entitlements:
       path: App/TheShortsEditor.entitlements
       properties:

@@ -22,6 +22,7 @@ struct TimelineView: View {
     private let trackHeight: CGFloat = 72
     private let captionLaneHeight: CGFloat = 22
     private let titleLaneHeight: CGFloat = 22
+    private let musicLaneHeight: CGFloat = 30
     private var titleLaneY: CGFloat { rulerHeight + 6 }
     private var clipsY: CGFloat { titleLaneY + titleLaneHeight + 4 }
     private let leadingInset: CGFloat = 12
@@ -60,6 +61,7 @@ struct TimelineView: View {
                         titleLane.offset(y: titleLaneY)
                         clipsRow.offset(y: clipsY)
                         captionLane.offset(y: clipsY + trackHeight + 6)
+                        musicLane.offset(y: clipsY + trackHeight + 6 + captionLaneHeight + 4)
                         pauseCuts.offset(y: clipsY)
                         limitMarker
                         playhead
@@ -233,6 +235,54 @@ struct TimelineView: View {
         .opacity(model.project.captions.isVisible ? 1 : 0.4)
     }
 
+    /// The song, under everything else, with a line showing its volume (it dips where people talk).
+    @ViewBuilder
+    private var musicLane: some View {
+        if let range = model.project.musicRange, let song = model.musicAsset {
+            let width = max(CGFloat(range.duration.seconds) * pointsPerSecond - 2, 6)
+            let isSelected = model.selection == .music
+            RoundedRectangle(cornerRadius: 4)
+                .fill(Color.green.opacity(isSelected ? 0.45 : 0.25))
+                .overlay {
+                    VolumeLine(points: model.musicEnvelope, fullVolume: model.project.music?.volume ?? 1, pointsPerSecond: pointsPerSecond)
+                        .stroke(Color.primary.opacity(0.75), lineWidth: 1.5)
+                        .padding(.top, 14)
+                        .padding(.bottom, 3)
+                }
+                .overlay(alignment: .topLeading) {
+                    Label(song.name, systemImage: "music.note")
+                        .font(.caption2.weight(.medium))
+                        .lineLimit(1)
+                        .padding(.horizontal, 4)
+                        .padding(.top, 1)
+                }
+                .clipShape(RoundedRectangle(cornerRadius: 4))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 4)
+                        .strokeBorder(isSelected ? Color.yellow : Color.green.opacity(0.8), lineWidth: isSelected ? 2 : 1)
+                }
+                .frame(width: width, height: musicLaneHeight)
+                .contentShape(Rectangle())
+                .offset(x: leadingInset + 1)
+                .onTapGesture { model.selection = .music }
+                .contextMenu {
+                    Button("Remove Music", role: .destructive) { model.removeMusic() }
+                }
+                .help("Music: \(song.name). The line shows its volume; it dips while people talk.")
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel("Music: \(song.name)")
+                .accessibilityAddTraits(isSelected ? .isSelected : [])
+        } else if !model.project.timeline.clips.isEmpty {
+            Button("Add Music…", systemImage: "music.note") { MusicImportPanel.run(model: model) }
+                .buttonStyle(.borderless)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .frame(height: musicLaneHeight)
+                .offset(x: leadingInset + 4)
+                .help("Add a song to play under your Short. You can also drop a sound file here.")
+        }
+    }
+
     /// While choosing pauses to remove: the parts that would be cut, over the clips.
     @ViewBuilder
     private var pauseCuts: some View {
@@ -274,6 +324,26 @@ struct TimelineView: View {
         .offset(x: x(for: model.currentTime) - 5, y: rulerHeight - 10)
         .allowsHitTesting(false)
         .accessibilityHidden(true)
+    }
+}
+
+/// A volume curve drawn across the music: full height is the music's chosen volume, so the dips
+/// under speech and the fades are easy to see.
+private nonisolated struct VolumeLine: Shape {
+    let points: [VolumePoint]
+    let fullVolume: Double
+    let pointsPerSecond: CGFloat
+
+    func path(in rect: CGRect) -> Path {
+        Path { path in
+            for (index, point) in points.enumerated() {
+                let location = CGPoint(
+                    x: rect.minX + CGFloat(point.time.seconds) * pointsPerSecond,
+                    y: rect.maxY - rect.height * CGFloat(fullVolume > 0 ? min(point.volume / fullVolume, 1) : 0)
+                )
+                if index == 0 { path.move(to: location) } else { path.addLine(to: location) }
+            }
+        }
     }
 }
 
@@ -341,7 +411,16 @@ private struct ClipBlock: View {
             .overlay(alignment: .topLeading) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(name).font(.caption.weight(.medium)).lineLimit(1)
-                    Text(TimeFormat.string(clip.duration)).font(.caption2).foregroundStyle(.secondary)
+                    HStack(spacing: 4) {
+                        Text(TimeFormat.string(clip.duration))
+                        if clip.isMuted {
+                            Image(systemName: "speaker.slash.fill").help("Muted")
+                        } else if clip.volume != 1 {
+                            Text("\(Int((clip.volume * 100).rounded()))%").help("Volume")
+                        }
+                    }
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
                 }
                 .padding(.leading, 46)
                 .padding(.top, 6)
@@ -356,5 +435,7 @@ private struct ClipBlock: View {
             .contentShape(Rectangle())
             .accessibilityElement(children: .combine)
             .accessibilityAddTraits(isSelected ? .isSelected : [])
+            .accessibilityValue(clip.isMuted ? "Muted" : "")
+            .accessibilityValue(clip.isMuted ? "Muted" : "")
     }
 }

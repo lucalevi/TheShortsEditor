@@ -7,11 +7,16 @@ struct InspectorView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            PanelHeader(title: model.silenceSession != nil ? "Remove Pauses" : model.selectedTitle != nil ? "Title" : model.selectedClip == nil ? "Your Short" : "Clip")
+            PanelHeader(title: model.silenceSession != nil ? "Remove Pauses"
+                        : model.selectedTitle != nil ? "Title"
+                        : model.selection == .music && model.project.music != nil ? "Music"
+                        : model.selectedClip == nil ? "Your Short" : "Clip")
             ScrollView {
                 Group {
                     if model.silenceSession != nil {
                         SilencePanel(model: model)
+                    } else if model.selection == .music, let music = model.project.music, let song = model.musicAsset {
+                        MusicInspector(model: model, music: music, song: song)
                     } else if let title = model.selectedTitle {
                         TitleInspector(model: model, title: title)
                             .id(title.id)
@@ -62,9 +67,57 @@ private struct ClipInspector: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
 
+            ClipSound(model: model, clip: clip, hasSound: asset?.hasAudio ?? false)
+                .id(clip.id)
+
             HStack {
                 Button("Split at Playhead", systemImage: "scissors") { model.splitAtPlayhead() }
                 Button("Delete", systemImage: "trash", role: .destructive) { model.deleteSelection() }
+            }
+        }
+    }
+}
+
+/// The clip's volume, with a mute switch. The change is saved when the slider is let go.
+private struct ClipSound: View {
+    let model: EditorModel
+    let clip: Clip
+    let hasSound: Bool
+    /// The slider's value while it is being dragged.
+    @State private var dragging: Double?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Sound").font(.subheadline.weight(.semibold))
+            if hasSound {
+                HStack {
+                    Button(clip.isMuted ? "Unmute" : "Mute", systemImage: clip.isMuted ? "speaker.slash.fill" : "speaker.wave.2.fill") {
+                        model.setClipMuted(clip.id, !clip.isMuted)
+                    }
+                    .labelStyle(.iconOnly)
+                    .buttonStyle(.borderless)
+                    .frame(width: 22)
+                    .help(clip.isMuted ? "Turn this clip's sound back on" : "Silence this clip")
+                    Slider(value: Binding(get: { dragging ?? clip.volume }, set: { dragging = $0 }), in: 0...Clip.maxVolume) { editing in
+                        if !editing, let value = dragging {
+                            dragging = nil
+                            model.setClipVolume(clip.id, (value * 20).rounded() / 20)
+                        }
+                    }
+                    .disabled(clip.isMuted)
+                    Text(clip.isMuted ? "Off" : "\(Int(((dragging ?? clip.volume) * 100).rounded()))%")
+                        .monospacedDigit()
+                        .frame(width: 40, alignment: .trailing)
+                }
+                Text(clip.isMuted ? "This clip is silent." : "100% is the sound as recorded. Your whole Short is evened out to YouTube's loudness when you export.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                if clip.volume != 1, !clip.isMuted {
+                    Button("Reset to 100%") { model.setClipVolume(clip.id, 1) }.controlSize(.small)
+                }
+            } else {
+                Text("This clip has no sound.").foregroundStyle(.secondary)
             }
         }
     }

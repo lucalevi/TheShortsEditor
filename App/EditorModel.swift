@@ -12,13 +12,27 @@ import Transcription
 @Observable
 final class EditorModel {
     private(set) var project = Project()
-    /// A clip or a title can be selected, never both.
+    /// One thing at a time: a clip, a title, or the music.
+    var selection: Selection?
+
+    enum Selection: Equatable {
+        case clip(Clip.ID)
+        case title(TextOverlay.ID)
+        case music
+    }
+
     var selectedClipID: Clip.ID? {
-        didSet { if selectedClipID != nil { selectedTitleID = nil } }
+        get { if case .clip(let id) = selection { id } else { nil } }
+        set { if let newValue { selection = .clip(newValue) } else if selectedClipID != nil { selection = nil } }
     }
     var selectedTitleID: TextOverlay.ID? {
-        didSet { if selectedTitleID != nil { selectedClipID = nil } }
+        get { if case .title(let id) = selection { id } else { nil } }
+        set { if let newValue { selection = .title(newValue) } else if selectedTitleID != nil { selection = nil } }
     }
+    /// The music's volume over the timeline, as built, for drawing it.
+    private(set) var musicEnvelope: [VolumePoint] = []
+    /// Export at YouTube's loudness. On unless the user turns it off in the Export sheet.
+    var evensOutLoudness = true
     /// Asks the title inspector to put the cursor in the text (after adding a title). It resets it.
     var wantsTitleTextFocus = false
     var selectedAssetID: MediaAsset.ID?
@@ -44,7 +58,7 @@ final class EditorModel {
     var exportPhase: ExportPhase?
     /// Set while the user is choosing which pauses to remove.
     private(set) var silenceSession: SilenceSession?
-    /// Sound levels of each file, measured once when first needed.
+    /// Sound levels of the files on the timeline, for Remove Pauses (measured by `LevelCache`).
     @ObservationIgnored private var audioLevels: [MediaAsset.ID: AudioLevels] = [:]
     /// Where a preview skip is heading, so it isn't started again while the seek lands.
     @ObservationIgnored private var skipTarget: CMTime?
@@ -165,26 +179,37 @@ final class EditorModel {
             }
             isImporting = false
 
-            apply(addToTimeline ? "Add to Timeline" : "Import") { project in
+            let songs = probed.filter { !$0.hasVideo }
+            apply(addToTimeline ? (probed.allSatisfy { !$0.hasVideo } ? "Add Music" : "Add to Timeline") : "Import") { project in
                 for asset in probed {
                     let id = project.addAsset(asset)
-                    if addToTimeline { project.appendClip(of: id) }
+                    if addToTimeline, asset.hasVideo { project.appendClip(of: id) }
+                }
+                // A sound file dropped on the timeline or viewer becomes the music.
+                if addToTimeline, let song = songs.first, let id = project.assets.first(where: { $0.url.standardizedFileURL == song.url.standardizedFileURL })?.id {
+                    project.setMusic(id)
                 }
             }
-            for asset in probed where thumbnails[asset.id] == nil {
+            if addToTimeline, !songs.isEmpty { selection = .music }
+            for asset in probed where asset.hasVideo && thumbnails[asset.id] == nil {
                 loadThumbnail(for: asset)
             }
             if !failures.isEmpty {
                 alert = AlertMessage(
                     title: failures.count == 1 ? "This file can't be used" : "These files can't be used",
-                    message: failures.joined(separator: "\n") + "\n\nOnly video files can be added for now."
+                    message: failures.joined(separator: "\n") + "\n\nOnly video and sound files can be added."
                 )
             }
         }
     }
 
+    /// Puts a video at the end of the timeline, or uses a sound file as the music.
     func appendToTimeline(_ assetID: MediaAsset.ID) {
-        apply("Add to Timeline") { $0.appendClip(of: assetID) }
+        if project.asset(id: assetID)?.hasVideo == false {
+            useAsMusic(assetID)
+        } else {
+            apply("Add to Timeline") { $0.appendClip(of: assetID) }
+        }
     }
 
     func splitAtPlayhead() {
@@ -199,9 +224,11 @@ final class EditorModel {
         selectedClipID = nil
     }
 
-    /// Deletes the selected title, or else the selected clip (⌫).
+    /// Deletes what is selected: a title, the music, or a clip (⌫).
     func deleteSelection() {
-        if let id = selectedTitleID {
+        if selection == .music {
+            removeMusic()
+        } else if let id = selectedTitleID {
             apply("Delete Title") { $0.removeTitle(id) }
             selectedTitleID = nil
         } else {
@@ -218,6 +245,49 @@ final class EditorModel {
 
     func moveClip(_ clipID: Clip.ID, to index: Int) {
         apply("Move Clip") { $0.timeline.move(clipID, to: index) }
+    }
+
+    // MARK: Sound
+
+    func setClipVolume(_ clipID: Clip.ID, _ volume: Double) {
+        apply("Change Volume") { project in
+            guard let index = project.timeline.index(of: clipID) else { return }
+            project.timeline.clips[index].volume = min(max(volume, 0), Clip.maxVolume)
+            project.timeline.clips[index].isMuted = false
+        }
+    }
+
+    func setClipMuted(_ clipID: Clip.ID, _ muted: Bool) {
+        apply(muted ? "Mute Clip" : "Unmute Clip") { project in
+            guard let index = project.timeline.index(of: clipID) else { return }
+            project.timeline.clips[index].isMuted = muted
+        }
+    }
+
+    func useAsMusic(_ assetID: MediaAsset.ID) {
+        apply("Add Music") { $0.setMusic(assetID) }
+        if project.music?.assetID == assetID { selection = .music }
+    }
+
+    func removeMusic() {
+        apply("Remove Music") { $0.music = nil }
+        if selection == .music { selection = nil }
+    }
+
+    func editMusic(_ actionName: String, _ change: @escaping (inout BackgroundMusic) -> Void) {
+        apply(actionName) { project in
+            guard var music = project.music else { return }
+            change(&music)
+            project.music = music
+        }
+    }
+
+    func setMusicStart(_ start: CMTime) {
+        apply("Choose Part of Song") { $0.setMusicStart(start) }
+    }
+
+    var musicAsset: MediaAsset? {
+        project.music.flatMap { project.asset(id: $0.assetID) }
     }
 
     // MARK: Titles
@@ -354,7 +424,7 @@ final class EditorModel {
         exportPhase = .exporting(0)
         exportTask = Task {
             do {
-                try await Exporter.export(project, to: url) { fraction in
+                try await Exporter.export(project, to: url, evenOutLoudness: evensOutLoudness) { fraction in
                     if case .exporting = self.exportPhase { self.exportPhase = .exporting(fraction) }
                 }
                 exportPhase = .finished(url)
@@ -390,7 +460,7 @@ final class EditorModel {
         let assets = Dictionary(project.timeline.clips.compactMap { project.asset(id: $0.assetID) }.map { ($0.id, $0) }) { a, _ in a }
         Task {
             for asset in assets.values where asset.hasAudio && audioLevels[asset.id] == nil {
-                if let levels = try? await AudioProbe.levels(of: asset.url) {
+                if let levels = await LevelCache.levels(of: asset.url) {
                     audioLevels[asset.id] = levels
                 }
             }
@@ -486,8 +556,9 @@ final class EditorModel {
     /// Rebuilds the player's content from the project, keeping the playhead where it was.
     private func projectDidChange() {
         captionPages = CaptionLayout.pages(in: project)
-        if let id = selectedTitleID, project.title(id: id) == nil { selectedTitleID = nil }
-        if let id = selectedClipID, project.timeline.index(of: id) == nil { selectedClipID = nil }
+        if let id = selectedTitleID, project.title(id: id) == nil { selection = nil }
+        if let id = selectedClipID, project.timeline.index(of: id) == nil { selection = nil }
+        if selection == .music, project.music == nil { selection = nil }
         if let settings = silenceSession?.settings { updateSilenceSettings(settings) }
         rebuildTask?.cancel()
         let project = project
@@ -495,12 +566,14 @@ final class EditorModel {
             guard !project.timeline.clips.isEmpty else {
                 player.replaceCurrentItem(with: nil)
                 currentTime = .zero
+                musicEnvelope = []
                 return
             }
             do {
                 let built = try await CompositionBuilder.build(project)
                 guard !Task.isCancelled else { return }
                 let time = min(currentTime, project.duration)
+                musicEnvelope = built.musicEnvelope
                 player.replaceCurrentItem(with: built.makePlayerItem())
                 seek(to: time)
             } catch {

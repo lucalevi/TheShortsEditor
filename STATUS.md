@@ -4,7 +4,7 @@ _Last updated: 2026-11-09. Read this first when picking the project back up, the
 
 ## Where we are
 
-Stages 1–5 are done, tested on screen, committed and pushed to https://github.com/lucalevi/TheShortsEditor (public, branch `main`):
+Stages 1–6 are done, tested on screen, committed and pushed to https://github.com/lucalevi/TheShortsEditor (public, branch `main`):
 
 | Stage | What | Session |
 |---|---|---|
@@ -13,11 +13,12 @@ Stages 1–5 are done, tested on screen, committed and pushed to https://github.
 | 3 | Export to a YouTube-ready MP4, with pre-export checks | 2026-11-08 |
 | 4 | Remove Pauses (silence removal) | 2026-11-08 |
 | 5 | Titles (text overlay for the hook) | 2026-11-09 |
+| 6 | Audio: clip volume, music with ducking, loudness on export | 2026-11-09 |
 
-**Pick up here:** stage 6, **Audio** (see "What's next"): clip volume, fades, a background-music lane with ducking under speech, loudness normalisation on export, and the "music on a Short over 1:00" export check.
+**Pick up here:** stage 7, **Save/open projects** (see "What's next"): today quitting loses the edit, which is now the biggest gap.
 
 What works today:
-- Import videos by drag-and-drop (Media list, viewer, timeline), with **Import…** / **Choose Videos…**, or from Finder (Open With / Dock icon). Files go onto the timeline in order, and the same file is never imported twice.
+- Import videos (and sound files, for music) by drag-and-drop (Media list, viewer, timeline), with **Import…** / **Choose Videos…**, or from Finder (Open With / Dock icon). Files go onto the timeline in order, and the same file is never imported twice.
 - 9:16 viewer (1080×1920, 30 fps) with a toggle for the dimmed areas YouTube's interface covers (`SafeZone`).
 - Magnetic timeline: click a clip to select it and move the playhead there, drag the ruler to scrub, split (**B**), delete with the gap closing (**⌫**), move earlier/later (right-click), zoom.
 - Per-clip framing: **Fill screen** / **Show all**. Vertical footage defaults to fill, horizontal to show all.
@@ -42,10 +43,17 @@ What works today:
   - Titles belong to the timeline, not to a file: they stay at their time when clips change. Past the end of the Short they are cut or not shown (dimmed in the lane, with an export tip).
   - Drawn by `ShortsCompositor` under the captions (`TitleRenderer`), so they're in the export.
 - The old Captions menu is now **Text** (Add Title + the caption items).
-- 80 automated tests (`make test`, about a minute): timeline, caption, pause and export-check logic; framing math; rendering checked pixel by pixel (orientation, every caption style); export checked for codec, size, AAC and fast start; per-frame sound levels; and a real transcription of speech made with `say`.
+- **Sound** (Sound menu, toolbar **Music**, the clip inspector):
+  - Clip volume 0–200% with a mute switch (inspector), shown on the clip ("160%", or a crossed-out speaker). Kept through split and Remove Pauses.
+  - **Music**: one song per Short. Add it with the toolbar button, Sound ▸ Add Music…, "Add Music…" in the empty music lane, by dropping a sound file on the timeline/viewer, or by opening one from Finder. Sound files show in Media as Music (double-click uses it). A video's sound can also be used as music (right-click in Media).
+  - The music starts with the Short and stops with it (or when the song ends: the inspector says so). Settings: volume (default 50%), "Start the song at" (skip an intro), fade in (1 s) / fade out (2 s).
+  - **Lower while people talk** (on by default): the music drops to 20% of its volume (about −14 dB) wherever the clips have speech, found from the per-frame loudness of the files (gaps under 0.5 s are bridged; muted clips don't count). It goes down 0.25 s before speech and comes back up over 0.6 s. The music lane draws the volume line, so the dips are visible.
+  - **Even out the loudness** (Export sheet, on by default): the mixed sound is measured with an EBU R128 / BS.1770 meter and brought to −14 LUFS, keeping peaks at −1 dBFS or lower and boosting by 20 dB at most. Checked with ffmpeg's `ebur128` on an export: −14.0 LUFS, peak −1.1 dBFS.
+  - Export check: **music on a Short over 1:00** (warning: Content ID claims block those Shorts).
+- 105 automated tests (`make test`, about a minute): timeline, caption, pause and export-check logic; framing math; rendering checked pixel by pixel (orientation, every caption style); export checked for codec, size, AAC and fast start; per-frame sound levels; and a real transcription of speech made with `say`.
 
-Verified on screen: import, Finder open (launch and while running), select, framing switch, split, delete, undo (fixed 2026-11-08, see below), Space play/pause, ruler scrub, closing the window quits. Captions: make, style and position switches, editing a line, jumping from the timeline lane, split/delete with captions following, undo of all of these. Export: checks sheet, save panel, progress, finished state, output checked with ffprobe. Remove Pauses: detection on a sample with known pauses, sliders, preview playback, apply, undo. Titles: add (⌘T) with text ready to type, typing + Return, style switch, undo/redo, drag in the viewer into the covered area (warning in inspector and export sheet), Top preset, move and lengthen on the timeline, ⌫ delete.
-**Not yet verified on screen:** J/K/L reverse and fast playback, the clip right-click menu, the title right-click menu, the title length stepper, timeline zoom, drag-and-drop from Finder. The Pop and Fade animations are checked by render tests, not by eye during playback.
+Verified on screen: import, Finder open (launch and while running), select, framing switch, split, delete, undo (fixed 2026-11-08, see below), Space play/pause, ruler scrub, closing the window quits. Captions: make, style and position switches, editing a line, jumping from the timeline lane, split/delete with captions following, undo of all of these. Export: checks sheet, save panel, progress, finished state, output checked with ffprobe. Remove Pauses: detection on a sample with known pauses, sliders, preview playback, apply, undo. Sound: song opened from Finder becomes the music, ducking curve on a clip with pauses, lowering off/on (inspector and Sound menu), mute (music stays up under the muted clip), volume slider to 160%, export with loudness evened out (ffmpeg: −14.0 LUFS). Titles: add (⌘T) with text ready to type, typing + Return, style switch, undo/redo, drag in the viewer into the covered area (warning in inspector and export sheet), Top preset, move and lengthen on the timeline, ⌫ delete.
+**Not yet verified on screen:** the music volume and "Start the song at" sliders, Change Song…, dropping a sound file on the timeline, listening to the result (checks so far are visual and measured, not by ear). J/K/L reverse and fast playback, the clip right-click menu, the title right-click menu, the title length stepper, timeline zoom, drag-and-drop from Finder. The Pop and Fade animations are checked by render tests, not by eye during playback.
 
 ## Decisions already made (don't re-ask)
 
@@ -60,11 +68,11 @@ Verified on screen: import, Finder open (launch and while running), select, fram
 The P0 list from `research/shorts-editor-research.md` §5. Each stage ends with tests and an on-screen check.
 
 1. ~~Auto-captions~~ (done)
-2. ~~Export~~ (done). Still to add with later stages: the "music on a Short over 1:00" check (needs the music lane, step 5), loudness normalisation (step 5).
+2. ~~Export~~ (done), with all the checks from the research except "low-volume audio" (made unnecessary by evening out the loudness).
 3. ~~Remove silences~~ (done, as "Remove Pauses").
 4. ~~Text overlay~~ (done, as "Titles", stage 5), with the "text where YouTube covers it" export check.
-5. **Audio** ← next (stage 6): clip volume, fades, a background-music lane with automatic ducking under speech, loudness normalisation on export.
-6. **Save/open projects**: a project file with autosave, security-scoped bookmarks to media, and relinking of missing media. Today the project lives only in memory, so **quitting loses the edit**.
+5. ~~Audio~~ (done, stage 6): clip volume, music with fades and ducking, loudness on export.
+6. **Save/open projects** ← next (stage 7): a project file with autosave, security-scoped bookmarks to media, and relinking of missing media. Today the project lives only in memory, so **quitting loses the edit**.
 7. Then P1 from the research: editing by deleting words in the transcript, keyframes/punch-in zoom, auto-reframe of horizontal footage (Vision), speed, loop preview, brand kit.
 
 ## Open questions for the user
@@ -83,7 +91,9 @@ The P0 list from `research/shorts-editor-research.md` §5. Each stage ends with 
 - Titles: the text is saved when editing ends (Return or clicking away), so the viewer updates then, not while typing. No snapping when dragging on the timeline. Overlapping titles share one lane row and are drawn on top of each other. One font (the system font) for all styles; no colour picker.
 - SwiftUI text fields hand the old value back to their binding as focus leaves. Editing fields that save on end (caption lines, title text) only accept changes while focused; otherwise what was typed is lost.
 - No project saving yet (see step 6).
-- Only video files can be imported (no audio-only files or images yet).
+- Only video and sound files can be imported (no images yet). Sound files can only be the music, not clips.
+- Audio: one song only; it always starts with the Short (no placing it later, no looping a short song). No fades on clip sound and no voice clean-up. Speech for ducking is found by loudness, so a clip with constant loud sound (e.g. its own music) counts as speech throughout. Volume sliders apply when released (no live preview while dragging). AVFoundation's audio mix does boost above 100% (checked: linear in float).
+- `MusicTrack` is a type in Apple's AudioToolbox, hence the model's name `BackgroundMusic`.
 - `SafeZone` margins are approximate (no official YouTube overlay found).
 - Moving clips by dragging on the timeline isn't implemented (right-click Move Earlier/Later only).
 - The timeline shows one thumbnail per clip, not a filmstrip.
