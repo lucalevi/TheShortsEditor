@@ -10,6 +10,10 @@ struct TimelineView: View {
     @State private var isDropTargeted = false
     /// A title being dragged on the timeline: moved, or its length changed from the right edge.
     @State private var titleDrag: TitleDrag?
+    /// The rectangle being drawn across the timeline to select what it covers.
+    @State private var marquee: CGRect?
+    /// The selection when the rectangle was started, which it adds to while ⌘ or ⇧ is held.
+    @State private var marqueeBase: TimelineSelection?
 
     struct TitleDrag {
         enum Kind { case move, resize }
@@ -25,6 +29,7 @@ struct TimelineView: View {
     private let musicLaneHeight: CGFloat = 30
     private var titleLaneY: CGFloat { rulerHeight + 6 }
     private var clipsY: CGFloat { titleLaneY + titleLaneHeight + 4 }
+    private var musicY: CGFloat { clipsY + trackHeight + 6 + captionLaneHeight + 4 }
     private let leadingInset: CGFloat = 12
 
     private var pointsPerSecond: CGFloat { model.timelineZoom }
@@ -57,14 +62,16 @@ struct TimelineView: View {
             GeometryReader { geometry in
                 ScrollView(.horizontal) {
                     ZStack(alignment: .topLeading) {
+                        marqueeArea
                         ruler
                         titleLane.offset(y: titleLaneY)
                         clipsRow.offset(y: clipsY)
                         captionLane.offset(y: clipsY + trackHeight + 6)
-                        musicLane.offset(y: clipsY + trackHeight + 6 + captionLaneHeight + 4)
+                        musicLane.offset(y: musicY)
                         pauseCuts.offset(y: clipsY)
                         limitMarker
                         playhead
+                        marqueeRectangle
                     }
                     .frame(width: max(geometry.size.width, contentWidth), height: geometry.size.height, alignment: .topLeading)
                 }
@@ -93,6 +100,75 @@ struct TimelineView: View {
 
     private var contentWidth: CGFloat {
         x(for: model.duration) + 10 * pointsPerSecond
+    }
+
+    /// In a right-click menu: deletes all selected items when this one is among several selected,
+    /// otherwise just this one.
+    @ViewBuilder
+    private func deleteButton(for item: EditorModel.Selection, single: String) -> some View {
+        let count = model.timelineSelection.count
+        if model.isSelected(item), count > 1 {
+            Button("Delete \(count) Selected Items", role: .destructive) { model.deleteSelection() }
+        } else {
+            Button(single, role: .destructive) {
+                model.selection = item
+                model.deleteSelection()
+            }
+        }
+    }
+
+    /// The empty space behind everything: click to deselect, drag to select with a rectangle
+    /// (holding ⌘ or ⇧ adds to what is already selected).
+    private var marqueeArea: some View {
+        Color.clear
+            .contentShape(Rectangle())
+            .gesture(DragGesture(minimumDistance: 0)
+                .onChanged { value in
+                    let rect = CGRect(x: min(value.startLocation.x, value.location.x),
+                                      y: min(value.startLocation.y, value.location.y),
+                                      width: abs(value.location.x - value.startLocation.x),
+                                      height: abs(value.location.y - value.startLocation.y))
+                    guard rect.width > 3 || rect.height > 3 || marquee != nil else { return }
+                    if marqueeBase == nil { marqueeBase = model.timelineSelection }
+                    marquee = rect
+                    var selection = marqueeBase ?? TimelineSelection()
+                    let adding = !NSEvent.modifierFlags.isDisjoint(with: [.command, .shift])
+                    selection.select(items(in: rect), adding: adding)
+                    model.timelineSelection = selection
+                }
+                .onEnded { _ in
+                    if marquee == nil, NSEvent.modifierFlags.isDisjoint(with: [.command, .shift]) {
+                        model.selection = nil   // a plain click on empty space
+                    }
+                    marquee = nil
+                    marqueeBase = nil
+                })
+    }
+
+    @ViewBuilder
+    private var marqueeRectangle: some View {
+        if let marquee {
+            Rectangle()
+                .fill(Color.accentColor.opacity(0.15))
+                .overlay(Rectangle().strokeBorder(Color.accentColor.opacity(0.9), lineWidth: 1))
+                .frame(width: marquee.width, height: marquee.height)
+                .offset(x: marquee.minX, y: marquee.minY)
+                .allowsHitTesting(false)
+                .accessibilityHidden(true)
+        }
+    }
+
+    /// The clips, titles and music a rectangle on the timeline touches.
+    private func items(in rect: CGRect) -> Set<EditorModel.Selection> {
+        let lanes: [(TimelineLane, CGFloat, CGFloat)] = [
+            (.titles, titleLaneY, titleLaneHeight),
+            (.clips, clipsY, trackHeight),
+            (.music, musicY, musicLaneHeight),
+        ]
+        let covered = Set(lanes.filter { _, y, height in rect.minY < y + height && rect.maxY > y }.map(\.0))
+        guard !covered.isEmpty else { return [] }
+        let range = CMTimeRange(start: time(at: rect.minX), end: time(at: rect.maxX))
+        return model.project.timelineItems(overlapping: range, in: covered)
     }
 
     /// Seconds along the top. Click or drag here to move the playhead.
@@ -136,11 +212,14 @@ struct TimelineView: View {
                         clip: clip,
                         name: model.project.asset(id: clip.assetID)?.name ?? "Missing",
                         thumbnail: model.thumbnails[clip.assetID],
-                        isSelected: clip.id == model.selectedClipID
+                        isSelected: model.isSelected(.clip(clip.id))
                     )
                     .frame(width: max(CGFloat(clip.duration.seconds) * pointsPerSecond, 2), height: trackHeight)
                     .onTapGesture { location in
-                        model.selectedClipID = clip.id
+                        let modifiers = NSEvent.modifierFlags
+                        model.click(.clip(clip.id), modifiers: modifiers)
+                        // ⌘/⇧-clicks only change the selection; a plain click also moves the playhead.
+                        guard modifiers.isDisjoint(with: [.command, .shift]) else { return }
                         let start = model.project.timeline.startTime(ofClipAt: index)
                         model.pause()
                         model.seek(to: start + CMTime(seconds: Double(location.x / pointsPerSecond), preferredTimescale: 600))
@@ -158,10 +237,7 @@ struct TimelineView: View {
                             Button("Move Later") { model.moveClip(clip.id, to: index + 1) }
                         }
                         Divider()
-                        Button("Delete Clip", role: .destructive) {
-                            model.selectedClipID = clip.id
-                            model.deleteSelection()
-                        }
+                        deleteButton(for: .clip(clip.id), single: "Delete Clip")
                     }
                 }
             }
@@ -179,7 +255,7 @@ struct TimelineView: View {
                     ? max(title.duration.seconds + drag!.seconds, TextOverlay.minimumDuration.seconds)
                     : title.duration.seconds
                 let isAfterEnd = title.visibleRange(in: model.project) == nil
-                TitleBlock(title: title, isSelected: model.selectedTitleID == title.id, isAfterEnd: isAfterEnd) { offset in
+                TitleBlock(title: title, isSelected: model.isSelected(.title(title.id)), isAfterEnd: isAfterEnd) { offset in
                     titleDrag = TitleDrag(id: title.id, kind: .resize, seconds: Double(offset / pointsPerSecond))
                 } onResizeEnd: { offset in
                     titleDrag = nil
@@ -187,22 +263,26 @@ struct TimelineView: View {
                 }
                 .frame(width: max(CGFloat(length) * pointsPerSecond - 2, 6), height: titleLaneHeight)
                 .offset(x: leadingInset + CGFloat(start) * pointsPerSecond + 1)
-                .onTapGesture { model.selectTitle(title.id) }
+                .onTapGesture {
+                    let modifiers = NSEvent.modifierFlags
+                    if modifiers.isDisjoint(with: [.command, .shift]) {
+                        model.selectTitle(title.id)
+                    } else {
+                        model.click(.title(title.id), modifiers: modifiers)
+                    }
+                }
                 .gesture(DragGesture(minimumDistance: 3).onChanged { value in
-                    if model.selectedTitleID != title.id { model.selectedTitleID = title.id }
+                    if !model.isSelected(.title(title.id)) { model.selectedTitleID = title.id }
                     titleDrag = TitleDrag(id: title.id, kind: .move, seconds: Double(value.translation.width / pointsPerSecond))
                 }.onEnded { value in
                     titleDrag = nil
                     model.moveTitle(title.id, to: title.start + CMTime(seconds: Double(value.translation.width / pointsPerSecond), preferredTimescale: 600))
-                    model.selectTitle(title.id)
+                    if model.timelineSelection.count <= 1 { model.selectTitle(title.id) }
                 })
                 .contextMenu {
                     Button("Start at Playhead") { model.moveTitle(title.id, to: model.currentTime) }
                     Divider()
-                    Button("Delete Title", role: .destructive) {
-                        model.selectedTitleID = title.id
-                        model.deleteSelection()
-                    }
+                    deleteButton(for: .title(title.id), single: "Delete Title")
                 }
             }
         }
@@ -241,7 +321,7 @@ struct TimelineView: View {
     private var musicLane: some View {
         if let range = model.project.musicRange, let song = model.musicAsset {
             let width = max(CGFloat(range.duration.seconds) * pointsPerSecond - 2, 6)
-            let isSelected = model.selection == .music
+            let isSelected = model.isSelected(.music)
             RoundedRectangle(cornerRadius: 4)
                 .fill(Color.green.opacity(isSelected ? 0.45 : 0.25))
                 .overlay {
@@ -265,9 +345,9 @@ struct TimelineView: View {
                 .frame(width: width, height: musicLaneHeight)
                 .contentShape(Rectangle())
                 .offset(x: leadingInset + 1)
-                .onTapGesture { model.selection = .music }
+                .onTapGesture { model.click(.music, modifiers: NSEvent.modifierFlags) }
                 .contextMenu {
-                    Button("Remove Music", role: .destructive) { model.removeMusic() }
+                    deleteButton(for: .music, single: "Remove Music")
                 }
                 .help("Music: \(song.name). The line shows its volume; it dips while people talk.")
                 .accessibilityElement(children: .combine)

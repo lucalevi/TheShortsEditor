@@ -19,6 +19,13 @@ final class EditorKeys {
     }
 
     private static func handle(_ event: NSEvent, _ model: EditorModel) -> Bool {
+        // ⌘A outside a text field selects everything on the timeline (Edit ▸ Select All).
+        if event.modifierFlags.intersection([.command, .control, .option, .shift]) == .command,
+           event.charactersIgnoringModifiers == "a",
+           !(event.window?.firstResponder is NSText) {
+            model.selectAllOnTimeline()
+            return true
+        }
         guard event.modifierFlags.intersection([.command, .control, .option]).isEmpty,
               !(event.window?.firstResponder is NSText)
         else { return false }

@@ -8,6 +8,7 @@ struct InspectorView: View {
     var body: some View {
         VStack(spacing: 0) {
             PanelHeader(title: model.silenceSession != nil ? "Remove Pauses"
+                        : model.timelineSelection.count > 1 ? "\(model.timelineSelection.count) Selected"
                         : model.selectedTitle != nil ? "Title"
                         : model.selection == .music && model.project.music != nil ? "Music"
                         : model.selectedClip == nil ? "Your Short" : "Clip")
@@ -15,6 +16,8 @@ struct InspectorView: View {
                 Group {
                     if model.silenceSession != nil {
                         SilencePanel(model: model)
+                    } else if model.timelineSelection.count > 1 {
+                        MultipleInspector(model: model)
                     } else if model.selection == .music, let music = model.project.music, let song = model.musicAsset {
                         MusicInspector(model: model, music: music, song: song)
                     } else if let title = model.selectedTitle {
@@ -32,6 +35,60 @@ struct InspectorView: View {
         }
         .background(Theme.panel)
     }
+}
+
+/// Several items selected on the timeline: what they are, and what can be done to all of them.
+private struct MultipleInspector: View {
+    let model: EditorModel
+
+    private var clips: [Clip] {
+        model.project.timeline.clips.filter { model.isSelected(.clip($0.id)) }
+    }
+
+    private var summary: [String] {
+        let items = model.timelineSelection.items
+        let titles = items.filter { if case .title = $0 { true } else { false } }.count
+        var parts: [String] = []
+        if !clips.isEmpty { parts.append(clips.count == 1 ? "1 clip" : "\(clips.count) clips") }
+        if titles > 0 { parts.append(titles == 1 ? "1 title" : "\(titles) titles") }
+        if items.contains(.music) { parts.append("the music") }
+        return parts
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text(summary.formatted(.list(type: .and)).capitalizedFirst + " selected.")
+                .fixedSize(horizontal: false, vertical: true)
+
+            if !clips.isEmpty {
+                let allMuted = clips.allSatisfy(\.isMuted)
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Framing").font(.subheadline.weight(.semibold))
+                    HStack {
+                        Button("Fill Screen") { model.setFraming(.fill, for: clips.map(\.id)) }
+                        Button("Show All") { model.setFraming(.fit, for: clips.map(\.id)) }
+                    }
+                    Text("Sets every selected clip at once.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Button(allMuted ? "Unmute Clips" : "Mute Clips", systemImage: allMuted ? "speaker.wave.2" : "speaker.slash") {
+                    model.setClipsMuted(clips.map(\.id), !allMuted)
+                }
+            }
+
+            Button("Delete All Selected", systemImage: "trash", role: .destructive) { model.deleteSelection() }
+
+            Text("⌘-click adds or removes one item. ⇧-click adds the clips in between. Drag across empty space on the timeline to select with a rectangle.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+}
+
+private extension String {
+    var capitalizedFirst: String { prefix(1).uppercased() + dropFirst() }
 }
 
 private struct ClipInspector: View {

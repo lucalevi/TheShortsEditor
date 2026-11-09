@@ -21,13 +21,30 @@ final class EditorModel {
     private(set) var recentProjects: [URL] = ProjectStore.recentProjects
     /// Media used in the Short whose files can't be found (moved, renamed elsewhere, deleted).
     private(set) var missingAssets: Set<MediaAsset.ID> = []
-    /// One thing at a time: a clip, a title, or the music.
-    var selection: Selection?
+    /// What is selected on the timeline: any mix of clips, titles and the music.
+    var timelineSelection = TimelineSelection()
 
-    enum Selection: Equatable {
-        case clip(Clip.ID)
-        case title(TextOverlay.ID)
-        case music
+    typealias Selection = TimelineItem
+
+    /// The selected item when exactly one is selected (the inspector shows its details). Setting it
+    /// selects only that item; setting nil clears the selection.
+    var selection: Selection? {
+        get { timelineSelection.single }
+        set { timelineSelection = TimelineSelection(newValue.map { [$0] } ?? []) }
+    }
+
+    func isSelected(_ item: Selection) -> Bool { timelineSelection.contains(item) }
+
+    /// A click on a timeline item, with ⌘ (add/remove) or ⇧ (add the clips in between) as held.
+    func click(_ item: Selection, modifiers: NSEvent.ModifierFlags) {
+        let kind: TimelineSelection.ClickKind = modifiers.contains(.command) ? .toggle
+            : modifiers.contains(.shift) ? .extend : .replace
+        timelineSelection.click(item, kind, in: project.timeline)
+    }
+
+    /// Selects every clip, title and the music (⌘A on the timeline).
+    func selectAllOnTimeline() {
+        timelineSelection = TimelineSelection(project.allTimelineItems)
     }
 
     var selectedClipID: Clip.ID? {
@@ -243,9 +260,13 @@ final class EditorModel {
         selectedClipID = nil
     }
 
-    /// Deletes what is selected: a title, the music, or a clip (⌫).
+    /// Deletes what is selected: a title, the music, a clip, or several of them at once (⌫).
     func deleteSelection() {
-        if selection == .music {
+        if timelineSelection.count > 1 {
+            let items = timelineSelection.items
+            apply("Delete \(items.count) Items") { $0.remove(items) }
+            selection = nil
+        } else if selection == .music {
             removeMusic()
         } else if let id = selectedTitleID {
             apply("Delete Title") { $0.removeTitle(id) }
@@ -259,6 +280,22 @@ final class EditorModel {
         apply("Change Framing") { project in
             guard let index = project.timeline.index(of: clipID) else { return }
             project.timeline.clips[index].framing = framing
+        }
+    }
+
+    func setFraming(_ framing: Framing, for clipIDs: [Clip.ID]) {
+        apply("Change Framing") { project in
+            for id in clipIDs {
+                if let index = project.timeline.index(of: id) { project.timeline.clips[index].framing = framing }
+            }
+        }
+    }
+
+    func setClipsMuted(_ clipIDs: [Clip.ID], _ muted: Bool) {
+        apply(muted ? "Mute Clips" : "Unmute Clips") { project in
+            for id in clipIDs {
+                if let index = project.timeline.index(of: id) { project.timeline.clips[index].isMuted = muted }
+            }
         }
     }
 
@@ -812,9 +849,7 @@ final class EditorModel {
     private func projectDidChange(autosave: Bool = true) {
         if autosave { scheduleAutosave() }
         captionPages = CaptionLayout.pages(in: project)
-        if let id = selectedTitleID, project.title(id: id) == nil { selection = nil }
-        if let id = selectedClipID, project.timeline.index(of: id) == nil { selection = nil }
-        if selection == .music, project.music == nil { selection = nil }
+        timelineSelection.prune(to: project)
         if let settings = silenceSession?.settings { updateSilenceSettings(settings) }
         rebuildTask?.cancel()
         let project = project

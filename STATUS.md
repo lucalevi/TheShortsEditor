@@ -23,6 +23,7 @@ What works today:
 - Import videos (and sound files, for music) by drag-and-drop (Media list, viewer, timeline), with **Import…** / **Choose Videos…**, or from Finder (Open With / Dock icon). Files go onto the timeline in order, and the same file is never imported twice.
 - 9:16 viewer (1080×1920, 30 fps) with a toggle for the dimmed areas YouTube's interface covers (`SafeZone`).
 - Magnetic timeline: click a clip to select it and move the playhead there, drag the ruler to scrub, split (**B**), delete with the gap closing (**⌫**), move earlier/later (right-click), zoom.
+- **Selecting several items** on the timeline (`TimelineSelection` in EditorCore): ⌘-click adds/removes, ⇧-click adds the clips in between, drag across empty space draws a selection rectangle (⌘/⇧ adds), click empty space or ⇧⌘A deselects, ⌘A selects all (outside text fields, in `EditorKeys`). Delete removes them all in one undo step; the inspector shows "N Selected" with framing and mute for all selected clips. Not yet seen on screen: music in a group, the right-click "Delete N Selected Items", the group framing/mute buttons, Deselect All. Dragging a title moves only that title; the rectangle doesn't auto-scroll.
 - Per-clip framing: **Fill screen** / **Show all**. Vertical footage defaults to fill, horizontal to show all.
 - Playback: Space, J/K/L, ←/→ frame step, Home/End. Undo/redo for every edit (⌘Z).
 - Length against the 3:00 Shorts limit (inspector + red marker on the timeline).

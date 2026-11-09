@@ -31,8 +31,8 @@ struct ContentView: View {
                     .help("Cut the clip at the playhead (B)")
                     .disabled(model.project.timeline.clips.isEmpty)
                 Button("Delete", systemImage: "trash") { model.deleteSelection() }
-                    .help("Remove the selected clip, title or music (⌫)")
-                    .disabled(model.selection == nil)
+                    .help("Remove the selected clips, titles or music (⌫)")
+                    .disabled(model.timelineSelection.isEmpty)
             }
             ToolbarItem {
                 Button("Remove Pauses", systemImage: "waveform.path.badge.minus") { model.beginRemovingSilences() }

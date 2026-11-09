@@ -39,13 +39,22 @@ struct EditorCommands: Commands {
                 .disabled(model.project.timeline.clips.isEmpty || model.exportPhase != nil)
         }
 
+        CommandGroup(after: .pasteboard) {
+            // ⌘A (Edit ▸ Select All) selects everything on the timeline when no text is being
+            // edited; EditorKeys handles that, since the standard item only reaches text fields.
+            Button("Deselect All") { model.selection = nil }
+                .keyboardShortcut("a", modifiers: [.command, .shift])
+                .disabled(model.timelineSelection.isEmpty)
+        }
+
         CommandMenu("Clip") {
             Button("Split at Playhead") { model.splitAtPlayhead() }
                 .keyboardShortcut("b", modifiers: [])
                 .disabled(model.project.timeline.clips.isEmpty)
-            Button(model.selection == .music ? "Remove Music" : model.selectedTitleID != nil ? "Delete Title" : "Delete Clip") { model.deleteSelection() }
+            Button(model.timelineSelection.count > 1 ? "Delete \(model.timelineSelection.count) Items"
+                   : model.selection == .music ? "Remove Music" : model.selectedTitleID != nil ? "Delete Title" : "Delete Clip") { model.deleteSelection() }
                 .keyboardShortcut(.delete, modifiers: [])
-                .disabled(model.selection == nil)
+                .disabled(model.timelineSelection.isEmpty)
             Divider()
             Button("Remove Pauses…") { model.beginRemovingSilences() }
                 .disabled(model.project.timeline.clips.isEmpty || model.silenceSession != nil)
