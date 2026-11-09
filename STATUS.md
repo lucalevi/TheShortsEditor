@@ -16,7 +16,9 @@ Stages 1–7 are done, tested on screen, committed and pushed to https://github.
 | 6 | Audio: clip volume, music with ducking, loudness on export | 2026-11-09 |
 | 7 | Save/open projects, autosave, missing media | 2026-11-09 |
 
-**Pick up here:** the P0 list from the research is complete. On 2026-11-09 CapCut was analysed (`research/capcut-reverse-engineering.md`) and creator tool usage researched (`research/shorts-creator-tools-research.md`, with a gap table in §5), then distilled into the build list `research/feature-roadmap.md` (12 features, stages 8–16).
+**Pick up here (2026-11-09, latest):** iMovie has been reverse engineered: `research/imovie/` (start with `imovie-reverse-engineering.md`). It ranks what to take from iMovie into build stages A–F (A: iMovie's grammar, i.e. skimming, live drag numbers, R ranges, items that follow their clip, drop-on-clip menu, Reset/Paste Settings, loop and full-screen preview; then D sound, C transitions and time, B look, E media and finishing, F one-click Shorts). **Next: the user decides which stage to build first.** Test footage and a closed scratch iMovie library from the session are in `~/Movies/ShortsEditorResearch` (safe to delete).
+
+Earlier: the P0 list from the research is complete. On 2026-11-09 CapCut was analysed (`research/capcut-reverse-engineering.md`) and creator tool usage researched (`research/shorts-creator-tools-research.md`, with a gap table in §5), then distilled into the build list `research/feature-roadmap.md` (12 features, stages 8–16).
 
 ### Delete media from the media panel (2026-11-09): done
 Select a file in the Media panel and press ⌫, or right-click ▸ Delete. It also removes the file's clips, B-roll, sounds, music and captions; one undo restores everything (`Project.removeAsset`, `EditorModel.removeAssets`). Checked on screen (key, right-click, undo). Not checked: deleting several files at once.

@@ -67,6 +67,8 @@ Order rationale: 8 makes every later stage easier to use; 9–10 close the gaps 
 
 ## 4. Next 20% (after the twelve)
 
+> **Superseded (2026-11-09):** the iMovie research (`research/imovie/imovie-reverse-engineering.md` §6–7) folds these items into build stages A–F, in the recommended order A → D → C → B → E → F. Use that list; this section is kept for history.
+
 Worth doing once stages 8–16 are in, roughly in this order:
 1. **Markers and beats**: M to mark, beat detection on the music, snap cuts to beats.
 2. **Looks**: 8–10 filter presets and basic adjustments (exposure, contrast, saturation, warmth) with Core Image; apply to all.

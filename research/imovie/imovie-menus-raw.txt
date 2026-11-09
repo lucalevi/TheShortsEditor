@@ -1,0 +1,276 @@
+## iMovie
+About iMovie
+——— (disabled)
+Settings… [0+,]
+——— (disabled)
+Provide iMovie Feedback…
+——— (disabled)
+Services
+    Activity Monitor
+    Allocations & Leaks
+    File Activity
+    System Trace
+    Time Profile Active Application
+    Time Profile App Under Mouse
+    Time Profile Entire System
+    Toggle Instruments Recording
+    Services Settings…
+——— (disabled)
+Hide iMovie [0+H]
+Hide Others [2+H]
+Show All (disabled)
+——— (disabled)
+Quit iMovie [0+Q]
+Quit and Keep Windows [2+Q]
+## File
+New Movie [0+N] (disabled)
+New Trailer… [1+N] (disabled)
+New App Preview (disabled)
+——— (disabled)
+New Event [10+N] (disabled)
+Import Media… [0+I]
+Import iMovie iOS Projects…
+——— (disabled)
+Open Library
+    iMovie Library
+    ——— (disabled)
+    New…
+    Other…
+    Clear Recents
+Close Library (disabled)
+Copy to Library (disabled)
+    iMovie Library (disabled)
+    ——— (disabled)
+    New Library… (disabled)
+Move to Library (disabled)
+    iMovie Library (disabled)
+    ——— (disabled)
+    New Library… (disabled)
+Merge Events (disabled)
+Consolidate Library Files… (disabled)
+——— (disabled)
+Share
+    Email… (disabled)
+    Social Platforms… (disabled)
+    Image… (disabled)
+    File… (disabled)
+Convert Trailer to Movie (disabled)
+——— (disabled)
+Reveal in Event [9+F] (disabled)
+Reveal in Finder [1+R] (disabled)
+——— (disabled)
+Update Projects and Events…
+——— (disabled)
+Delete [0+⌫] (disabled)
+## Edit
+Undo [0+Z] (disabled)
+Redo [1+Z] (disabled)
+——— (disabled)
+Cut [0+X] (disabled)
+Copy [0+C] (disabled)
+Paste [0+V] (disabled)
+Paste Adjustments
+    All [2+V] (disabled)
+    ——— (disabled)
+    Color Correction [2+C] (disabled)
+    Crop [2+R] (disabled)
+    Volume [2+A] (disabled)
+    Clip Filter [2+L] (disabled)
+    Audio Effect [2+O] (disabled)
+    Speed [2+S] (disabled)
+    Video Overlay Settings [2+U] (disabled)
+    Map Style [2+M] (disabled)
+Delete [8+⌫] (disabled)
+Delete Keyframes [11+⌫] (disabled)
+——— (disabled)
+Duplicate Project [0+D] (disabled)
+——— (disabled)
+Select All [0+A] (disabled)
+Select Entire Clip [8+X] (disabled)
+Select in Movie
+    Video Clips (disabled)
+    Transitions (disabled)
+    Photos (disabled)
+    Maps (disabled)
+    Backgrounds (disabled)
+Deselect All [1+A] (disabled)
+——— (disabled)
+Add to Movie [8+E] (disabled)
+Add Connected Media [8+Q] (disabled)
+Insert [8+W] (disabled)
+——— (disabled)
+Add Cross Dissolve [0+T] (disabled)
+——— (disabled)
+Find… [0+F] (disabled)
+——— (disabled)
+Writing Tools
+    Show Writing Tools (disabled)
+    ——— (disabled)
+    Proofread (disabled)
+    Rewrite (disabled)
+    ——— (disabled)
+    Make Friendly (disabled)
+    Make Professional (disabled)
+    Make Concise (disabled)
+    ——— (disabled)
+    Summarize (disabled)
+    Create Key Points (disabled)
+    Make List (disabled)
+    Make Table (disabled)
+    ——— (disabled)
+    Compose… (disabled)
+——— (disabled)
+AutoFill
+    Contact… (disabled)
+    Passwords… (disabled)
+    Credit Card… (disabled)
+Start Dictation [8+🎤] (disabled)
+Emoji & Symbols [24+E]
+## Mark
+Favorite [8+F] (disabled)
+Reject [8+⌫] (disabled)
+Unrate [8+U] (disabled)
+——— (disabled)
+Add Marker [8+M] (disabled)
+Delete Marker [13+M] (disabled)
+## Modify
+Enhance [1+E] (disabled)
+Fade to
+    Black and White (disabled)
+    Sepia (disabled)
+    Dream (disabled)
+Flash and Freeze Frame (disabled)
+Mute Audio [1+M] (disabled)
+——— (disabled)
+Trim to Selection [10+-] (disabled)
+Trim Clip Edge
+    Nudge Left [8+,] (disabled)
+    Nudge Right [8+.] (disabled)
+    Nudge Left Many [9+,] (disabled)
+    Nudge Right Many [9+.] (disabled)
+Split Clip [0+B] (disabled)
+Join Clips [1+B] (disabled)
+Detach Audio [2+B] (disabled)
+——— (disabled)
+Slow Motion
+    50% (disabled)
+    25% (disabled)
+    10% (disabled)
+Fast Forward
+    2x (disabled)
+    4x (disabled)
+    8x (disabled)
+    20x (disabled)
+Instant Replay
+    100% (disabled)
+    50% (disabled)
+    25% (disabled)
+    10% (disabled)
+Rewind
+    1x (disabled)
+    2x (disabled)
+    4x (disabled)
+Add Freeze Frame [9+H] (disabled)
+Reset Speed  [11+R] (disabled)
+——— (disabled)
+Adjust Clip Date and Time… (disabled)
+## View
+Play [8+ ]
+Play Selection
+Play from Beginning [8+<]
+Play Full Screen [1+F] (disabled)
+Loop Playback [0+L] (disabled)
+——— (disabled)
+Sort Events By
+    Name (disabled)
+    Newest to Oldest (disabled)
+    Oldest to Newest (disabled)
+Sort By (disabled)
+    Date (disabled)
+    Name (disabled)
+    Duration (disabled)
+    ——— (disabled)
+    Ascending (disabled)
+    Descending (disabled)
+Show Separate Days in Events (disabled)
+Show Audio Waveforms (disabled)
+Show Used Media Ranges (disabled)
+Show Skimmer Info [12+Y] (disabled)
+——— (disabled)
+Zoom In [0++]
+Zoom Out [0+-]
+Zoom All Clips [9+Z] (disabled)
+——— (disabled)
+Snapping [8+N]
+Audio Skimming [9+S]
+## Window
+Minimize [0+M]
+Minimize All
+Zoom [8+]
+Zoom All [10+]
+Fill [28+F]
+Center [28+C]
+——— (disabled)
+Move & Resize
+    Halves (disabled)
+    Left
+    Right
+    Top
+    Bottom
+    ——— (disabled)
+    Quarters (disabled)
+    Top Left
+    Top Right
+    Bottom Left
+    Bottom Right
+    ——— (disabled)
+    Arrange (disabled)
+    Left & Right
+    Left & Quarters
+    Right & Left
+    Right & Quarters
+    Top & Bottom
+    Top & Quarters
+    Bottom & Top
+    Bottom & Quarters
+    Quarters
+    ——— (disabled)
+    Return to Previous Size [28+R] (disabled)
+Full Screen Tile
+    Left of Screen
+    Right of Screen
+——— (disabled)
+Move to Built-in Retina Display
+Move All to Built-in Retina Display
+——— (disabled)
+Go to Media [8+1]
+Go to Projects [8+2]
+Show Libraries [1+1] (disabled)
+Content Library
+    My Media [0+1]
+    Audio & Video [0+2]
+    Titles [0+3]
+    Backgrounds [0+4]
+    Transitions [0+5]
+Theme Chooser… [0+6]
+——— (disabled)
+Clip Trimmer [0+<] (disabled)
+Precision Editor [0+.] (disabled)
+Record Voiceover [8+V] (disabled)
+——— (disabled)
+Revert to Original Layout
+——— (disabled)
+Bring All to Front
+Arrange in Front
+Remove Window from Set (disabled)
+——— (disabled)
+Enter Full Screen [4+F]
+## Help
+iMovie Help
+——— (disabled)
+What’s New in iMovie
+Keyboard Shortcuts
+Supported Cameras
+——— (disabled)
+Service and Support
+

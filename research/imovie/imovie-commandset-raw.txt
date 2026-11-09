@@ -1,0 +1,137 @@
+⌘⇧= / ⌘⇧keypad= Increase Clip Height — Increase the Event Browser clip height
+⌘⇧1 / ⌘⇧keypad3 Show Libraries — Show Libraries
+⌘= / ⌘keypad= / ⌘keypad+ Zoom In — Zoom in to the Timeline, Event Browser, or Viewer
+⌘t             Add Default Transition — Add the default transition to the selection
+m              Add Marker — Add a marker at the location of the skimmer or playhead
+e              Add to Project — Add the selection to the end of the project
+⌃c             All Clips — Change the Event Browser filter setting to show all clips
+⇧s             Audio Skimming — Turn audio skimming on or off
+⌘b             Blade — Cut the topmost clip under the skimmer or playhead, or cut all selected clips
+⌥⌃f            Cinematic Editor — Show or hide the Cinematic Editor for the selected timeline clips
+⌥o             Clear Range End — Clear the range’s end point
+⌥i             Clear Range Start — Clear the range’s start point
+⌥x             Clear Selected Ranges — Clear the ranges that are selected
+⌘w             Close Window — Close windows other than the Final Cut Pro main window
+q              Connect to Primary Storyline — Connect the selection to the primary storyline
+⌘⌥c            Copy Effects — Copy the selected effects and their settings
+⌘c             Copy — Copy the selection
+⌘x             Cut — Cut the selection
+⌘⇧-            Decrease Clip Height — Decrease the Event Browser clip height
+⌃⇧m            Delete Marker — Delete the selected marker
+⌘⇧a            Deselect All — Deselect all selected items
+⌥⌘b            Detach Audio — Make the Audio component a connected clip
+⌘d             Duplicate — Duplicate the selection
+⌘⇧e            Enhance — 
+⌘e             Export Using Default Share Destination… — Export using the default share destination
+f              Favorite — Rate the Event Browser selection as Favorite 
+⌃f             Favorites — Change the Event Browser filter setting to show Favorites
+⌘f             Find — Show or hide the Filter window (in the Event Browser) or the Timeline Index (in the Timeline)
+⇧⌥⌘NSRightArrowFunctionKey Next Focus Point — Go to next focus point
+1 / keypad1    Go to Library — Show/Hide Library
+'              Go to Next Edit — Move the playhead to the next edit point in the Timeline
+;              Go to Previous Edit — Move the playhead to the previous edit point in the Timeline
+⇧o             Go to Range End — Move the playhead to the end of the nearest range
+⇧i             Go to Range Start — Move the playhead to the beginning of the nearest range
+⌘h             Hide Application — Hide Final Cut Pro
+⌘⌥h            Hide Other Applications — Hide all applications except Final Cut Pro
+⌃h             Hide Rejected — Change the Event Browser filter setting to hide rejected clips
+⌘i             Import Media — Import media from a device, camera, archive, or Image Playground
+w              Insert — Insert the selection at the skimmer or playhead position 
+⌘⇧b            Join Clips — Join two continuous clips into a single clip
+⌘l             Loop Playback — Turn looped playback on or off
+⌃-             Lower Volume 1 dB — Lower the audio volume by 1 dB
+⌘m             Minimize — Minimize Final Cut Pro
+⌘⇧m            MuteClip — 
+⇧keypadfunctionNSLeftArrowFunctionKey Go Back 10 Frames — Move the playhead back 10 frames
+⇧keypadfunctionNSRightArrowFunctionKey Go Forward 10 Frames — Move the playhead forward 10 frames
+⌥n             New Event — Create a new Event
+⌘n             New Movie — Create a new movie
+⌘⇧n            New Trailer — Create a new trailer
+⌃'             Next Marker — Move the playhead to the next marker
+⌃x             No Ratings or Keywords — Change the Event Browser filter setting to show clips with no ratings or keywords
+⌥⇧,            Nudge Audio Subframe Left Many — Nudge the selected audio edit point left by 10 subframes, creating a split edit
+⌥,             Nudge Audio Subframe Left — Nudge the selected audio edit point left by one subframe, creating a split edit
+⌥⇧.            Nudge Audio Subframe Right Many — Nudge the selected audio edit point right by 10 subframes, creating a split edit
+⌥.             Nudge Audio Subframe Right — Nudge the selected audio edit point right by one subframe, creating a split edit
+⇧,             Nudge Left Many — Nudge the selection 10 units to the left
+,              Nudge Left — Nudge the selection one unit to the left
+⇧.             Nudge Right Many — Nudge the selection 10 units to the right
+.              Nudge Right — Nudge the selection one unit to the right
+⌘⌥v            Paste Adjustments: All — Applies all adjustments you’ve made to the selection
+⌘⌥o            Paste Adjustments: Audio Effect — Applies the copied audio effect to the selection
+⌘⌥c            Paste Adjustments: Color Correction — Applies only color correction adjustments to the selection
+⌘⌥r            Paste Adjustments: Crop — Applies only crop positioning to the selection
+⌘⌥m            Paste Adjustments: Map Style — Applies the copied map style to selected maps
+⌘⌥t            Paste Adjustments: Rolling Shutter — Applies the state of rolling shutter correction (enabled or disabled) and the amount of rolling shutter correction to the selection
+⌘⌥s            Paste Adjustments: Speed — Applies only adjustments you’ve made to the speed of the video clip to the selection
+⌘⌥z            Paste Adjustments: Stabilization — Applies only stabilization adjustments to the selection
+⌘⌥l            Paste Adjustments: Video Effect — Applies the copied video effect to the selection
+⌘⌥u            Paste Adjustments: Video Overlay — Applies video overlay adjustments to the selection
+⌘v             Paste Insert at Playhead — Insert the Clipboard contents at the skimmer or playhead position
+⌘⌥a            PasteAdjustmentsVolume — 
+⇧?             Play Around — Play around the playhead position
+l / ⌃l         Play Forward — Play forward (press L multiple times to increase the playback speed)
+\              Play From Beginning — Play from the beginning
+⇧⌘F            Play Full Screen — Play full screen from the skimmer or playhead position
+⇧Space         Play Reverse — Play in reverse
+j / ⌃j         Play Reverse — Play in reverse (press J multiple times to increase the reverse playback speed)
+/              Play Selection — Play the selection
+⌃⇧o            Play to End — Play from the playhead to the end of the selection
+Space / ⌃Space Play/Pause — Start or pause playback
+⌃;             Previous Marker — Move the playhead to the previous marker
+⌘j             Project Properties — Open the Properties inspector for the current project
+⌘q             Quit — Quit Final Cut Pro
+⌃= / ⌃keypad=  Raise Volume 1 dB — Raise the audio volume by 1 dB
+r              Range Selection Tool — Make the Range Selection tool active
+⌘⇧z            Redo Changes — Redo the last command
+⌘r             Retime Editor — Show or hide the Retime Editor
+⇧n             Retime: Create Normal Speed Segment — Set the selection to play at normal (100 percent) speed
+⌥f             Retime: Hold — Create a 2-second hold segment
+⌥⇧r            Retime: Reset — Reset the selection to play forward at normal (100 percent) speed
+⇧f             Reveal In Browser — Reveal the selected clip in the Event Browser
+⌘⇧r            Reveal in Finder — Reveal the selected Event clip’s source media file in the Finder
+keypadfunctionNSLeftArrowFunctionKey Go to Previous Frame — Move the playhead to the previous frame
+keypadfunctionNSRightArrowFunctionKey Go to Next Frame — Move the playhead to the next frame
+⌘a             Select All — Select all clips
+x              Select Clip Range — Set the range selection to match the boundaries of the clip below the skimmer or playhead
+c              Select Clip — Select the clip under the pointer in the Timeline
+⇧[             Select Left Audio Edge — For audio/video clips in expanded view, select the left edge of the audio edit point
+[              Select Left Edge — Select the left edge of the edit point
+⇧]             Select Right Audio Edge — For audio/video clips in expanded view, select the right edge of the audio edit point
+]              Select Right Edge — Select the right edge of the edit point
+a              Select Tool — Make the Select tool active
+o / ⌃o         Set Range End — Set the end point for the range
+i / ⌃i         Set Range Start — Set the start point for the range
+⌘,             Settings — Open the Final Cut Pro Settings window
+3 / keypad3    Show / Hide Theater — Show / Hide Theater
+⌘⇧1            Show/Hide Event Library — Show or hide the Event Library
+⌘/             Show/Hide Precision Editor — Show or hide the Precision Editor
+⌃y             Show/Hide Skimmer Info — Show or hide clip information when skimming in the Event Browser
+2 / keypad2    ShowHideProjects — 
+v              Start/Stop Voiceover Recording — Start or stop voiceover recording
+k / ⌃k         Stop — Stop playback
+n              Toggle Snapping — 
+⌘\             ToggleClipTrimmer — 
+⌥/             Trim to Selection — Trim clip start and end points to the range selection
+⌘z             Undo Changes — Undo the last command
+u              Unrate — Remove ratings from the selection
+⌘- / ⌘keypad-  Zoom Out — Zoom out of the Timeline, Event Browser, or Viewer
+⇧z             Zoom to Fit — Zoom the contents to fit the size of the Event Browser, Viewer, or Timeline
+⌥⇧NSDeleteCharacter Delete Keyframes — Delete Selected Keyframes
+⇧NSDownArrowFunctionKey Extend Selection Down — In the Event Browser, add the next clip to the selection
+⌥NSDownArrowFunctionKey Nudge Down — Nudge the selection down one unit
+NSDeleteCharacter Delete — Delete the Timeline selection, reject the Event Browser selection, or remove a multicam through edit
+⇧NSUpArrowFunctionKey Extend Selection Up — In the Event Browser, add the previous clip to the selection
+⌥NSUpArrowFunctionKey Nudge Up — Nudge the selection up one unit
+functionNSEndFunctionKey Go to End — Move the playhead to the end of the Timeline or last clip in the Event Browser
+⌥⇧NSDownArrowFunctionKey Nudge Down Many — Nudge the selection down 10 units
+⌘⌃NSLeftArrowFunctionKey Previous Clip — Go to the previous item (in the Event Browser) or the previous edit point (in the Timeline)
+NSUpArrowFunctionKey / ⌃NSUpArrowFunctionKey Up — Go to the previous item (in the Event Browser) or the previous edit point (in the Timeline)
+⌘NSDeleteCharacter Move to Trash — Move the selection to the Finder Trash
+⌃NSDeleteCharacter Rejected — Change the Event Browser filter setting to show rejected clips
+NSDownArrowFunctionKey / ⌃NSDownArrowFunctionKey Down — Go to the next item (in the Event Browser) or the next edit point (in the Timeline)
+⌘⌥NSUpArrowFunctionKey Lift from Storyline — Lift the selection from the storyline and connect it to the resulting gap clips
+⌥⇧NSUpArrowFunctionKey Nudge Up Many — Nudge the selection up 10 units
+functionNSHomeFunctionKey Go to Beginning — Move the playhead to the beginning of the Timeline or first clip in the Event Browser
+⌘⌃NSRightArrowFunctionKey Next Clip — Go to the next item (in the Event Browser) or the next edit point (in the Timeline)
+⇧⌥⌘NSLeftArrowFunctionKey Previous Focus Point — Go to previous focus point
