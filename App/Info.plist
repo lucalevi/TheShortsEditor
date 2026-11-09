@@ -10,6 +10,18 @@
 	<array>
 		<dict>
 			<key>CFBundleTypeName</key>
+			<string>Shorts Editor Project</string>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>LSHandlerRank</key>
+			<string>Owner</string>
+			<key>LSItemContentTypes</key>
+			<array>
+				<string>com.lucalevi.shortseditor.project</string>
+			</array>
+		</dict>
+		<dict>
+			<key>CFBundleTypeName</key>
 			<string>Video</string>
 			<key>CFBundleTypeRole</key>
 			<string>Viewer</string>
@@ -53,5 +65,26 @@
 	<string>© 2026 Luca Iacolettig</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>Captions are made on this Mac from what is said in your clips.</string>
+	<key>UTExportedTypeDeclarations</key>
+	<array>
+		<dict>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>public.json</string>
+				<string>public.content</string>
+			</array>
+			<key>UTTypeDescription</key>
+			<string>Shorts Editor Project</string>
+			<key>UTTypeIdentifier</key>
+			<string>com.lucalevi.shortseditor.project</string>
+			<key>UTTypeTagSpecification</key>
+			<dict>
+				<key>public.filename-extension</key>
+				<array>
+					<string>shortsproject</string>
+				</array>
+			</dict>
+		</dict>
+	</array>
 </dict>
 </plist>

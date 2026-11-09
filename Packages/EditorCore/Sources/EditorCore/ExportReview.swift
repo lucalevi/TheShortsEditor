@@ -5,7 +5,7 @@ import Foundation
 /// Something worth knowing before exporting a Short.
 public struct ExportIssue: Identifiable, Equatable, Sendable {
     public enum Kind: String, Sendable {
-        case tooLong, musicOverOneMinute, quietStart, titleCovered, noSound, noCaptions, captionsHidden, titleAfterEnd
+        case missingMedia, tooLong, musicOverOneMinute, quietStart, titleCovered, noSound, noCaptions, captionsHidden, titleAfterEnd
     }
 
     public enum Severity: Sendable {
@@ -30,8 +30,18 @@ public enum ExportReview {
     /// `openingPeak` is the loudest sample in the first second (0…1), or nil when the Short has
     /// no sound at all. `titleFrames` is where each title is drawn, in canvas pixels with the
     /// origin at the top left (measured by the renderer, which knows how big the text is).
-    public static func issues(for project: Project, openingPeak: Float?, titleFrames: [TextOverlay.ID: CGRect] = [:]) -> [ExportIssue] {
+    /// `missing` are the assets whose files can't be found.
+    public static func issues(for project: Project, openingPeak: Float?, titleFrames: [TextOverlay.ID: CGRect] = [:],
+                              missing: Set<MediaAsset.ID> = []) -> [ExportIssue] {
         var issues: [ExportIssue] = []
+        let missingUsed = project.usedAssets.filter { missing.contains($0.id) }
+        if !missingUsed.isEmpty {
+            issues.append(ExportIssue(
+                kind: .missingMedia, severity: .warning,
+                title: missingUsed.count == 1 ? "A file can't be found" : "\(missingUsed.count) files can't be found",
+                detail: "\(missingUsed.map(\.name).joined(separator: ", ")): those parts would be black and silent. Use Find Missing Files… in Media to point at where they are now."
+            ))
+        }
         if project.isOverMaxDuration {
             issues.append(ExportIssue(
                 kind: .tooLong, severity: .warning,

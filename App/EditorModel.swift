@@ -12,6 +12,15 @@ import Transcription
 @Observable
 final class EditorModel {
     private(set) var project = Project()
+    /// The file this Short is saved in. Nil until it is given a name; until then it is kept in
+    /// `ProjectStore.untitledURL`. Either way every change is saved a moment after it is made.
+    private(set) var documentURL: URL? {
+        didSet { window?.representedURL = documentURL }
+    }
+    /// Named projects opened lately, for File ▸ Open Recent.
+    private(set) var recentProjects: [URL] = ProjectStore.recentProjects
+    /// Media used in the Short whose files can't be found (moved, renamed elsewhere, deleted).
+    private(set) var missingAssets: Set<MediaAsset.ID> = []
     /// One thing at a time: a clip, a title, or the music.
     var selection: Selection?
 
@@ -68,7 +77,12 @@ final class EditorModel {
     /// that window's undo manager, the one Edit ▸ Undo and ⌘Z use. (Opening files from Finder can
     /// briefly create a second window that then closes, so the first window seen isn't reliable,
     /// and neither is SwiftUI's environment undo manager.)
-    @ObservationIgnored weak var window: NSWindow?
+    @ObservationIgnored weak var window: NSWindow? {
+        didSet { window?.representedURL = documentURL }
+    }
+    @ObservationIgnored private var autosaveTask: Task<Void, Never>?
+    @ObservationIgnored private var hasUnsavedChanges = false
+    @ObservationIgnored private var didReportSaveError = false
     private var undoManager: UndoManager? { (window ?? NSApp.mainWindow)?.undoManager }
 
     @ObservationIgnored private var rebuildTask: Task<Void, Never>?
@@ -159,6 +173,11 @@ final class EditorModel {
 
     /// Reads the files, adds the usable ones to Media and, if asked, to the end of the timeline.
     func importFiles(_ urls: [URL], addToTimeline: Bool) {
+        // A project file dropped or opened opens that Short instead.
+        if let projectFile = urls.first(where: { $0.pathExtension.lowercased() == ProjectFile.fileExtension }) {
+            openProject(projectFile)
+            return
+        }
         guard !urls.isEmpty else { return }
         isImporting = true
         Task {
@@ -414,7 +433,7 @@ final class EditorModel {
                 peak = 1  // Couldn't measure: skip that check rather than claim silence.
             }
             guard exportPhase == .checking else { return }
-            exportPhase = .review(ExportReview.issues(for: project, openingPeak: peak, titleFrames: TitlePreview.frames(in: project)))
+            exportPhase = .review(ExportReview.issues(for: project, openingPeak: peak, titleFrames: TitlePreview.frames(in: project), missing: missingAssets))
         }
     }
 
@@ -551,10 +570,247 @@ final class EditorModel {
         timelineZoom = min(max(timelineZoom * factor, Self.zoomRange.lowerBound), Self.zoomRange.upperBound)
     }
 
+    // MARK: Saving and opening
+
+    /// The name shown in the window's title.
+    var documentName: String {
+        documentURL?.deletingPathExtension().lastPathComponent ?? "Untitled Short"
+    }
+
+    /// Writes the Short to its file now (or to the unnamed Short's place), if anything changed.
+    func saveNow() {
+        autosaveTask?.cancel()
+        autosaveTask = nil
+        guard hasUnsavedChanges else { return }
+        let url = documentURL ?? ProjectStore.untitledURL
+        if documentURL == nil, project.assets.isEmpty {
+            try? FileManager.default.removeItem(at: url)
+            hasUnsavedChanges = false
+            return
+        }
+        do {
+            try ProjectStore.write(project, to: url)
+            hasUnsavedChanges = false
+            didReportSaveError = false
+        } catch {
+            // Say it once; keep trying with the next change.
+            if !didReportSaveError {
+                didReportSaveError = true
+                alert = AlertMessage(title: "Your Short couldn't be saved", message: error.localizedDescription)
+            }
+        }
+    }
+
+    private func scheduleAutosave() {
+        hasUnsavedChanges = true
+        autosaveTask?.cancel()
+        autosaveTask = Task {
+            try? await Task.sleep(for: .seconds(1))
+            guard !Task.isCancelled else { return }
+            saveNow()
+        }
+    }
+
+    /// File ▸ Save: names the Short the first time, otherwise just saves it now.
+    func save() {
+        if documentURL == nil {
+            saveAs()
+        } else {
+            hasUnsavedChanges = true
+            saveNow()
+        }
+    }
+
+    /// Asks where to save the Short and keeps working on that file from then on.
+    @discardableResult
+    func saveAs() -> Bool {
+        let panel = NSSavePanel()
+        panel.allowedContentTypes = [.shortsProject]
+        panel.nameFieldStringValue = documentURL?.lastPathComponent
+            ?? "\(project.timeline.clips.first.flatMap { project.asset(id: $0.assetID)?.name } ?? "My Short").\(ProjectFile.fileExtension)"
+        panel.canCreateDirectories = true
+        panel.message = "Your Short is saved as you work. Choose its name and where to keep it."
+        guard panel.runModal() == .OK, let url = panel.url else { return false }
+        do {
+            try ProjectStore.write(project, to: url)
+        } catch {
+            alert = AlertMessage(title: "Your Short couldn't be saved", message: error.localizedDescription)
+            return false
+        }
+        if documentURL == nil { try? FileManager.default.removeItem(at: ProjectStore.untitledURL) }
+        documentURL = url
+        hasUnsavedChanges = false
+        ProjectStore.noteOpened(url)
+        recentProjects = ProjectStore.recentProjects
+        return true
+    }
+
+    /// Before leaving an unnamed Short that has something in it: offers to save it.
+    /// Returns false when the user cancels.
+    private func confirmLeavingUntitled() -> Bool {
+        guard documentURL == nil, !project.assets.isEmpty else { return true }
+        let alert = NSAlert()
+        alert.messageText = "Do you want to save this Short?"
+        alert.informativeText = "It hasn't been given a name yet. If you don't save it, it will be lost."
+        alert.addButton(withTitle: "Save…")
+        alert.addButton(withTitle: "Don't Save")
+        alert.addButton(withTitle: "Cancel")
+        switch alert.runModal() {
+        case .alertFirstButtonReturn:
+            return saveAs()
+        case .alertSecondButtonReturn:
+            autosaveTask?.cancel()
+            hasUnsavedChanges = false
+            try? FileManager.default.removeItem(at: ProjectStore.untitledURL)
+            return true
+        default:
+            return false
+        }
+    }
+
+    /// File ▸ New Short.
+    func newShort() {
+        guard confirmLeavingUntitled() else { return }
+        saveNow()
+        load(Project(), from: nil)
+    }
+
+    /// File ▸ Open…
+    func openProjectPanel() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.shortsProject]
+        panel.allowsMultipleSelection = false
+        panel.message = "Choose a Short to open"
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        openProject(url)
+    }
+
+    func openProject(_ url: URL) {
+        guard url.standardizedFileURL != documentURL?.standardizedFileURL else { return }
+        let opened: Project
+        do {
+            opened = try ProjectStore.read(url)
+        } catch {
+            alert = AlertMessage(title: "“\(url.deletingPathExtension().lastPathComponent)” can't be opened", message: error.localizedDescription)
+            return
+        }
+        guard confirmLeavingUntitled() else { return }
+        saveNow()
+        load(opened, from: url)
+    }
+
+    /// At launch: reopens the Short that was open when the app quit.
+    func restoreLastSession() {
+        if let url = ProjectStore.lastOpenProject, let opened = try? ProjectStore.read(url) {
+            load(opened, from: url)
+        } else if ProjectStore.hasUntitled, let opened = try? ProjectStore.read(ProjectStore.untitledURL) {
+            load(opened, from: nil)
+        }
+    }
+
+    func clearRecentProjects() {
+        ProjectStore.clearRecents()
+        recentProjects = []
+    }
+
+    /// Replaces the whole Short (opening another one): not an edit, so undo starts afresh.
+    private func load(_ opened: Project, from url: URL?) {
+        autosaveTask?.cancel()
+        hasUnsavedChanges = false
+        captionTask?.cancel()
+        silenceSession = nil
+        player.pause()
+        project = opened
+        documentURL = url
+        selection = nil
+        selectedAssetID = nil
+        focusedCaptionID = nil
+        thumbnails = [:]
+        audioLevels = [:]
+        missingAssets = []
+        currentTime = .zero
+        undoManager?.removeAllActions()
+        for asset in project.assets where asset.hasVideo { loadThumbnail(for: asset) }
+        if let url {
+            ProjectStore.noteOpened(url)
+        } else {
+            ProjectStore.noteUntitledOpen()
+        }
+        recentProjects = ProjectStore.recentProjects
+        projectDidChange(autosave: false)
+    }
+
+    // MARK: Missing media
+
+    var missingAssetList: [MediaAsset] {
+        project.assets.filter { missingAssets.contains($0.id) }
+    }
+
+    /// Asks where the missing files are now: one file, or a folder (every missing file with the
+    /// same name in it is found). Files are checked to be the same kind and length before use.
+    func findMissingFiles() {
+        let missing = missingAssetList
+        guard let first = missing.first else { return }
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = true
+        // Folders must be listed too: with only file types allowed, a folder can't be chosen.
+        panel.allowedContentTypes = [.movie, .audio, .folder]
+        panel.prompt = "Use"
+        panel.message = missing.count == 1
+            ? "Where is “\(first.url.lastPathComponent)” now? Choose the file, or the folder it is in."
+            : "Where are the \(missing.count) missing files now? Choose the folder they are in, or one of the files."
+        guard panel.runModal() == .OK, let chosen = panel.url else { return }
+        // Kept for as long as the app runs, so the files (and the bookmarks saved for them) work.
+        _ = chosen.startAccessingSecurityScopedResource()
+
+        var candidates: [MediaAsset.ID: URL] = [:]
+        if (try? chosen.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true {
+            let contents = (try? FileManager.default.contentsOfDirectory(at: chosen, includingPropertiesForKeys: nil)) ?? []
+            candidates = project.relinkMatches(for: missingAssets, in: contents)
+        } else if let match = missing.first(where: { $0.url.lastPathComponent.lowercased() == chosen.lastPathComponent.lowercased() })
+                    ?? (missing.count == 1 ? first : nil) {
+            candidates = [match.id: chosen]
+        }
+        guard !candidates.isEmpty else {
+            alert = AlertMessage(title: "No missing files there",
+                                 message: "None of the files there has the name of a missing one (\(missing.map(\.url.lastPathComponent).joined(separator: ", "))).")
+            return
+        }
+        Task {
+            var accepted: [MediaAsset.ID: URL] = [:]
+            var rejected: [String] = []
+            for (id, url) in candidates {
+                guard let asset = project.asset(id: id) else { continue }
+                if let found = try? await MediaProbe.probe(url), Project.isLikelySameMedia(asset, as: found) {
+                    accepted[id] = url
+                } else {
+                    rejected.append(url.lastPathComponent)
+                }
+            }
+            if !accepted.isEmpty {
+                apply(accepted.count == 1 ? "Find Missing File" : "Find Missing Files") { project in
+                    for (id, url) in accepted { project.relink(id, to: url) }
+                }
+                for id in accepted.keys {
+                    if let asset = project.asset(id: id), asset.hasVideo { loadThumbnail(for: asset) }
+                }
+            }
+            if !rejected.isEmpty {
+                alert = AlertMessage(
+                    title: rejected.count == 1 ? "This file doesn't match" : "These files don't match",
+                    message: rejected.joined(separator: "\n") + "\n\nThey have a different length or kind than the missing media, so your cuts would land in the wrong places."
+                )
+            }
+        }
+    }
+
     // MARK: Private
 
-    /// Rebuilds the player's content from the project, keeping the playhead where it was.
-    private func projectDidChange() {
+    /// Rebuilds the player's content from the project, keeping the playhead where it was, and
+    /// saves the change a moment later.
+    private func projectDidChange(autosave: Bool = true) {
+        if autosave { scheduleAutosave() }
         captionPages = CaptionLayout.pages(in: project)
         if let id = selectedTitleID, project.title(id: id) == nil { selection = nil }
         if let id = selectedClipID, project.timeline.index(of: id) == nil { selection = nil }
@@ -567,6 +823,7 @@ final class EditorModel {
                 player.replaceCurrentItem(with: nil)
                 currentTime = .zero
                 musicEnvelope = []
+                missingAssets = []
                 return
             }
             do {
@@ -574,6 +831,7 @@ final class EditorModel {
                 guard !Task.isCancelled else { return }
                 let time = min(currentTime, project.duration)
                 musicEnvelope = built.musicEnvelope
+                missingAssets = built.missingAssets
                 player.replaceCurrentItem(with: built.makePlayerItem())
                 seek(to: time)
             } catch {

@@ -4,7 +4,7 @@ _Last updated: 2026-11-09. Read this first when picking the project back up, the
 
 ## Where we are
 
-Stages 1–6 are done, tested on screen, committed and pushed to https://github.com/lucalevi/TheShortsEditor (public, branch `main`):
+Stages 1–7 are done, tested on screen, committed and pushed to https://github.com/lucalevi/TheShortsEditor (public, branch `main`):
 
 | Stage | What | Session |
 |---|---|---|
@@ -14,8 +14,9 @@ Stages 1–6 are done, tested on screen, committed and pushed to https://github.
 | 4 | Remove Pauses (silence removal) | 2026-11-08 |
 | 5 | Titles (text overlay for the hook) | 2026-11-09 |
 | 6 | Audio: clip volume, music with ducking, loudness on export | 2026-11-09 |
+| 7 | Save/open projects, autosave, missing media | 2026-11-09 |
 
-**Pick up here:** stage 7, **Save/open projects** (see "What's next"): today quitting loses the edit, which is now the biggest gap.
+**Pick up here:** the P0 list from the research is then complete. Next is P1 (see "What's next"); suggested first: **editing by deleting words in the transcript**, since transcripts already exist per file. Ask the user which P1 item matters most.
 
 What works today:
 - Import videos (and sound files, for music) by drag-and-drop (Media list, viewer, timeline), with **Import…** / **Choose Videos…**, or from Finder (Open With / Dock icon). Files go onto the timeline in order, and the same file is never imported twice.
@@ -50,10 +51,16 @@ What works today:
   - **Lower while people talk** (on by default): the music drops to 20% of its volume (about −14 dB) wherever the clips have speech, found from the per-frame loudness of the files (gaps under 0.5 s are bridged; muted clips don't count). It goes down 0.25 s before speech and comes back up over 0.6 s. The music lane draws the volume line, so the dips are visible.
   - **Even out the loudness** (Export sheet, on by default): the mixed sound is measured with an EBU R128 / BS.1770 meter and brought to −14 LUFS, keeping peaks at −1 dBFS or lower and boosting by 20 dB at most. Checked with ffmpeg's `ebur128` on an export: −14.0 LUFS, peak −1.1 dBFS.
   - Export check: **music on a Short over 1:00** (warning: Content ID claims block those Shorts).
-- 105 automated tests (`make test`, about a minute): timeline, caption, pause and export-check logic; framing math; rendering checked pixel by pixel (orientation, every caption style); export checked for codec, size, AAC and fast start; per-frame sound levels; and a real transcription of speech made with `say`.
+- **Saving** (File menu): every change is saved about a second later, so quitting never loses work.
+  - An unnamed Short ("Untitled Short", subtitle "Kept on this Mac · ⌘S to name it") lives in the app's container (`Application Support/Shorts Editor/Untitled.shortsproject`) and comes back at the next launch.
+  - ⌘S names it the first time (save panel); after that it saves in place. Save As… ⌘⇧S switches to a new file. The window shows the name and the file's proxy icon.
+  - New Short ⌘N, Open… ⌘O, Open Recent (8, with Clear Menu). Leaving an unnamed Short with something in it asks Save… / Don't Save / Cancel. The last open Short reopens at launch. `.shortsproject` files open from Finder; dropping one on the window opens it.
+  - Format: JSON (`ProjectFile`, version 1; a newer version is refused with a clear message). Each media file is saved with a security-scoped (app-scope) bookmark, so the sandboxed app can open it again after a restart, and follows files moved or renamed on the same disk.
+  - **Missing media**: clips whose file can't be found play black and silent for their full length (a black placeholder video is stretched over them); missing music is left out. An orange bar over the viewer, "Can't be found" in Media, and an export warning. **Find Missing Files…** (bar, File menu, Media right-click) takes the file or its folder; files with the same names are checked for kind and length (±0.5 s) before being used. Undoable.
+- 115 automated tests (`make test`, about a minute): timeline, caption, pause and export-check logic; framing math; rendering checked pixel by pixel (orientation, every caption style); export checked for codec, size, AAC and fast start; per-frame sound levels; and a real transcription of speech made with `say`.
 
-Verified on screen: import, Finder open (launch and while running), select, framing switch, split, delete, undo (fixed 2026-11-08, see below), Space play/pause, ruler scrub, closing the window quits. Captions: make, style and position switches, editing a line, jumping from the timeline lane, split/delete with captions following, undo of all of these. Export: checks sheet, save panel, progress, finished state, output checked with ffprobe. Remove Pauses: detection on a sample with known pauses, sliders, preview playback, apply, undo. Sound: song opened from Finder becomes the music, ducking curve on a clip with pauses, lowering off/on (inspector and Sound menu), mute (music stays up under the muted clip), volume slider to 160%, export with loudness evened out (ffmpeg: −14.0 LUFS). Titles: add (⌘T) with text ready to type, typing + Return, style switch, undo/redo, drag in the viewer into the covered area (warning in inspector and export sheet), Top preset, move and lengthen on the timeline, ⌫ delete.
-**Not yet verified on screen:** the music volume and "Start the song at" sliders, Change Song…, dropping a sound file on the timeline, listening to the result (checks so far are visual and measured, not by ear). J/K/L reverse and fast playback, the clip right-click menu, the title right-click menu, the title length stepper, timeline zoom, drag-and-drop from Finder. The Pop and Fade animations are checked by render tests, not by eye during playback.
+Verified on screen: import, Finder open (launch and while running), select, framing switch, split, delete, undo (fixed 2026-11-08, see below), Space play/pause, ruler scrub, closing the window quits. Captions: make, style and position switches, editing a line, jumping from the timeline lane, split/delete with captions following, undo of all of these. Export: checks sheet, save panel, progress, finished state, output checked with ffprobe. Remove Pauses: detection on a sample with known pauses, sliders, preview playback, apply, undo. Saving: unnamed Short survives ⌘Q and relaunch (media readable through bookmarks, also after a rebuild), ⌘S into a folder, autosave in place after a split, file moved + original deleted → missing bar/black frames/Media marker, Find Missing Files… with the folder → relinked and still relinked after relaunch, New Short, Open Recent, Don't Save prompt (autosave removed), opening a project file through Launch Services. Sound: song opened from Finder becomes the music, ducking curve on a clip with pauses, lowering off/on (inspector and Sound menu), mute (music stays up under the muted clip), volume slider to 160%, export with loudness evened out (ffmpeg: −14.0 LUFS). Titles: add (⌘T) with text ready to type, typing + Return, style switch, undo/redo, drag in the viewer into the covered area (warning in inspector and export sheet), Top preset, move and lengthen on the timeline, ⌫ delete.
+**Not yet verified on screen:** Save As…, Open… panel, the "Save…" branch of the leave-unnamed prompt, a project whose media is on another disk, a newer-version file. The music volume and "Start the song at" sliders, Change Song…, dropping a sound file on the timeline, listening to the result (checks so far are visual and measured, not by ear). J/K/L reverse and fast playback, the clip right-click menu, the title right-click menu, the title length stepper, timeline zoom, drag-and-drop from Finder. The Pop and Fade animations are checked by render tests, not by eye during playback.
 
 ## Decisions already made (don't re-ask)
 
@@ -72,8 +79,8 @@ The P0 list from `research/shorts-editor-research.md` §5. Each stage ends with 
 3. ~~Remove silences~~ (done, as "Remove Pauses").
 4. ~~Text overlay~~ (done, as "Titles", stage 5), with the "text where YouTube covers it" export check.
 5. ~~Audio~~ (done, stage 6): clip volume, music with fades and ducking, loudness on export.
-6. **Save/open projects** ← next (stage 7): a project file with autosave, security-scoped bookmarks to media, and relinking of missing media. Today the project lives only in memory, so **quitting loses the edit**.
-7. Then P1 from the research: editing by deleting words in the transcript, keyframes/punch-in zoom, auto-reframe of horizontal footage (Vision), speed, loop preview, brand kit.
+6. ~~Save/open projects~~ (done, stage 7).
+7. **Next: P1** from the research: editing by deleting words in the transcript, keyframes/punch-in zoom, auto-reframe of horizontal footage (Vision), speed, loop preview, brand kit.
 
 ## Open questions for the user
 
@@ -90,7 +97,7 @@ The P0 list from `research/shorts-editor-research.md` §5. Each stage ends with 
 - The Highlight style's green box can blend into green backgrounds.
 - Titles: the text is saved when editing ends (Return or clicking away), so the viewer updates then, not while typing. No snapping when dragging on the timeline. Overlapping titles share one lane row and are drawn on top of each other. One font (the system font) for all styles; no colour picker.
 - SwiftUI text fields hand the old value back to their binding as focus leaves. Editing fields that save on end (caption lines, title text) only accept changes while focused; otherwise what was typed is lost.
-- No project saving yet (see step 6).
+- Saving: one window, one Short at a time (no DocumentGroup: the single-window model, shared `EditorModel` and Finder media import made a custom store simpler). No versions browser and no "Revert". Media bookmarks are app-scoped, so a project copied to another Mac (or user) needs Find Missing Files… there. Writing tries an atomic write first and falls back to a plain one if the sandbox refuses the temporary file. In an Open panel a folder has to be *selected* (not just opened) for "Use" to work, as everywhere in macOS. `screencapture` of the app window misses separate windows (Open panel, alerts): capture their region (`System Events … get {position, size} of windows`).
 - Only video and sound files can be imported (no images yet). Sound files can only be the music, not clips.
 - Audio: one song only; it always starts with the Short (no placing it later, no looping a short song). No fades on clip sound and no voice clean-up. Speech for ducking is found by loudness, so a clip with constant loud sound (e.g. its own music) counts as speech throughout. Volume sliders apply when released (no live preview while dragging). AVFoundation's audio mix does boost above 100% (checked: linear in float).
 - `MusicTrack` is a type in Apple's AudioToolbox, hence the model's name `BackgroundMusic`.

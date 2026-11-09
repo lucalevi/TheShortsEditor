@@ -1,3 +1,4 @@
+import EditorCore
 import SwiftUI
 
 @main
@@ -21,13 +22,13 @@ struct TheShortsEditorApp: App {
         .handlesExternalEvents(matching: ["*"])
         .defaultSize(width: 1400, height: 900)
         .commands {
-            CommandGroup(replacing: .newItem) {}
             EditorCommands(model: model)
         }
     }
 }
 
-/// Receives videos opened with the app from Finder or the Dock and puts them on the timeline.
+/// Reopens the last Short at launch, saves on quit, and receives files opened with the app from
+/// Finder or the Dock: projects are opened, videos go onto the timeline, a song becomes the music.
 /// (SwiftUI's onOpenURL drops files when several are opened at once; this gets them all together.)
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private weak var model: EditorModel?
@@ -37,6 +38,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func connect(_ model: EditorModel) {
         guard self.model !== model else { return }
         self.model = model
+        // Opening a project from Finder is what launched the app: open that one instead.
+        if !pending.contains(where: { $0.pathExtension.lowercased() == ProjectFile.fileExtension }) {
+            model.restoreLastSession()
+        }
         if !pending.isEmpty {
             model.importFiles(pending, addToTimeline: true)
             pending = []
@@ -49,6 +54,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         } else {
             pending += urls
         }
+    }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        model?.saveNow()
     }
 
     /// There is only one window, so closing it means being done; this also avoids a running app

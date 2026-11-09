@@ -12,6 +12,9 @@ struct ViewerView: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            if !model.missingAssets.isEmpty {
+                MissingMediaBar(model: model)
+            }
             ZStack {
                 Color(nsColor: .underPageBackgroundColor)
                 if model.project.timeline.clips.isEmpty {
@@ -54,6 +57,31 @@ struct ViewerView: View {
             }
             .aspectRatio(canvasAspect, contentMode: .fit)
             .padding(24)
+    }
+}
+
+/// Shown while files used by the Short can't be found: their parts play black and silent.
+private struct MissingMediaBar: View {
+    let model: EditorModel
+
+    var body: some View {
+        let names = model.missingAssetList.map(\.url.lastPathComponent)
+        HStack(spacing: 10) {
+            Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(names.count == 1 ? "A file can't be found" : "\(names.count) files can't be found").font(.headline)
+                Text("\(names.joined(separator: ", ")). Their parts play black and silent until you find them.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+            }
+            Spacer()
+            Button("Find Missing Files…") { model.findMissingFiles() }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(Color.orange.opacity(0.15))
+        .overlay(alignment: .bottom) { Divider() }
     }
 }
 

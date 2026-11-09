@@ -6,9 +6,33 @@ struct EditorCommands: Commands {
     let model: EditorModel
 
     var body: some Commands {
-        CommandGroup(after: .newItem) {
+        CommandGroup(replacing: .newItem) {
+            Button("New Short") { model.newShort() }
+                .keyboardShortcut("n")
+            Button("Open…") { model.openProjectPanel() }
+                .keyboardShortcut("o")
+            Menu("Open Recent") {
+                ForEach(model.recentProjects, id: \.self) { url in
+                    Button(url.deletingPathExtension().lastPathComponent) { model.openProject(url) }
+                }
+                if !model.recentProjects.isEmpty {
+                    Divider()
+                    Button("Clear Menu") { model.clearRecentProjects() }
+                }
+            }
+            .disabled(model.recentProjects.isEmpty)
+        }
+
+        CommandGroup(replacing: .saveItem) {
+            Button("Save") { model.save() }
+                .keyboardShortcut("s")
+            Button("Save As…") { model.saveAs() }
+                .keyboardShortcut("s", modifiers: [.command, .shift])
+            Divider()
             Button("Import Media…") { MediaImportPanel.run(model: model, addToTimeline: false) }
                 .keyboardShortcut("i")
+            Button("Find Missing Files…") { model.findMissingFiles() }
+                .disabled(model.missingAssets.isEmpty)
             Divider()
             Button("Export Short…") { model.beginExport() }
                 .keyboardShortcut("e")

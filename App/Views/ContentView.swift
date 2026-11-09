@@ -65,6 +65,8 @@ struct ContentView: View {
                     .disabled(model.project.timeline.clips.isEmpty)
             }
         }
+        .navigationTitle(model.documentName)
+        .navigationSubtitle(model.documentURL == nil && !model.project.assets.isEmpty ? "Kept on this Mac · ⌘S to name it" : "")
         .onAppear {
             keys.install(for: model)
         }

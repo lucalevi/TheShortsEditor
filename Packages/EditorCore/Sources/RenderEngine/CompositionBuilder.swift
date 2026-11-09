@@ -9,6 +9,8 @@ public struct PlayableComposition {
     public let audioMix: AVAudioMix
     /// The music's volume over the timeline (before any export gain), for drawing it.
     public let musicEnvelope: [VolumePoint]
+    /// Media whose files can't be read: their clips are black and silent, the music is left out.
+    public let missingAssets: Set<MediaAsset.ID>
 
     @MainActor
     public func makePlayerItem() -> AVPlayerItem {
@@ -54,15 +56,32 @@ public enum CompositionBuilder {
         let titles = TitleTrack(project: project)
         let clipSound = AVMutableAudioMixInputParameters(track: audioTrack)
 
-        for clip in project.timeline.clips {
-            guard let media = project.asset(id: clip.assetID), media.hasVideo else {
-                throw BuildError.missingAsset(clip.assetID.uuidString)
-            }
-            let source = sources[media.id] ?? AVURLAsset(url: media.url)
-            sources[media.id] = source
+        var missing = Set<MediaAsset.ID>()
 
-            guard let sourceVideo = try await source.loadTracks(withMediaType: .video).first else {
-                throw BuildError.unreadable(media.name)
+        for clip in project.timeline.clips {
+            let media = project.asset(id: clip.assetID)
+            var sourceVideo: AVAssetTrack?
+            var source: AVURLAsset?
+            if let media, media.hasVideo {
+                let asset = sources[media.id] ?? AVURLAsset(url: media.url)
+                sources[media.id] = asset
+                source = asset
+                // A file that was moved or deleted (or can't be opened any more) can't be read.
+                sourceVideo = try? await asset.loadTracks(withMediaType: .video).first
+            }
+            guard media != nil, let source, let sourceVideo else {
+                // Missing media: keep its place, black and silent, so the rest still plays.
+                if let media { missing.insert(media.id) }
+                let black = try await Placeholder.blackVideoTrack()
+                let second = CMTimeRange(start: .zero, duration: CMTime(value: 1, timescale: 1))
+                try videoTrack.insertTimeRange(second, of: black.track, at: cursor)
+                videoTrack.scaleTimeRange(CMTimeRange(start: cursor, duration: second.duration), toDuration: clip.duration)
+                instructions.append(ShortsInstruction(
+                    timeRange: CMTimeRange(start: cursor, duration: clip.duration),
+                    trackID: videoTrack.trackID, transform: .identity, captions: captions, titles: titles
+                ))
+                cursor = cursor + clip.duration
+                continue
             }
             try videoTrack.insertTimeRange(clip.sourceRange, of: sourceVideo, at: cursor)
 
@@ -101,13 +120,15 @@ public enum CompositionBuilder {
 
         // The background song, on its own track, with its volume curve.
         var envelope: [VolumePoint] = []
-        if let track = project.music, let range = project.musicRange, let song = project.asset(id: track.assetID),
-           // Kept in `sources`: a track is only usable while its asset is alive.
-           let songAudio = try await {
-               let asset = sources[song.id] ?? AVURLAsset(url: song.url)
-               sources[song.id] = asset
-               return try await asset.loadTracks(withMediaType: .audio).first
-           }(),
+        var songAudio: AVAssetTrack?
+        if project.music != nil, project.musicRange != nil, let song = project.asset(id: project.music!.assetID) {
+            // Kept in `sources`: a track is only usable while its asset is alive.
+            let asset = sources[song.id] ?? AVURLAsset(url: song.url)
+            sources[song.id] = asset
+            songAudio = try? await asset.loadTracks(withMediaType: .audio).first
+            if songAudio == nil { missing.insert(song.id) }
+        }
+        if let track = project.music, let range = project.musicRange, let songAudio,
            let musicTrack = composition.addMutableTrack(withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid) {
             let available = try await songAudio.load(.timeRange)
             let source = CMTimeRange(start: track.sourceStart, duration: range.duration).intersection(available)
@@ -133,7 +154,8 @@ public enum CompositionBuilder {
             instructions: instructions,
             renderSize: Project.canvasSize
         ))
-        return PlayableComposition(composition: composition, videoComposition: videoComposition, audioMix: audioMix, musicEnvelope: envelope)
+        return PlayableComposition(composition: composition, videoComposition: videoComposition, audioMix: audioMix,
+                                   musicEnvelope: envelope, missingAssets: missing)
     }
 
     /// Where people talk in the Short, from the measured loudness of the clips' files.

@@ -224,3 +224,47 @@ struct CompositionBuilderTests {
         #expect(box.maxX <= Project.canvasSize.width - SafeZone.right)
     }
 }
+
+@MainActor
+struct MissingMediaTests {
+    private let red: (UInt8, UInt8, UInt8, UInt8) = (0, 0, 255, 255)
+
+    @Test func aMissingClipIsBlackAndTheRestStillPlays() async throws {
+        let first = try await Fixture.video(width: 180, height: 320, bgra: red, toneFrom: 0)
+        let second = try await Fixture.video(width: 180, height: 320, bgra: red, toneFrom: 0)
+        var project = Project()
+        project.appendClip(of: project.addAsset(try await MediaProbe.probe(first)))
+        let gone = project.addAsset(try await MediaProbe.probe(second))
+        project.appendClip(of: gone)
+        try FileManager.default.removeItem(at: second)
+
+        let built = try await CompositionBuilder.build(project)
+        #expect(built.missingAssets == [gone])
+        #expect(abs(built.composition.duration.seconds - 2) < 0.05)
+        let generator = AVAssetImageGenerator(asset: built.composition)
+        generator.videoComposition = built.videoComposition
+        generator.requestedTimeToleranceBefore = .zero
+        generator.requestedTimeToleranceAfter = .zero
+        let playing = try await generator.image(at: CMTime(value: 1, timescale: 2)).image
+        let black = try await generator.image(at: CMTime(value: 3, timescale: 2)).image
+        #expect(Fixture.pixel(playing, x: 540, y: 960).r > 200)
+        let p = Fixture.pixel(black, x: 540, y: 960)
+        #expect(p.r < 30 && p.g < 30 && p.b < 30)
+        // The missing part is silent.
+        let silent = try await AudioProbe.peak(of: project, in: CMTimeRange(start: CMTime(value: 11, timescale: 10), duration: CMTime(value: 8, timescale: 10)))
+        #expect((silent ?? 0) < 0.001)
+    }
+
+    @Test func aMissingSongIsLeftOut() async throws {
+        let video = try await Fixture.video(width: 180, height: 320, bgra: red)
+        let song = try await Fixture.sound(seconds: 3)
+        var project = Project()
+        project.appendClip(of: project.addAsset(try await MediaProbe.probe(video)))
+        let songID = project.addAsset(try await MediaProbe.probe(song))
+        project.setMusic(songID)
+        try FileManager.default.removeItem(at: song)
+        let built = try await CompositionBuilder.build(project)
+        #expect(built.missingAssets == [songID])
+        #expect(built.musicEnvelope.isEmpty)
+    }
+}

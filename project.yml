@@ -39,6 +39,10 @@ targets:
         # Lets videos be opened with the app from Finder ("Open With", or dropped on the Dock icon).
         # Alternate rank: never takes over as the default player for movies.
         CFBundleDocumentTypes:
+          - CFBundleTypeName: Shorts Editor Project
+            CFBundleTypeRole: Editor
+            LSHandlerRank: Owner
+            LSItemContentTypes: [com.lucalevi.shortseditor.project]
           - CFBundleTypeName: Video
             CFBundleTypeRole: Viewer
             LSHandlerRank: Alternate
@@ -47,11 +51,20 @@ targets:
             CFBundleTypeRole: Viewer
             LSHandlerRank: Alternate
             LSItemContentTypes: [public.audio]
+        # Saved Shorts: a JSON file with its own extension, opened by this app.
+        UTExportedTypeDeclarations:
+          - UTTypeIdentifier: com.lucalevi.shortseditor.project
+            UTTypeDescription: Shorts Editor Project
+            UTTypeConformsTo: [public.json, public.content]
+            UTTypeTagSpecification:
+              public.filename-extension: [shortsproject]
     entitlements:
       path: App/TheShortsEditor.entitlements
       properties:
         com.apple.security.app-sandbox: true
         com.apple.security.files.user-selected.read-write: true
+        # Bookmarks let a saved Short find its media (and recent projects) again after a restart.
+        com.apple.security.files.bookmarks.app-scope: true
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.lucalevi.TheShortsEditor

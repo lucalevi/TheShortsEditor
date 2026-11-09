@@ -8,7 +8,7 @@ struct MediaBrowserView: View {
     var body: some View {
         List(selection: $model.selectedAssetID) {
             ForEach(model.project.assets) { asset in
-                MediaRow(asset: asset, thumbnail: model.thumbnails[asset.id])
+                MediaRow(asset: asset, thumbnail: model.thumbnails[asset.id], isMissing: model.missingAssets.contains(asset.id))
                     .tag(asset.id)
                     .draggable(asset.url)
             }
@@ -17,6 +17,9 @@ struct MediaBrowserView: View {
             let assets = ids.compactMap(model.project.asset(id:))
             if assets.contains(where: \.hasVideo) {
                 Button("Add to Timeline") { assets.filter(\.hasVideo).map(\.id).forEach(model.appendToTimeline) }
+            }
+            if assets.contains(where: { model.missingAssets.contains($0.id) }) {
+                Button("Find Missing Files…") { model.findMissingFiles() }
             }
             if assets.count == 1, let asset = assets.first, asset.hasAudio {
                 Button(asset.hasVideo ? "Use Its Sound as Music" : "Use as Music") { model.useAsMusic(asset.id) }
@@ -75,6 +78,7 @@ struct SidebarView: View {
 private struct MediaRow: View {
     let asset: MediaAsset
     let thumbnail: CGImage?
+    let isMissing: Bool
 
     var body: some View {
         HStack(spacing: 10) {
@@ -89,6 +93,11 @@ private struct MediaRow: View {
             .clipShape(RoundedRectangle(cornerRadius: 6))
             VStack(alignment: .leading, spacing: 2) {
                 Text(asset.name).lineLimit(1)
+                if isMissing {
+                    Label("Can't be found", systemImage: "exclamationmark.triangle.fill")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                }
                 HStack(spacing: 6) {
                     Text(TimeFormat.string(asset.duration))
                     if asset.hasVideo {
