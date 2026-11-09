@@ -16,7 +16,7 @@ Stages 1–7 are done, tested on screen, committed and pushed to https://github.
 | 6 | Audio: clip volume, music with ducking, loudness on export | 2026-11-09 |
 | 7 | Save/open projects, autosave, missing media | 2026-11-09 |
 
-**Pick up here:** the P0 list from the research is complete. Next is P1 (see "What's next"); suggested first: **editing by deleting words in the transcript**, since transcripts already exist per file. Ask the user which P1 item matters most.
+**Pick up here:** the P0 list from the research is complete. On 2026-11-09 CapCut was analysed (`research/capcut-reverse-engineering.md`) and creator tool usage researched (`research/shorts-creator-tools-research.md`, with a gap table and a suggested P1/P2/P3 order in §5–§6). The user wants Shorts Editor to become a close match for CapCut's feature set, **but only when they say so**: don't start building from that list until asked.
 
 What works today:
 - **Dark look** like Final Cut Pro / iMovie: the app always runs in Dark Mode (`AppDelegate`), with flat greys from `App/Views/Theme.swift` (near-black viewer, dark timeline, mid-grey panels, lighter header strips). Not yet seen on screen: Captions panel with captions, Export sheet, Remove Pauses panel.
@@ -82,7 +82,7 @@ The P0 list from `research/shorts-editor-research.md` §5. Each stage ends with 
 4. ~~Text overlay~~ (done, as "Titles", stage 5), with the "text where YouTube covers it" export check.
 5. ~~Audio~~ (done, stage 6): clip volume, music with fades and ducking, loudness on export.
 6. ~~Save/open projects~~ (done, stage 7).
-7. **Next: P1** from the research: editing by deleting words in the transcript, keyframes/punch-in zoom, auto-reframe of horizontal footage (Vision), speed, loop preview, brand kit.
+7. **Next: P1**, now ordered in `research/shorts-creator-tools-research.md` §6: timeline drag/trim/snap, blurred background + viewer transform + punch-in, images, speed, text styling with own fonts, caption keyword highlight, edit by text/filler words, sound effects + voice-over + voice clean-up. Then P2 (overlay track/layouts, keyframes, auto reframe, beats, filters/transitions).
 
 ## Open questions for the user
 
