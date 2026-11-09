@@ -143,7 +143,7 @@ struct CompositionBuilderTests {
         var project = try await project(with: url, framing: .fill)
         let id = project.addTitle(at: CMTime(value: 3, timescale: 10), text: "Watch this")
         project.updateTitle(id) { title in
-            title.style = style
+            title.applyStyle(style)
             title.entrance = entrance
             title.verticalPosition = position
             title.start = CMTime(value: 9, timescale: 30)

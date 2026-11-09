@@ -33,6 +33,7 @@ targets:
         CFBundleName: Shorts Editor
         LSApplicationCategoryType: public.app-category.video
         NSSpeechRecognitionUsageDescription: Captions are made on this Mac from what is said in your clips.
+        NSMicrophoneUsageDescription: To record a voice-over for your Short.
         NSHumanReadableCopyright: "© 2026 Luca Iacolettig"
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
@@ -69,6 +70,8 @@ targets:
         com.apple.security.files.user-selected.read-write: true
         # Bookmarks let a saved Short find its media (and recent projects) again after a restart.
         com.apple.security.files.bookmarks.app-scope: true
+        # Recording voice-overs.
+        com.apple.security.device.audio-input: true
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.lucalevi.TheShortsEditor

@@ -84,6 +84,7 @@ public enum Exporter {
             ])
             audioOutput.alwaysCopiesSampleData = false
             audioOutput.audioMix = built.audioMix
+            audioOutput.audioTimePitchAlgorithm = .spectral
             let audioInput = AVAssetWriterInput(mediaType: .audio, outputSettings: [
                 AVFormatIDKey: kAudioFormatMPEG4AAC,
                 AVSampleRateKey: audioSampleRate,

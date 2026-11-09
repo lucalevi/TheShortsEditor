@@ -23,7 +23,9 @@ struct ViewerView: View {
                     PlayerView(player: model.player)
                         .overlay { if model.showsSafeZone { SafeZoneOverlay() } }
                         .overlay { PictureHandles(model: model) }
+                        .overlay { CaptionHandle(model: model) }
                         .overlay { TitleHandles(model: model) }
+                        .overlay { VoiceOverBadge(model: model) }
                         .aspectRatio(canvasAspect, contentMode: .fit)
                         .clipShape(RoundedRectangle(cornerRadius: 4))
                         .shadow(radius: 6)
@@ -155,7 +157,7 @@ private struct PictureHandles: View {
                     .onTapGesture { location in selectPicture(at: CGPoint(x: location.x / scale, y: location.y / scale)) }
                 if let clip = model.adjustableClip, let asset = model.project.asset(id: clip.assetID) {
                     let placement = dragged?.clipID == clip.id ? dragged!.now : model.placementAtPlayhead(of: clip)
-                    let frame = clip.framing.placedFrame(of: asset.displaySize, placement: placement)
+                    let frame = clip.framing.placedFrame(of: asset.displaySize, placement: placement, region: region(of: clip))
                     box(for: clip, frame: frame, scale: scale, viewSize: geometry.size)
                 }
                 if guides.vertical {
@@ -236,15 +238,21 @@ private struct PictureHandles: View {
         model.previewPlacement(placement, for: clip.id)
     }
 
+    /// Where the clip is drawn: the whole canvas, or its half of a split screen.
+    private func region(of clip: Clip) -> CGRect {
+        model.project.regions(at: model.currentTime).region(for: clip.id, isMain: model.project.timeline.index(of: clip.id) != nil)
+    }
+
     private func move(_ clip: Clip, by translation: CGSize, scale: CGFloat) {
         let start = begin(clip)
+        let area = region(of: clip).size
         var p = start
-        p.offsetX = start.offsetX + translation.width / scale / canvas.width
-        p.offsetY = start.offsetY + translation.height / scale / canvas.height
-        // Stick to the middle of the screen, within a few points.
+        p.offsetX = start.offsetX + translation.width / scale / area.width
+        p.offsetY = start.offsetY + translation.height / scale / area.height
+        // Stick to the middle of the screen (or its half), within a few points.
         let tolerance = 6 / scale
-        let snapX = abs(p.offsetX * canvas.width) < tolerance
-        let snapY = abs(p.offsetY * canvas.height) < tolerance
+        let snapX = abs(p.offsetX * area.width) < tolerance
+        let snapY = abs(p.offsetY * area.height) < tolerance
         if snapX { p.offsetX = 0 }
         if snapY { p.offsetY = 0 }
         guides = (snapX, snapY)
@@ -300,7 +308,7 @@ private struct PictureHandles: View {
         for overlay in model.project.overlaysOnScreen(at: time).reversed() {
             guard let asset = model.project.asset(id: overlay.clip.assetID) else { continue }
             let placement = overlay.clip.placement(atSourceTime: overlay.sourceTime(at: time))
-            if contains(overlay.clip.framing.placedFrame(of: asset.displaySize, placement: placement), point) {
+            if contains(overlay.clip.framing.placedFrame(of: asset.displaySize, placement: placement, region: region(of: overlay.clip)), point) {
                 if model.selection != .overlay(overlay.id) { model.selection = .overlay(overlay.id) }
                 return
             }
@@ -333,11 +341,82 @@ private struct PictureHandles: View {
     }
 }
 
+/// A box around the caption on screen: drag it up or down to move all the captions. They stay
+/// clear of the areas YouTube covers.
+private struct CaptionHandle: View {
+    let model: EditorModel
+    @State private var dy: CGFloat?
+    @State private var isHovered = false
+
+    var body: some View {
+        GeometryReader { geometry in
+            let scale = geometry.size.width / Project.canvasSize.width
+            if model.project.captions.isVisible, model.currentCaption != nil,
+               let frame = CaptionPreview.frame(in: model.project, at: model.currentTime) {
+                let rect = frame.offsetBy(dx: 0, dy: (dy ?? 0) / scale)
+                RoundedRectangle(cornerRadius: 4)
+                    .strokeBorder(style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
+                    .foregroundStyle(Color.white.opacity(isHovered || dy != nil ? 0.9 : 0))
+                    .contentShape(Rectangle())
+                    .frame(width: rect.width * scale, height: rect.height * scale)
+                    .offset(x: rect.minX * scale, y: rect.minY * scale)
+                    .onHover { isHovered = $0 }
+                    .pointerStyle(.frameResize(position: .top, directions: [.inward, .outward]))
+                    .gesture(DragGesture(minimumDistance: 2).onChanged { value in
+                        model.pause()
+                        dy = value.translation.height
+                    }.onEnded { value in
+                        dy = nil
+                        let middle = frame.midY + value.translation.height / scale
+                        model.setCaptionPositionByDragging(Double(middle / Project.canvasSize.height))
+                    })
+                    .help("Drag up or down to move the captions")
+            }
+        }
+    }
+}
+
+/// The 3-2-1 before a voice-over, then a recording sign.
+private struct VoiceOverBadge: View {
+    let model: EditorModel
+
+    var body: some View {
+        switch model.voiceOver {
+        case .countdown(let n)?:
+            Text("\(n)")
+                .font(.system(size: 96, weight: .bold, design: .rounded))
+                .foregroundStyle(.white)
+                .shadow(radius: 8)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(Color.black.opacity(0.35))
+                .allowsHitTesting(false)
+        case .recording?:
+            VStack {
+                Button {
+                    model.stopVoiceOver()
+                } label: {
+                    Label("Recording — click or press Space to stop", systemImage: "record.circle")
+                        .font(.callout.weight(.semibold))
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(Color.red.opacity(0.85), in: Capsule())
+                        .foregroundStyle(.white)
+                }
+                .buttonStyle(.plain)
+                .padding(.top, 10)
+                Spacer()
+            }
+        case nil:
+            EmptyView()
+        }
+    }
+}
+
 /// Boxes over the titles on screen: click one to select it, drag it up or down to move it.
 /// The selected title has a visible frame; the others show one when the pointer is over them.
 private struct TitleHandles: View {
     let model: EditorModel
-    @State private var drag: (id: TextOverlay.ID, dy: CGFloat)?
+    @State private var drag: (id: TextOverlay.ID, offset: CGSize)?
     @State private var hovered: TextOverlay.ID?
 
     var body: some View {
@@ -346,8 +425,8 @@ private struct TitleHandles: View {
             ForEach(model.project.titlesOnScreen(at: model.currentTime)) { title in
                 if let frame = TitlePreview.frame(of: title) {
                     let isSelected = model.selectedTitleID == title.id
-                    let dy = drag?.id == title.id ? drag!.dy : 0
-                    let rect = clamped(frame.offsetBy(dx: 0, dy: dy / scale))
+                    let offset = drag?.id == title.id ? drag!.offset : .zero
+                    let rect = clamped(frame.offsetBy(dx: offset.width / scale, dy: offset.height / scale))
                     RoundedRectangle(cornerRadius: 4)
                         .strokeBorder(style: StrokeStyle(lineWidth: isSelected ? 2 : 1, dash: isSelected ? [] : [4, 3]))
                         .foregroundStyle(isSelected ? Color.yellow : Color.white.opacity(hovered == title.id || drag != nil ? 0.9 : 0))
@@ -355,7 +434,7 @@ private struct TitleHandles: View {
                         .frame(width: rect.width * scale, height: rect.height * scale)
                         .offset(x: rect.minX * scale, y: rect.minY * scale)
                         .onHover { hovered = $0 ? title.id : (hovered == title.id ? nil : hovered) }
-                        .pointerStyle(.frameResize(position: .top, directions: [.inward, .outward]))
+                        .pointerStyle(.grabIdle)
                         .onTapGesture(count: 2) {
                             model.selectedTitleID = title.id
                             model.wantsTitleTextFocus = true
@@ -364,14 +443,24 @@ private struct TitleHandles: View {
                         .gesture(DragGesture(minimumDistance: 2).onChanged { value in
                             model.pause()
                             if model.selectedTitleID != title.id { model.selectedTitleID = title.id }
-                            drag = (title.id, value.translation.height)
-                        }.onEnded { value in
+                            var translation = value.translation
+                            // Sticks to the middle across.
+                            if abs(frame.midX + translation.width / scale - Project.canvasSize.width / 2) < 8 / scale {
+                                translation.width = (Project.canvasSize.width / 2 - frame.midX) * scale
+                            }
+                            drag = (title.id, translation)
+                        }.onEnded { _ in
+                            let offset = drag?.offset ?? .zero
                             drag = nil
-                            let moved = clamped(frame.offsetBy(dx: 0, dy: value.translation.height / scale))
-                            let position = Double(moved.midY / Project.canvasSize.height)
-                            model.editTitle(title.id, "Move Title") { $0.verticalPosition = min(max(position, 0), 1) }
+                            let moved = clamped(frame.offsetBy(dx: offset.width / scale, dy: offset.height / scale))
+                            let vertical = Double(moved.midY / Project.canvasSize.height)
+                            let across = Double(moved.midX / Project.canvasSize.width)
+                            model.editTitle(title.id, "Move Title") { title in
+                                title.verticalPosition = min(max(vertical, 0), 1)
+                                title.horizontalPosition = abs(across - 0.5) < 0.005 ? 0.5 : min(max(across, 0), 1)
+                            }
                         })
-                        .help("Click to edit, drag up or down to move. Double-click to change the words.")
+                        .help("Click to edit, drag to move. Double-click to change the words.")
                 }
             }
         }
@@ -381,6 +470,7 @@ private struct TitleHandles: View {
     private func clamped(_ rect: CGRect) -> CGRect {
         var rect = rect
         rect.origin.y = min(max(rect.minY, 0), Project.canvasSize.height - rect.height)
+        rect.origin.x = min(max(rect.minX, 0), max(Project.canvasSize.width - rect.width, 0))
         return rect
     }
 }

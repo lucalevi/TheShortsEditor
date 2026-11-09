@@ -25,6 +25,14 @@ nonisolated struct CompositorLayer: Sendable {
     let preferredTransform: CGAffineTransform
     /// The main clip fills the canvas behind it (blurred or black); overlays don't.
     let isMain: Bool
+    /// Where on the canvas it is drawn (canvas pixels, origin top left): the whole canvas, or half
+    /// of it in a split screen. The picture is framed inside it and cut to it.
+    let region: CGRect
+
+    func with(region: CGRect) -> CompositorLayer {
+        CompositorLayer(source: source, clip: clip, timelineStart: timelineStart, naturalSize: naturalSize,
+                        preferredTransform: preferredTransform, isMain: isMain, region: region)
+    }
 }
 
 /// What the compositor needs for one stretch of the timeline where the same clips are on screen.
@@ -104,23 +112,33 @@ nonisolated final class ShortsCompositor: NSObject, AVVideoCompositing, Sendable
         var image = CIImage(color: .black).cropped(to: canvas)
 
         for layer in instruction.layers {
-            guard let source = sourceImage(for: layer, request: request) else { continue }
+            let region = layer.region
+            // Core Image's origin is at the bottom left.
+            let ciRegion = CGRect(x: region.minX, y: canvas.height - region.maxY, width: region.width, height: region.height)
+            guard let source = sourceImage(for: layer, request: request) else {
+                if layer.isMain { image = CIImage(color: .black).cropped(to: ciRegion).composited(over: image) }
+                continue
+            }
             let sourceTime = layer.clip.sourceTime(atOffset: time - layer.timelineStart)
             let placement = LivePreview.placement(for: layer.clip.id) ?? layer.clip.placement(atSourceTime: sourceTime)
-            let framing = layer.clip.framing.transform(naturalSize: layer.naturalSize, preferredTransform: layer.preferredTransform)
+            // Framed to the region's size, then moved, resized and turned around its middle, then put in place.
+            let transform = layer.clip.framing.transform(naturalSize: layer.naturalSize, preferredTransform: layer.preferredTransform, canvas: region.size)
+                .concatenating(placement.transform(in: region))
             let height = source.extent.height
-            if layer.isMain, layer.clip.background == .blur,
-               !layer.clip.framing.placedFrame(of: Self.displaySize(layer), placement: placement).covers() {
-                image = Self.blurredBackground(source, layer: layer, sourceHeight: height).composited(over: image)
+            if layer.isMain {
+                let covers = layer.clip.framing.placedFrame(of: Self.displaySize(layer), placement: placement, region: region).covers(region)
+                let behind = layer.clip.background == .blur && !covers
+                    ? Self.blurredBackground(source, layer: layer, sourceHeight: height)
+                    : CIImage(color: .black)
+                image = behind.cropped(to: ciRegion).composited(over: image)
             }
-            let placed = source
-                .transformed(by: Self.flipped(framing.concatenating(placement.transform()), sourceHeight: height))
-            // Overlays are clipped to the canvas so a big one doesn't stretch the frame.
-            image = placed.cropped(to: canvas).composited(over: image)
+            let placed = source.transformed(by: Self.flipped(transform, sourceHeight: height))
+            // Cut to the region (the canvas, or half of it) so a big picture doesn't spill over.
+            image = placed.cropped(to: ciRegion).composited(over: image)
         }
 
         for state in instruction.titles.states(at: time) {
-            guard state.opacity > 0, let title = titleImage(state.title, scale: state.scale) else { continue }
+            guard state.opacity > 0, let title = titleImage(state) else { continue }
             let over = title.composited(over: image)
             // Fading: blend between the frame without and with the title.
             image = state.opacity < 1
@@ -156,8 +174,8 @@ nonisolated final class ShortsCompositor: NSObject, AVVideoCompositing, Sendable
     /// doesn't cover it. Blurred at a quarter of the size, which is much quicker and looks the same.
     private static func blurredBackground(_ source: CIImage, layer: CompositorLayer, sourceHeight: CGFloat) -> CIImage {
         let canvas = CGRect(origin: .zero, size: Project.canvasSize)
-        let fill = Framing.fill.transform(naturalSize: layer.naturalSize, preferredTransform: layer.preferredTransform)
-            .concatenating(Placement(scale: 1.1).transform())
+        let fill = Framing.fill.transform(naturalSize: layer.naturalSize, preferredTransform: layer.preferredTransform, canvas: layer.region.size)
+            .concatenating(Placement(scale: 1.1).transform(in: layer.region))
         let small = CGAffineTransform(scaleX: 0.25, y: 0.25)
         return source
             .transformed(by: flipped(fill, sourceHeight: sourceHeight).concatenating(small))
@@ -179,9 +197,11 @@ nonisolated final class ShortsCompositor: NSObject, AVVideoCompositing, Sendable
 
     private func captionImage(for track: CaptionTrack, at time: CMTime) -> CIImage? {
         guard let state = track.state(at: time) else { return nil }
-        let key = "\(track.style.rawValue)|\(state.page.id)|\(state.page.text)|\(state.word)"
+        let keywords = Set(state.page.words.indices.filter { state.page.words[$0].isKeyword })
+        let key = "\(track.settings.hashValue)|\(state.page.id)|\(state.page.text)|\(state.word)|\(keywords.sorted())|\(state.page.emoji ?? "")"
         let cgImage = cachedImage(key) {
-            CaptionRenderer.image(words: state.page.words.map(\.text), currentWord: state.word, style: track.style)
+            CaptionRenderer.image(words: state.page.words.map(\.text), keywords: keywords, currentWord: state.word,
+                                  emoji: state.page.emoji, settings: track.settings)
         }
         guard let cgImage else { return nil }
 
@@ -214,9 +234,11 @@ nonisolated final class ShortsCompositor: NSObject, AVVideoCompositing, Sendable
         return made
     }
 
-    private func titleImage(_ title: TextOverlay, scale: Double) -> CIImage? {
+    private func titleImage(_ state: TitleTrack.State) -> CIImage? {
+        let title = state.title, scale = state.scale
+        let key = "title|\(title.look.hashValue)|\(title.text)|\(state.visibleCharacters ?? -1)"
         guard let placement = TitleRenderer.placement(of: title),
-              let cgImage = cachedImage("title|\(title.style.rawValue)|\(title.text)", make: { TitleRenderer.image(text: title.text, style: title.style) })
+              let cgImage = cachedImage(key, make: { TitleRenderer.image(text: title.text, look: title.look, visibleCharacters: state.visibleCharacters) })
         else { return nil }
         let size = CGSize(width: cgImage.width, height: cgImage.height)
         var image = CIImage(cgImage: cgImage)
@@ -228,7 +250,7 @@ nonisolated final class ShortsCompositor: NSObject, AVVideoCompositing, Sendable
         let canvas = Project.canvasSize
         return image.transformed(by: CGAffineTransform(
             translationX: placement.image.minX,
-            y: canvas.height - placement.image.maxY
+            y: canvas.height - placement.image.maxY - state.yOffset
         ))
     }
 

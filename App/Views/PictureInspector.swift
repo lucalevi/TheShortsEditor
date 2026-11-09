@@ -75,6 +75,10 @@ struct PictureSection: View {
             }
             .controlSize(.small)
 
+            if model.project.asset(id: clip.assetID)?.isImage != true {
+                FollowSubjectButton(model: model, clip: clip)
+            }
+
             Text(isOnScreen
                  ? "Drag the picture in the viewer to move it; drag a corner or pinch to resize it."
                  : "Move the playhead onto this clip to drag its picture in the viewer.")
@@ -130,7 +134,7 @@ struct MotionSection: View {
                     ForEach(Array(clip.visibleKeyframes.enumerated()), id: \.element.id) { index, keyframe in
                         HStack(spacing: 6) {
                             Image(systemName: "diamond.fill").font(.caption2).foregroundStyle(.yellow)
-                            Button("Keyframe \(index + 1) at \(TimeFormat.string(keyframe.time - clip.sourceStart))") {
+                            Button("Keyframe \(index + 1) at \(TimeFormat.string(clip.timelineOffset(ofSourceTime: keyframe.time)))") {
                                 model.goToKeyframe(keyframe, in: clip.id)
                             }
                             .buttonStyle(.link)

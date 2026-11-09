@@ -30,6 +30,16 @@ final class EditorKeys {
               !(event.window?.firstResponder is NSText)
         else { return false }
 
+        // While recording a voice-over, Space (or Escape) stops it.
+        if model.isRecordingVoiceOver, event.keyCode == 49 || event.keyCode == 53 {
+            model.stopVoiceOver()
+            return true
+        }
+        // In the Script panel, ⌫ cuts the selected words.
+        if model.sidebar == .script, !model.scriptSelection.isEmpty, event.keyCode == 51 || event.keyCode == 117 {
+            model.cutWords(model.scriptSelection)
+            return true
+        }
         switch event.keyCode {
         case 49: model.togglePlayback()            // Space
         case 38: model.shuttle(forward: false)     // J

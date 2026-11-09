@@ -79,6 +79,21 @@ final class EditorModel {
 
     /// Which list the left panel shows.
     var sidebar: Sidebar = .media
+    /// Title looks the user saved, for every Short (their "brand kit").
+    var savedTextStyles: [SavedTextStyle] = TextStyleStore.load() {
+        didSet { TextStyleStore.save(savedTextStyles) }
+    }
+    /// Files whose voice is being cleaned up, with how far it has got (0…1).
+    var voiceCleaning: [MediaAsset.ID: Double] = [:]
+    /// A clip whose subject is being found for reframing, with how far it has got.
+    var reframing: (clipID: Clip.ID, progress: Double)?
+    /// While recording a voice-over: counting down, then recording from a time.
+    var voiceOver: VoiceOverState?
+    /// Words selected in the Script panel.
+    var scriptSelection: Set<WordRef> = []
+    @ObservationIgnored var effectPlayer: AVAudioPlayer?
+    @ObservationIgnored var recorder: AVAudioRecorder?
+    @ObservationIgnored var voiceOverURL: URL?
     var captionLanguage = CaptionLanguage.preferred()
     /// What the caption maker is doing, while it works.
     private(set) var captionJob: CaptionJob?
@@ -116,9 +131,16 @@ final class EditorModel {
 
     static let zoomRange: ClosedRange<CGFloat> = 15...400
 
+    enum VoiceOverState: Equatable {
+        case countdown(Int)
+        case recording(from: CMTime)
+    }
+
     enum Sidebar: String, CaseIterable, Identifiable {
         case media = "Media"
         case captions = "Captions"
+        case script = "Script"
+        case sounds = "Sounds"
         var id: String { rawValue }
     }
 
@@ -152,6 +174,7 @@ final class EditorModel {
     }
 
     init() {
+        FontLibrary.registerImportedFonts()
         player.actionAtItemEnd = .pause
         timeObserver = player.addPeriodicTimeObserver(forInterval: .oneFrame, queue: .main) { [weak self] time in
             MainActor.assumeIsolated { self?.playheadMoved(to: time) }
@@ -202,6 +225,8 @@ final class EditorModel {
         case timelineEnd
         /// Also over the clips, starting at this time (videos and pictures).
         case overlay(at: CMTime)
+        /// Sound files as sound effects, starting at this time.
+        case sound(at: CMTime)
     }
 
     /// Reads the files, adds the usable ones to Media and, if asked, to the end of the timeline.
@@ -243,6 +268,7 @@ final class EditorModel {
             case .media: "Import"
             case .timelineEnd: probed.allSatisfy { !$0.hasVideo } ? "Add Music" : "Add to Timeline"
             case .overlay: "Add Over Clips"
+            case .sound: "Add Sound"
             }
             apply(actionName) { project in
                 var overlayStart: CMTime?
@@ -250,6 +276,9 @@ final class EditorModel {
                 for asset in probed {
                     let id = project.addAsset(asset)
                     if addToTimeline, asset.hasVideo { project.appendClip(of: id) }
+                    if case .sound(let time) = destination, !asset.hasVideo, let soundID = project.addSound(of: id, at: time) {
+                        overlayIDs.append(soundID)
+                    }
                     // Several dropped together go one after another.
                     if let start = overlayStart, asset.hasVideo, let overlayID = project.addOverlay(of: id, at: start) {
                         overlayIDs.append(overlayID)
@@ -262,7 +291,9 @@ final class EditorModel {
                 }
             }
             if addToTimeline, !songs.isEmpty { selection = .music }
-            if overlayIDs.count == 1 { selection = .overlay(overlayIDs[0]) }
+            if overlayIDs.count == 1 {
+                if case .sound = destination { selection = .sound(overlayIDs[0]) } else { selection = .overlay(overlayIDs[0]) }
+            }
             for asset in probed { loadPreviews(for: asset) }
             if !failures.isEmpty {
                 alert = AlertMessage(
@@ -290,6 +321,11 @@ final class EditorModel {
             if let newID { selection = .overlay(newID) } else { NSSound.beep() }
             return
         }
+        if case .sound(let id)? = selection, project.sound(id: id)?.range.containsTime(currentTime) == true {
+            apply("Split Sound") { newID = $0.splitSound(id, at: currentTime) }
+            if let newID { selection = .sound(newID) } else { NSSound.beep() }
+            return
+        }
         apply("Split Clip") { newID = $0.timeline.split(at: currentTime) }
         if let newID { selectedClipID = newID } else { NSSound.beep() }
     }
@@ -313,6 +349,9 @@ final class EditorModel {
             selectedTitleID = nil
         } else if case .overlay(let id)? = selection {
             apply("Delete Clip") { $0.removeOverlay(id) }
+            selection = nil
+        } else if case .sound(let id)? = selection {
+            apply("Delete Sound") { $0.removeSound(id) }
             selection = nil
         } else {
             deleteSelectedClip()
@@ -592,6 +631,7 @@ final class EditorModel {
 
     private func playheadMoved(to time: CMTime) {
         currentTime = time
+        if case .recording = voiceOver, time >= duration - .oneFrame { stopVoiceOver() }
         // While previewing pause removal, jump over the parts that would be cut.
         // Compare whole frames: the player reports nanoseconds, and 3.233333333 s is a hair before
         // a cut ending at 97/30 s, which would otherwise jump to the same place forever.
@@ -915,6 +955,9 @@ final class EditorModel {
             }
         }
     }
+
+    func audioLevelsMissing(_ id: MediaAsset.ID) -> Bool { audioLevels[id] == nil }
+    func setAudioLevels(_ levels: AudioLevels, for id: MediaAsset.ID) { audioLevels[id] = levels }
 
     /// Makes what is drawn for a file: its thumbnail, the stills along it, and its sound levels.
     /// `again` makes them anew, e.g. after the file was found somewhere else.

@@ -8,7 +8,8 @@ import Foundation
 public struct ProjectFile: Codable, Equatable, Sendable {
     /// Bumped when the format changes in a way older versions can't read.
     /// 2: overlays (B-roll), pictures, placement and motion.
-    public static let currentVersion = 2
+    /// 3: speed, title looks, key words and emoji, sound effects and voice-overs, layouts.
+    public static let currentVersion = 3
     public static let fileExtension = "shortsproject"
 
     public var version: Int
@@ -57,6 +58,7 @@ public extension Project {
     var usedAssets: [MediaAsset] {
         var ids = Set(timeline.clips.map(\.assetID))
         ids.formUnion(overlays.map(\.clip.assetID))
+        ids.formUnion(sounds.map(\.clip.assetID))
         if let music { ids.insert(music.assetID) }
         return assets.filter { ids.contains($0.id) }
     }

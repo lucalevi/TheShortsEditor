@@ -24,7 +24,7 @@ public extension Project {
         guard applied != .zero else { return false }
         switch edge {
         case .start:
-            if isVideoAsset(clip.assetID) { clip.sourceStart = clip.sourceStart + applied }
+            if isVideoAsset(clip.assetID) { clip.sourceStart = clip.sourceTime(atOffset: applied) }
             clip.duration = clip.duration - applied
         case .end:
             clip.duration = clip.duration + applied
@@ -41,10 +41,10 @@ public extension Project {
         case .start:
             // Right: until the clip is as short as allowed. Left: back to the start of the file
             // (a picture can grow as long as it may be shown).
-            let leftmost = asset.isImage ? -(MediaAsset.imageDuration - clip.duration) : -clip.sourceStart
+            let leftmost = asset.isImage ? -(MediaAsset.imageDuration - clip.duration) : -clip.timelineDuration(ofSource: clip.sourceStart)
             return CMTimeRange(start: min(leftmost, .zero), end: max(shortest, .zero))
         case .end:
-            let available = asset.isImage ? MediaAsset.imageDuration : asset.duration - clip.sourceStart
+            let available = asset.isImage ? MediaAsset.imageDuration : clip.timelineDuration(ofSource: asset.duration - clip.sourceStart)
             return CMTimeRange(start: min(-shortest, .zero), end: max(available - clip.duration, .zero))
         }
     }
@@ -86,10 +86,13 @@ public struct Overlay: Identifiable, Codable, Equatable, Sendable {
     public var clip: Clip
     /// When it appears, on the timeline.
     public var start: CMTime
+    /// Over the main clip, or sharing the screen with it (split screen).
+    public var layout: OverlayLayout
 
-    public init(clip: Clip, start: CMTime) {
+    public init(clip: Clip, start: CMTime, layout: OverlayLayout = .free) {
         self.clip = clip
         self.start = start
+        self.layout = layout
     }
 
     public var id: Clip.ID { clip.id }
@@ -104,20 +107,22 @@ public struct Overlay: Identifiable, Codable, Equatable, Sendable {
     }
 
     /// The source time showing at timeline `time`.
-    public func sourceTime(at time: CMTime) -> CMTime { clip.sourceStart + (time - start) }
+    public func sourceTime(at time: CMTime) -> CMTime { clip.sourceTime(atOffset: time - start) }
 
-    private enum CodingKeys: String, CodingKey { case clip, start }
+    private enum CodingKeys: String, CodingKey { case clip, start, layout }
 
     public init(from decoder: any Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         clip = try c.decode(Clip.self, forKey: .clip)
         start = try c.decodeTime(forKey: .start)
+        layout = try c.decodeIfPresent(OverlayLayout.self, forKey: .layout) ?? .free
     }
 
     public func encode(to encoder: any Encoder) throws {
         var c = encoder.container(keyedBy: CodingKeys.self)
         try c.encode(clip, forKey: .clip)
         try c.encode(time: start, forKey: .start)
+        try c.encode(layout, forKey: .layout)
     }
 }
 
@@ -181,7 +186,7 @@ public extension Project {
             switch edge {
             case .start:
                 overlay.start = overlay.start + applied
-                if !isImage { overlay.clip.sourceStart = overlay.clip.sourceStart + applied }
+                if !isImage { overlay.clip.sourceStart = overlay.clip.sourceTime(atOffset: applied) }
                 overlay.clip.duration = overlay.clip.duration - applied
             case .end:
                 overlay.clip.duration = overlay.clip.duration + applied
@@ -200,9 +205,9 @@ public extension Project {
         let offset = time - overlay.start
         guard offset >= Clip.minimumDuration, overlay.duration - offset >= Clip.minimumDuration else { return nil }
         let isImage = asset(id: overlay.clip.assetID)?.isImage == true
-        let second = overlay.clip.piece(sourceStart: isImage ? overlay.clip.sourceStart : overlay.clip.sourceStart + offset, duration: overlay.duration - offset)
+        let second = overlay.clip.piece(sourceStart: isImage ? overlay.clip.sourceStart : overlay.clip.sourceTime(atOffset: offset), duration: overlay.duration - offset)
         overlays[index].clip.duration = offset
-        overlays.insert(Overlay(clip: second, start: time), at: index + 1)
+        overlays.insert(Overlay(clip: second, start: time, layout: overlay.layout), at: index + 1)
         return second.id
     }
 
@@ -215,27 +220,41 @@ public extension Project {
     mutating func updateAnyClip(_ id: Clip.ID, _ change: (inout Clip) -> Void) {
         if let index = timeline.index(of: id) {
             change(&timeline.clips[index])
-        } else {
+        } else if overlay(id: id) != nil {
             updateOverlay(id) { change(&$0.clip) }
+        } else {
+            updateSound(id) { change(&$0.clip) }
         }
     }
 
-    /// A clip by id, on the main storyline or over it.
+    /// A clip by id, on the main storyline, over it, or a sound.
     func anyClip(id: Clip.ID) -> Clip? {
-        timeline.clips.first { $0.id == id } ?? overlay(id: id)?.clip
+        timeline.clips.first { $0.id == id } ?? overlay(id: id)?.clip ?? sound(id: id)?.clip
     }
 
-    /// Where a clip (main or overlay) starts on the timeline.
+    /// Where a clip (main, overlay or sound) starts on the timeline.
     func timelineStart(ofClip id: Clip.ID) -> CMTime? {
         if let index = timeline.index(of: id) { return timeline.startTime(ofClipAt: index) }
-        return overlay(id: id)?.start
+        return overlay(id: id)?.start ?? sound(id: id)?.start
     }
 
     /// The source time a clip (main or overlay) shows at timeline `time`, clamped to the clip.
     func sourceTime(ofClip id: Clip.ID, at time: CMTime) -> CMTime? {
         guard let clip = anyClip(id: id), let start = timelineStart(ofClip: id) else { return nil }
         let offset = (time - start).clamped(.zero, clip.duration)
-        return clip.sourceStart + offset
+        return clip.sourceTime(atOffset: offset)
+    }
+
+    /// Changes how fast a clip (main or B-roll) plays. It keeps showing the same part of its
+    /// source, so it gets shorter when faster and longer when slower. Pictures have no speed.
+    mutating func setSpeed(_ speed: Double, for id: Clip.ID) {
+        guard let clip = anyClip(id: id), asset(id: clip.assetID)?.isImage != true else { return }
+        let speed = min(max(speed, Clip.speedRange.lowerBound), Clip.speedRange.upperBound)
+        let source = clip.sourceDuration
+        updateAnyClip(id) { clip in
+            clip.speed = speed
+            clip.duration = max(CMTimeMultiplyByFloat64(source, multiplier: 1 / speed).snappedToFrame(), Clip.minimumDuration)
+        }
     }
 }
 
@@ -259,6 +278,7 @@ public enum Snapping {
         }
         for title in project.titles where !excluding.contains(.title(title.id)) { times += [title.start, title.end] }
         for overlay in project.overlays where !excluding.contains(.overlay(overlay.id)) { times += [overlay.start, overlay.end] }
+        for sound in project.sounds where !excluding.contains(.sound(sound.id)) { times += [sound.start, sound.end] }
         if let playhead { times.append(playhead) }
         return times
     }
@@ -308,5 +328,124 @@ public enum LanePacking {
     /// How many rows `rows(_:)` used (at least one).
     public static func count<ID: Hashable>(_ rows: [ID: Int]) -> Int {
         (rows.values.max() ?? 0) + 1
+    }
+}
+
+// MARK: - Sound effects and voice-overs
+
+/// A sound on the timeline besides the clips' own and the music: a sound effect (whoosh, pop…)
+/// or a recorded voice-over. Timed on the timeline, like titles and B-roll.
+public struct SoundClip: Identifiable, Codable, Equatable, Sendable {
+    /// Which part of the sound file, its volume and speed.
+    public var clip: Clip
+    public var start: CMTime
+    /// A voice recorded over the Short: the music is lowered under it, like under speech.
+    public var isVoiceOver: Bool
+
+    public init(clip: Clip, start: CMTime, isVoiceOver: Bool = false) {
+        self.clip = clip
+        self.start = start
+        self.isVoiceOver = isVoiceOver
+    }
+
+    public var id: Clip.ID { clip.id }
+    public var duration: CMTime { clip.duration }
+    public var end: CMTime { start + clip.duration }
+    public var range: CMTimeRange { CMTimeRange(start: start, duration: clip.duration) }
+
+    /// The part that is heard in `project`, or nil when it starts after the end.
+    public func audibleRange(in project: Project) -> CMTimeRange? {
+        let audible = range.intersection(CMTimeRange(start: .zero, duration: project.duration))
+        return audible.duration > .zero ? audible : nil
+    }
+
+    private enum CodingKeys: String, CodingKey { case clip, start, isVoiceOver }
+
+    public init(from decoder: any Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        clip = try c.decode(Clip.self, forKey: .clip)
+        start = try c.decodeTime(forKey: .start)
+        isVoiceOver = try c.decodeIfPresent(Bool.self, forKey: .isVoiceOver) ?? false
+    }
+
+    public func encode(to encoder: any Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(clip, forKey: .clip)
+        try c.encode(time: start, forKey: .start)
+        try c.encode(isVoiceOver, forKey: .isVoiceOver)
+    }
+}
+
+public extension Project {
+    func sound(id: Clip.ID) -> SoundClip? {
+        sounds.first { $0.id == id }
+    }
+
+    /// Adds a sound file at `time`, whole (up to the end of the Short). Returns nil for media
+    /// without sound.
+    @discardableResult
+    mutating func addSound(of assetID: MediaAsset.ID, at time: CMTime, isVoiceOver: Bool = false) -> Clip.ID? {
+        guard let asset = asset(id: assetID), asset.hasAudio, !asset.isImage, asset.duration > .zero else { return nil }
+        let start = time.snappedToFrame().clamped(.zero, max(duration - .oneFrame, .zero))
+        let length = max(min(asset.duration, max(duration - start, Clip.minimumDuration)), Clip.minimumDuration).snappedToFrame()
+        let clip = Clip(assetID: assetID, sourceStart: .zero, duration: min(length, asset.duration.snappedToFrame()), framing: .fill)
+        sounds.append(SoundClip(clip: clip, start: start, isVoiceOver: isVoiceOver))
+        return clip.id
+    }
+
+    mutating func updateSound(_ id: Clip.ID, _ change: (inout SoundClip) -> Void) {
+        guard let index = sounds.firstIndex(where: { $0.id == id }) else { return }
+        change(&sounds[index])
+    }
+
+    mutating func removeSound(_ id: Clip.ID) {
+        sounds.removeAll { $0.id == id }
+    }
+
+    mutating func moveSound(_ id: Clip.ID, to start: CMTime) {
+        let end = duration
+        updateSound(id) { sound in
+            sound.start = start.snappedToFrame().clamped(.zero, max(.zero, end - .oneFrame)).snappedToFrame()
+        }
+    }
+
+    /// Moves one edge of a sound by `delta`; its other edge stays where it is on the timeline.
+    @discardableResult
+    mutating func trimSound(_ id: Clip.ID, edge: ClipEdge, by delta: CMTime) -> Bool {
+        guard let sound = sound(id: id), let limits = trimLimits(for: sound.clip, edge: edge) else { return false }
+        var range = limits
+        if edge == .start, range.start < -sound.start { range = CMTimeRange(start: -sound.start, end: max(range.end, -sound.start)) }
+        let applied = delta.snappedToFrame().clamped(range.start, range.end).snappedToFrame()
+        guard applied != .zero else { return false }
+        updateSound(id) { sound in
+            switch edge {
+            case .start:
+                sound.start = sound.start + applied
+                sound.clip.sourceStart = sound.clip.sourceTime(atOffset: applied)
+                sound.clip.duration = sound.clip.duration - applied
+            case .end:
+                sound.clip.duration = sound.clip.duration + applied
+            }
+        }
+        return true
+    }
+
+    /// Cuts a sound in two at `time`. Returns the id of the second half.
+    @discardableResult
+    mutating func splitSound(_ id: Clip.ID, at time: CMTime) -> Clip.ID? {
+        let time = time.snappedToFrame()
+        guard let index = sounds.firstIndex(where: { $0.id == id }) else { return nil }
+        let sound = sounds[index]
+        let offset = time - sound.start
+        guard offset >= Clip.minimumDuration, sound.duration - offset >= Clip.minimumDuration else { return nil }
+        let second = sound.clip.piece(sourceStart: sound.clip.sourceTime(atOffset: offset), duration: sound.duration - offset)
+        sounds[index].clip.duration = offset
+        sounds.insert(SoundClip(clip: second, start: time, isVoiceOver: sound.isVoiceOver), at: index + 1)
+        return second.id
+    }
+
+    /// Where voice-overs are heard, for lowering the music under them.
+    var voiceOverRanges: [CMTimeRange] {
+        sounds.filter { $0.isVoiceOver && $0.clip.effectiveVolume > 0 }.compactMap { $0.audibleRange(in: self) }
     }
 }

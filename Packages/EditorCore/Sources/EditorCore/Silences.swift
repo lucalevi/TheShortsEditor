@@ -94,7 +94,7 @@ public struct SilencePlan: Equatable, Sendable {
             timelineCuts += cuts.map {
                 // Clamp to the clip, whose ends may fall between frames of the source.
                 let range = $0.intersection(clip.sourceRange)
-                return CMTimeRange(start: clipStart + (range.start - clip.sourceStart), duration: range.duration)
+                return CMTimeRange(start: clipStart + clip.timelineOffset(ofSourceTime: range.start), duration: clip.timelineDuration(ofSource: range.duration))
             }
         }
         return SilencePlan(sourceCuts: sourceCuts, timelineCuts: timelineCuts)
@@ -127,7 +127,7 @@ public extension Project {
             var keptAny = false
             for piece in pieces where piece.duration >= .oneFrame {
                 defer { keptAny = true }
-                clips.append(clip.piece(id: keptAny ? UUID() : clip.id, sourceStart: piece.start, duration: piece.duration))
+                clips.append(clip.piece(id: keptAny ? UUID() : clip.id, sourceStart: piece.start, duration: clip.timelineDuration(ofSource: piece.duration).snappedToFrame()))
             }
         }
         timeline.clips = clips

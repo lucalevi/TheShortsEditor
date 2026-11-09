@@ -44,11 +44,13 @@ struct TitleInspector: View {
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 72), spacing: 6)], spacing: 6) {
                     ForEach(TitleStyle.allCases) { style in
                         StyleChip(name: style.displayName, isSelected: title.style == style, makeImage: { TitlePreview.image(for: style) }) {
-                            model.editTitle(title.id, "Change Title Style") { $0.style = style }
+                            model.editTitle(title.id, "Change Title Style") { $0.applyStyle(style) }
                         }
                     }
                 }
             }
+
+            TitleLookSection(model: model, title: title)
 
             VStack(alignment: .leading, spacing: 6) {
                 Text("Appears with").font(.subheadline.weight(.semibold))
@@ -57,8 +59,8 @@ struct TitleInspector: View {
                 })) {
                     ForEach(TitleEntrance.allCases) { Text($0.displayName).tag($0) }
                 }
-                .pickerStyle(.segmented)
                 .labelsHidden()
+                .fixedSize()
             }
 
             VStack(alignment: .leading, spacing: 6) {
@@ -71,9 +73,15 @@ struct TitleInspector: View {
                 }
                 .pickerStyle(.segmented)
                 .labelsHidden()
-                Text("Or drag the title up and down in the viewer.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                HStack {
+                    Text("Or drag the title anywhere in the viewer.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    if title.horizontalPosition != 0.5 {
+                        Button("Centre Across") { model.editTitle(title.id, "Move Title") { $0.horizontalPosition = 0.5 } }
+                            .controlSize(.small)
+                    }
+                }
                 if isCovered {
                     Label("Part of it is in an area YouTube covers. Move it towards the middle.", systemImage: "exclamationmark.triangle.fill")
                         .font(.caption)
@@ -125,5 +133,118 @@ struct TitleInspector: View {
         let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty, text != title.text else { return }
         model.editTitle(title.id, "Edit Title") { $0.text = text }
+    }
+}
+
+/// The title's own look: font, size, colours, outline, box, shadow, capitals, and saved styles.
+private struct TitleLookSection: View {
+    let model: EditorModel
+    let title: TextOverlay
+    @State private var dragging: Double?
+    @State private var isNaming = false
+    @State private var newName = ""
+
+    private var look: TextLook { title.look }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text("Design").font(.subheadline.weight(.semibold))
+                Spacer()
+                if title.isCustomized {
+                    Button("Reset") { model.editTitle(title.id, "Reset Title Design") { $0.applyStyle($0.style) } }
+                        .controlSize(.small)
+                        .help("Back to how the \(title.style.displayName) style looks")
+                }
+            }
+            HStack {
+                FontMenu(model: model, selection: look.fontFamily) { family in
+                    model.editTitleLook(title.id, "Change Font") { $0.fontFamily = family }
+                }
+                Toggle("Bold", isOn: Binding(get: { look.isBold }, set: { bold in
+                    model.editTitleLook(title.id, bold ? "Bold" : "Not Bold") { $0.weight = bold ? 0.62 : 0 }
+                }))
+                .toggleStyle(.button)
+                Toggle("AA", isOn: Binding(get: { look.uppercase }, set: { on in
+                    model.editTitleLook(title.id, "Change Capitals") { $0.uppercase = on }
+                }))
+                .toggleStyle(.button)
+                .help("All capitals")
+            }
+            .controlSize(.small)
+            HStack {
+                Text("Size").frame(width: 34, alignment: .leading)
+                Slider(value: Binding(get: { dragging ?? look.size }, set: { dragging = $0 }), in: TextLook.sizeRange) { editing in
+                    if !editing, let value = dragging {
+                        dragging = nil
+                        model.editTitleLook(title.id, "Change Size") { $0.size = value.rounded() }
+                    }
+                }
+                .controlSize(.small)
+                Text("\(Int((dragging ?? look.size).rounded()))").monospacedDigit().frame(width: 32, alignment: .trailing)
+            }
+            ColorRow(title: "Letters", selection: look.textColor) { color in
+                if let color { model.editTitleLook(title.id, "Change Colour") { $0.textColor = color } }
+            }
+            ColorRow(title: "Outline", selection: look.outlineColor, allowsNone: true) { color in
+                model.editTitleLook(title.id, "Change Outline") { $0.outlineColor = color }
+            }
+            ColorRow(title: "Box behind", selection: look.boxColor, allowsNone: true) { color in
+                model.editTitleLook(title.id, "Change Box") { $0.boxColor = color }
+            }
+            HStack {
+                if look.boxColor != nil {
+                    Toggle("A box per line", isOn: Binding(get: { look.boxPerLine }, set: { on in
+                        model.editTitleLook(title.id, "Change Box") { $0.boxPerLine = on }
+                    }))
+                }
+                Toggle("Shadow", isOn: Binding(get: { look.shadow }, set: { on in
+                    model.editTitleLook(title.id, "Change Shadow") { $0.shadow = on }
+                }))
+            }
+            .controlSize(.small)
+
+            HStack {
+                Menu("My Styles") {
+                    if model.savedTextStyles.isEmpty {
+                        Text("No saved styles yet")
+                    }
+                    ForEach(model.savedTextStyles) { style in
+                        Button(style.name) { model.applySavedStyle(style, to: title.id) }
+                    }
+                    if !model.savedTextStyles.isEmpty {
+                        Divider()
+                        Menu("Delete") {
+                            ForEach(model.savedTextStyles) { style in
+                                Button(style.name, role: .destructive) { model.deleteSavedStyle(style.id) }
+                            }
+                        }
+                    }
+                }
+                .fixedSize()
+                .help("Your saved looks, for every Short")
+                Button("Save Style…") {
+                    newName = ""
+                    isNaming = true
+                }
+                .help("Keep this look (and how it appears) to use on other titles and Shorts")
+            }
+            .controlSize(.small)
+            if isNaming {
+                HStack {
+                    TextField("Name, e.g. Brand Hook", text: $newName)
+                        .textFieldStyle(.roundedBorder)
+                        .onSubmit(save)
+                    Button("Save", action: save).disabled(newName.trimmingCharacters(in: .whitespaces).isEmpty)
+                    Button("Cancel") { isNaming = false }
+                }
+                .controlSize(.small)
+            }
+        }
+    }
+
+    private func save() {
+        model.saveTextStyle(from: title, name: newName)
+        isNaming = false
     }
 }

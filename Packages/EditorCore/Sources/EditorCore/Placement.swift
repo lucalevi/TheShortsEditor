@@ -230,9 +230,6 @@ public extension Clip {
         return last.placement
     }
 
-    /// The source time playing `offset` into the clip.
-    func sourceTime(atOffset offset: CMTime) -> CMTime { sourceStart + offset }
-
     /// Sets the placement at `sourceTime`. Without keyframes it is the clip's fixed placement; with
     /// them, the keyframe at that time is changed (or one is added there).
     mutating func setPlacement(_ newValue: Placement, atSourceTime sourceTime: CMTime) {
@@ -272,13 +269,13 @@ public extension Clip {
 
     /// The keyframes inside this clip's part of the source.
     var visibleKeyframes: [Keyframe] {
-        keyframes.filter { $0.time >= sourceStart && $0.time <= sourceStart + duration }
+        keyframes.filter { $0.time >= sourceStart && $0.time <= sourceRange.end }
     }
 
     /// Replaces the motion with a preset, starting from the placement at `playheadSource` (a time
     /// in the source; it is also where a zoom at the playhead happens).
     mutating func applyMotion(_ preset: MotionPreset, playheadSource: CMTime) {
-        let start = sourceStart, end = (sourceStart + duration - .oneFrame).snappedToFrame()
+        let start = sourceStart, end = (sourceRange.end - .oneFrame).snappedToFrame()
         let base = placement(atSourceTime: playheadSource)
         func scaled(_ factor: Double) -> Placement {
             var p = base

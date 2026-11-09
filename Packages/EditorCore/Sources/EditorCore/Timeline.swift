@@ -7,6 +7,8 @@ public struct Clip: Identifiable, Codable, Equatable, Sendable {
     public var assetID: MediaAsset.ID
     /// Where in the source file this clip begins.
     public var sourceStart: CMTime
+    /// How long the clip lasts on the timeline. At a speed other than 1 it shows
+    /// `duration × speed` of its source (see `sourceDuration`).
     public var duration: CMTime
     public var framing: Framing
     /// How loud the clip's own sound plays: 1 is as recorded, up to `Clip.maxVolume`.
@@ -19,15 +21,22 @@ public struct Clip: Identifiable, Codable, Equatable, Sendable {
     public var keyframes: [Keyframe]
     /// What shows around the picture where it doesn't cover the canvas.
     public var background: ClipBackground
+    /// How fast it plays: 2 is twice as fast (half as long), 0.5 is slow motion. Voices keep their pitch.
+    public var speed: Double
+    /// Whether the clip's sound is cleaned up (background noise removed, voice kept).
+    public var cleansVoice: Bool
 
     public static let maxVolume = 2.0
     /// No clip is shorter than this, so it can still be seen and grabbed on the timeline.
     public static let minimumDuration = CMTime(value: 3, timescale: Project.frameRate)
+    public static let speedRange: ClosedRange<Double> = 0.25...4
+    /// The speeds offered with one click.
+    public static let speedPresets: [Double] = [0.5, 1, 1.25, 1.5, 2]
 
     public init(
         id: UUID = UUID(), assetID: MediaAsset.ID, sourceStart: CMTime, duration: CMTime, framing: Framing = .fill,
         volume: Double = 1, isMuted: Bool = false, placement: Placement = .identity, keyframes: [Keyframe] = [],
-        background: ClipBackground = .blur
+        background: ClipBackground = .blur, speed: Double = 1, cleansVoice: Bool = false
     ) {
         self.id = id
         self.assetID = assetID
@@ -39,9 +48,31 @@ public struct Clip: Identifiable, Codable, Equatable, Sendable {
         self.placement = placement
         self.keyframes = keyframes
         self.background = background
+        self.speed = speed
+        self.cleansVoice = cleansVoice
     }
 
-    public var sourceRange: CMTimeRange { CMTimeRange(start: sourceStart, duration: duration) }
+    /// How much of the source the clip shows.
+    public var sourceDuration: CMTime {
+        speed == 1 ? duration : CMTimeMultiplyByFloat64(duration, multiplier: speed).convertScale(600, method: .roundHalfAwayFromZero)
+    }
+
+    public var sourceRange: CMTimeRange { CMTimeRange(start: sourceStart, duration: sourceDuration) }
+
+    /// The source time playing `offset` into the clip.
+    public func sourceTime(atOffset offset: CMTime) -> CMTime {
+        speed == 1 ? sourceStart + offset : sourceStart + CMTimeMultiplyByFloat64(offset, multiplier: speed)
+    }
+
+    /// How far into the clip a source time plays (it may be outside the clip).
+    public func timelineOffset(ofSourceTime time: CMTime) -> CMTime {
+        speed == 1 ? time - sourceStart : CMTimeMultiplyByFloat64(time - sourceStart, multiplier: 1 / speed)
+    }
+
+    /// A stretch of the source as it lasts on the timeline.
+    public func timelineDuration(ofSource duration: CMTime) -> CMTime {
+        speed == 1 ? duration : CMTimeMultiplyByFloat64(duration, multiplier: 1 / speed)
+    }
 
     /// The volume actually played.
     public var effectiveVolume: Double { isMuted ? 0 : volume }
@@ -117,7 +148,7 @@ public struct Timeline: Codable, Equatable, Sendable {
         guard let (index, offset) = locate(time), offset > .zero else { return nil }
         var first = clips[index]
         guard offset < first.duration else { return nil }
-        let second = first.piece(sourceStart: first.sourceStart + offset, duration: first.duration - offset)
+        let second = first.piece(sourceStart: first.sourceTime(atOffset: offset), duration: first.duration - offset)
         first.duration = offset
         clips[index] = first
         clips.insert(second, at: index + 1)
@@ -127,7 +158,7 @@ public struct Timeline: Codable, Equatable, Sendable {
 
 extension Clip {
     private enum CodingKeys: String, CodingKey {
-        case id, assetID, sourceStart, duration, framing, volume, isMuted, placement, keyframes, background
+        case id, assetID, sourceStart, duration, framing, volume, isMuted, placement, keyframes, background, speed, cleansVoice
     }
 
     public init(from decoder: any Decoder) throws {
@@ -143,6 +174,8 @@ extension Clip {
         keyframes = try c.decodeIfPresent([Keyframe].self, forKey: .keyframes) ?? []
         // Shorts saved before backgrounds existed had black bars: keep them looking the same.
         background = try c.decodeIfPresent(ClipBackground.self, forKey: .background) ?? .black
+        speed = try c.decodeIfPresent(Double.self, forKey: .speed) ?? 1
+        cleansVoice = try c.decodeIfPresent(Bool.self, forKey: .cleansVoice) ?? false
     }
 
     public func encode(to encoder: any Encoder) throws {
@@ -157,5 +190,7 @@ extension Clip {
         try c.encode(placement, forKey: .placement)
         try c.encode(keyframes, forKey: .keyframes)
         try c.encode(background, forKey: .background)
+        try c.encode(speed, forKey: .speed)
+        try c.encode(cleansVoice, forKey: .cleansVoice)
     }
 }

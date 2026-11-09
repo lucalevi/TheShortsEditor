@@ -11,12 +11,18 @@ public struct Word: Identifiable, Codable, Equatable, Sendable {
     public var text: String
     public var start: CMTime
     public var duration: CMTime
+    /// Shown in the accent colour wherever it is on screen, to make it stand out.
+    public var isKeyword: Bool
+    /// An emoji shown with the caption this word is in, or nil.
+    public var emoji: String?
 
-    public init(id: UUID = UUID(), text: String, start: CMTime, duration: CMTime) {
+    public init(id: UUID = UUID(), text: String, start: CMTime, duration: CMTime, isKeyword: Bool = false, emoji: String? = nil) {
         self.id = id
         self.text = text
         self.start = start
         self.duration = duration
+        self.isKeyword = isKeyword
+        self.emoji = emoji
     }
 
     public var end: CMTime { start + duration }
@@ -102,14 +108,50 @@ public enum CaptionStyle: String, Codable, CaseIterable, Identifiable, Sendable 
 }
 
 /// Settings for the whole Short's captions.
-public struct CaptionSettings: Codable, Equatable, Sendable {
+public struct CaptionSettings: Codable, Equatable, Hashable, Sendable {
     public var isVisible = true
     public var style: CaptionStyle = .bold
     /// Where the middle of the caption sits, from 0 (top of the screen) to 1 (bottom).
     /// Clamped to the area YouTube doesn't cover, see `SafeZone.captionRange`.
     public var verticalPosition = CaptionPlacement.bottom.verticalPosition
+    /// A font family, or nil for the system font.
+    public var fontFamily: String?
+    /// Bigger or smaller than the style's own size (1 is as designed).
+    public var sizeScale: Double = 1
+    /// The letters' colour, or nil for the style's.
+    public var textColor: RGBA?
+    /// The colour of the word being spoken (or its box) and of key words, or nil for the style's.
+    public var accentColor: RGBA?
+    /// Key words (`Word.isKeyword`) shown in the accent colour.
+    public var showsKeywords = true
+    /// Emoji (`Word.emoji`) shown above the caption they are in.
+    public var showsEmoji = true
+
+    public static let sizeRange: ClosedRange<Double> = 0.6...1.6
 
     public init() {}
+
+    private enum CodingKeys: String, CodingKey {
+        case isVisible, style, verticalPosition, fontFamily, sizeScale, textColor, accentColor, showsKeywords, showsEmoji
+    }
+
+    public init(from decoder: any Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        isVisible = try c.decodeIfPresent(Bool.self, forKey: .isVisible) ?? true
+        style = try c.decodeIfPresent(CaptionStyle.self, forKey: .style) ?? .bold
+        verticalPosition = try c.decodeIfPresent(Double.self, forKey: .verticalPosition) ?? CaptionPlacement.bottom.verticalPosition
+        fontFamily = try c.decodeIfPresent(String.self, forKey: .fontFamily)
+        sizeScale = try c.decodeIfPresent(Double.self, forKey: .sizeScale) ?? 1
+        textColor = try c.decodeIfPresent(RGBA.self, forKey: .textColor)
+        accentColor = try c.decodeIfPresent(RGBA.self, forKey: .accentColor)
+        showsKeywords = try c.decodeIfPresent(Bool.self, forKey: .showsKeywords) ?? true
+        showsEmoji = try c.decodeIfPresent(Bool.self, forKey: .showsEmoji) ?? true
+    }
+
+    /// Whether anything differs from how the style looks on its own.
+    public var isCustomized: Bool {
+        fontFamily != nil || sizeScale != 1 || textColor != nil || accentColor != nil
+    }
 }
 
 /// The simple choice of where captions go, offered instead of a free slider.
@@ -148,6 +190,8 @@ public struct TimedWord: Equatable, Sendable {
     public var text: String
     /// Timeline range, cut to the clip it plays in.
     public var range: CMTimeRange
+    public var isKeyword: Bool = false
+    public var emoji: String?
 }
 
 /// The words on screen together at one time.
@@ -159,6 +203,9 @@ public struct CaptionPage: Identifiable, Equatable, Sendable {
     public var range: CMTimeRange
 
     public var text: String { words.map(\.text).joined(separator: " ") }
+
+    /// The emoji shown with this caption: the first one any of its words has.
+    public var emoji: String? { words.lazy.compactMap(\.emoji).first }
 
     /// The first whole frame on which the page is on screen, for jumping to it.
     public var firstFrame: CMTime {
@@ -199,10 +246,11 @@ public enum CaptionLayout {
             for word in transcript.words {
                 let middle = word.start + CMTimeMultiplyByRatio(word.duration, multiplier: 1, divisor: 2)
                 guard source.containsTime(middle) else { continue }
-                let start = clipStart + (word.start - clip.sourceStart)
-                let range = CMTimeRange(start: start, duration: word.duration).intersection(clipRange)
+                let start = clipStart + clip.timelineOffset(ofSourceTime: word.start)
+                let range = CMTimeRange(start: start, duration: clip.timelineDuration(ofSource: word.duration)).intersection(clipRange)
                 guard range.duration > .zero else { continue }
-                result.append(TimedWord(wordID: word.id, assetID: clip.assetID, clipID: clip.id, text: word.text, range: range))
+                result.append(TimedWord(wordID: word.id, assetID: clip.assetID, clipID: clip.id, text: word.text, range: range,
+                                        isKeyword: word.isKeyword, emoji: word.emoji))
             }
         }
         return result
@@ -318,7 +366,7 @@ public extension Project {
 
 extension Word {
     private enum CodingKeys: String, CodingKey {
-        case id, text, start, duration
+        case id, text, start, duration, isKeyword, emoji
     }
 
     public init(from decoder: any Decoder) throws {
@@ -327,6 +375,8 @@ extension Word {
         text = try c.decode(String.self, forKey: .text)
         start = try c.decodeTime(forKey: .start)
         duration = try c.decodeTime(forKey: .duration)
+        isKeyword = try c.decodeIfPresent(Bool.self, forKey: .isKeyword) ?? false
+        emoji = try c.decodeIfPresent(String.self, forKey: .emoji)
     }
 
     public func encode(to encoder: any Encoder) throws {
@@ -335,5 +385,7 @@ extension Word {
         try c.encode(text, forKey: .text)
         try c.encode(time: start, forKey: .start)
         try c.encode(time: duration, forKey: .duration)
+        try c.encode(isKeyword, forKey: .isKeyword)
+        try c.encodeIfPresent(emoji, forKey: .emoji)
     }
 }

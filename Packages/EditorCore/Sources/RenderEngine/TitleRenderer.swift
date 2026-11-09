@@ -20,24 +20,53 @@ nonisolated struct TitleTrack: Sendable {
         }
     }
 
-    /// The titles on screen at `time`, with how big and how opaque each is at that moment.
-    func states(at time: CMTime) -> [(title: TextOverlay, scale: Double, opacity: Double)] {
+    /// How a title is drawn at one moment of its entrance.
+    struct State: Sendable {
+        let title: TextOverlay
+        var scale: Double = 1
+        var opacity: Double = 1
+        /// Moved down by this many canvas pixels (sliding in).
+        var yOffset: Double = 0
+        /// For the typewriter entrance: how many characters are showing (nil: all).
+        var visibleCharacters: Int?
+    }
+
+    /// The titles on screen at `time`, with how each looks at that moment of its entrance.
+    func states(at time: CMTime) -> [State] {
         items.compactMap { item in
             guard item.range.containsTime(time) else { return nil }
             let since = (time - item.range.start).seconds
             let until = (item.range.end - time).seconds
+            var state = State(title: item.title)
             switch item.title.entrance {
             case .pop:
                 let p = min(max(since / TitleRenderer.popSeconds, 0), 1)
                 // Ease out with a slight overshoot, so it lands with a little bounce.
                 let c = 1.70158
                 let eased = 1 + (c + 1) * pow(p - 1, 3) + c * pow(p - 1, 2)
-                return (item.title, 0.6 + 0.4 * eased, min(since / 0.06, 1))
+                state.scale = 0.6 + 0.4 * eased
+                state.opacity = min(since / 0.06, 1)
             case .fade:
-                return (item.title, 1, min(max(min(since, until) / TitleRenderer.fadeSeconds, 0), 1))
+                state.opacity = min(max(min(since, until) / TitleRenderer.fadeSeconds, 0), 1)
+            case .typewriter:
+                let count = item.title.text.count
+                let typing = min(Double(count) * TitleRenderer.secondsPerCharacter, item.range.duration.seconds * 0.4, 1.5)
+                let shown = typing > 0 ? Int((Double(count) * since / typing).rounded(.up)) : count
+                state.visibleCharacters = min(max(shown, 1), count)
+            case .slideUp:
+                let p = min(max(since / TitleRenderer.slideSeconds, 0), 1)
+                let eased = 1 - pow(1 - p, 3)
+                state.yOffset = 80 * (1 - eased)
+                state.opacity = eased
+            case .zoom:
+                let p = min(max(since / TitleRenderer.slideSeconds, 0), 1)
+                let eased = 1 - pow(1 - p, 3)
+                state.scale = 1.6 - 0.6 * eased
+                state.opacity = min(p * 2, 1)
             case .none:
-                return (item.title, 1, 1)
+                break
             }
+            return state
         }
     }
 }
@@ -48,39 +77,12 @@ nonisolated enum TitleRenderer {
     static let maxWidth: CGFloat = 760
     static let popSeconds = 0.2
     static let fadeSeconds = 0.3
-
-    private struct Look {
-        var fontSize: CGFloat
-        var weight: CGFloat
-        var text = CGColor(red: 1, green: 1, blue: 1, alpha: 1)
-        /// Stroke width as a percentage of the font size, drawn behind the letters.
-        var outline: CGFloat = 0
-        /// A box behind each line.
-        var lineBox: CGColor?
-        /// One box behind the whole title.
-        var backgroundBox: CGColor?
-        var shadow = false
-    }
-
-    private static func look(for style: TitleStyle) -> Look {
-        let black = CGColor(red: 0, green: 0, blue: 0, alpha: 1)
-        switch style {
-        case .bold:
-            return Look(fontSize: 96, weight: 0.62, outline: 24)
-        case .label:
-            return Look(fontSize: 76, weight: 0.56, text: black, lineBox: CGColor(red: 1, green: 1, blue: 1, alpha: 1))
-        case .marker:
-            return Look(fontSize: 76, weight: 0.56, text: black, lineBox: CGColor(red: 1, green: 0.86, blue: 0.1, alpha: 1))
-        case .dark:
-            return Look(fontSize: 70, weight: 0.4, backgroundBox: CGColor(red: 0, green: 0, blue: 0, alpha: 0.75))
-        case .simple:
-            return Look(fontSize: 84, weight: 0.5, shadow: true)
-        }
-    }
+    static let slideSeconds = 0.35
+    static let secondsPerCharacter = 0.045
 
     /// The title laid out: everything needed to draw it or to know where it will be.
     private struct Layout {
-        let look: Look
+        let look: TextLook
         let framesetter: CTFramesetter
         let text: CFAttributedString
         /// The whole image, including room for outlines, boxes and shadows.
@@ -90,18 +92,30 @@ nonisolated enum TitleRenderer {
         let contentRect: CGRect
     }
 
-    private static func layout(text raw: String, style: TitleStyle, stroke: Bool = false) -> Layout? {
+    static func cgColor(_ color: RGBA) -> CGColor {
+        CGColor(red: color.red, green: color.green, blue: color.blue, alpha: color.alpha)
+    }
+
+    /// The text as it is shown (in capitals when the look says so).
+    private static func shownText(_ raw: String, _ look: TextLook) -> String {
         let text = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        return look.uppercase ? text.uppercased() : text
+    }
+
+    /// `visible`: how many characters are drawn (the rest take their place but are clear).
+    private static func layout(text raw: String, look: TextLook, stroke: Bool = false, visible: Int? = nil) -> Layout? {
+        let text = shownText(raw, look)
         guard !text.isEmpty else { return nil }
-        let look = look(for: style)
-        let font = CaptionRenderer.makeFont(size: look.fontSize, weight: look.weight)
+        let size = CGFloat(look.size)
+        let font = CaptionRenderer.makeFont(size: size, weight: look.weight, family: look.fontFamily)
 
         let string = CFAttributedStringCreateMutable(nil, 0)!
         CFAttributedStringReplaceString(string, CFRange(location: 0, length: 0), text as CFString)
-        let all = CFRange(location: 0, length: CFAttributedStringGetLength(string))
+        let length = CFAttributedStringGetLength(string)
+        let all = CFRange(location: 0, length: length)
         var alignment = CTTextAlignment.center
         // Room between lines for their boxes.
-        var spacing: CGFloat = look.lineBox == nil ? 0 : look.fontSize * 0.16
+        var spacing: CGFloat = look.boxColor != nil && look.boxPerLine ? size * 0.16 : 0
         let paragraph = withUnsafeMutableBytes(of: &alignment) { alignmentPointer in
             withUnsafeMutableBytes(of: &spacing) { spacingPointer in
                 var settings = [
@@ -113,13 +127,19 @@ nonisolated enum TitleRenderer {
         }
         CFAttributedStringSetAttribute(string, all, kCTFontAttributeName, font)
         CFAttributedStringSetAttribute(string, all, kCTParagraphStyleAttributeName, paragraph)
-        if stroke {
-            let black = CGColor(red: 0, green: 0, blue: 0, alpha: 1)
-            CFAttributedStringSetAttribute(string, all, kCTForegroundColorAttributeName, black)
-            CFAttributedStringSetAttribute(string, all, kCTStrokeColorAttributeName, black)
-            CFAttributedStringSetAttribute(string, all, kCTStrokeWidthAttributeName, look.outline as NSNumber)
+        if stroke, let outline = look.outlineColor {
+            let color = cgColor(outline)
+            CFAttributedStringSetAttribute(string, all, kCTForegroundColorAttributeName, color)
+            CFAttributedStringSetAttribute(string, all, kCTStrokeColorAttributeName, color)
+            CFAttributedStringSetAttribute(string, all, kCTStrokeWidthAttributeName, look.outlineWidth as NSNumber)
         } else {
-            CFAttributedStringSetAttribute(string, all, kCTForegroundColorAttributeName, look.text)
+            CFAttributedStringSetAttribute(string, all, kCTForegroundColorAttributeName, cgColor(look.textColor))
+        }
+        if let visible, visible < length {
+            let clear = CGColor(red: 0, green: 0, blue: 0, alpha: 0)
+            let hidden = CFRange(location: visible, length: length - visible)
+            CFAttributedStringSetAttribute(string, hidden, kCTForegroundColorAttributeName, clear)
+            CFAttributedStringSetAttribute(string, hidden, kCTStrokeColorAttributeName, clear)
         }
 
         let framesetter = CTFramesetterCreateWithAttributedString(string)
@@ -128,19 +148,20 @@ nonisolated enum TitleRenderer {
             CGSize(width: maxWidth, height: .greatestFiniteMagnitude), nil
         )
         let textSize = CGSize(width: ceil(suggested.width) + 2, height: ceil(suggested.height) + 2)
-        let padding = ceil(look.fontSize * 0.45)
-        let size = CGSize(width: textSize.width + padding * 2, height: textSize.height + padding * 2)
+        let padding = ceil(size * 0.45)
+        let imageSize = CGSize(width: textSize.width + padding * 2, height: textSize.height + padding * 2)
         let textRect = CGRect(origin: CGPoint(x: padding, y: padding), size: textSize)
         return Layout(
-            look: look, framesetter: framesetter, text: string, size: size, textRect: textRect,
-            contentRect: textRect.insetBy(dx: -look.fontSize * 0.2, dy: -look.fontSize * 0.12)
+            look: look, framesetter: framesetter, text: string, size: imageSize, textRect: textRect,
+            contentRect: textRect.insetBy(dx: -size * 0.2, dy: -size * 0.12)
         )
     }
 
-    /// The title as an image, centred, wrapped to `maxWidth`.
-    static func image(text: String, style: TitleStyle) -> CGImage? {
-        guard let layout = layout(text: text, style: style) else { return nil }
-        let look = layout.look
+    /// The title as an image, centred, wrapped to `maxWidth`. With `visibleCharacters`, only
+    /// that many letters are drawn (typing), in their final places.
+    static func image(text: String, look: TextLook, visibleCharacters: Int? = nil) -> CGImage? {
+        guard let layout = layout(text: text, look: look, visible: visibleCharacters) else { return nil }
+        let size = CGFloat(look.size)
         guard let context = CGContext(
             data: nil, width: Int(layout.size.width), height: Int(layout.size.height), bitsPerComponent: 8, bytesPerRow: 0,
             space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
@@ -149,22 +170,23 @@ nonisolated enum TitleRenderer {
 
         let path = CGPath(rect: layout.textRect, transform: nil)
         let frame = CTFramesetterCreateFrame(layout.framesetter, CFRange(location: 0, length: 0), path, nil)
+        let length = CFAttributedStringGetLength(layout.text)
+        let shown = CFRange(location: 0, length: min(visibleCharacters ?? length, length))
 
-        if let box = look.backgroundBox {
-            context.addPath(CGPath(roundedRect: layout.contentRect, cornerWidth: 18, cornerHeight: 18, transform: nil))
-            context.setFillColor(box)
-            context.fillPath()
-        }
-        if let box = look.lineBox {
-            let all = CFRange(location: 0, length: CFAttributedStringGetLength(layout.text))
-            for rect in CaptionRenderer.rects(of: all, in: frame, origin: layout.textRect.origin) where rect.width > 1 {
-                let padded = rect.insetBy(dx: -look.fontSize * 0.2, dy: -look.fontSize * 0.08)
-                context.addPath(CGPath(roundedRect: padded, cornerWidth: 12, cornerHeight: 12, transform: nil))
+        if let box = look.boxColor {
+            if look.boxPerLine {
+                for rect in CaptionRenderer.rects(of: shown, in: frame, origin: layout.textRect.origin) where rect.width > 1 {
+                    let padded = rect.insetBy(dx: -size * 0.2, dy: -size * 0.08)
+                    context.addPath(CGPath(roundedRect: padded, cornerWidth: 12, cornerHeight: 12, transform: nil))
+                }
+            } else {
+                context.addPath(CGPath(roundedRect: layout.contentRect, cornerWidth: 18, cornerHeight: 18, transform: nil))
             }
-            context.setFillColor(box)
+            context.setFillColor(cgColor(box))
             context.fillPath()
         }
-        if look.outline > 0, let stroke = Self.layout(text: text, style: style, stroke: true) {
+        if look.outlineColor != nil, look.outlineWidth > 0,
+           let stroke = Self.layout(text: text, look: look, stroke: true, visible: visibleCharacters) {
             CTFrameDraw(CTFramesetterCreateFrame(stroke.framesetter, CFRange(location: 0, length: 0), path, nil), context)
         }
         if look.shadow {
@@ -174,19 +196,26 @@ nonisolated enum TitleRenderer {
         return context.makeImage()
     }
 
+    /// A title drawn in a ready-made style's look.
+    static func image(text: String, style: TitleStyle) -> CGImage? {
+        image(text: text, look: style.look)
+    }
+
     /// Where the title's image goes on the canvas (origin top left), and the part of it that can
     /// be seen. The visible part is centred on the title's position, but never leaves the canvas.
     static func placement(of title: TextOverlay) -> (image: CGRect, content: CGRect)? {
-        guard let layout = layout(text: title.text, style: title.style) else { return nil }
+        guard let layout = layout(text: title.text, look: title.look) else { return nil }
         let canvas = Project.canvasSize
         let content = layout.contentRect
         let middle = CGFloat(title.verticalPosition) * canvas.height
         let contentTop = min(max(middle - content.height / 2, 0), max(canvas.height - content.height, 0))
+        let centre = CGFloat(title.horizontalPosition) * canvas.width
+        let contentLeft = min(max(centre - content.width / 2, 0), max(canvas.width - content.width, 0))
         // The image's own origin is at the bottom left: its top margin is above `content.maxY`.
         let imageTop = contentTop - (layout.size.height - content.maxY)
-        let imageLeft = (canvas.width - layout.size.width) / 2
+        let imageLeft = contentLeft - content.minX
         let image = CGRect(x: imageLeft, y: imageTop, width: layout.size.width, height: layout.size.height)
-        let visible = CGRect(x: imageLeft + content.minX, y: contentTop, width: content.width, height: content.height)
+        let visible = CGRect(x: contentLeft, y: contentTop, width: content.width, height: content.height)
         return (image, visible)
     }
 }
@@ -194,7 +223,12 @@ nonisolated enum TitleRenderer {
 /// Titles as the app needs them: style samples for the picker, and where a title is on screen.
 public enum TitlePreview {
     public static func image(for style: TitleStyle) -> CGImage? {
-        TitleRenderer.image(text: "Hook", style: style)
+        TitleRenderer.image(text: "Hook", look: style.look)
+    }
+
+    /// A sample of a look, for saved styles and the font menu.
+    public static func image(for look: TextLook, text: String = "Hook") -> CGImage? {
+        TitleRenderer.image(text: text, look: look)
     }
 
     /// The visible part of the title on the 1080×1920 canvas, origin at the top left; nil when it

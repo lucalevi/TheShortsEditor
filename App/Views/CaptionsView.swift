@@ -13,7 +13,12 @@ struct CaptionsView: View {
             MakeCaptions(model: model)
         } else {
             VStack(spacing: 0) {
-                CaptionSettingsForm(model: model)
+                // Scrolls on its own, so opening the design options never pushes the window around.
+                ScrollView {
+                    CaptionSettingsForm(model: model)
+                }
+                .frame(maxHeight: 330)
+                .fixedSize(horizontal: false, vertical: false)
                 Divider()
                 CaptionList(model: model)
             }
@@ -112,7 +117,12 @@ private struct CaptionSettingsForm: View {
                 }
                 .pickerStyle(.segmented)
                 .labelsHidden()
+                Text("Or drag the caption up and down in the viewer.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
+
+            CaptionDesign(model: model, settings: settings)
 
             let missing = model.project.assetsNeedingTranscription(in: model.captionLanguage)
             HStack {
@@ -240,5 +250,77 @@ private struct CaptionRow: View {
             (isCurrent || model.focusedCaptionID == page.id ? Color.accentColor.opacity(0.15) : Color.clear)
                 .clipShape(RoundedRectangle(cornerRadius: 6))
         )
+    }
+}
+
+/// Font, size, colours, key words and emoji, folded away until wanted.
+private struct CaptionDesign: View {
+    let model: EditorModel
+    let settings: CaptionSettings
+    @State private var isOpen = false
+    @State private var dragging: Double?
+
+    var body: some View {
+        DisclosureGroup("Design, key words & emoji", isExpanded: $isOpen) {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    FontMenu(model: model, selection: settings.fontFamily) { family in
+                        model.editCaptionLook("Change Caption Font") { $0.fontFamily = family }
+                    }
+                    if settings.isCustomized {
+                        Button("Reset") {
+                            model.editCaptionLook("Reset Caption Design") { captions in
+                                captions.fontFamily = nil
+                                captions.sizeScale = 1
+                                captions.textColor = nil
+                                captions.accentColor = nil
+                            }
+                        }
+                    }
+                }
+                .controlSize(.small)
+                HStack {
+                    Text("Size").frame(width: 34, alignment: .leading)
+                    Slider(value: Binding(get: { dragging ?? settings.sizeScale }, set: { dragging = $0 }), in: CaptionSettings.sizeRange) { editing in
+                        if !editing, let value = dragging {
+                            dragging = nil
+                            model.editCaptionLook("Change Caption Size") { $0.sizeScale = (value * 20).rounded() / 20 }
+                        }
+                    }
+                    .controlSize(.small)
+                    Text("\(Int(((dragging ?? settings.sizeScale) * 100).rounded()))%").monospacedDigit().frame(width: 40, alignment: .trailing)
+                }
+                ColorRow(title: "Letters", selection: settings.textColor, allowsNone: true) { color in
+                    model.editCaptionLook("Change Caption Colour") { $0.textColor = color }
+                }
+                ColorRow(title: "Accent (spoken word, key words)", selection: settings.accentColor, allowsNone: true) { color in
+                    model.editCaptionLook("Change Accent Colour") { $0.accentColor = color }
+                }
+                Text("“None” keeps the style's own colour.").font(.caption).foregroundStyle(.secondary)
+
+                Divider()
+                Toggle("Highlight key words", isOn: Binding(get: { settings.showsKeywords }, set: { on in
+                    model.editCaptionLook(on ? "Show Key Words" : "Hide Key Words") { $0.showsKeywords = on }
+                }))
+                HStack {
+                    Button("Pick Key Words") { model.pickKeywords() }
+                        .help("Highlight numbers, names and strong words automatically, about one in seven words")
+                    Button("Clear") { model.clearKeywords() }
+                }
+                .controlSize(.small)
+                Toggle("Show emoji", isOn: Binding(get: { settings.showsEmoji }, set: { on in
+                    model.editCaptionLook(on ? "Show Emoji" : "Hide Emoji") { $0.showsEmoji = on }
+                }))
+                HStack {
+                    Button("Suggest Emoji") { model.suggestEmoji() }
+                        .help("Add an emoji above captions with words like money, love, fire, idea… (at most one per caption)")
+                    Button("Clear") { model.clearEmoji() }
+                }
+                .controlSize(.small)
+                Text("Pick single words yourself in the Script panel.").font(.caption).foregroundStyle(.secondary)
+            }
+            .padding(.top, 6)
+        }
+        .font(.subheadline)
     }
 }

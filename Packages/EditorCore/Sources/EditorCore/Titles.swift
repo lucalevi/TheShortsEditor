@@ -10,7 +10,10 @@ import Foundation
 public struct TextOverlay: Identifiable, Codable, Equatable, Sendable {
     public let id: UUID
     public var text: String
+    /// The ready-made look it started from.
     public var style: TitleStyle
+    /// How it actually looks: the style's look, plus any changes made to it.
+    public var look: TextLook
     public var entrance: TitleEntrance
     /// When it appears, on the timeline.
     public var start: CMTime
@@ -18,14 +21,18 @@ public struct TextOverlay: Identifiable, Codable, Equatable, Sendable {
     /// Where the middle of the title sits, from 0 (top of the screen) to 1 (bottom). Not clamped to
     /// the safe area: the user may put it anywhere, and export warns when it ends up covered.
     public var verticalPosition: Double
+    /// Where the middle of the title sits across, from 0 (left edge) to 1 (right edge).
+    public var horizontalPosition: Double
 
     public init(
-        id: UUID = UUID(), text: String, style: TitleStyle = .bold, entrance: TitleEntrance = .pop,
-        start: CMTime, duration: CMTime, verticalPosition: Double = TitlePlacement.top.verticalPosition
+        id: UUID = UUID(), text: String, style: TitleStyle = .bold, look: TextLook? = nil, entrance: TitleEntrance = .pop,
+        start: CMTime, duration: CMTime, verticalPosition: Double = TitlePlacement.top.verticalPosition, horizontalPosition: Double = 0.5
     ) {
         self.id = id
         self.text = text
         self.style = style
+        self.look = look ?? style.look
+        self.horizontalPosition = horizontalPosition
         self.entrance = entrance
         self.start = start
         self.duration = duration
@@ -34,6 +41,18 @@ public struct TextOverlay: Identifiable, Codable, Equatable, Sendable {
 
     public var end: CMTime { start + duration }
     public var range: CMTimeRange { CMTimeRange(start: start, duration: duration) }
+
+    /// Switches to another ready-made style. Its look replaces the current one, except for the
+    /// font, which stays (a brand font is usually wanted whatever the style).
+    public mutating func applyStyle(_ newStyle: TitleStyle) {
+        let font = look.fontFamily
+        style = newStyle
+        look = newStyle.look
+        look.fontFamily = font
+    }
+
+    /// Whether the look differs from the style it started from.
+    public var isCustomized: Bool { look != style.look }
 
     /// The part of the title that is on screen in `project`, or nil when it starts after the end.
     public func visibleRange(in project: Project) -> CMTimeRange? {
@@ -74,6 +93,12 @@ public enum TitleEntrance: String, Codable, CaseIterable, Identifiable, Sendable
     case pop
     /// Fades in, and fades out at the end.
     case fade
+    /// The letters appear one after another, as if typed.
+    case typewriter
+    /// Slides up into place while fading in.
+    case slideUp
+    /// Shrinks into place from big.
+    case zoom
     /// Just appears.
     case none
 
@@ -83,6 +108,9 @@ public enum TitleEntrance: String, Codable, CaseIterable, Identifiable, Sendable
         switch self {
         case .pop: "Pop"
         case .fade: "Fade"
+        case .typewriter: "Type"
+        case .slideUp: "Slide Up"
+        case .zoom: "Zoom"
         case .none: "None"
         }
     }
@@ -177,7 +205,7 @@ public extension Project {
 
 extension TextOverlay {
     private enum CodingKeys: String, CodingKey {
-        case id, text, style, entrance, start, duration, verticalPosition
+        case id, text, style, look, entrance, start, duration, verticalPosition, horizontalPosition
     }
 
     public init(from decoder: any Decoder) throws {
@@ -185,6 +213,8 @@ extension TextOverlay {
         id = try c.decode(UUID.self, forKey: .id)
         text = try c.decode(String.self, forKey: .text)
         style = try c.decode(TitleStyle.self, forKey: .style)
+        look = try c.decodeIfPresent(TextLook.self, forKey: .look) ?? style.look
+        horizontalPosition = try c.decodeIfPresent(Double.self, forKey: .horizontalPosition) ?? 0.5
         entrance = try c.decode(TitleEntrance.self, forKey: .entrance)
         start = try c.decodeTime(forKey: .start)
         duration = try c.decodeTime(forKey: .duration)
@@ -196,6 +226,8 @@ extension TextOverlay {
         try c.encode(id, forKey: .id)
         try c.encode(text, forKey: .text)
         try c.encode(style, forKey: .style)
+        try c.encode(look, forKey: .look)
+        try c.encode(horizontalPosition, forKey: .horizontalPosition)
         try c.encode(entrance, forKey: .entrance)
         try c.encode(time: start, forKey: .start)
         try c.encode(time: duration, forKey: .duration)

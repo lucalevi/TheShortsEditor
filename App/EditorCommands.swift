@@ -1,4 +1,5 @@
 import EditorCore
+import RenderEngine
 import SwiftUI
 
 /// Menu bar commands. Every keyboard shortcut lives here so it is also discoverable in a menu.
@@ -75,6 +76,16 @@ struct EditorCommands: Commands {
                 .disabled(selectedClips.allSatisfy(\.hasMotion))
             Button("Punch In on Every Other Cut") { model.punchInOnAlternateCuts() }
                 .disabled(model.project.timeline.clips.count < 2)
+            Menu("Speed") {
+                ForEach(Clip.speedPresets, id: \.self) { speed in
+                    Button(speed == 1 ? "Normal (1×)" : "\(speed.formatted())×") {
+                        model.setSpeed(speed, for: selectedClips.filter { model.project.asset(id: $0.assetID)?.isImage != true }.map(\.id))
+                    }
+                }
+            }
+            .disabled(selectedClips.isEmpty)
+            Button("Follow the Subject") { if let clip = selectedClips.first { model.followSubject(clip.id) } }
+                .disabled(selectedClips.count != 1 || model.reframing != nil)
             Menu("Motion") {
                 ForEach(MotionPreset.allCases) { preset in
                     Button(preset.displayName) { if let clip = model.adjustableClip { model.applyMotion(preset, to: clip.id) } }
@@ -109,6 +120,18 @@ struct EditorCommands: Commands {
         }
 
         CommandMenu("Sound") {
+            Button(model.isRecordingVoiceOver ? "Stop Recording" : "Record Voice-Over") {
+                if model.isRecordingVoiceOver { model.stopVoiceOver() } else { model.startVoiceOver() }
+            }
+            .keyboardShortcut("r", modifiers: [.command, .option])
+            .disabled(model.project.timeline.clips.isEmpty)
+            Menu("Add Sound Effect") {
+                ForEach(SoundEffect.allCases) { effect in
+                    Button(effect.displayName) { model.addSoundEffect(effect) }
+                }
+            }
+            .disabled(model.project.timeline.clips.isEmpty)
+            Divider()
             Button("Add Music…") { MusicImportPanel.run(model: model) }
                 .disabled(model.project.timeline.clips.isEmpty)
             Button("Remove Music") { model.removeMusic() }
@@ -121,8 +144,11 @@ struct EditorCommands: Commands {
             Divider()
             if let clip = model.selectedClip {
                 Toggle("Mute Clip", isOn: Binding(get: { clip.isMuted }, set: { model.setClipMuted(clip.id, $0) }))
+                Toggle("Clean Up Voice", isOn: Binding(get: { clip.cleansVoice }, set: { model.setCleansVoice($0, for: [clip.id]) }))
+                    .disabled(model.project.asset(id: clip.assetID)?.hasAudio != true)
             } else {
                 Button("Mute Clip") {}.disabled(true)
+                Button("Clean Up Voice") {}.disabled(true)
             }
         }
 

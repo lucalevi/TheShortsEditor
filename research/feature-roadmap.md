@@ -43,7 +43,7 @@ Why these twelve and not others: they cover the three kinds of Short completely 
 
 ---
 
-**Progress:** features 1–5 built on 2026-11-09 (one batch, see `STATUS.md`). Next: 6–12, when the user asks.
+**Progress:** features 1–5 and 6–12 built on 2026-11-09 (two batches, see `STATUS.md`). All twelve are done; next is §4 when the user asks.
 
 ## 3. Build order
 

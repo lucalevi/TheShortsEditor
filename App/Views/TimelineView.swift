@@ -51,6 +51,7 @@ struct TimelineView: View {
     private let titleRowHeight: CGFloat = 22
     private let overlayRowHeight: CGFloat = 40
     private let musicLaneHeight: CGFloat = 30
+    private let soundRowHeight: CGFloat = 26
     private let rowGap: CGFloat = 3
     private let leadingInset: CGFloat = 12
 
@@ -59,6 +60,9 @@ struct TimelineView: View {
     }
     private var overlayRows: [Clip.ID: Int] {
         LanePacking.rows(model.project.overlays.map { (id: $0.id, range: $0.range) })
+    }
+    private var soundRows: [Clip.ID: Int] {
+        LanePacking.rows(model.project.sounds.map { (id: $0.id, range: $0.range) })
     }
     private var titleRowCount: Int { LanePacking.count(titleRows) }
     private var overlayRowCount: Int { LanePacking.count(overlayRows) }
@@ -69,7 +73,9 @@ struct TimelineView: View {
     private var overlaysHeight: CGFloat { CGFloat(overlayRowCount) * (overlayRowHeight + rowGap) }
     private var clipsY: CGFloat { overlaysY + overlaysHeight + 2 }
     private var captionsY: CGFloat { clipsY + trackHeight + 6 }
-    private var musicY: CGFloat { captionsY + captionLaneHeight + 4 }
+    private var soundsY: CGFloat { captionsY + captionLaneHeight + 4 }
+    private var soundsHeight: CGFloat { CGFloat(LanePacking.count(soundRows)) * (soundRowHeight + 2) }
+    private var musicY: CGFloat { soundsY + soundsHeight + 2 }
     private var contentHeight: CGFloat { musicY + musicLaneHeight + 12 }
 
     private var pointsPerSecond: CGFloat { model.timelineZoom }
@@ -125,6 +131,7 @@ struct TimelineView: View {
                         overlayLane.offset(y: overlaysY)
                         clipsRow.offset(y: clipsY)
                         captionLane.offset(y: captionsY)
+                        soundLane.offset(y: soundsY)
                         musicLane.offset(y: musicY)
                         pauseCuts.offset(y: clipsY)
                         limitMarker
@@ -223,6 +230,7 @@ struct TimelineView: View {
             (.titles, titlesY, titlesHeight),
             (.overlays, overlaysY, overlaysHeight),
             (.clips, clipsY, trackHeight),
+            (.sounds, soundsY, soundsHeight),
             (.music, musicY, musicLaneHeight),
         ]
         let covered = Set(lanes.filter { _, y, height in rect.minY < y + height && rect.maxY > y }.map(\.0))
@@ -481,7 +489,7 @@ struct TimelineView: View {
             aspect: aspect(of: asset),
             filmstrip: model.filmstrips[overlay.clip.assetID],
             pointsPerSecond: pointsPerSecond,
-            sourceStart: overlay.clip.sourceStart + (start - overlay.start),
+            sourceStart: overlay.clip.sourceTime(atOffset: start - overlay.start),
             isSelected: model.isSelected(item),
             isAfterEnd: overlay.visibleRange(in: model.project) == nil
         )
@@ -625,9 +633,104 @@ struct TimelineView: View {
             model.trimOverlay(id, edge: .start, by: drag.delta)
         case (.overlay(let id), .end):
             model.trimOverlay(id, edge: .end, by: drag.delta)
+        case (.sound(let id), .move):
+            if let sound = model.project.sound(id: id) { model.moveSound(id, to: sound.start + drag.delta) }
+        case (.sound(let id), .start):
+            model.trimSound(id, edge: .start, by: drag.delta)
+        case (.sound(let id), .end):
+            model.trimSound(id, edge: .end, by: drag.delta)
         default:
             break
         }
+    }
+
+    // MARK: Sound effects and voice-overs
+
+    /// Sound effects and voice-overs, under the captions. Drop sound files here to add them.
+    private var soundLane: some View {
+        let rows = soundRows
+        return ZStack(alignment: .topLeading) {
+            Color.clear
+                .frame(width: max(contentWidth, 1), height: soundsHeight)
+                .contentShape(Rectangle())
+                .dropDestination(for: URL.self) { urls, location in
+                    model.importFiles(urls, to: .sound(at: time(at: location.x)))
+                    return true
+                }
+            if model.project.sounds.isEmpty, !model.project.timeline.clips.isEmpty {
+                Label("Sound effects and voice-overs go here (Sounds panel, or drop a sound file)", systemImage: "waveform")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .frame(height: soundRowHeight)
+                    .offset(x: leadingInset + 4)
+                    .allowsHitTesting(false)
+            }
+            ForEach(model.project.sounds) { sound in
+                soundView(sound, row: rows[sound.id] ?? 0)
+            }
+        }
+    }
+
+    private func soundView(_ sound: SoundClip, row: Int) -> some View {
+        let item = TimelineItem.sound(sound.id)
+        let (start, length) = shownRange(of: item, start: sound.start, duration: sound.duration)
+        let name = model.project.asset(id: sound.clip.assetID)?.name ?? "Missing"
+        let isSelected = model.isSelected(item)
+        return RoundedRectangle(cornerRadius: 4)
+            .fill((sound.isVoiceOver ? Color.pink : Color.indigo).opacity(isSelected ? 0.6 : 0.4))
+            .overlay(alignment: .bottom) {
+                if let levels = model.audioLevels[sound.clip.assetID] {
+                    WaveformView(levels: levels, sourceStart: sound.clip.sourceTime(atOffset: start - sound.start),
+                                 pointsPerSecond: pointsPerSecond / CGFloat(sound.clip.speed))
+                        .frame(height: soundRowHeight - 12)
+                        .opacity(sound.clip.isMuted ? 0.3 : 0.8)
+                }
+            }
+            .overlay(alignment: .topLeading) {
+                Label(name, systemImage: sound.isVoiceOver ? "mic.fill" : "waveform")
+                    .font(.caption2.weight(.medium))
+                    .lineLimit(1)
+                    .padding(.horizontal, 4)
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 4))
+            .overlay {
+                RoundedRectangle(cornerRadius: 4)
+                    .strokeBorder(isSelected ? Color.yellow : Color.white.opacity(0.4), lineWidth: isSelected ? 2 : 1)
+            }
+            .overlay(alignment: .leading) {
+                EdgeHandle(edge: .leading, help: "Drag to trim the start") { dx in
+                    updateBlockDrag(item, kind: .start, points: dx, start: sound.start, duration: sound.duration)
+                } onEnd: { endBlockDrag() }
+            }
+            .overlay(alignment: .trailing) {
+                EdgeHandle(edge: .trailing, help: "Drag to trim the end") { dx in
+                    updateBlockDrag(item, kind: .end, points: dx, start: sound.start, duration: sound.duration)
+                } onEnd: { endBlockDrag() }
+            }
+            .frame(width: max(width(of: length) - 2, 6), height: soundRowHeight)
+            .contentShape(Rectangle())
+            .offset(x: x(for: start) + 1, y: CGFloat(row) * (soundRowHeight + 2))
+            .zIndex(blockDrag?.item == item ? 1 : 0)
+            .onTapGesture {
+                let modifiers = NSEvent.modifierFlags
+                if modifiers.isDisjoint(with: [.command, .shift]) { model.selectSound(sound.id) } else { model.click(item, modifiers: modifiers) }
+            }
+            .gesture(DragGesture(minimumDistance: 3)
+                .onChanged { value in updateBlockDrag(item, kind: .move, points: value.translation.width, start: sound.start, duration: sound.duration) }
+                .onEnded { _ in endBlockDrag() })
+            .contextMenu {
+                Button("Split at Playhead") {
+                    model.selection = item
+                    model.splitAtPlayhead()
+                }
+                Button("Start at Playhead") { model.moveSound(sound.id, to: model.currentTime) }
+                Divider()
+                deleteButton(for: item, single: "Delete")
+            }
+            .help("\(sound.isVoiceOver ? "Voice-over" : "Sound"): \(name). Drag to move, drag an edge to trim.")
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("\(sound.isVoiceOver ? "Voice-over" : "Sound"): \(name)")
+            .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 
     // MARK: Captions, music, pauses
@@ -872,7 +975,7 @@ private struct OverlayBlock: View {
         RoundedRectangle(cornerRadius: 5)
             .fill(Color.teal.opacity(0.35))
             .overlay {
-                FilmstripView(filmstrip: filmstrip, sourceStart: sourceStart, pointsPerSecond: pointsPerSecond, aspect: aspect)
+                FilmstripView(filmstrip: filmstrip, sourceStart: sourceStart, pointsPerSecond: pointsPerSecond / CGFloat(overlay.clip.speed), aspect: aspect)
                     .opacity(0.75)
             }
             .overlay(alignment: .topLeading) {
@@ -925,13 +1028,13 @@ private struct ClipBlock: View, Equatable {
         RoundedRectangle(cornerRadius: 6)
             .fill(Color.accentColor.opacity(0.25))
             .overlay(alignment: .top) {
-                FilmstripView(filmstrip: filmstrip, sourceStart: clip.sourceStart, pointsPerSecond: pointsPerSecond, aspect: aspect)
+                FilmstripView(filmstrip: filmstrip, sourceStart: clip.sourceStart, pointsPerSecond: pointsPerSecond / CGFloat(clip.speed), aspect: aspect)
                     .padding(.bottom, levels == nil ? 0 : waveHeight)
                     .opacity(0.85)
             }
             .overlay(alignment: .bottom) {
                 if let levels {
-                    WaveformView(levels: levels, sourceStart: clip.sourceStart, pointsPerSecond: pointsPerSecond)
+                    WaveformView(levels: levels, sourceStart: clip.sourceStart, pointsPerSecond: pointsPerSecond / CGFloat(clip.speed))
                         .frame(height: waveHeight - 2)
                         .padding(.bottom, 1)
                         .background(Color.black.opacity(0.35))
@@ -945,7 +1048,7 @@ private struct ClipBlock: View, Equatable {
                         .font(.system(size: 8))
                         .foregroundStyle(.yellow)
                         .shadow(color: .black, radius: 1)
-                        .offset(x: CGFloat((keyframe.time - clip.sourceStart).seconds) * pointsPerSecond - 4, y: -waveHeight - 1)
+                        .offset(x: CGFloat(clip.timelineOffset(ofSourceTime: keyframe.time).seconds) * pointsPerSecond - 4, y: -waveHeight - 1)
                 }
             }
             .overlay(alignment: .topLeading) {
@@ -957,6 +1060,12 @@ private struct ClipBlock: View, Equatable {
                             Image(systemName: "speaker.slash.fill").help("Muted")
                         } else if clip.volume != 1 {
                             Text("\(Int((clip.volume * 100).rounded()))%").help("Volume")
+                        }
+                        if clip.speed != 1 {
+                            Text("\(clip.speed.formatted(.number.precision(.fractionLength(0...2))))×").help("Speed")
+                        }
+                        if clip.cleansVoice {
+                            Image(systemName: "waveform.badge.magnifyingglass").help("Voice cleaned up")
                         }
                         if clip.hasMotion {
                             Image(systemName: "move.3d").help("The picture moves")

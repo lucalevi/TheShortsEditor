@@ -26,11 +26,13 @@ public struct Project: Codable, Equatable, Sendable {
     /// Pictures over the main clips (B-roll, picture-in-picture). Drawn in this order, so later
     /// ones are on top.
     public var overlays: [Overlay] = []
+    /// Sound effects and voice-overs.
+    public var sounds: [SoundClip] = []
 
     public init() {}
 
     private enum CodingKeys: String, CodingKey {
-        case assets, timeline, transcripts, captions, titles, music, overlays
+        case assets, timeline, transcripts, captions, titles, music, overlays, sounds
     }
 
     /// Reads what older versions saved too: anything they didn't have yet starts empty.
@@ -43,6 +45,7 @@ public struct Project: Codable, Equatable, Sendable {
         titles = try c.decodeIfPresent([TextOverlay].self, forKey: .titles) ?? []
         music = try c.decodeIfPresent(BackgroundMusic.self, forKey: .music)
         overlays = try c.decodeIfPresent([Overlay].self, forKey: .overlays) ?? []
+        sounds = try c.decodeIfPresent([SoundClip].self, forKey: .sounds) ?? []
     }
 
     public var duration: CMTime { timeline.duration }

@@ -7,13 +7,13 @@ import Foundation
 /// The captions of a whole Short, ready to draw: pages plus how they look and where they go.
 nonisolated struct CaptionTrack: Sendable {
     let pages: [CaptionPage]
-    let style: CaptionStyle
-    let verticalPosition: Double
+    let settings: CaptionSettings
+    var style: CaptionStyle { settings.style }
+    var verticalPosition: Double { settings.verticalPosition }
 
     init(project: Project) {
         pages = project.captions.isVisible ? CaptionLayout.pages(in: project) : []
-        style = project.captions.style
-        verticalPosition = project.captions.verticalPosition
+        settings = project.captions
     }
 
     /// What to draw at `time`: the page, the word being spoken, and how far the page's
@@ -55,6 +55,23 @@ nonisolated enum CaptionRenderer {
         var pops = false
     }
 
+    /// The colour key words get when no accent is chosen: one that differs from the spoken word's.
+    static func keywordColor(for style: CaptionStyle) -> RGBA {
+        style == .bold ? RGBA(0.35, 0.95, 0.45) : .yellow
+    }
+
+    /// The style's look with the user's changes (font size, colours).
+    private static func look(for settings: CaptionSettings) -> Look {
+        var look = look(for: settings.style)
+        look.fontSize *= CGFloat(min(max(settings.sizeScale, CaptionSettings.sizeRange.lowerBound), CaptionSettings.sizeRange.upperBound))
+        if let text = settings.textColor { look.text = TitleRenderer.cgColor(text) }
+        if let accent = settings.accentColor {
+            if look.currentWord != nil { look.currentWord = TitleRenderer.cgColor(accent) }
+            if look.wordBox != nil { look.wordBox = TitleRenderer.cgColor(accent) }
+        }
+        return look
+    }
+
     private static func look(for style: CaptionStyle) -> Look {
         switch style {
         case .bold:
@@ -72,22 +89,36 @@ nonisolated enum CaptionRenderer {
 
     static func animates(_ style: CaptionStyle) -> Bool { look(for: style).pops }
 
-    /// The page as an image, with `currentWord` emphasised when the style does that.
+    /// The page as an image, with `currentWord` emphasised when the style does that, the words at
+    /// `keywords` in the accent colour, and `emoji` above.
     static func image(words: [String], currentWord: Int?, style: CaptionStyle) -> CGImage? {
-        var look = look(for: style)
+        var settings = CaptionSettings()
+        settings.style = style
+        return image(words: words, keywords: [], currentWord: currentWord, emoji: nil, settings: settings)
+    }
+
+    static func image(words: [String], keywords: Set<Int>, currentWord: Int?, emoji: String?, settings: CaptionSettings) -> CGImage? {
+        let style = settings.style
+        var look = look(for: settings)
+        let family = settings.fontFamily
         let shown = words.map { style.isUppercase ? $0.uppercased() : $0 }
         let text = shown.joined(separator: " ")
         guard !text.isEmpty else { return nil }
         if look.pops {
             // The punchy styles read best on one line: shrink a long page a little rather than wrap it.
-            let plain = CFAttributedStringCreate(nil, text as CFString, [kCTFontAttributeName: makeFont(size: look.fontSize, weight: look.weight)] as CFDictionary)!
+            let plain = CFAttributedStringCreate(nil, text as CFString, [kCTFontAttributeName: makeFont(size: look.fontSize, weight: Double(look.weight), family: family)] as CFDictionary)!
             let kerning = look.wordBox == nil ? 0 : look.fontSize * 0.22 * CGFloat(shown.count - 1)
             let width = CTLineGetTypographicBounds(CTLineCreateWithAttributedString(plain), nil, nil, nil) + kerning + look.fontSize * 0.1
-            if width > maxWidth {
-                look.fontSize = max(look.fontSize * maxWidth / width, look.fontSize * 0.7).rounded(.down)
+            // The spoken word is drawn a little bigger: leave room for it.
+            let needed = style.highlightsCurrentWord ? width * 1.12 : width
+            if needed > maxWidth {
+                look.fontSize = max(look.fontSize * maxWidth / needed, look.fontSize * 0.7).rounded(.down)
             }
         }
-        let font = makeFont(size: look.fontSize, weight: look.weight)
+        let font = makeFont(size: look.fontSize, weight: Double(look.weight), family: family)
+        // The spoken word grows a little in the punchy styles.
+        let bigFont = look.pops && style.highlightsCurrentWord ? makeFont(size: look.fontSize * 1.12, weight: Double(look.weight), family: family) : font
+        let keywordColor = TitleRenderer.cgColor(settings.accentColor ?? keywordColor(for: style))
 
         // Where each word is in the string, for colouring and boxing the current one.
         var wordRanges: [CFRange] = []
@@ -116,12 +147,20 @@ nonisolated enum CaptionRenderer {
                     CFAttributedStringSetAttribute(string, CFRange(location: range.location + range.length, length: 1), kCTKernAttributeName, look.fontSize * 0.22 as NSNumber)
                 }
             }
+            if let current, bigFont !== font {
+                CFAttributedStringSetAttribute(string, current, kCTFontAttributeName, bigFont)
+            }
             if stroke {
                 CFAttributedStringSetAttribute(string, all, kCTForegroundColorAttributeName, CGColor(red: 0, green: 0, blue: 0, alpha: 1))
                 CFAttributedStringSetAttribute(string, all, kCTStrokeColorAttributeName, CGColor(red: 0, green: 0, blue: 0, alpha: 1))
                 CFAttributedStringSetAttribute(string, all, kCTStrokeWidthAttributeName, look.outline as NSNumber)
             } else {
                 CFAttributedStringSetAttribute(string, all, kCTForegroundColorAttributeName, look.text)
+                if settings.showsKeywords {
+                    for index in keywords where wordRanges.indices.contains(index) {
+                        CFAttributedStringSetAttribute(string, wordRanges[index], kCTForegroundColorAttributeName, keywordColor)
+                    }
+                }
                 if let current, let color = look.currentWord {
                     CFAttributedStringSetAttribute(string, current, kCTForegroundColorAttributeName, color)
                 }
@@ -137,8 +176,14 @@ nonisolated enum CaptionRenderer {
         )
         let textSize = CGSize(width: ceil(suggested.width) + 2, height: ceil(suggested.height) + 2)
         let padding = ceil(look.fontSize * 0.4)
-        let size = CGSize(width: textSize.width + padding * 2, height: textSize.height + padding * 2)
-        let textRect = CGRect(origin: CGPoint(x: padding, y: padding), size: textSize)
+        // Room above the text for the emoji.
+        let emojiLine: CTLine? = settings.showsEmoji ? emoji.map { emoji in
+            let emojiFont = CTFontCreateWithName("AppleColorEmoji" as CFString, look.fontSize * 1.05, nil)
+            return CTLineCreateWithAttributedString(CFAttributedStringCreate(nil, emoji as CFString, [kCTFontAttributeName: emojiFont] as CFDictionary)!)
+        } : nil
+        let emojiHeight: CGFloat = emojiLine == nil ? 0 : ceil(look.fontSize * 1.3)
+        let size = CGSize(width: max(textSize.width + padding * 2, emojiHeight * 1.6), height: textSize.height + padding * 2 + emojiHeight)
+        let textRect = CGRect(origin: CGPoint(x: (size.width - textSize.width) / 2, y: padding), size: textSize)
 
         guard let context = CGContext(
             data: nil, width: Int(size.width), height: Int(size.height), bitsPerComponent: 8, bytesPerRow: 0,
@@ -170,6 +215,12 @@ nonisolated enum CaptionRenderer {
             context.setShadow(offset: CGSize(width: 0, height: -4), blur: 14, color: CGColor(red: 0, green: 0, blue: 0, alpha: 0.85))
         }
         CTFrameDraw(frame, context)
+        if let emojiLine {
+            let width = CTLineGetTypographicBounds(emojiLine, nil, nil, nil)
+            context.setShadow(offset: .zero, blur: 0, color: nil)
+            context.textPosition = CGPoint(x: (size.width - width) / 2, y: textRect.maxY + emojiHeight * 0.18)
+            CTLineDraw(emojiLine, context)
+        }
         return context.makeImage()
     }
 
@@ -198,6 +249,21 @@ nonisolated enum CaptionRenderer {
         return result
     }
 
+    /// A font of `family` (bold when `weight` is above 0.3), or the system font at `weight` when
+    /// there is no family or it isn't installed.
+    static func makeFont(size: CGFloat, weight: Double, family: String?) -> CTFont {
+        if let family, !family.isEmpty {
+            var attributes: [CFString: Any] = [kCTFontFamilyNameAttribute: family]
+            if weight > 0.3 { attributes[kCTFontTraitsAttribute] = [kCTFontSymbolicTrait: CTFontSymbolicTraits.traitBold.rawValue] }
+            let wanted = CTFontDescriptorCreateWithAttributes(attributes as CFDictionary)
+            let mandatory: Set<CFString> = [kCTFontFamilyNameAttribute]
+            if let match = CTFontDescriptorCreateMatchingFontDescriptor(wanted, mandatory as CFSet) {
+                return CTFontCreateWithFontDescriptor(match, size, nil)
+            }
+        }
+        return makeFont(size: size, weight: CGFloat(weight))
+    }
+
     static func makeFont(size: CGFloat, weight: CGFloat) -> CTFont {
         let base = CTFontCreateUIFontForLanguage(.system, size, nil)!
         let traits = [kCTFontWeightTrait: weight] as CFDictionary
@@ -213,5 +279,22 @@ nonisolated enum CaptionRenderer {
 public enum CaptionPreview {
     public static func image(for style: CaptionStyle) -> CGImage? {
         CaptionRenderer.image(words: style == .oneWord ? ["Wow"] : ["Make", "it", "pop"], currentWord: 1, style: style)
+    }
+
+    /// A sample with the Short's own caption settings (font, size, colours), a key word and an emoji.
+    public static func image(for settings: CaptionSettings) -> CGImage? {
+        CaptionRenderer.image(words: settings.style == .oneWord ? ["Wow"] : ["Make", "it", "pop"], keywords: settings.style == .oneWord ? [] : [2],
+                              currentWord: 1, emoji: "🔥", settings: settings)
+    }
+
+    /// Where the caption on screen at `time` is (canvas pixels, origin top left), for dragging it.
+    public static func frame(in project: Project, at time: CMTime) -> CGRect? {
+        let track = CaptionTrack(project: project)
+        guard let state = track.state(at: time),
+              let image = CaptionRenderer.image(words: state.page.words.map(\.text), keywords: [], currentWord: nil,
+                                                emoji: state.page.emoji, settings: track.settings)
+        else { return nil }
+        let size = CGSize(width: image.width, height: image.height)
+        return CGRect(x: (Project.canvasSize.width - size.width) / 2, y: track.top(forHeight: size.height), width: size.width, height: size.height)
     }
 }

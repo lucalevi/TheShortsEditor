@@ -27,6 +27,10 @@ struct MediaBrowserView: View {
             }
             if assets.count == 1, let asset = assets.first, asset.hasAudio {
                 Button(asset.hasVideo ? "Use Its Sound as Music" : "Use as Music") { model.useAsMusic(asset.id) }
+                if !asset.hasVideo {
+                    Button("Add as Sound Effect at Playhead") { model.addSound(asset.id) }
+                        .disabled(model.project.timeline.clips.isEmpty)
+                }
             }
         } primaryAction: { ids in
             ids.forEach(model.appendToTimeline)
@@ -74,6 +78,8 @@ struct SidebarView: View {
                 switch model.sidebar {
                 case .media: MediaBrowserView(model: model)
                 case .captions: CaptionsView(model: model)
+                case .script: ScriptView(model: model)
+                case .sounds: SoundsView(model: model)
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)

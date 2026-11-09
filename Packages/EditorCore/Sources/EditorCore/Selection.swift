@@ -6,12 +6,14 @@ public enum TimelineItem: Hashable, Sendable {
     case title(TextOverlay.ID)
     /// A clip over the main clips (B-roll, picture-in-picture).
     case overlay(Clip.ID)
+    /// A sound effect or voice-over.
+    case sound(Clip.ID)
     case music
 }
 
 /// The rows of the timeline, top to bottom, for picking items with a rectangle.
 public enum TimelineLane: Hashable, Sendable, CaseIterable {
-    case titles, overlays, clips, music
+    case titles, overlays, clips, sounds, music
 }
 
 /// What is selected on the timeline: any mix of clips, titles and the music.
@@ -83,6 +85,7 @@ public extension Project {
         case .clip(let id): timeline.index(of: id) != nil
         case .title(let id): title(id: id) != nil
         case .overlay(let id): overlay(id: id) != nil
+        case .sound(let id): sound(id: id) != nil
         case .music: music != nil
         }
     }
@@ -92,6 +95,7 @@ public extension Project {
         var items = Set(timeline.clips.map { TimelineItem.clip($0.id) })
         items.formUnion(titles.map { .title($0.id) })
         items.formUnion(overlays.map { .overlay($0.id) })
+        items.formUnion(sounds.map { .sound($0.id) })
         if musicRange != nil { items.insert(.music) }
         return items
     }
@@ -114,6 +118,9 @@ public extension Project {
         if lanes.contains(.overlays) {
             for overlay in overlays where overlaps(overlay.start, overlay.end) { items.insert(.overlay(overlay.id)) }
         }
+        if lanes.contains(.sounds) {
+            for sound in sounds where overlaps(sound.start, sound.end) { items.insert(.sound(sound.id)) }
+        }
         if lanes.contains(.music), let music = musicRange, overlaps(music.start, music.end) {
             items.insert(.music)
         }
@@ -127,6 +134,7 @@ public extension Project {
             case .clip(let id): timeline.remove(id)
             case .title(let id): removeTitle(id)
             case .overlay(let id): removeOverlay(id)
+            case .sound(let id): removeSound(id)
             case .music: music = nil
             }
         }

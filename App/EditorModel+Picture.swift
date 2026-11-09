@@ -48,7 +48,7 @@ extension EditorModel {
     /// Where a keyframe is on the timeline, for going to it.
     func timelineTime(of keyframe: Keyframe, in clipID: Clip.ID) -> CMTime? {
         guard let clip = project.anyClip(id: clipID), let start = project.timelineStart(ofClip: clipID) else { return nil }
-        return start + (keyframe.time - clip.sourceStart)
+        return start + clip.timelineOffset(ofSourceTime: keyframe.time)
     }
 
     // MARK: Trimming

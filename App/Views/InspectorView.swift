@@ -11,6 +11,7 @@ struct InspectorView: View {
                         : model.timelineSelection.count > 1 ? "\(model.timelineSelection.count) Selected"
                         : model.selectedTitle != nil ? "Title"
                         : model.selectedOverlay != nil ? "Over the Clips"
+                        : model.selectedSound != nil ? (model.selectedSound!.isVoiceOver ? "Voice-Over" : "Sound Effect")
                         : model.selection == .music && model.project.music != nil ? "Music"
                         : model.selectedClip == nil ? "Your Short" : "Clip")
             ScrollView {
@@ -26,6 +27,9 @@ struct InspectorView: View {
                             .id(title.id)
                     } else if let overlay = model.selectedOverlay {
                         OverlayInspector(model: model, overlay: overlay)
+                    } else if let sound = model.selectedSound {
+                        SoundInspector(model: model, sound: sound)
+                            .id(sound.id)
                     } else if let clip = model.selectedClip {
                         ClipInspector(model: model, clip: clip)
                     } else {
@@ -104,6 +108,11 @@ private struct MultipleInspector: View {
                 }
             }
 
+            let videoClips = clips.filter { model.project.asset(id: $0.assetID)?.isImage != true }
+            if !videoClips.isEmpty {
+                SpeedSection(model: model, clips: videoClips)
+            }
+
             Button("Delete All Selected", systemImage: "trash", role: .destructive) { model.deleteSelection() }
 
             Text("⌘-click adds or removes one item. ⇧-click adds the clips in between. Drag across empty space on the timeline to select with a rectangle.")
@@ -141,8 +150,16 @@ private struct ClipInspector: View {
 
             MotionSection(model: model, clip: clip)
 
+            if asset?.isImage != true {
+                SpeedSection(model: model, clips: [clip])
+                    .id(clip.id)
+            }
+
             ClipSound(model: model, clip: clip, hasSound: asset?.hasAudio ?? false)
                 .id(clip.id)
+            if asset?.hasAudio == true {
+                CleanVoiceToggle(model: model, clips: [clip])
+            }
 
             HStack {
                 Button("Split at Playhead", systemImage: "scissors") { model.splitAtPlayhead() }
@@ -223,10 +240,17 @@ private struct OverlayInspector: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
 
+            LayoutSection(model: model, overlay: overlay)
+
             PictureSection(model: model, clip: overlay.clip, isMain: false)
                 .id(overlay.id)
 
             MotionSection(model: model, clip: overlay.clip)
+
+            if asset?.isImage != true {
+                SpeedSection(model: model, clips: [overlay.clip])
+                    .id(overlay.id)
+            }
 
             if asset?.hasAudio == true {
                 VStack(alignment: .leading, spacing: 6) {
@@ -234,6 +258,7 @@ private struct OverlayInspector: View {
                     if !overlay.clip.isMuted {
                         ClipSound(model: model, clip: overlay.clip, hasSound: true)
                             .id(overlay.id)
+                        CleanVoiceToggle(model: model, clips: [overlay.clip])
                     }
                 }
             }

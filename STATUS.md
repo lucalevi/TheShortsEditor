@@ -18,7 +18,36 @@ Stages 1–7 are done, tested on screen, committed and pushed to https://github.
 
 **Pick up here:** the P0 list from the research is complete. On 2026-11-09 CapCut was analysed (`research/capcut-reverse-engineering.md`) and creator tool usage researched (`research/shorts-creator-tools-research.md`, with a gap table in §5), then distilled into the build list `research/feature-roadmap.md` (12 features, stages 8–16).
 
-### Batch "features 1–5" (2026-11-09): done, waiting for the user
+### Batch "features 6–12" (2026-11-09): done, not committed yet
+
+Features 1–5 are committed (`b764acb`). The user then asked for 6–12 in one go; a usage limit interrupted it once, then it was finished. All seven are built, tested and checked on screen. **Not committed yet** (the user commits each batch).
+
+| # | Feature | Model + tests | Rendering + tests | UI | On screen |
+|---|---|---|---|---|---|
+| 6 | Speed | ✅ | ✅ | ✅ | ✅ |
+| 7 | Text design | ✅ | ✅ | ✅ | ✅ |
+| 8 | Captions that pop | ✅ | ✅ | ✅ | ✅ |
+| 9 | Edit by text | ✅ | — | ✅ | ✅ |
+| 10 | Sound layer | ✅ | ✅ | ✅ | ✅ |
+| 11 | Auto reframe | ✅ | ✅ | ✅ | ✅ |
+| 12 | Layouts | ✅ | ✅ | ✅ | ✅ |
+
+Tests: 175 model + 54 render + 3 transcription = 232, all pass (`make test`).
+
+What 6–12 added:
+- **Speed** (Clip ▸ Speed, inspector Speed section with 0.5/1/1.25/1.5/2× and a slider 0.25–4×; also for B-roll and several selected clips): `Clip.speed`, `duration` stays the timeline length and the source covers `duration × speed`; voices keep their pitch (spectral pitch algorithm in the player, export and loudness meter). Captions, pauses, keyframes, trimming and splitting all follow the speed. Clips show "2×".
+- **Text design** (title inspector Design section): font (installed families, plus Add Fonts… which copies font files into the app's folder and registers them for the app at each launch), Bold, all capitals, size 40–220, colours for letters / outline / box (a palette of 11 named colours plus None), a box per line, shadow, Reset to the style. Titles can be dragged anywhere in the viewer (sticks to the centre across; "Centre Across" button). New entrances: Type (typewriter), Slide Up, Zoom. **My Styles**: Save Style… keeps the look and entrance for every Short (UserDefaults), apply or delete from the menu. Choosing a style replaces the look but keeps the font.
+- **Captions that pop** (Captions panel ▸ Design, key words & emoji, which scrolls inside the settings area): font, size 60–160%, letters and accent colours ("None" = the style's), Pick Key Words (numbers, names, long words, about one in seven; heuristic, 4 languages), Suggest Emoji (a dictionary of ~45 concepts in EN/IT/DE/FR, at most one per caption, drawn above it), show/hide toggles. The spoken word is a little bigger in Bold/Highlight. Captions can be dragged up/down in the viewer (kept clear of YouTube's areas).
+- **Script panel** (new sidebar tab): the transcript as words, one paragraph per clip; click goes there, ⇧-click selects a range, ⌘-click toggles; ⌫ or Cut removes the words and the pause after each from the video (as a `SilencePlan`, like Remove Pauses); Highlight marks key words; an emoji menu for a single word; Remove N Filler Words cuts "um/eh/äh/euh…" and words said twice (dotted underline). Needs captions to exist.
+- **Sounds** (new sidebar tab, sounds row under the captions, Sound menu): 7 built-in effects (Whoosh, Swipe, Pop, Click, Ding, Riser, Boom) synthesized by the app the first time (`SoundEffect`, no licensing), listen/add at playhead; sound files from Media (right-click ▸ Add as Sound Effect) or dropped on the sounds row. Drag, trim, split, delete like B-roll; overlapping ones stack. **Record Voice-Over** (⌥⌘R or the panel): microphone permission, 3-2-1 countdown, the Short plays silently from the playhead, stop with Space/Escape/the button or at the end; becomes a voice-over sound (pink, mic icon), and the music is lowered under voice-overs. Recordings go to Application Support/Shorts Editor/Voice-overs.
+- **Clean up voice** (clip/B-roll/voice-over inspector toggle, Sound ▸ Clean Up Voice): Apple's voice isolation (AUSoundIsolation) renders a lossless cleaned copy of the file once (Caches/Shorts Editor/Clean Voice, keyed by path+size+date), used in playback and export. Progress shown in the inspector.
+- **Follow the Subject** (Picture section on horizontal clips, Clip menu): Vision faces (biggest) or attention saliency, every 0.25 s, smoothed over ±0.8 s, keyframes every 0.5 s with redundant ones dropped; sets Fill screen. A still subject gives one fixed crop.
+- **Layouts** (B-roll inspector Layout): Over / Top Half / Bottom Half (split screen: each clip fills its half, `Project.regions(at:)`), and Top Left/Top Right/Bottom Left/Bottom Right picture-in-picture placed clear of YouTube's covered areas. Viewer handles work inside the halves.
+
+Verified on screen (2026-11-09, test Short): Whoosh added from the Sounds tab at the playhead (sounds row with waveform, inspector); 2× speed from the Clip menu (3.5 → 1.8 s, badge); Top Half split screen; Top Right corner; title added, letters made yellow, dragged left/down, Reset appears; captions made from the Script tab; caption settings scroll (fixed a layout bug where they pushed the window); cutting "Hey everyone," from the Script (talking clip 11.8 → 11.0 s, captions follow); Pick Key Words + Suggest Emoji (bold/underlined key words and 👀 in the Script); Follow the Subject on the horizontal clip; Clean Up Voice (cleaned in seconds, badge on clip); voice-over: countdown, recording, auto-stop at the end, voice-over on the sounds row; relaunch keeps everything (file version 3).
+Not yet verified on screen (6–12): the font menu and Add Fonts… (NSMenu pop-ups block `ui.sh`; press Escape after), My Styles, Type/Slide Up/Zoom entrances watched during playback, dragging captions in the viewer, key-word colour on a caption that isn't being spoken (render test checks it), emoji above a caption in the viewer (render test), Remove Filler Words on real speech (the synthetic voices have none), split screen in an export, a voice-over with real speech and ducking heard.
+
+### Batch "features 1–5" (2026-11-09): done and committed
 
 The user asked for the first five of the twelve roadmap features in one go, then to **stop and ask** before going on (next would be 6 speed, 7 text design, 8 captions that pop, 9 edit by text, 10 sound layer, 11 auto reframe, 12 layouts). All five are built, tested and checked on screen; **not committed yet** (the user commits each stage).
 
@@ -111,7 +140,8 @@ The P0 list from `research/shorts-editor-research.md` §5. Each stage ends with 
 5. ~~Audio~~ (done, stage 6): clip volume, music with fades and ducking, loudness on export.
 6. ~~Save/open projects~~ (done, stage 7).
 7. **Roadmap features 1–5 done** (2026-11-09, `research/feature-roadmap.md`): timeline you can touch, B-roll, pictures, framing in the viewer, motion.
-8. **Next (ask the user first):** features 6–12: speed, text design, captions that pop, edit by text, sound layer, auto reframe, layouts (top/bottom split; mostly placement presets now that B-roll exists).
+8. **Roadmap features 6–12 done** (2026-11-09): speed, text design, captions that pop, edit by text, sound layer, auto reframe, layouts.
+9. **Next (ask the user first):** the "next 20%" in `research/feature-roadmap.md` §4: markers and beats, filters/adjustments, a few transitions and effects, loop preview and cover frame, long video → Shorts, background removal, text to speech, stickers, templates, copy/paste clip settings.
 
 ## Open questions for the user
 
@@ -130,7 +160,11 @@ The P0 list from `research/shorts-editor-research.md` §5. Each stage ends with 
 - SwiftUI text fields hand the old value back to their binding as focus leaves. Editing fields that save on end (caption lines, title text) only accept changes while focused; otherwise what was typed is lost.
 - Saving: one window, one Short at a time (no DocumentGroup: the single-window model, shared `EditorModel` and Finder media import made a custom store simpler). No versions browser and no "Revert". Media bookmarks are app-scoped, so a project copied to another Mac (or user) needs Find Missing Files… there. Writing tries an atomic write first and falls back to a plain one if the sandbox refuses the temporary file. In an Open panel a folder has to be *selected* (not just opened) for "Use" to work, as everywhere in macOS. `screencapture` of the app window misses separate windows (Open panel, alerts): capture their region (`System Events … get {position, size} of windows`).
 - Sound files can only be the music, not clips. Animated GIFs show their first frame only.
-- B-roll sound isn't counted as speech for ducking, and B-roll isn't transcribed for captions. Overlays are timeline-timed (like titles), not attached to the clip under them, so moving a main clip doesn't move its B-roll.
+- B-roll sound isn't counted as speech for ducking, and B-roll isn't transcribed for captions. Voice-overs count as speech for their whole length (not by loudness) and aren't transcribed either.
+- Key words and emoji are picked by simple rules (no language model); "welcome"/"showing" can be picked. Emoji dictionary is small. Filler words are sounds only ("um", "eh"…), not real words used as fillers ("like", "allora").
+- Voice clean-up copies are kept in Caches and remade if missing; a project opened on another Mac re-cleans when the toggle is switched off and on.
+- Speed has no ramps/curves and no smooth slow motion (frame blending). Reversed clips don't exist.
+- Split screen is top/bottom halves only, and only the topmost split B-roll at a time decides it. Overlays are timeline-timed (like titles), not attached to the clip under them, so moving a main clip doesn't move its B-roll.
 - Live preview while dragging a picture redraws the frame by seeking to the same time; during playback it isn't shown (dragging pauses).
 - Keyframes animate placement only (not opacity or volume). The handles' corner squares are kept inside the viewer, so on a picture bigger than the screen they sit at the edge, not at the true corner.
 - Filmstrip and waveform are drawn per clip with Canvas; very long clips at high zoom draw many stills (no tiling yet).

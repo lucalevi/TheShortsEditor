@@ -95,7 +95,7 @@ public enum AudioMix {
             let threshold = max(audio.suggestedThreshold, quietestSpeech)
             let sourceFirst = clip.sourceStart.convertScale(Project.frameRate, method: .roundHalfAwayFromZero).value
             for offset in 0..<clipFrames {
-                let index = Int(sourceFirst + offset)
+                let index = Int(sourceFirst + Int64((Double(offset) * clip.speed).rounded(.down)))
                 if index >= 0, index < audio.decibels.count, audio.decibels[index] >= threshold {
                     frames.append(clipStart + offset)
                 }
@@ -111,9 +111,21 @@ public enum AudioMix {
                 runs.append((frame, frame + 1))
             }
         }
-        return runs.filter { $0.end - $0.start >= shortest }.map {
+        let speech = runs.filter { $0.end - $0.start >= shortest }.map {
             CMTimeRange(start: CMTime(value: $0.start, timescale: Project.frameRate), end: CMTime(value: $0.end, timescale: Project.frameRate))
         }
+        // Voice-overs count as speech for their whole length.
+        let voiceOvers = project.voiceOverRanges
+        guard !voiceOvers.isEmpty else { return speech }
+        var merged: [CMTimeRange] = []
+        for range in (speech + voiceOvers).sorted(by: { $0.start < $1.start }) {
+            if let last = merged.last, range.start <= last.end + bridgedGap {
+                merged[merged.count - 1] = CMTimeRange(start: last.start, end: max(last.end, range.end))
+            } else {
+                merged.append(range)
+            }
+        }
+        return merged
     }
 
     /// The song's volume over the timeline: its own volume, faded in and out, and lowered around

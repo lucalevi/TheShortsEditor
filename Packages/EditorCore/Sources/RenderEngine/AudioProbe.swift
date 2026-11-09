@@ -20,6 +20,7 @@ public enum AudioProbe {
             AVLinearPCMIsBigEndianKey: false,
         ])
         output.audioMix = built.audioMix
+        output.audioTimePitchAlgorithm = .spectral
         reader.add(output)
         guard reader.startReading() else { throw reader.error ?? CancellationError() }
         while let sample = output.copyNextSampleBuffer() {

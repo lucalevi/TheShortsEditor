@@ -75,6 +75,8 @@
 	<string>public.app-category.video</string>
 	<key>NSHumanReadableCopyright</key>
 	<string>© 2026 Luca Iacolettig</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>To record a voice-over for your Short.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>Captions are made on this Mac from what is said in your clips.</string>
 	<key>UTExportedTypeDeclarations</key>
