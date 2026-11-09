@@ -1,6 +1,7 @@
 #!/bin/zsh
 # Drives the running app for on-screen checks. Needs Screen Recording + Accessibility for the terminal.
 #   ui.sh click X Y [count]      real mouse click, X/Y in points relative to the window's top-left
+#   ui.sh rclick X Y             right-click (context menu)
 #   ui.sh drag X1 Y1 X2 Y2
 #   ui.sh scroll X Y LINES        scroll wheel (negative LINES shows what is further down)
 #   ui.sh key CHAR ["command down"]
@@ -18,6 +19,7 @@ WX=${POS%%,*}; WY=${${POS##*,}// /}
 osascript -e 'tell application "Shorts Editor" to activate'; sleep 0.4
 case $1 in
   click) $BIN/mouse click $(($WX+$2)) $(($WY+$3)) $4 ;;
+  rclick) $BIN/mouse rclick $(($WX+$2)) $(($WY+$3)) ;;
   drag) $BIN/mouse drag $(($WX+$2)) $(($WY+$3)) $(($WX+$4)) $(($WY+$5)) ;;
   scroll) $BIN/mouse scroll $(($WX+$2)) $(($WY+$3)) $4 ;;
   key) M=""; [[ -n $3 ]] && M=" using {$3}"; osascript -e "tell application \"System Events\" to keystroke \"$2\"$M" ;;

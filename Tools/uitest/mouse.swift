@@ -1,6 +1,6 @@
 import CoreGraphics
 import Foundation
-// mouse click X Y [count] | mouse drag X1 Y1 X2 Y2   (global screen points)
+// mouse click X Y [count] | mouse rclick X Y | mouse drag X1 Y1 X2 Y2   (global screen points)
 let a = CommandLine.arguments
 func post(_ type: CGEventType, _ p: CGPoint, clicks: Int64 = 1) {
     let e = CGEvent(mouseEventSource: nil, mouseType: type, mouseCursorPosition: p, mouseButton: .left)!
@@ -27,4 +27,15 @@ if a[1] == "scroll" {
     e.location = p
     e.post(tap: .cghidEventTap)
     usleep(30_000)
+}
+
+if a[1] == "rclick" {
+    let p = CGPoint(x: n[0], y: n[1])
+    post(.mouseMoved, p)
+    for t in [CGEventType.rightMouseDown, .rightMouseUp] {
+        let e = CGEvent(mouseEventSource: nil, mouseType: t, mouseCursorPosition: p, mouseButton: .right)!
+        e.setIntegerValueField(.mouseEventClickState, value: 1)
+        e.post(tap: .cghidEventTap)
+        usleep(30_000)
+    }
 }

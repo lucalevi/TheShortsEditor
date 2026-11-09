@@ -18,6 +18,9 @@ Stages 1–7 are done, tested on screen, committed and pushed to https://github.
 
 **Pick up here:** the P0 list from the research is complete. On 2026-11-09 CapCut was analysed (`research/capcut-reverse-engineering.md`) and creator tool usage researched (`research/shorts-creator-tools-research.md`, with a gap table in §5), then distilled into the build list `research/feature-roadmap.md` (12 features, stages 8–16).
 
+### Delete media from the media panel (2026-11-09): done
+Select a file in the Media panel and press ⌫, or right-click ▸ Delete. It also removes the file's clips, B-roll, sounds, music and captions; one undo restores everything (`Project.removeAsset`, `EditorModel.removeAssets`). Checked on screen (key, right-click, undo). Not checked: deleting several files at once.
+
 ### Home window with every Short (2026-11-09): done, committed (44c6838)
 
 Like iMovie's Projects browser. The app opens on **Shorts**, a grid of every Short (9:16 poster = a frame 1 s in, rendered by `ProjectPoster` through the compositor; length badge; name; last change), grouped Today / Yesterday / Previous 7 Days / month, newest first, with a **New Short** tile, a + button and **Search Shorts**. Click a Short to edit it. "…" button or right-click: Edit, Rename (inline, also by double-clicking the name), Duplicate ("… copy"), Delete… (asks; moves the file to the Trash, media untouched). Dropping videos on the home window starts a new Short with them.
@@ -196,6 +199,7 @@ Tools/uitest/make-samples.sh                       # test clips into Tools/uites
 open -a "$PWD/build/Build/Products/Debug/Shorts Editor.app" Tools/uitest/.samples/*.mp4
 Tools/uitest/ui.sh shot start                      # screenshot → Tools/uitest/.shots/start.png
 Tools/uitest/ui.sh click 470 621                   # real click, window-relative points
+Tools/uitest/ui.sh rclick 120 290                  # right-click; a click on a context-menu item doesn't register, so pick it with the arrow keys + Return (key code 125, 36)
 Tools/uitest/ui.sh key b ; Tools/uitest/ui.sh code 49   # B, then Space
 ```
 

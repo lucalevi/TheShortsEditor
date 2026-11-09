@@ -22,6 +22,10 @@ struct MediaBrowserView: View {
                 }
                 .disabled(model.project.timeline.clips.isEmpty)
             }
+            if !assets.isEmpty {
+                Divider()
+                Button("Delete", role: .destructive) { model.removeAssets(Set(ids)) }
+            }
             if assets.contains(where: { model.missingAssets.contains($0.id) }) {
                 Button("Find Missing Files…") { model.findMissingFiles() }
             }
@@ -34,6 +38,9 @@ struct MediaBrowserView: View {
             }
         } primaryAction: { ids in
             ids.forEach(model.appendToTimeline)
+        }
+        .onDeleteCommand {
+            if let id = model.selectedAssetID { model.removeAssets([id]) }
         }
         .scrollContentBackground(.hidden)
         .overlay {

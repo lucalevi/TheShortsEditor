@@ -477,3 +477,30 @@ struct EditingFileTests {
         #expect(project.timeline.clips[0].background == .black)
     }
 }
+
+// MARK: - Removing media
+
+struct RemoveAssetTests {
+    @Test func removingAFileRemovesEverythingThatUsesIt() {
+        var p = twoClips()
+        let used = p.timeline.clips[0].assetID
+        let other = p.addAsset(video("other.mov"))
+        p.addOverlay(of: used, at: seconds(1))
+        p.setMusic(used)
+        #expect(p.usageCount(of: used) == 4)
+        p.removeAsset(used)
+        #expect(p.asset(id: used) == nil)
+        #expect(p.timeline.clips.isEmpty)
+        #expect(p.overlays.isEmpty)
+        #expect(p.music == nil)
+        #expect(p.asset(id: other) != nil)
+    }
+
+    @Test func removingAnUnusedFileLeavesTheShortAlone() {
+        var p = twoClips()
+        let spare = p.addAsset(video("spare.mov"))
+        p.removeAsset(spare)
+        #expect(p.timeline.clips.count == 2)
+        #expect(p.assets.count == 1)
+    }
+}

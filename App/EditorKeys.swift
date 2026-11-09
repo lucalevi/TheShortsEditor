@@ -42,6 +42,11 @@ final class EditorKeys {
             model.cutWords(model.scriptSelection)
             return true
         }
+        // In the Media panel, ⌫ removes the selected file.
+        if model.sidebar == .media, let id = model.selectedAssetID, event.keyCode == 51 || event.keyCode == 117 {
+            model.removeAssets([id])
+            return true
+        }
         switch event.keyCode {
         case 49: model.togglePlayback()            // Space
         case 38: model.shuttle(forward: false)     // J

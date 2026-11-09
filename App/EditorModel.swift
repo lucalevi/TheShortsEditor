@@ -21,7 +21,10 @@ final class EditorModel {
     /// Media used in the Short whose files can't be found (moved, renamed elsewhere, deleted).
     private(set) var missingAssets: Set<MediaAsset.ID> = []
     /// What is selected on the timeline: any mix of clips, titles and the music.
-    var timelineSelection = TimelineSelection()
+    var timelineSelection = TimelineSelection() {
+        // Only one place has the selection: picking something on the timeline unselects the media.
+        didSet { if !timelineSelection.isEmpty { selectedAssetID = nil } }
+    }
 
     typealias Selection = TimelineItem
 
@@ -327,6 +330,17 @@ final class EditorModel {
         }
         apply("Split Clip") { newID = $0.timeline.split(at: currentTime) }
         if let newID { selectedClipID = newID } else { NSSound.beep() }
+    }
+
+    /// Removes files from the media panel, and from the timeline where they are used.
+    func removeAssets(_ ids: Set<MediaAsset.ID>) {
+        let ids = ids.filter { project.asset(id: $0) != nil }
+        guard !ids.isEmpty else { return }
+        apply(ids.count == 1 ? "Remove Media" : "Remove \(ids.count) Media") { project in
+            ids.forEach { project.removeAsset($0) }
+        }
+        selection = nil
+        selectedAssetID = nil
     }
 
     func deleteSelectedClip() {

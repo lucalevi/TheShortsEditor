@@ -449,3 +449,24 @@ public extension Project {
         sounds.filter { $0.isVoiceOver && $0.clip.effectiveVolume > 0 }.compactMap { $0.audibleRange(in: self) }
     }
 }
+
+extension Project {
+    /// Takes a file out of the project, together with everything that uses it: clips, B-roll,
+    /// sounds, the music and its captions.
+    public mutating func removeAsset(_ id: MediaAsset.ID) {
+        timeline.clips.removeAll { $0.assetID == id }
+        overlays.removeAll { $0.clip.assetID == id }
+        sounds.removeAll { $0.clip.assetID == id }
+        if music?.assetID == id { music = nil }
+        transcripts[id] = nil
+        assets.removeAll { $0.id == id }
+    }
+
+    /// How many places on the timeline use this file.
+    public func usageCount(of id: MediaAsset.ID) -> Int {
+        timeline.clips.filter { $0.assetID == id }.count
+            + overlays.filter { $0.clip.assetID == id }.count
+            + sounds.filter { $0.clip.assetID == id }.count
+            + (music?.assetID == id ? 1 : 0)
+    }
+}
