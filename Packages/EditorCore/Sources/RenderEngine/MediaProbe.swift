@@ -72,6 +72,18 @@ public enum MediaProbe {
         // Half a second in avoids the black first frame many recordings start with.
         return try await generator.image(at: CMTime(value: 1, timescale: 2)).image
     }
+
+    /// An upright frame of a video at `time`, near enough (a twentieth of a second) to be quick,
+    /// for skimming through a file.
+    public static func frame(of url: URL, at time: CMTime, maxSize: CGSize = CGSize(width: 720, height: 1280)) async throws -> CGImage {
+        let generator = AVAssetImageGenerator(asset: AVURLAsset(url: url))
+        generator.appliesPreferredTrackTransform = true
+        generator.maximumSize = maxSize
+        let tolerance = CMTime(value: 1, timescale: 20)
+        generator.requestedTimeToleranceBefore = tolerance
+        generator.requestedTimeToleranceAfter = tolerance
+        return try await generator.image(at: time).image
+    }
 }
 
 /// Small stills along a video, for drawing a strip of pictures on its clips.

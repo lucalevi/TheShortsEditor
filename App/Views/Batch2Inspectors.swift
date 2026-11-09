@@ -13,7 +13,15 @@ struct SpeedSection: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("Speed").font(.subheadline.weight(.semibold))
+            HStack {
+                Text("Speed").font(.subheadline.weight(.semibold))
+                Spacer()
+                if clips.contains(where: { $0.speed != 1 }) {
+                    Button("Reset") { model.setSpeed(1, for: clips.map(\.id)) }
+                        .controlSize(.small)
+                        .help("Back to normal speed (1×)")
+                }
+            }
             HStack(spacing: 4) {
                 ForEach(Clip.speedPresets, id: \.self) { preset in
                     Button(label(preset)) { model.setSpeed(preset, for: clips.map(\.id)) }
@@ -146,6 +154,7 @@ struct SoundInspector: View {
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             if sound.isVoiceOver { CleanVoiceToggle(model: model, clips: [sound.clip]) }
+            FollowClipToggle(model: model, item: .sound(sound.id))
             HStack {
                 Button("Start at Playhead") { model.moveSound(sound.id, to: model.currentTime) }
                 Button("Delete", systemImage: "trash", role: .destructive) { model.deleteSelection() }
@@ -250,5 +259,109 @@ struct FontMenu: View {
             Text(selection ?? "System Font").lineLimit(1)
         }
         .help("The font. Add your own with Add Fonts… at the bottom.")
+    }
+}
+
+/// Whether a title, B-roll clip or sound moves with the main clip under its start.
+struct FollowClipToggle: View {
+    let model: EditorModel
+    let item: TimelineItem
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Toggle("Move with the clip under it", isOn: Binding(get: { model.project.followsClip(item) }, set: { model.setFollowsClip($0, for: item) }))
+            Text(model.project.followsClip(item)
+                 ? "Pinned to the clip below its start (the thin line on the timeline): moving, trimming or speeding up that clip carries it along."
+                 : "Stays at its time on the timeline whatever happens to the clips, e.g. to land on a beat of the music.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+}
+
+/// Reset All for a clip, and copying its settings to others.
+struct ClipSettingsButtons: View {
+    let model: EditorModel
+    let clipID: Clip.ID
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Settings").font(.subheadline.weight(.semibold))
+            HStack {
+                Button("Copy", systemImage: "doc.on.doc") { model.copySettings() }
+                    .help("Copy this clip's picture, motion, speed and sound settings (⌥⌘C), to paste on other clips (⌥⌘V)")
+                Menu("Paste") {
+                    Button("All") { model.pasteSettings(Set(SettingsKind.allCases)) }
+                    Divider()
+                    ForEach(SettingsKind.allCases) { kind in
+                        Button(kind.displayName) { model.pasteSettings([kind]) }
+                    }
+                }
+                .fixedSize()
+                .disabled(model.copiedClip == nil || model.copiedClip?.id == clipID)
+                Button("Reset All") { model.resetSettings(Set(SettingsKind.allCases), of: [clipID]) }
+                    .disabled(model.project.changedSettings(of: clipID).isEmpty)
+                    .help("Back to how the clip was when added: picture, motion, speed and sound")
+            }
+            .controlSize(.small)
+        }
+    }
+}
+
+/// A stretch of the storyline picked with R or X: what can be done to just that part.
+struct RangeInspector: View {
+    let model: EditorModel
+    let range: CMTimeRange
+    @State private var volume: Double = 1
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("\(TimeFormat.string(range.duration)) picked").font(.headline).monospacedDigit()
+                Text("From \(TimeFormat.string(range.start)) to \(TimeFormat.string(range.end))")
+                    .monospacedDigit()
+                    .foregroundStyle(.secondary)
+            }
+            VStack(alignment: .leading, spacing: 6) {
+                Button("Delete This Part", systemImage: "trash") { model.deleteRange() }
+                    .help("Take it out; what comes after closes up (⌫)")
+                Button("Keep Only This Part", systemImage: "scissors") { model.trimToRange() }
+                    .help("Trim the clips it touches to just this part (⌥/)")
+                Button("Play It", systemImage: "play.fill") { model.playSelection() }
+                    .help("Play just this part (/). With Loop on, it plays over and over.")
+            }
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Speed of this part").font(.subheadline.weight(.semibold))
+                HStack(spacing: 4) {
+                    ForEach(Clip.speedPresets, id: \.self) { speed in
+                        Button(speed == 1 ? "1×" : "\(speed.formatted())×") { model.setSpeedInRange(speed) }
+                            .buttonStyle(.bordered)
+                    }
+                }
+                .controlSize(.small)
+            }
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Volume of this part").font(.subheadline.weight(.semibold))
+                HStack {
+                    Slider(value: $volume, in: 0...Clip.maxVolume) { editing in
+                        if !editing { model.setVolumeInRange((volume * 20).rounded() / 20) }
+                    }
+                    .controlSize(.small)
+                    Text("\(Int((volume * 100).rounded()))%").monospacedDigit().frame(width: 44, alignment: .trailing)
+                }
+                Button("Mute This Part", systemImage: "speaker.slash") { model.setVolumeInRange(1, muted: true) }
+                    .controlSize(.small)
+                Text("The sound fades smoothly into and out of the new volume.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Button("Clear Range") { model.clearRanges() }
+                .controlSize(.small)
+            Text("Hold R and drag across clips to pick another part, or press X for the clip under the pointer. Escape lets go.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
     }
 }

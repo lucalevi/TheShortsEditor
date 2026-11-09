@@ -40,7 +40,8 @@ Concurrency: Swift 6 strict mode. `RenderEngine`, its tests and the app default 
 
 - **The project value is the source of truth.** Every edit goes through `EditorModel.apply(_:_:)`, which snapshots the old value for undo and rebuilds the player item from scratch. Never mutate AVFoundation objects to make an edit.
 - **Placement and keyframes sit on top of framing.** A clip's picture is framed (Fill/Show all), then moved/scaled/turned by its `Placement`. Keyframe times are in the source file's time, so motion survives split/trim/Remove Pauses. While a picture is dragged in the viewer, `LivePreview` shows it without rebuilding; the rebuild after the edit clears it.
-- **B-roll (`Project.overlays`) is timed on the timeline**, like titles, not attached to a main clip. Each row of overlapping overlays gets its own composition track.
+- **B-roll (`Project.overlays`), titles and sounds are timed on the timeline, but follow their clip**: `EditorModel.apply` calls `Project.followClips(from:)` after every edit, which keeps each item (with `followsClip`) on the same moment of the main clip under its start. Edits never need to move items themselves. Each row of overlapping overlays gets its own composition track.
+- iMovie's grammar (ranges, insert/replace, drop actions, copy/paste/reset settings, edit points) is in `EditorCore/Grammar.swift`; skimming, loop, full-screen preview and tips in `App/EditorModel+Grammar.swift`. Punctuation shortcuts are matched by character in `EditorKeys` (keyboard layouts differ).
 - **Speed:** `Clip.duration` is the timeline length; map source ↔ timeline only through `sourceTime(atOffset:)`, `timelineOffset(ofSourceTime:)` and `timelineDuration(ofSource:)`.
 - **Title style vs look:** set a title's style with `applyStyle(_:)` (it rewrites `look`); assigning `style` alone leaves the look unchanged.
 - Use `CMTime.clamped(_:_:)`, not `CMTimeClampToRange`: the latter returns an invalid time for an empty range.

@@ -31,6 +31,9 @@ struct ViewerView: View {
                         .shadow(radius: 6)
                         .padding(16)
                 }
+                if let image = model.mediaSkimImage, let skim = model.mediaSkim {
+                    MediaSkimView(model: model, image: image, assetID: skim.assetID, time: skim.time)
+                }
             }
             .dropDestination(for: URL.self) { urls, _ in
                 model.importFiles(urls, addToTimeline: true)
@@ -102,10 +105,15 @@ private struct TransportBar: View {
             .font(.title2)
             .frame(width: 28)
             Button("Next Frame", systemImage: "chevron.right") { model.step(frames: 1) }
-            Text("\(TimeFormat.string(model.currentTime)) / \(TimeFormat.string(model.duration))")
+            Text("\(TimeFormat.string(model.skimTime ?? model.currentTime)) / \(TimeFormat.string(model.duration))")
                 .monospacedDigit()
                 .foregroundStyle(.secondary)
                 .frame(minWidth: 110, alignment: .leading)
+            Toggle("Loop", systemImage: "repeat", isOn: $model.loopsPlayback)
+                .toggleStyle(.button)
+                .help(model.loopsPlayback ? "Loop is on: playing starts again at the end, as a Short does on YouTube (⌘L)" : "Play over and over, as a Short does on YouTube (⌘L)")
+            Button("Play Full Screen", systemImage: "arrow.up.left.and.arrow.down.right") { model.toggleFullScreenPreview() }
+                .help("Watch it full screen on a phone, with YouTube's buttons over it (⇧⌘F)")
         }
         .labelStyle(.iconOnly)
         .buttonStyle(.borderless)
@@ -477,7 +485,7 @@ private struct TitleHandles: View {
 
 /// AVPlayerLayer hosted in an NSView: smoother and lighter than SwiftUI's VideoPlayer, and without
 /// its built-in controls.
-private struct PlayerView: NSViewRepresentable {
+struct PlayerView: NSViewRepresentable {
     let player: AVPlayer
 
     func makeNSView(context: Context) -> PlayerNSView {
@@ -491,7 +499,7 @@ private struct PlayerView: NSViewRepresentable {
     }
 }
 
-private final class PlayerNSView: NSView {
+final class PlayerNSView: NSView {
     let playerLayer = AVPlayerLayer()
 
     override init(frame: NSRect) {
@@ -510,5 +518,37 @@ private final class PlayerNSView: NSView {
         CATransaction.setDisableActions(true)
         playerLayer.frame = bounds
         CATransaction.commit()
+    }
+}
+
+/// A file in Media being skimmed: its frame under the pointer, shown in the viewer.
+private struct MediaSkimView: View {
+    let model: EditorModel
+    let image: CGImage
+    let assetID: MediaAsset.ID
+    let time: CMTime
+
+    var body: some View {
+        ZStack {
+            Color.black
+            Image(decorative: image, scale: 1)
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+        }
+        .overlay(alignment: .top) {
+            let name = model.project.asset(id: assetID)?.name ?? ""
+            Label("\(name) · \(TimeFormat.string(time))", systemImage: "film.stack")
+                .font(.caption.weight(.semibold).monospacedDigit())
+                .padding(.horizontal, 8)
+                .padding(.vertical, 3)
+                .background(.black.opacity(0.75), in: Capsule())
+                .foregroundStyle(.white)
+                .padding(8)
+        }
+        .aspectRatio(Project.canvasSize.width / Project.canvasSize.height, contentMode: .fit)
+        .clipShape(RoundedRectangle(cornerRadius: 4))
+        .padding(16)
+        .allowsHitTesting(false)
+        .accessibilityLabel("Looking through a file in Media")
     }
 }

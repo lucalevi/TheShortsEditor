@@ -88,11 +88,14 @@ public struct Overlay: Identifiable, Codable, Equatable, Sendable {
     public var start: CMTime
     /// Over the main clip, or sharing the screen with it (split screen).
     public var layout: OverlayLayout
+    /// Moves with the main clip under its start (see `Project.followClips(from:)`).
+    public var followsClip: Bool
 
-    public init(clip: Clip, start: CMTime, layout: OverlayLayout = .free) {
+    public init(clip: Clip, start: CMTime, layout: OverlayLayout = .free, followsClip: Bool = true) {
         self.clip = clip
         self.start = start
         self.layout = layout
+        self.followsClip = followsClip
     }
 
     public var id: Clip.ID { clip.id }
@@ -109,13 +112,14 @@ public struct Overlay: Identifiable, Codable, Equatable, Sendable {
     /// The source time showing at timeline `time`.
     public func sourceTime(at time: CMTime) -> CMTime { clip.sourceTime(atOffset: time - start) }
 
-    private enum CodingKeys: String, CodingKey { case clip, start, layout }
+    private enum CodingKeys: String, CodingKey { case clip, start, layout, followsClip }
 
     public init(from decoder: any Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         clip = try c.decode(Clip.self, forKey: .clip)
         start = try c.decodeTime(forKey: .start)
         layout = try c.decodeIfPresent(OverlayLayout.self, forKey: .layout) ?? .free
+        followsClip = try c.decodeIfPresent(Bool.self, forKey: .followsClip) ?? true
     }
 
     public func encode(to encoder: any Encoder) throws {
@@ -123,6 +127,7 @@ public struct Overlay: Identifiable, Codable, Equatable, Sendable {
         try c.encode(clip, forKey: .clip)
         try c.encode(time: start, forKey: .start)
         try c.encode(layout, forKey: .layout)
+        try c.encode(followsClip, forKey: .followsClip)
     }
 }
 
@@ -207,7 +212,7 @@ public extension Project {
         let isImage = asset(id: overlay.clip.assetID)?.isImage == true
         let second = overlay.clip.piece(sourceStart: isImage ? overlay.clip.sourceStart : overlay.clip.sourceTime(atOffset: offset), duration: overlay.duration - offset)
         overlays[index].clip.duration = offset
-        overlays.insert(Overlay(clip: second, start: time, layout: overlay.layout), at: index + 1)
+        overlays.insert(Overlay(clip: second, start: time, layout: overlay.layout, followsClip: overlay.followsClip), at: index + 1)
         return second.id
     }
 
@@ -341,11 +346,14 @@ public struct SoundClip: Identifiable, Codable, Equatable, Sendable {
     public var start: CMTime
     /// A voice recorded over the Short: the music is lowered under it, like under speech.
     public var isVoiceOver: Bool
+    /// Moves with the main clip under its start (see `Project.followClips(from:)`).
+    public var followsClip: Bool
 
-    public init(clip: Clip, start: CMTime, isVoiceOver: Bool = false) {
+    public init(clip: Clip, start: CMTime, isVoiceOver: Bool = false, followsClip: Bool = true) {
         self.clip = clip
         self.start = start
         self.isVoiceOver = isVoiceOver
+        self.followsClip = followsClip
     }
 
     public var id: Clip.ID { clip.id }
@@ -359,13 +367,14 @@ public struct SoundClip: Identifiable, Codable, Equatable, Sendable {
         return audible.duration > .zero ? audible : nil
     }
 
-    private enum CodingKeys: String, CodingKey { case clip, start, isVoiceOver }
+    private enum CodingKeys: String, CodingKey { case clip, start, isVoiceOver, followsClip }
 
     public init(from decoder: any Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         clip = try c.decode(Clip.self, forKey: .clip)
         start = try c.decodeTime(forKey: .start)
         isVoiceOver = try c.decodeIfPresent(Bool.self, forKey: .isVoiceOver) ?? false
+        followsClip = try c.decodeIfPresent(Bool.self, forKey: .followsClip) ?? true
     }
 
     public func encode(to encoder: any Encoder) throws {
@@ -373,6 +382,7 @@ public struct SoundClip: Identifiable, Codable, Equatable, Sendable {
         try c.encode(clip, forKey: .clip)
         try c.encode(time: start, forKey: .start)
         try c.encode(isVoiceOver, forKey: .isVoiceOver)
+        try c.encode(followsClip, forKey: .followsClip)
     }
 }
 
@@ -440,7 +450,7 @@ public extension Project {
         guard offset >= Clip.minimumDuration, sound.duration - offset >= Clip.minimumDuration else { return nil }
         let second = sound.clip.piece(sourceStart: sound.clip.sourceTime(atOffset: offset), duration: sound.duration - offset)
         sounds[index].clip.duration = offset
-        sounds.insert(SoundClip(clip: second, start: time, isVoiceOver: sound.isVoiceOver), at: index + 1)
+        sounds.insert(SoundClip(clip: second, start: time, isVoiceOver: sound.isVoiceOver, followsClip: sound.followsClip), at: index + 1)
         return second.id
     }
 

@@ -39,3 +39,36 @@ if a[1] == "rclick" {
         usleep(30_000)
     }
 }
+
+// mouse move X Y   (hover, e.g. for skimming)
+if a[1] == "move" {
+    post(.mouseMoved, CGPoint(x: n[0], y: n[1]))
+}
+// mouse keydrag KEYCODE X1 Y1 X2 Y2   (drag while a key is held, e.g. R for a range)
+if a[1] == "keydrag" {
+    let key = CGKeyCode(n[0]), p1 = CGPoint(x: n[1], y: n[2]), p2 = CGPoint(x: n[3], y: n[4])
+    CGEvent(keyboardEventSource: nil, virtualKey: key, keyDown: true)!.post(tap: .cghidEventTap)
+    usleep(80_000)
+    post(.mouseMoved, p1); post(.leftMouseDown, p1)
+    for i in 1...10 { let t = Double(i) / 10; post(.leftMouseDragged, CGPoint(x: p1.x + (p2.x - p1.x) * t, y: p1.y + (p2.y - p1.y) * t)) }
+    post(.leftMouseUp, p2)
+    CGEvent(keyboardEventSource: nil, virtualKey: key, keyDown: false)!.post(tap: .cghidEventTap)
+    usleep(30_000)
+}
+// mouse hold X1 Y1 X2 Y2   (press and drag, but keep the button down, to see a drag under way)
+// mouse release X Y
+if a[1] == "hold" {
+    let p1 = CGPoint(x: n[0], y: n[1]), p2 = CGPoint(x: n[2], y: n[3])
+    post(.mouseMoved, p1); post(.leftMouseDown, p1)
+    for i in 1...10 { let t = Double(i) / 10; post(.leftMouseDragged, CGPoint(x: p1.x + (p2.x - p1.x) * t, y: p1.y + (p2.y - p1.y) * t)) }
+}
+if a[1] == "release" {
+    post(.leftMouseUp, CGPoint(x: n[0], y: n[1]))
+}
+// mouse key KEYCODE   (a key press without Apple events, which a pop-up menu would block)
+if a[1] == "key" {
+    for down in [true, false] {
+        CGEvent(keyboardEventSource: nil, virtualKey: CGKeyCode(n[0]), keyDown: down)!.post(tap: .cghidEventTap)
+        usleep(40_000)
+    }
+}

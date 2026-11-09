@@ -23,6 +23,8 @@ public struct TextOverlay: Identifiable, Codable, Equatable, Sendable {
     public var verticalPosition: Double
     /// Where the middle of the title sits across, from 0 (left edge) to 1 (right edge).
     public var horizontalPosition: Double
+    /// Moves with the main clip under its start (see `Project.followClips(from:)`).
+    public var followsClip: Bool = true
 
     public init(
         id: UUID = UUID(), text: String, style: TitleStyle = .bold, look: TextLook? = nil, entrance: TitleEntrance = .pop,
@@ -205,7 +207,7 @@ public extension Project {
 
 extension TextOverlay {
     private enum CodingKeys: String, CodingKey {
-        case id, text, style, look, entrance, start, duration, verticalPosition, horizontalPosition
+        case id, text, style, look, entrance, start, duration, verticalPosition, horizontalPosition, followsClip
     }
 
     public init(from decoder: any Decoder) throws {
@@ -219,6 +221,7 @@ extension TextOverlay {
         start = try c.decodeTime(forKey: .start)
         duration = try c.decodeTime(forKey: .duration)
         verticalPosition = try c.decode(Double.self, forKey: .verticalPosition)
+        followsClip = try c.decodeIfPresent(Bool.self, forKey: .followsClip) ?? true
     }
 
     public func encode(to encoder: any Encoder) throws {
@@ -232,5 +235,6 @@ extension TextOverlay {
         try c.encode(time: start, forKey: .start)
         try c.encode(time: duration, forKey: .duration)
         try c.encode(verticalPosition, forKey: .verticalPosition)
+        try c.encode(followsClip, forKey: .followsClip)
     }
 }

@@ -23,7 +23,14 @@ final class EditorModel {
     /// What is selected on the timeline: any mix of clips, titles and the music.
     var timelineSelection = TimelineSelection() {
         // Only one place has the selection: picking something on the timeline unselects the media.
-        didSet { if !timelineSelection.isEmpty { selectedAssetID = nil } }
+        didSet {
+            if !timelineSelection.isEmpty { selectedAssetID = nil }
+            switch timelineSelection.single {
+            case .clip?: showTip(.range)
+            case .title?, .overlay?, .sound?: showTip(.follow)
+            default: break
+            }
+        }
     }
 
     typealias Selection = TimelineItem
@@ -63,7 +70,53 @@ final class EditorModel {
     var evensOutLoudness = true
     /// Asks the title inspector to put the cursor in the text (after adding a title). It resets it.
     var wantsTitleTextFocus = false
-    var selectedAssetID: MediaAsset.ID?
+    var selectedAssetID: MediaAsset.ID? {
+        didSet { if selectedAssetID != nil { showTip(.mediaKeys) } }
+    }
+
+    // MARK: State for iMovie's grammar (EditorModel+Grammar.swift)
+
+    /// Hovering over the timeline shows that moment in the viewer (iMovie's skimming).
+    var skimsTimeline = UserDefaults.standard.object(forKey: "skimming") as? Bool ?? true {
+        didSet { UserDefaults.standard.set(skimsTimeline, forKey: "skimming"); if !skimsTimeline { skim(to: nil) } }
+    }
+    /// Skimming also plays a moment of sound (⇧S).
+    var skimsAudio = UserDefaults.standard.bool(forKey: "audioSkimming") {
+        didSet { UserDefaults.standard.set(skimsAudio, forKey: "audioSkimming") }
+    }
+    /// Where the pointer is skimming on the timeline (the white line), nil when it isn't.
+    var skimTime: CMTime?
+    /// A file in Media being skimmed: which one and where, with the frame shown in the viewer.
+    var mediaSkim: (assetID: MediaAsset.ID, time: CMTime)?
+    var mediaSkimImage: CGImage?
+    /// A stretch of the storyline picked with R (or X), to delete, keep, speed up or change the volume of.
+    var timelineRange: CMTimeRange?
+    /// Part of a file picked in Media, used by E, W and dropping it on the timeline.
+    var mediaRange: (assetID: MediaAsset.ID, range: CMTimeRange)?
+    /// R is held down: dragging across clips picks a range instead of moving them.
+    @ObservationIgnored var isRangeKeyDown = false
+    /// Playing starts again from the beginning (or the range) at the end (⌘L).
+    var loopsPlayback = UserDefaults.standard.bool(forKey: "loopPlayback") {
+        didSet { UserDefaults.standard.set(loopsPlayback, forKey: "loopPlayback") }
+    }
+    /// Playing only this stretch (/), stopping or looping at its end.
+    @ObservationIgnored var playRange: CMTimeRange?
+    /// The Short shown full screen in a phone, with YouTube's buttons drawn over it (⇧⌘F).
+    var isFullScreenPreview = false
+    /// Settings copied with Copy Settings (⌥⌘C), for pasting onto other clips or titles.
+    var copiedClip: Clip?
+    var copiedTitle: TextOverlay?
+    /// A one-time hint shown at the right moment.
+    var tip: EditorTip?
+    @ObservationIgnored var tipTask: Task<Void, Never>?
+    @ObservationIgnored var chaseTarget: CMTime?
+    @ObservationIgnored var isChasing = false
+    /// A moment of sound playing while skimming: the player runs, but nothing should react.
+    @ObservationIgnored var isSkimBlip = false
+    @ObservationIgnored var skimBlipTask: Task<Void, Never>?
+    @ObservationIgnored var mediaSkimTask: Task<Void, Never>?
+    @ObservationIgnored var mediaSkimTarget: (assetID: MediaAsset.ID, time: CMTime)?
+    @ObservationIgnored var windowWasFullScreen = false
     var showsSafeZone = true
     /// Timeline zoom, in points per second.
     var timelineZoom: CGFloat = 60
@@ -181,7 +234,13 @@ final class EditorModel {
         }
         statusObservation = player.observe(\.timeControlStatus) { [weak self] player, _ in
             let playing = player.timeControlStatus != .paused
-            Task { @MainActor in self?.isPlaying = playing }
+            Task { @MainActor in
+                guard let self, !self.isSkimBlip else { return }
+                self.isPlaying = playing
+            }
+        }
+        NotificationCenter.default.addObserver(forName: AVPlayerItem.didPlayToEndTimeNotification, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.playerReachedEnd() }
         }
     }
 
@@ -203,6 +262,9 @@ final class EditorModel {
     func apply(_ actionName: String, _ edit: (inout Project) -> Void) {
         var updated = project
         edit(&updated)
+        // Titles, B-roll and sounds stay with the clip under them.
+        updated.followClips(from: project)
+        if updated.timeline != project.timeline { timelineRange = nil }
         replaceProject(with: updated, actionName: actionName)
     }
 
@@ -235,7 +297,8 @@ final class EditorModel {
     }
 
     /// Reads the files, adds the usable ones to Media, and puts them where `destination` says.
-    func importFiles(_ urls: [URL], to destination: ImportDestination) {
+    func importFiles(_ urls: [URL], to destination: ImportDestination, actionName customName: String? = nil,
+                     then: ((inout Project, [MediaAsset.ID]) -> Void)? = nil) {
         let addToTimeline = destination == .timelineEnd
         // A project file dropped or opened opens that Short instead.
         if let projectFile = urls.first(where: { $0.pathExtension.lowercased() == ProjectFile.fileExtension }) {
@@ -272,11 +335,14 @@ final class EditorModel {
             case .overlay: "Add Over Clips"
             case .sound: "Add Sound"
             }
-            apply(actionName) { project in
+            apply(customName ?? actionName) { project in
+                var importedIDs: [MediaAsset.ID] = []
+                defer { then?(&project, importedIDs) }
                 var overlayStart: CMTime?
                 if case .overlay(let time) = destination { overlayStart = time }
                 for asset in probed {
                     let id = project.addAsset(asset)
+                    importedIDs.append(id)
                     if addToTimeline, asset.hasVideo { project.appendClip(of: id) }
                     if case .sound(let time) = destination, !asset.hasVideo, let soundID = project.addSound(of: id, at: time) {
                         overlayIDs.append(soundID)
@@ -643,7 +709,13 @@ final class EditorModel {
     // MARK: Playback
 
     private func playheadMoved(to time: CMTime) {
+        // While skimming, the player shows the skimmer's moment; the playhead stays put.
+        if isSkimBlip || (skimTime != nil && !isPlaying) || isChasing { return }
         currentTime = time
+        if let range = playRange, player.rate > 0, time.snappedToFrame() >= range.end {
+            playRangeEnded(range)
+            return
+        }
         if case .recording = voiceOver, time >= duration - .oneFrame { stopVoiceOver() }
         // While previewing pause removal, jump over the parts that would be cut.
         // Compare whole frames: the player reports nanoseconds, and 3.233333333 s is a hair before
@@ -661,6 +733,12 @@ final class EditorModel {
     func togglePlayback() {
         if isPlaying {
             player.pause()
+            playRange = nil
+        } else if let skim = skimTime {
+            // Space while skimming plays from the skimmer, as in iMovie.
+            skimTime = nil
+            seek(to: skim)
+            player.play()
         } else {
             if currentTime >= duration - .oneFrame { seek(to: .zero) }
             player.play()
@@ -677,7 +755,10 @@ final class EditorModel {
         }
     }
 
-    func pause() { player.pause() }
+    func pause() {
+        player.pause()
+        playRange = nil
+    }
 
     func step(frames: Int) {
         player.pause()

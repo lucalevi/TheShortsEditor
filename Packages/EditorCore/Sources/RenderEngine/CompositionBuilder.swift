@@ -59,6 +59,7 @@ public enum CompositionBuilder {
         // The main clips, back to back.
         var layers: [(range: CMTimeRange, layer: CompositorLayer)] = []
         var cursor = CMTime.zero
+        var previous: Clip?
         for clip in project.timeline.clips {
             let layer = try await media.layer(for: clip, at: cursor, in: videoTrack, isMain: true)
             if case .track = layer.source, let sourceAudio = try await media.audioTrack(of: clip.assetID, cleaned: clip.cleansVoice) {
@@ -73,7 +74,15 @@ public enum CompositionBuilder {
                     if clip.speed != 1 { audioTrack.scaleTimeRange(CMTimeRange(start: insertAt, duration: range.duration), toDuration: clip.timelineDuration(ofSource: range.duration)) }
                 }
             }
-            clipSound.setVolume(Float(clip.effectiveVolume * gain), at: cursor)
+            if let previous, clip.continues(previous), previous.effectiveVolume != clip.effectiveVolume {
+                // A volume set on part of a recording: fade between the two instead of jumping.
+                let fade = min(CMTime(value: 1, timescale: 5), clip.duration)
+                clipSound.setVolumeRamp(fromStartVolume: Float(previous.effectiveVolume * gain), toEndVolume: Float(clip.effectiveVolume * gain),
+                                        timeRange: CMTimeRange(start: cursor, duration: fade))
+            } else {
+                clipSound.setVolume(Float(clip.effectiveVolume * gain), at: cursor)
+            }
+            previous = clip
             layers.append((CMTimeRange(start: cursor, duration: clip.duration), layer))
             cursor = cursor + clip.duration
         }

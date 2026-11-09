@@ -43,6 +43,19 @@ struct AudioMixTests {
         #expect(try await AudioProbe.peak(of: p, in: full) == 0)
     }
 
+    @Test func volumeOnPartOfAClipFadesInsteadOfJumping() async throws {
+        var p = try await project(seconds: 2)
+        p.setVolume(0.2, in: CMTimeRange(start: CMTime(value: 1, timescale: 1), duration: CMTime(value: 1, timescale: 1)))
+        #expect(p.timeline.clips.count == 2)
+        let built = try await CompositionBuilder.build(p)
+        let parameters = try #require(built.audioMix.inputParameters.first)
+        var from: Float = 0, to: Float = 0
+        var range = CMTimeRange()
+        #expect(parameters.getVolumeRamp(for: CMTime(value: 11, timescale: 10), startVolume: &from, endVolume: &to, timeRange: &range))
+        #expect(abs(from - 1) < 0.01 && abs(to - 0.2) < 0.01)
+        #expect(abs(range.start.seconds - 1) < 0.01 && abs(range.duration.seconds - 0.2) < 0.01)
+    }
+
     @Test func musicPlaysUnderASilentVideoAtItsVolume() async throws {
         var p = try await project(toneFrom: nil)
         #expect(try await AudioProbe.peak(of: p, in: full) == nil)

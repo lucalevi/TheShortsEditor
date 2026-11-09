@@ -8,6 +8,7 @@ struct InspectorView: View {
     var body: some View {
         VStack(spacing: 0) {
             PanelHeader(title: model.silenceSession != nil ? "Remove Pauses"
+                        : model.timelineRange != nil ? "Range"
                         : model.timelineSelection.count > 1 ? "\(model.timelineSelection.count) Selected"
                         : model.selectedTitle != nil ? "Title"
                         : model.selectedOverlay != nil ? "Over the Clips"
@@ -18,6 +19,8 @@ struct InspectorView: View {
                 Group {
                     if model.silenceSession != nil {
                         SilencePanel(model: model)
+                    } else if let range = model.timelineRange {
+                        RangeInspector(model: model, range: range)
                     } else if model.timelineSelection.count > 1 {
                         MultipleInspector(model: model)
                     } else if model.selection == .music, let music = model.project.music, let song = model.musicAsset {
@@ -161,6 +164,8 @@ private struct ClipInspector: View {
                 CleanVoiceToggle(model: model, clips: [clip])
             }
 
+            ClipSettingsButtons(model: model, clipID: clip.id)
+
             HStack {
                 Button("Split at Playhead", systemImage: "scissors") { model.splitAtPlayhead() }
                 Button("Delete", systemImage: "trash", role: .destructive) { model.deleteSelection() }
@@ -262,6 +267,10 @@ private struct OverlayInspector: View {
                     }
                 }
             }
+
+            FollowClipToggle(model: model, item: .overlay(overlay.id))
+
+            ClipSettingsButtons(model: model, clipID: overlay.id)
 
             HStack {
                 Button("Start at Playhead") { model.moveOverlay(overlay.id, to: model.currentTime) }

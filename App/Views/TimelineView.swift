@@ -2,6 +2,7 @@ import AVFoundation
 import EditorCore
 import RenderEngine
 import SwiftUI
+import UniformTypeIdentifiers
 
 /// The storyline and everything over and under it: titles, B-roll, the clips, captions and music,
 /// with a ruler for scrubbing and the playhead.
@@ -22,6 +23,10 @@ struct TimelineView: View {
     @State private var marquee: CGRect?
     /// The selection when the rectangle was started, which it adds to while ⌘ or ⇧ is held.
     @State private var marqueeBase: TimelineSelection?
+    /// Where a range being dragged with R started.
+    @State private var rangeAnchor: CMTime?
+    /// Where files are being dragged over the clips, for the landing marker.
+    @State private var dropX: CGFloat?
 
     struct BlockDrag {
         enum Kind { case move, start, end }
@@ -129,22 +134,45 @@ struct TimelineView: View {
                         ruler
                         titleLane.offset(y: titlesY)
                         overlayLane.offset(y: overlaysY)
-                        clipsRow.offset(y: clipsY)
+                        pinLines
+                        clipsRow
+                            .onDrop(of: [.fileURL], delegate: ClipRowDrop(onUpdate: dropHover, onDrop: drop))
+                            .offset(y: clipsY)
                         captionLane.offset(y: captionsY)
                         soundLane.offset(y: soundsY)
                         musicLane.offset(y: musicY)
                         pauseCuts.offset(y: clipsY)
+                        rangeOverlay
+                        dropMarker
                         limitMarker
                         snapIndicator
+                        skimmer
                         playhead
                         marqueeRectangle
+                        dragLabel
                     }
                     .coordinateSpace(.named(Self.contentSpace))
+                    .onContinuousHover { phase in
+                        switch phase {
+                        case .active(let point):
+                            guard reorder == nil, clipTrim == nil, blockDrag == nil, marquee == nil, rangeAnchor == nil else { return }
+                            model.skim(to: time(at: point.x))
+                        case .ended:
+                            model.skim(to: nil)
+                        }
+                    }
                     .frame(width: max(geometry.size.width, contentWidth), height: max(geometry.size.height, contentHeight), alignment: .topLeading)
                 }
                 .scrollPosition($scrollPosition)
                 .onScrollGeometryChange(for: CGRect.self) { $0.visibleRect } action: { _, newValue in
                     visibleRect = newValue
+                }
+            }
+            .overlay(alignment: .bottom) {
+                if let tip = model.tip {
+                    TipBanner(tip: tip) { model.dismissTip() }
+                        .padding(.bottom, 8)
+                        .transition(.opacity)
                 }
             }
             .background(isDropTargeted ? Color.accentColor.opacity(0.08) : Color.clear)
@@ -153,6 +181,9 @@ struct TimelineView: View {
                 model.importFiles(urls, addToTimeline: true)
                 return true
             } isTargeted: { isDropTargeted = $0 }
+        }
+        .onChange(of: model.project.timeline.clips.isEmpty, initial: true) {
+            if !model.project.timeline.clips.isEmpty { model.showTip(.skimming) }
         }
         .onChange(of: model.currentTime) {
             // Keep the playhead in view while playing.
@@ -210,6 +241,14 @@ struct TimelineView: View {
     private var emptySpaceGesture: some Gesture {
         DragGesture(minimumDistance: 0, coordinateSpace: .named(Self.contentSpace))
                 .onChanged { value in
+                    if rangeAnchor != nil || (marquee == nil && model.isRangeKeyDown && abs(value.translation.width) > 3) {
+                        if rangeAnchor == nil {
+                            model.pause()
+                            rangeAnchor = time(at: value.startLocation.x)
+                        }
+                        model.setTimelineRange(from: rangeAnchor!, to: time(at: value.location.x))
+                        return
+                    }
                     let rect = CGRect(x: min(value.startLocation.x, value.location.x),
                                       y: min(value.startLocation.y, value.location.y),
                                       width: abs(value.location.x - value.startLocation.x),
@@ -223,8 +262,14 @@ struct TimelineView: View {
                     model.timelineSelection = selection
                 }
                 .onEnded { value in
+                    if rangeAnchor != nil {
+                        rangeAnchor = nil
+                        return
+                    }
                     if marquee == nil, NSEvent.modifierFlags.isDisjoint(with: [.command, .shift]) {
                         model.selection = nil   // a plain click on empty space
+                        model.selectedAssetID = nil
+                        model.timelineRange = nil
                         model.pause()           // ...also moves the playhead there
                         model.seek(to: time(at: value.location.x))
                     }
@@ -328,6 +373,246 @@ struct TimelineView: View {
         .accessibilityHidden(true)
     }
 
+    // MARK: Skimming, ranges, live numbers, pins
+
+    /// The white line under the pointer while skimming.
+    @ViewBuilder
+    private var skimmer: some View {
+        if let skim = model.skimTime, !model.isPlaying, reorder == nil, clipTrim == nil, blockDrag == nil, rangeAnchor == nil {
+            Rectangle()
+                .fill(Color.white)
+                .frame(width: 1)
+                .offset(x: x(for: skim), y: rulerHeight)
+                .allowsHitTesting(false)
+                .accessibilityHidden(true)
+        }
+    }
+
+    /// The range picked with R (or X), over the clips.
+    @ViewBuilder
+    private var rangeOverlay: some View {
+        if let range = model.timelineRange {
+            RoundedRectangle(cornerRadius: 4)
+                .fill(Color.yellow.opacity(0.18))
+                .overlay(RoundedRectangle(cornerRadius: 4).strokeBorder(Color.yellow, style: StrokeStyle(lineWidth: 3)))
+                .overlay(alignment: .bottomLeading) {
+                    Text("Range \(TimeFormat.string(range.duration))")
+                        .font(.caption2.weight(.bold))
+                        .foregroundStyle(.black)
+                        .padding(.horizontal, 4)
+                        .background(Color.yellow, in: RoundedRectangle(cornerRadius: 3))
+                        .fixedSize()
+                        .padding(3)
+                }
+                .frame(width: max(width(of: range.duration), 3), height: trackHeight + 8)
+                .offset(x: x(for: range.start), y: clipsY - 4)
+                .allowsHitTesting(false)
+                .accessibilityLabel("Range of \(TimeFormat.string(range.duration))")
+        }
+    }
+
+    @ViewBuilder
+    private var rangeMenuItems: some View {
+        Button("Delete Range") { model.deleteRange() }
+        Button("Trim to Range") { model.trimToRange() }
+        Menu("Speed of Range") {
+            ForEach(Clip.speedPresets, id: \.self) { speed in
+                Button(speed == 1 ? "Normal (1×)" : "\(speed.formatted())×") { model.setSpeedInRange(speed) }
+            }
+        }
+        Button("Mute Range") { model.setVolumeInRange(1, muted: true) }
+        Button("Play Range") { model.playSelection() }
+        Button("Clear Range") { model.clearRanges() }
+    }
+
+    /// Copy, paste and reset settings, for a clip's right-click menu.
+    @ViewBuilder
+    private func settingsMenuItems(for item: TimelineItem, clipID: Clip.ID) -> some View {
+        Button("Copy Settings") {
+            if !model.isSelected(item) { model.selection = item }
+            model.copySettings()
+        }
+        Menu("Paste Settings") {
+            Button("All") { pasteSettings(Set(SettingsKind.allCases), onto: item) }
+            Divider()
+            ForEach(SettingsKind.allCases) { kind in
+                Button(kind.displayName) { pasteSettings([kind], onto: item) }
+            }
+        }
+        .disabled(model.copiedClip == nil)
+        Button("Reset All Settings") { model.resetSettings(Set(SettingsKind.allCases), of: [clipID]) }
+            .disabled(model.project.changedSettings(of: clipID).isEmpty)
+    }
+
+    private func pasteSettings(_ kinds: Set<SettingsKind>, onto item: TimelineItem) {
+        if !model.isSelected(item) { model.selection = item }
+        model.pasteSettings(kinds)
+    }
+
+    /// Thin lines from titles, B-roll and sounds down (or up) to the clip they move with.
+    private var pinLines: some View {
+        let titleRows = titleRows, overlayRows = overlayRows, soundRows = soundRows
+        let end = model.duration
+        var pins: [(item: TimelineItem, time: CMTime, top: CGFloat, bottom: CGFloat)] = []
+        for title in model.project.titles where title.followsClip && title.start < end {
+            let top = titlesY + CGFloat(titleRows[title.id] ?? 0) * (titleRowHeight + 2) + titleRowHeight
+            pins.append((.title(title.id), title.start, top, clipsY + 8))
+        }
+        for overlay in model.project.overlays where overlay.followsClip && overlay.start < end {
+            let top = overlaysY + CGFloat(overlayRows[overlay.id] ?? 0) * (overlayRowHeight + rowGap) + overlayRowHeight
+            pins.append((.overlay(overlay.id), overlay.start, top, clipsY + 8))
+        }
+        for sound in model.project.sounds where sound.followsClip && sound.start < end {
+            let bottom = soundsY + CGFloat(soundRows[sound.id] ?? 0) * (soundRowHeight + 2)
+            pins.append((.sound(sound.id), sound.start, clipsY + trackHeight - 8, bottom))
+        }
+        return ZStack(alignment: .topLeading) {
+            ForEach(pins, id: \.item) { pin in
+                let selected = model.isSelected(pin.item)
+                Rectangle()
+                    .fill(selected ? Color.yellow : Color.white.opacity(0.45))
+                    .frame(width: selected ? 2 : 1, height: max(pin.bottom - pin.top, 0))
+                    .overlay(alignment: pin.bottom > clipsY + trackHeight / 2 ? .bottom : .top) {
+                        Circle().fill(selected ? Color.yellow : Color.white.opacity(0.7)).frame(width: 5, height: 5)
+                    }
+                    .offset(x: x(for: pin.time) + 1, y: pin.top)
+            }
+        }
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+
+    /// While dragging: the new length at a trimmed edge, or where the dragged item lands.
+    @ViewBuilder
+    private var dragLabel: some View {
+        if let (text, time) = dragLabelInfo {
+            Text(text)
+                .font(.caption.weight(.semibold).monospacedDigit())
+                .foregroundStyle(.white)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 2)
+                .background(Color.black.opacity(0.85), in: Capsule())
+                .overlay(Capsule().strokeBorder(Color.white.opacity(0.6), lineWidth: 1))
+                .fixedSize()
+                .offset(x: x(for: time) + 6, y: rulerHeight + 2)
+                .allowsHitTesting(false)
+        }
+    }
+
+    private var dragLabelInfo: (String, CMTime)? {
+        if let trim = clipTrim, let clip = model.project.anyClip(id: trim.id), let range = model.project.timeline.range(of: trim.id) {
+            let length = trim.edge == .start ? clip.duration - trim.delta : clip.duration + trim.delta
+            let edge = trim.edge == .start ? range.start + trim.delta : range.end + trim.delta
+            return ("Length \(TimeFormat.string(length))  \(signed(trim.edge == .start ? -trim.delta : trim.delta))", edge)
+        }
+        if let reorder {
+            let others = model.project.timeline.clips.filter { $0.id != reorder.id }
+            let boundary = others.prefix(reorder.destination).reduce(CMTime.zero) { $0 + $1.duration }
+            return ("Goes at \(TimeFormat.string(boundary))", boundary)
+        }
+        if let drag = blockDrag, let start = model.project.start(of: drag.item), let length = duration(of: drag.item) {
+            switch drag.kind {
+            case .move: return ("Starts at \(TimeFormat.string(start + drag.delta))", start + drag.delta)
+            case .start: return ("Length \(TimeFormat.string(length - drag.delta))  \(signed(-drag.delta))", start + drag.delta)
+            case .end: return ("Length \(TimeFormat.string(length + drag.delta))  \(signed(drag.delta))", start + length + drag.delta)
+            }
+        }
+        if rangeAnchor != nil, let range = model.timelineRange {
+            return ("Range \(TimeFormat.string(range.duration))", range.end)
+        }
+        return nil
+    }
+
+    private func duration(of item: TimelineItem) -> CMTime? {
+        switch item {
+        case .title(let id): model.project.title(id: id)?.duration
+        case .overlay(let id): model.project.overlay(id: id)?.duration
+        case .sound(let id): model.project.sound(id: id)?.duration
+        default: nil
+        }
+    }
+
+    /// "+0:00.5" or "−0:00.5".
+    private func signed(_ delta: CMTime) -> String {
+        delta < .zero ? "−\(TimeFormat.string(-delta))" : "+\(TimeFormat.string(delta))"
+    }
+
+    // MARK: Dropping on the clips
+
+    private enum DropTarget: Equatable {
+        /// Between clips (or at the end): put in there.
+        case cut(CMTime)
+        /// On a clip: ask what to do.
+        case clip(Clip.ID, CMTime)
+    }
+
+    /// A drop near a cut goes in there; on a clip, it asks.
+    private func dropTarget(at x: CGFloat) -> DropTarget {
+        var cuts: [CMTime] = [.zero]
+        for clip in model.project.timeline.clips { cuts.append(cuts.last! + clip.duration) }
+        if let near = cuts.min(by: { abs(self.x(for: $0) - x) < abs(self.x(for: $1) - x) }), abs(self.x(for: near) - x) <= 12 {
+            return .cut(near)
+        }
+        let time = time(at: x)
+        guard let (index, _) = model.project.timeline.locate(time) else { return .cut(model.duration) }
+        return .clip(model.project.timeline.clips[index].id, time.snappedToFrame())
+    }
+
+    private func dropHover(_ x: CGFloat?) {
+        dropX = x
+        if x != nil { model.showTip(.dropOnClip) }
+    }
+
+    private func drop(_ urls: [URL], at x: CGFloat) {
+        dropX = nil
+        guard !urls.isEmpty else { return }
+        // Songs and Short files do what they always did (become the music, open the Short).
+        let isPicture = { (url: URL) in
+            let type = UTType(filenameExtension: url.pathExtension.lowercased())
+            return type?.conforms(to: .movie) == true || type?.conforms(to: .image) == true
+        }
+        guard urls.contains(where: isPicture), !model.project.timeline.clips.isEmpty else {
+            model.importFiles(urls, addToTimeline: true)
+            return
+        }
+        switch dropTarget(at: x) {
+        case .cut(let time): model.dropFiles(urls, insertingAt: time)
+        case .clip(let id, let time): model.showDropMenu(for: urls, on: id, at: time)
+        }
+    }
+
+    /// Where dragged files would land: a bar on a cut ("put in here"), or a frame around a clip.
+    @ViewBuilder
+    private var dropMarker: some View {
+        if let dropX, !model.project.timeline.clips.isEmpty {
+            switch dropTarget(at: dropX) {
+            case .cut(let time):
+                Capsule()
+                    .fill(Color.blue)
+                    .overlay(Capsule().strokeBorder(Color.white, lineWidth: 1))
+                    .frame(width: 6, height: trackHeight + 12)
+                    .overlay(alignment: .top) {
+                        Text("Put in here").font(.caption2.weight(.bold)).padding(.horizontal, 4)
+                            .background(Color.blue, in: Capsule()).foregroundStyle(.white).fixedSize().offset(y: -16)
+                    }
+                    .offset(x: x(for: time) - 3, y: clipsY - 6)
+                    .allowsHitTesting(false)
+            case .clip(let id, _):
+                if let range = model.project.timeline.range(of: id) {
+                    RoundedRectangle(cornerRadius: 6)
+                        .strokeBorder(Color.blue, style: StrokeStyle(lineWidth: 3, dash: [6, 3]))
+                        .overlay(alignment: .top) {
+                            Text("Drop for options: replace, insert, over it").font(.caption2.weight(.bold)).padding(.horizontal, 4)
+                                .background(Color.blue, in: Capsule()).foregroundStyle(.white).fixedSize().offset(y: -16)
+                        }
+                        .frame(width: width(of: range.duration), height: trackHeight)
+                        .offset(x: x(for: range.start), y: clipsY)
+                        .allowsHitTesting(false)
+                }
+            }
+        }
+    }
+
     // MARK: Main clips
 
     @ViewBuilder
@@ -395,6 +680,7 @@ struct TimelineView: View {
         .frame(width: slot, height: trackHeight, alignment: .leading)
         .onTapGesture { location in
             let modifiers = NSEvent.modifierFlags
+            model.timelineRange = nil
             model.click(.clip(clip.id), modifiers: modifiers)
             // ⌘/⇧-clicks only change the selection; a plain click also moves the playhead.
             guard modifiers.isDisjoint(with: [.command, .shift]) else { return }
@@ -402,8 +688,17 @@ struct TimelineView: View {
             model.pause()
             model.seek(to: start + seconds(location.x))
         }
-        .gesture(DragGesture(minimumDistance: 4)
+        .gesture(DragGesture(minimumDistance: 4, coordinateSpace: .named(Self.contentSpace))
             .onChanged { value in
+                // With R held, dragging picks a range instead of moving the clip.
+                if rangeAnchor != nil || (reorder == nil && model.isRangeKeyDown) {
+                    if rangeAnchor == nil {
+                        model.pause()
+                        rangeAnchor = time(at: value.startLocation.x)
+                    }
+                    model.setTimelineRange(from: rangeAnchor!, to: time(at: value.location.x))
+                    return
+                }
                 if reorder == nil {
                     model.pause()
                     if !model.isSelected(.clip(clip.id)) { model.selectedClipID = clip.id }
@@ -411,6 +706,10 @@ struct TimelineView: View {
                 reorder = Reorder(id: clip.id, dx: value.translation.width, destination: destination(for: clip, index: index, dx: value.translation.width))
             }
             .onEnded { value in
+                if rangeAnchor != nil {
+                    rangeAnchor = nil
+                    return
+                }
                 let target = destination(for: clip, index: index, dx: value.translation.width)
                 reorder = nil
                 if target != index { model.moveClip(clip.id, to: target) }
@@ -425,6 +724,12 @@ struct TimelineView: View {
             }
             Button(model.isPunchedIn([clip]) ? "Remove Punch-In" : "Punch In") { model.togglePunchIn([clip.id]) }
                 .disabled(clip.hasMotion)
+            Divider()
+            settingsMenuItems(for: .clip(clip.id), clipID: clip.id)
+            if model.timelineRange != nil {
+                Divider()
+                rangeMenuItems
+            }
             Divider()
             deleteButton(for: .clip(clip.id), single: "Delete Clip")
         }
@@ -459,9 +764,11 @@ struct TimelineView: View {
         }
         delta = delta.snappedToFrame().clamped(limits.start, limits.end)
         clipTrim = ClipTrim(id: clip.id, edge: edge, delta: delta)
+        model.showEdgeFrame(ofClip: clip.id, edge: edge, delta: delta)
     }
 
     private func endClipTrim() {
+        if let trim = clipTrim { model.showEdgeFrame(ofClip: trim.id, edge: trim.edge, delta: nil) }
         if let trim = clipTrim, trim.delta != .zero { model.trimClip(trim.id, edge: trim.edge, by: trim.delta) }
         clipTrim = nil
         snapLine = nil
@@ -550,6 +857,8 @@ struct TimelineView: View {
             Button(overlay.clip.isMuted ? "Turn Sound On" : "Turn Sound Off") { model.setClipMuted(overlay.id, !overlay.clip.isMuted) }
                 .disabled(asset?.hasAudio != true)
             Divider()
+            settingsMenuItems(for: item, clipID: overlay.id)
+            Divider()
             deleteButton(for: item, single: "Delete")
         }
     }
@@ -560,6 +869,14 @@ struct TimelineView: View {
     private var titleLane: some View {
         let rows = titleRows
         return ZStack(alignment: .topLeading) {
+            if model.project.titles.isEmpty, !model.project.timeline.clips.isEmpty {
+                Label("Titles go here: ⌘T adds one at the playhead", systemImage: "textformat")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .frame(height: titleRowHeight)
+                    .offset(x: leadingInset + 4)
+                    .allowsHitTesting(false)
+            }
             ForEach(model.project.titles) { title in
                 let item = TimelineItem.title(title.id)
                 let (start, length) = shownRange(of: item, start: title.start, duration: title.duration)
@@ -587,6 +904,16 @@ struct TimelineView: View {
                 })
                 .contextMenu {
                     Button("Start at Playhead") { model.moveTitle(title.id, to: model.currentTime) }
+                    Divider()
+                    Button("Copy Title Design") {
+                        if !model.isSelected(item) { model.selection = item }
+                        model.copySettings()
+                    }
+                    Button("Paste Title Design") {
+                        if !model.isSelected(item) { model.selection = item }
+                        model.pasteTitleDesign()
+                    }
+                    .disabled(model.copiedTitle == nil)
                     Divider()
                     deleteButton(for: item, single: "Delete Title")
                 }
@@ -1112,5 +1439,64 @@ private struct ClipBlock: View, Equatable {
             .accessibilityElement(children: .combine)
             .accessibilityAddTraits(isSelected ? .isSelected : [])
             .accessibilityValue(clip.isMuted ? "Muted" : "")
+    }
+}
+
+/// Files dragged over the main clips: tells where they are (for the landing marker) and hands
+/// over the files when dropped.
+private struct ClipRowDrop: DropDelegate {
+    let onUpdate: (CGFloat?) -> Void
+    let onDrop: ([URL], CGFloat) -> Void
+
+    func validateDrop(info: DropInfo) -> Bool { info.hasItemsConforming(to: [.fileURL]) }
+
+    func dropUpdated(info: DropInfo) -> DropProposal? {
+        onUpdate(info.location.x)
+        return DropProposal(operation: .copy)
+    }
+
+    func dropExited(info: DropInfo) { onUpdate(nil) }
+
+    func performDrop(info: DropInfo) -> Bool {
+        let providers = info.itemProviders(for: [.fileURL])
+        let x = info.location.x
+        onUpdate(nil)
+        Task { @MainActor in
+            var urls: [URL] = []
+            for provider in providers {
+                if let url = await Self.url(from: provider) { urls.append(url) }
+            }
+            onDrop(urls, x)
+        }
+        return true
+    }
+
+    private static func url(from provider: NSItemProvider) async -> URL? {
+        await withCheckedContinuation { continuation in
+            _ = provider.loadObject(ofClass: URL.self) { url, _ in continuation.resume(returning: url) }
+        }
+    }
+}
+
+/// A one-time hint across the top of the timeline.
+private struct TipBanner: View {
+    let tip: EditorTip
+    let dismiss: () -> Void
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(systemName: tip.systemImage).font(.title3)
+            Text(tip.text).fixedSize(horizontal: false, vertical: true)
+            Button("Got It", action: dismiss).controlSize(.small)
+        }
+        .font(.callout)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .frame(maxWidth: 620)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 10))
+        .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(Color.white.opacity(0.3), lineWidth: 1))
+        .shadow(radius: 8)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Tip: \(tip.text)")
     }
 }

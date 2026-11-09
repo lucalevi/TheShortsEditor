@@ -12,6 +12,11 @@ struct ContentView: View {
             case .editor: EditorView(model: model)
             }
         }
+        .overlay {
+            if model.isFullScreenPreview, model.screen == .editor {
+                FullScreenPreview(model: model)
+            }
+        }
         .onAppear {
             keys.install(for: model)
         }

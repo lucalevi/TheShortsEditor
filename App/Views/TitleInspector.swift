@@ -52,6 +52,8 @@ struct TitleInspector: View {
 
             TitleLookSection(model: model, title: title)
 
+            FollowClipToggle(model: model, item: .title(title.id))
+
             VStack(alignment: .leading, spacing: 6) {
                 Text("Appears with").font(.subheadline.weight(.semibold))
                 Picker("Appears with", selection: Binding(get: { title.entrance }, set: { entrance in

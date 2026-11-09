@@ -41,6 +41,22 @@ struct EditorCommands: Commands {
             Button("Deselect All") { model.selection = nil }
                 .keyboardShortcut("a", modifiers: [.command, .shift])
                 .disabled(model.timelineSelection.isEmpty)
+            Divider()
+            Button("Copy Settings") { model.copySettings() }
+                .keyboardShortcut("c", modifiers: [.command, .option])
+                .disabled(model.settingsSource.clip == nil && model.settingsSource.title == nil)
+            Menu("Paste Settings") {
+                Button("All") { model.pasteAllSettings() }
+                    .keyboardShortcut("v", modifiers: [.command, .option])
+                Divider()
+                ForEach(SettingsKind.allCases) { kind in
+                    Button(kind.displayName) { model.pasteSettings([kind]) }
+                        .disabled(model.copiedClip == nil)
+                }
+                Button("Title Design") { model.pasteTitleDesign() }
+                    .disabled(model.copiedTitle == nil)
+            }
+            .disabled(!model.canPasteSettings)
         }
 
         CommandMenu("Clip") {
@@ -58,6 +74,22 @@ struct EditorCommands: Commands {
                 .keyboardShortcut(.delete, modifiers: [])
                 .disabled(model.timelineSelection.isEmpty)
             Divider()
+            Button("Select Clip Range") { model.selectClipRange() }
+                .keyboardShortcut("x", modifiers: [])
+                .disabled(model.project.timeline.clips.isEmpty)
+            Button("Trim to Range") { model.trimToRange() }
+                .keyboardShortcut("/", modifiers: .option)
+                .disabled(model.timelineRange == nil)
+            Button("Delete Range") { model.deleteRange() }
+                .disabled(model.timelineRange == nil)
+            Button("Clear Range") { model.clearRanges() }
+                .disabled(model.timelineRange == nil && model.mediaRange == nil)
+            Divider()
+            Button("Add Selected Media to End") { model.appendSelectedMedia() }
+                .keyboardShortcut("e", modifiers: [])
+                .disabled(model.selectedAssetID == nil)
+            Button("Insert Selected Media at Playhead (W)") { model.insertSelectedMedia() }
+                .disabled(model.selectedAssetID == nil)
             Button("Add Over Clips at Playhead…") { OverlayImportPanel.run(model: model) }
                 .disabled(model.project.timeline.clips.isEmpty)
             Divider()
@@ -74,11 +106,15 @@ struct EditorCommands: Commands {
             Menu("Speed") {
                 ForEach(Clip.speedPresets, id: \.self) { speed in
                     Button(speed == 1 ? "Normal (1×)" : "\(speed.formatted())×") {
-                        model.setSpeed(speed, for: selectedClips.filter { model.project.asset(id: $0.assetID)?.isImage != true }.map(\.id))
+                        if model.timelineRange != nil {
+                            model.setSpeedInRange(speed)
+                        } else {
+                            model.setSpeed(speed, for: selectedClips.filter { model.project.asset(id: $0.assetID)?.isImage != true }.map(\.id))
+                        }
                     }
                 }
             }
-            .disabled(selectedClips.isEmpty)
+            .disabled(selectedClips.isEmpty && model.timelineRange == nil)
             Button("Follow the Subject") { if let clip = selectedClips.first { model.followSubject(clip.id) } }
                 .disabled(selectedClips.count != 1 || model.reframing != nil)
             Menu("Motion") {
@@ -91,6 +127,8 @@ struct EditorCommands: Commands {
                     .disabled(model.adjustableClip?.hasMotion != true)
             }
             .disabled(model.adjustableClip == nil)
+            Button("Reset All Settings") { model.resetSelectedClips() }
+                .disabled(selectedClips.isEmpty)
             Divider()
             Button("Remove Pauses…") { model.beginRemovingSilences() }
                 .disabled(model.project.timeline.clips.isEmpty || model.silenceSession != nil)
@@ -166,6 +204,20 @@ struct EditorCommands: Commands {
                 .keyboardShortcut(.home, modifiers: [])
             Button("Go to End") { model.seek(to: model.duration) }
                 .keyboardShortcut(.end, modifiers: [])
+            Button("Previous Edit") { model.goToEdit(forward: false) }
+                .keyboardShortcut(";", modifiers: [])
+            Button("Next Edit") { model.goToEdit(forward: true) }
+                .keyboardShortcut("'", modifiers: [])
+            Divider()
+            Button("Play Selection") { model.playSelection() }
+                .keyboardShortcut("/", modifiers: [])
+            Button("Play from Start") { model.playFromStart() }
+                .keyboardShortcut("\\", modifiers: [])
+            Toggle("Loop Playback", isOn: Binding(get: { model.loopsPlayback }, set: { model.loopsPlayback = $0 }))
+                .keyboardShortcut("l", modifiers: .command)
+            Button(model.isFullScreenPreview ? "Leave Full Screen" : "Play Full Screen") { model.toggleFullScreenPreview() }
+                .keyboardShortcut("f", modifiers: [.command, .shift])
+                .disabled(model.project.timeline.clips.isEmpty)
         }
 
         CommandGroup(before: .toolbar) {
@@ -173,6 +225,10 @@ struct EditorCommands: Commands {
                 .keyboardShortcut("'", modifiers: .command)
             Toggle("Snapping", isOn: Binding(get: { model.snapsToEdges }, set: { model.snapsToEdges = $0 }))
                 .keyboardShortcut("s", modifiers: [])
+            Toggle("Skimming", isOn: Binding(get: { model.skimsTimeline }, set: { model.skimsTimeline = $0 }))
+            Toggle("Audio Skimming", isOn: Binding(get: { model.skimsAudio }, set: { model.skimsAudio = $0 }))
+                .keyboardShortcut("s", modifiers: .shift)
+                .disabled(!model.skimsTimeline)
             Button("Zoom In Timeline") { model.zoom(by: 1.5) }
                 .keyboardShortcut("+", modifiers: .command)
             Button("Zoom Out Timeline") { model.zoom(by: 1 / 1.5) }

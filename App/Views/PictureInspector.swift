@@ -69,9 +69,9 @@ struct PictureSection: View {
                 }
                 .disabled(clip.hasMotion)
                 .help("Zoom in 20%. On every other cut of the same recording, it hides jump cuts.")
-                Button("Reset") { model.resetPlacement(of: [clip.id]) }
-                    .disabled(clip.placement.isIdentity && !clip.hasMotion)
-                    .help("Back to the middle, at full size, with no motion")
+                Button("Reset") { model.resetSettings([.picture], of: [clip.id]) }
+                    .disabled(!model.project.changedSettings(of: clip.id).contains(.picture) && !clip.hasMotion)
+                    .help("Back to how the picture was when added: framing, middle of the screen, full size, no motion")
             }
             .controlSize(.small)
 
