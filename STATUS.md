@@ -18,7 +18,7 @@ Stages 1–7 are done, tested on screen, committed and pushed to https://github.
 
 **Pick up here:** the P0 list from the research is complete. On 2026-11-09 CapCut was analysed (`research/capcut-reverse-engineering.md`) and creator tool usage researched (`research/shorts-creator-tools-research.md`, with a gap table in §5), then distilled into the build list `research/feature-roadmap.md` (12 features, stages 8–16).
 
-### Home window with every Short (2026-11-09): done, not committed yet
+### Home window with every Short (2026-11-09): done, committed (44c6838)
 
 Like iMovie's Projects browser. The app opens on **Shorts**, a grid of every Short (9:16 poster = a frame 1 s in, rendered by `ProjectPoster` through the compositor; length badge; name; last change), grouped Today / Yesterday / Previous 7 Days / month, newest first, with a **New Short** tile, a + button and **Search Shorts**. Click a Short to edit it. "…" button or right-click: Edit, Rename (inline, also by double-clicking the name), Duplicate ("… copy"), Delete… (asks; moves the file to the Trash, media untouched). Dropping videos on the home window starts a new Short with them.
 - Editor toolbar: **‹ All Shorts** (⇧⌘0, File ▸ All Shorts) saves and goes back; next to it the Short's name, click to rename (Return keeps, Escape cancels). New Shorts are "My Short", "My Short 2"…; a Short left with no media isn't kept.
@@ -29,7 +29,7 @@ Like iMovie's Projects browser. The app opens on **Shorts**, a grid of every Sho
 - Verified on screen: launch on home, New Short tile, videos opened from Finder go into it, rename in the toolbar, split then All Shorts (home shows the new name and time, poster), empty New Short (⌘N then back) not kept, Duplicate from the "…" menu, rename by double-click, search, Delete… with the confirmation, a Short opened from Finder on the home window, ⌘Q in the editor then relaunch (Short kept with poster).
 - Not yet verified on screen: Open… with a `.shortsproject` from elsewhere, Save a Copy…, dropping videos on the home window, a library with Shorts from earlier months, many Shorts (no lazy poster loading limit beyond one at a time).
 
-### Batch "features 6–12" (2026-11-09): done, not committed yet
+### Batch "features 6–12" (2026-11-09): done, committed (ca0fc32)
 
 Features 1–5 are committed (`b764acb`). The user then asked for 6–12 in one go; a usage limit interrupted it once, then it was finished. All seven are built, tested and checked on screen. **Not committed yet** (the user commits each batch).
 
