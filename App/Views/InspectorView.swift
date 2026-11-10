@@ -148,25 +148,43 @@ private struct ClipInspector: View {
                 Text("Length \(TimeFormat.string(clip.duration))").foregroundStyle(.secondary)
             }
 
+            HStack {
+                Button("Freeze Frame", systemImage: "snowflake") { model.addFreezeFrame() }
+                    .help("Hold the picture at the playhead for three seconds (⌥F)")
+                    .disabled(clip.isFrozen || asset?.isImage == true)
+                Button("Replay", systemImage: "gobackward") { model.addInstantReplay() }
+                    .help("Show this clip once more straight after itself, at half speed")
+            }
+            .controlSize(.small)
+
             PictureSection(model: model, clip: clip, isMain: true)
                 .id(clip.id)
 
             MotionSection(model: model, clip: clip)
 
-            if asset?.isImage != true {
+            if clip.isFrozen {
+                FreezeSection(model: model, clip: clip)
+            } else if asset?.isImage != true {
                 SpeedSection(model: model, clips: [clip])
                     .id(clip.id)
             }
 
-            if !clip.soundDetached {
-                ClipSound(model: model, clip: clip, hasSound: asset?.hasAudio ?? false)
-                    .id(clip.id)
+            if clip.isFrozen {
+                // One picture: no sound of its own.
+            } else {
+                if !clip.soundDetached {
+                    ClipSound(model: model, clip: clip, hasSound: asset?.hasAudio ?? false)
+                        .id(clip.id)
+                }
+                if asset?.hasAudio == true, asset?.isImage != true {
+                    if !clip.soundDetached { CleanVoiceToggle(model: model, clips: [clip]) }
+                    SoundShapingSection(model: model, clip: clip, isMain: true)
+                        .id(clip.id)
+                }
             }
-            if asset?.hasAudio == true, asset?.isImage != true {
-                if !clip.soundDetached { CleanVoiceToggle(model: model, clips: [clip]) }
-                SoundShapingSection(model: model, clip: clip, isMain: true)
-                    .id(clip.id)
-            }
+
+            TransitionSection(model: model, clip: clip)
+                .id(clip.id)
 
             ClipSettingsButtons(model: model, clipID: clip.id)
 
@@ -254,6 +272,9 @@ private struct OverlayInspector: View {
             PictureSection(model: model, clip: overlay.clip, isMain: false)
                 .id(overlay.id)
 
+            SeeThroughSection(model: model, clip: overlay.clip)
+                .id(overlay.id)
+
             MotionSection(model: model, clip: overlay.clip)
 
             if asset?.isImage != true {
@@ -322,6 +343,7 @@ private struct ProjectInspector: View {
                 Tip(icon: "hand.tap", text: "Click a clip to select it. Drag it to move it, or drag its edges to trim it.")
                 Tip(icon: "rectangle.on.rectangle", text: "Drop B-roll or pictures on the row above the clips to show them over your clips.")
                 Tip(icon: "plus.magnifyingglass", text: "Punch in on every other cut (Clip menu) to hide jump cuts.")
+                Tip(icon: "circle.lefthalf.filled", text: "Press ⌥T to put a transition on the cut nearest the playhead. Plain cuts are usually best; keep transitions for a change of place or time.")
             }
         }
     }

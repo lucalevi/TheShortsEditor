@@ -81,6 +81,13 @@ struct EditorView: View {
                     .disabled(model.project.timeline.clips.isEmpty)
             }
             ToolbarItem {
+                Button("Transition", systemImage: "circle.lefthalf.filled") {
+                    model.chooseTransition()
+                }
+                .help("Put a transition on the cut nearest the playhead (⌥T), then choose its kind")
+                .disabled(model.project.timeline.clips.count < 2)
+            }
+            ToolbarItem {
                 Button("Remove Pauses", systemImage: "waveform.path.badge.minus") { model.beginRemovingSilences() }
                     .help("Cut out the quiet parts between sentences")
                     .disabled(model.project.timeline.clips.isEmpty || model.silenceSession != nil)

@@ -9,7 +9,8 @@ public struct ProjectFile: Codable, Equatable, Sendable {
     /// Bumped when the format changes in a way older versions can't read.
     /// 2: overlays (B-roll), pictures, placement and motion.
     /// 3: speed, title looks, key words and emoji, sound effects and voice-overs, layouts.
-    public static let currentVersion = 3
+    /// 4: transitions, freeze frames, clips played backwards, see-through B-roll.
+    public static let currentVersion = 4
     public static let fileExtension = "shortsproject"
 
     public var version: Int

@@ -178,8 +178,9 @@ public extension Clip {
 
     /// The fades and line of a clip cut in two at `offset`: the first part keeps the fade in, the second the fade out.
     mutating func keepFades(isFirst: Bool, isLast: Bool) {
-        if !isFirst { fadeIn = .zero }
-        if !isLast { fadeOut = .zero }
+        if !isFirst { fadeIn = .zero; pictureFadeIn = .zero }
+        // The change into the next clip stays at the end of the last part.
+        if !isLast { fadeOut = .zero; pictureFadeOut = .zero; transitionOut = nil }
     }
 
     /// Sound settings back to a newly added clip's.
@@ -275,6 +276,7 @@ public extension Project {
         sound.framing = .fill
         sound.placement = .identity
         sound.keyframes = []
+        sound.transitionOut = nil
         let start = timeline.startTime(ofClipAt: index)
         sounds.append(SoundClip(clip: sound, start: start, detachedFrom: clipID))
         timeline.clips[index].soundDetached = true

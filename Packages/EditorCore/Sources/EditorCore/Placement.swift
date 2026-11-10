@@ -16,12 +16,35 @@ public struct Placement: Codable, Equatable, Hashable, Sendable {
     public var scale: Double
     /// Degrees, clockwise.
     public var rotation: Double
+    /// How solid the picture is: 1 hides what is behind it, 0 can't be seen at all.
+    public var opacity: Double
 
-    public init(offsetX: Double = 0, offsetY: Double = 0, scale: Double = 1, rotation: Double = 0) {
+    public init(offsetX: Double = 0, offsetY: Double = 0, scale: Double = 1, rotation: Double = 0, opacity: Double = 1) {
         self.offsetX = offsetX
         self.offsetY = offsetY
         self.scale = scale
         self.rotation = rotation
+        self.opacity = opacity
+    }
+
+    private enum CodingKeys: String, CodingKey { case offsetX, offsetY, scale, rotation, opacity }
+
+    public init(from decoder: any Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        offsetX = try c.decode(Double.self, forKey: .offsetX)
+        offsetY = try c.decode(Double.self, forKey: .offsetY)
+        scale = try c.decode(Double.self, forKey: .scale)
+        rotation = try c.decode(Double.self, forKey: .rotation)
+        opacity = try c.decodeIfPresent(Double.self, forKey: .opacity) ?? 1
+    }
+
+    public func encode(to encoder: any Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(offsetX, forKey: .offsetX)
+        try c.encode(offsetY, forKey: .offsetY)
+        try c.encode(scale, forKey: .scale)
+        try c.encode(rotation, forKey: .rotation)
+        if opacity != 1 { try c.encode(opacity, forKey: .opacity) }
     }
 
     public static let identity = Placement()
@@ -39,6 +62,7 @@ public struct Placement: Codable, Equatable, Hashable, Sendable {
         p.rotation = p.rotation.truncatingRemainder(dividingBy: 360)
         if p.rotation > 180 { p.rotation -= 360 }
         if p.rotation < -180 { p.rotation += 360 }
+        p.opacity = min(max(p.opacity, 0), 1)
         return p
     }
 
@@ -58,7 +82,8 @@ public struct Placement: Codable, Equatable, Hashable, Sendable {
         let f = min(max(fraction, 0), 1)
         func mix(_ a: Double, _ b: Double) -> Double { a + (b - a) * f }
         let scale = self.scale > 0 && other.scale > 0 ? exp(mix(log(self.scale), log(other.scale))) : mix(self.scale, other.scale)
-        return Placement(offsetX: mix(offsetX, other.offsetX), offsetY: mix(offsetY, other.offsetY), scale: scale, rotation: mix(rotation, other.rotation))
+        return Placement(offsetX: mix(offsetX, other.offsetX), offsetY: mix(offsetY, other.offsetY), scale: scale, rotation: mix(rotation, other.rotation),
+                         opacity: mix(opacity, other.opacity))
     }
 }
 

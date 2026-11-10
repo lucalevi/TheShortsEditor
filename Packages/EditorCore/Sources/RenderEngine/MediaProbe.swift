@@ -42,6 +42,7 @@ public enum MediaProbe {
             )
         }
         let (timeRange, naturalSize, transform) = try await video.load(.timeRange, .naturalSize, .preferredTransform)
+        let frameRate = try? await video.load(.nominalFrameRate)
         guard timeRange.duration > .zero else { throw ProbeError.empty }
         let hasAudio = try await !asset.loadTracks(withMediaType: .audio).isEmpty
         let oriented = CGRect(origin: .zero, size: naturalSize).applying(transform)
@@ -51,7 +52,8 @@ public enum MediaProbe {
             // The video track's own length, not the file's: audio can run a few frames longer.
             duration: timeRange.duration,
             displaySize: CGSize(width: abs(oriented.width), height: abs(oriented.height)),
-            hasAudio: hasAudio
+            hasAudio: hasAudio,
+            frameRate: frameRate.flatMap { $0 > 0 ? Double($0) : nil }
         )
     }
 

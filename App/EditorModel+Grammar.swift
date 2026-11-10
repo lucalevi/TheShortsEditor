@@ -411,7 +411,7 @@ extension EditorModel {
 
 /// A hint shown once, the first time it would help (like iMovie's "Press the R key…").
 enum EditorTip: String, CaseIterable {
-    case skimming, range, mediaKeys, follow, dropOnClip
+    case skimming, range, mediaKeys, follow, dropOnClip, transitions, freezeFrame
 
     var text: String {
         switch self {
@@ -420,6 +420,8 @@ enum EditorTip: String, CaseIterable {
         case .mediaKeys: "Press E to add this file to the end, or W to put it in at the playhead. Drag across the bar under it to use only part of it."
         case .follow: "Titles, B-roll and sounds move with the clip under their start (the thin line shows which one). You can turn this off in the inspector."
         case .dropOnClip: "Drop on a cut to put it in there. Drop on a clip to replace it, or to show it over the clip."
+        case .transitions: "The white square on the cut is the transition. Click it to choose another kind or change its length. Move the pointer across it to see it."
+        case .freezeFrame: "The freeze frame holds this picture for three seconds. Drag its edges to make it shorter or longer."
         }
     }
 
@@ -430,6 +432,8 @@ enum EditorTip: String, CaseIterable {
         case .mediaKeys: "keyboard"
         case .follow: "pin"
         case .dropOnClip: "arrow.down.to.line"
+        case .transitions: "circle.lefthalf.filled"
+        case .freezeFrame: "snowflake"
         }
     }
 

@@ -58,7 +58,13 @@ public extension Project {
         if let part { range = part.intersection(range) }
         let start = range.start.snappedToFrame().clamped(.zero, max(.zero, asset.duration - Clip.minimumDuration))
         let length = max(range.duration.snappedToFrame(), Clip.minimumDuration).clamped(Clip.minimumDuration, asset.duration - start)
-        return Clip(assetID: assetID, sourceStart: start, duration: length, framing: asset.defaultFraming)
+        var clip = Clip(assetID: assetID, sourceStart: start, duration: length, framing: asset.defaultFraming)
+        // Footage filmed for slow motion starts slowed down, as it was meant to be seen.
+        if asset.defaultSpeed != 1 {
+            clip.speed = asset.defaultSpeed
+            clip.duration = max(CMTimeMultiplyByFloat64(length, multiplier: 1 / asset.defaultSpeed).snappedToFrame(), Clip.minimumDuration)
+        }
+        return clip
     }
 
     /// Adds `part` of a file (or all of it) to the end of the storyline (iMovie's E).
@@ -101,6 +107,7 @@ public extension Project {
         default:
             break
         }
+        clip.transitionOut = old.transitionOut
         timeline.clips[index] = clip
         return clip.id
     }
@@ -392,6 +399,8 @@ public extension Project {
                 clip.framing = source.framing
                 clip.placement = source.placement
                 clip.background = source.background
+                clip.pictureFadeIn = source.pictureFadeIn
+                clip.pictureFadeOut = source.pictureFadeOut
                 if !kinds.contains(.motion) { clip.keyframes = [] }
             }
             if kinds.contains(.motion) {
@@ -429,6 +438,8 @@ public extension Project {
                 clip.placement = .identity
                 clip.background = .blur
                 clip.keyframes = []
+                clip.pictureFadeIn = .zero
+                clip.pictureFadeOut = .zero
             }
             if kinds.contains(.motion) { clip.keyframes = [] }
             if kinds.contains(.sound) {
@@ -445,7 +456,7 @@ public extension Project {
         guard let clip = anyClip(id: id), let media = asset(id: clip.assetID) else { return [] }
         let isMain = timeline.index(of: id) != nil
         var kinds: Set<SettingsKind> = []
-        if !clip.placement.isIdentity || clip.framing != (isMain ? media.defaultFraming : .fill) || (isMain && clip.background != .blur) {
+        if !clip.placement.isIdentity || clip.framing != (isMain ? media.defaultFraming : .fill) || (isMain && clip.background != .blur) || clip.hasPictureFades {
             kinds.insert(.picture)
         }
         if !clip.keyframes.isEmpty { kinds.insert(.motion) }

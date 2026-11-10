@@ -70,6 +70,10 @@ public struct MediaAsset: Identifiable, Codable, Equatable, Sendable {
     /// A still picture (photo, screenshot). It has a picture (`hasVideo`) but no video track, and
     /// can be shown for any length up to `MediaAsset.imageDuration`.
     public var isImage: Bool
+    /// Pictures per second of a video, when known. High numbers mean it was filmed for slow motion.
+    public var frameRate: Double?
+    /// Set on a copy of another file made to play backwards (see `TimeEffects.swift`).
+    public var reversedFrom: ReversedSource?
 
     /// The longest a picture can be shown. Pictures are given this as their length, so trimming
     /// treats them like a very long video.
@@ -77,7 +81,10 @@ public struct MediaAsset: Identifiable, Codable, Equatable, Sendable {
     /// How long a picture stays when it is added.
     public static let imageClipDuration = CMTime(value: 3, timescale: 1)
 
-    public init(id: UUID = UUID(), url: URL, name: String, duration: CMTime, displaySize: CGSize, hasAudio: Bool, hasVideo: Bool = true, isImage: Bool = false) {
+    public init(id: UUID = UUID(), url: URL, name: String, duration: CMTime, displaySize: CGSize, hasAudio: Bool, hasVideo: Bool = true, isImage: Bool = false,
+                frameRate: Double? = nil, reversedFrom: ReversedSource? = nil) {
+        self.frameRate = frameRate
+        self.reversedFrom = reversedFrom
         self.id = id
         self.url = url
         self.name = name
@@ -129,16 +136,13 @@ public extension Project {
     /// Appends a clip covering the whole of the asset to the end of the timeline.
     @discardableResult
     mutating func appendClip(of assetID: MediaAsset.ID) -> Clip.ID? {
-        guard let asset = asset(id: assetID), asset.hasVideo, asset.duration > .zero else { return nil }
-        let clip = Clip(assetID: assetID, sourceStart: .zero, duration: asset.defaultClipDuration, framing: asset.defaultFraming)
-        timeline.clips.append(clip)
-        return clip.id
+        appendClip(of: assetID, part: nil)
     }
 }
 
 extension MediaAsset {
     private enum CodingKeys: String, CodingKey {
-        case id, url, name, duration, displaySize, hasAudio, hasVideo, isImage
+        case id, url, name, duration, displaySize, hasAudio, hasVideo, isImage, frameRate, reversedFrom
     }
 
     public init(from decoder: any Decoder) throws {
@@ -151,6 +155,8 @@ extension MediaAsset {
         hasAudio = try c.decode(Bool.self, forKey: .hasAudio)
         hasVideo = try c.decodeIfPresent(Bool.self, forKey: .hasVideo) ?? true
         isImage = try c.decodeIfPresent(Bool.self, forKey: .isImage) ?? false
+        frameRate = try c.decodeIfPresent(Double.self, forKey: .frameRate)
+        reversedFrom = try? c.decodeIfPresent(ReversedSource.self, forKey: .reversedFrom)
     }
 
     public func encode(to encoder: any Encoder) throws {
@@ -163,5 +169,7 @@ extension MediaAsset {
         try c.encode(hasAudio, forKey: .hasAudio)
         try c.encode(hasVideo, forKey: .hasVideo)
         try c.encode(isImage, forKey: .isImage)
+        try c.encodeIfPresent(frameRate, forKey: .frameRate)
+        try c.encodeIfPresent(reversedFrom, forKey: .reversedFrom)
     }
 }

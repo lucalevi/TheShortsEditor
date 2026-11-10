@@ -115,6 +115,30 @@ struct EditorCommands: Commands {
                 }
             }
             .disabled(selectedClips.isEmpty && model.timelineRange == nil)
+            Button("Add Freeze Frame") { model.addFreezeFrame() }
+                .keyboardShortcut("f", modifiers: .option)
+                .disabled(model.project.timeline.clips.isEmpty)
+            Button("Instant Replay") { model.addInstantReplay() }
+                .disabled(model.replayRange == nil)
+            let turnable = selectedClips.filter { model.project.canReverse($0) }
+            Toggle("Play Backwards", isOn: Binding(get: { !turnable.isEmpty && turnable.allSatisfy { model.project.isReversed($0) } },
+                                                    set: { _ in model.toggleBackwards(for: turnable.map(\.id)) }))
+                .disabled(turnable.isEmpty || !model.reversing.isEmpty)
+            Menu("Transition") {
+                Button("Add \(model.preferredTransition.kind.displayName) at Nearest Cut") { model.addTransition() }
+                    .keyboardShortcut("t", modifiers: .option)
+                Divider()
+                ForEach(TransitionKind.allCases) { kind in
+                    Button(kind.displayName) { model.addTransition(kind) }
+                }
+                Divider()
+                Button("Remove at Nearest Cut") { model.removeTransitionAtPlayhead() }
+                    .disabled(model.transitionCut.flatMap { model.project.transition(after: $0) } == nil)
+                Button("Same on Every Cut") { model.setTransitionOnEveryCut(model.transitionCut.flatMap { model.project.transition(after: $0) } ?? model.preferredTransition) }
+                Button("Remove All Transitions") { model.setTransitionOnEveryCut(nil) }
+                    .disabled(model.project.transitionCount == 0)
+            }
+            .disabled(model.project.timeline.clips.count < 2)
             Button("Follow the Subject") { if let clip = selectedClips.first { model.followSubject(clip.id) } }
                 .disabled(selectedClips.count != 1 || model.reframing != nil)
             Menu("Motion") {

@@ -62,8 +62,11 @@ public enum CompositionBuilder {
         // The main clips, back to back.
         var layers: [(range: CMTimeRange, layer: CompositorLayer)] = []
         var cursor = CMTime.zero
-        for clip in project.timeline.clips {
-            let layer = try await media.layer(for: clip, at: cursor, in: videoTrack, isMain: true)
+        for (index, clip) in project.timeline.clips.enumerated() {
+            // Where the speed changes gradually into a neighbour's, the picture goes in as a few
+            // short stretches at speeds in between (the sound keeps its plain step).
+            let segments = project.timeline.hasSpeedRamp(atClip: index) ? project.timeline.speedSegments(forClipAt: index) : nil
+            let layer = try await media.layer(for: clip, at: cursor, in: videoTrack, isMain: true, segments: segments)
             if case .track = layer.source, !clip.soundDetached, let sourceAudio = try await media.audioTrack(for: clip) {
                 // Audio may be a little shorter than the video; insert only what exists and pad
                 // so the next clip's sound still starts exactly with its picture.
@@ -79,6 +82,22 @@ public enum CompositionBuilder {
             layers.append((CMTimeRange(start: cursor, duration: clip.duration), layer))
             cursor = cursor + clip.duration
         }
+
+        // Transitions: around each cut both clips are on screen. In the half before the cut the
+        // next clip is needed early, in the half after it the old clip is needed late: more of
+        // their files where there is more (on a track of its own), else their first or last picture.
+        let spans = project.timeline.transitionSpans
+        var transitionTrack: AVMutableCompositionTrack?
+        var transitions: [(span: TransitionSpan, incoming: CompositorLayer, outgoing: CompositorLayer)] = []
+        for span in spans {
+            guard let from = layers.first(where: { $0.layer.clip.id == span.from }), let to = layers.first(where: { $0.layer.clip.id == span.to }) else { continue }
+            if transitionTrack == nil { transitionTrack = composition.addMutableTrack(withMediaType: .video, preferredTrackID: kCMPersistentTrackID_Invalid) }
+            guard let track = transitionTrack else { continue }
+            let incoming = try await media.borrowedLayer(like: to.layer, before: true, half: span.half, at: span.range.start, in: track)
+            let outgoing = try await media.borrowedLayer(like: from.layer, before: false, half: span.half, at: span.cut, in: track)
+            transitions.append((span, incoming, outgoing))
+        }
+        if let transitionTrack, transitionTrack.segments.isEmpty { composition.removeTrack(transitionTrack) }
 
         // Overlays: each row of overlapping ones gets its own video (and sound) track.
         var mixInputs: [AVAudioMixInputParameters] = []
@@ -140,14 +159,22 @@ public enum CompositionBuilder {
         // One instruction for each stretch where the same clips are on screen.
         var cuts = Set(layers.flatMap { [$0.range.start, $0.range.end] })
         for (range, _) in overlayLayers { cuts.formUnion([range.start, range.end]) }
+        for span in spans { cuts.formUnion([span.range.start, span.range.end]) }
         let times = cuts.filter { $0 <= cursor }.sorted()
         var instructions: [any AVVideoCompositionInstructionProtocol] = []
         for (from, to) in zip(times, times.dropFirst()) where to > from {
             guard let main = layers.first(where: { $0.range.containsTime(from) })?.layer else { continue }
             let regions = project.regions(at: from)
             let over = overlayLayers.filter { $0.range.containsTime(from) }.map { $0.layer.with(region: regions.region(for: $0.layer.clip.id, isMain: false)) }
+            var drawing: TransitionDrawing?
+            if let transition = transitions.first(where: { $0.span.range.containsTime(from) }) {
+                let beforeCut = from < transition.span.cut
+                drawing = TransitionDrawing(kind: transition.span.kind, range: transition.span.range,
+                                            other: (beforeCut ? transition.incoming : transition.outgoing).with(region: regions.main), otherIsIncoming: beforeCut)
+            }
             instructions.append(ShortsInstruction(
-                timeRange: CMTimeRange(start: from, end: to), layers: [main.with(region: regions.main)] + over, captions: captions, titles: titles
+                timeRange: CMTimeRange(start: from, end: to), layers: [main.with(region: regions.main)] + over, captions: captions, titles: titles,
+                transition: drawing
             ))
         }
         var missing = media.missing
@@ -274,11 +301,21 @@ private struct MediaSources {
     /// Puts `clip`'s picture into `track` at `start` and says how to draw it. A picture file is
     /// drawn by the compositor; missing media is black (main clip) or nothing (overlay). The main
     /// track always gets something for the whole clip, so the Short keeps its length.
-    mutating func layer(for clip: Clip, at start: CMTime, in track: AVMutableCompositionTrack, isMain: Bool) async throws -> CompositorLayer {
+    mutating func layer(for clip: Clip, at start: CMTime, in track: AVMutableCompositionTrack, isMain: Bool,
+                        segments: [SpeedSegment]? = nil) async throws -> CompositorLayer {
         func make(_ source: CompositorLayer.Source, _ size: CGSize, _ transform: CGAffineTransform = .identity) -> CompositorLayer {
             CompositorLayer(source: source, clip: clip, timelineStart: start, naturalSize: size, preferredTransform: transform, isMain: isMain, region: CGRect(origin: .zero, size: Project.canvasSize))
         }
         let media = project.asset(id: clip.assetID)
+        if let media, media.hasVideo, !media.isImage, clip.isFrozen {
+            // A freeze frame: one picture of the video, read once.
+            if isMain { try await CompositionBuilder.insertBlack(into: track, at: start, duration: clip.duration) }
+            if let still = await FrameStills.still(of: media.url, at: clip.sourceStart) {
+                return make(.frame(still), still.naturalSize, still.preferredTransform)
+            }
+            missing.insert(media.id)
+            return make(.none, Project.canvasSize)
+        }
         if let media, media.isImage {
             if isMain { try await CompositionBuilder.insertBlack(into: track, at: start, duration: clip.duration) }
             if let image = StillImages.image(at: media.url) {
@@ -288,8 +325,17 @@ private struct MediaSources {
             return make(.none, Project.canvasSize)
         }
         if let media, media.hasVideo, let video = try? await asset(media).loadTracks(withMediaType: .video).first {
-            try track.insertTimeRange(clip.sourceRange, of: video, at: start)
-            if clip.speed != 1 { track.scaleTimeRange(CMTimeRange(start: start, duration: clip.sourceRange.duration), toDuration: clip.duration) }
+            if let segments, !segments.isEmpty {
+                var at = start
+                for segment in segments {
+                    try track.insertTimeRange(segment.source, of: video, at: at)
+                    track.scaleTimeRange(CMTimeRange(start: at, duration: segment.source.duration), toDuration: segment.duration)
+                    at = at + segment.duration
+                }
+            } else {
+                try track.insertTimeRange(clip.sourceRange, of: video, at: start)
+                if clip.speed != 1 { track.scaleTimeRange(CMTimeRange(start: start, duration: clip.sourceRange.duration), toDuration: clip.duration) }
+            }
             let (naturalSize, preferredTransform) = try await video.load(.naturalSize, .preferredTransform)
             return make(.track(track.trackID), naturalSize, preferredTransform)
         }
@@ -297,6 +343,33 @@ private struct MediaSources {
         if let media { missing.insert(media.id) }
         if isMain { try await CompositionBuilder.insertBlack(into: track, at: start, duration: clip.duration) }
         return make(.none, Project.canvasSize)
+    }
+
+    /// The picture of a main clip for the half of a transition where the clip isn't on the main
+    /// track: the `half` just before its start (`before`) or just after its end, put into `track`
+    /// at `time`. Where its file has no more (or it is a still), it holds its first or last picture.
+    mutating func borrowedLayer(like layer: CompositorLayer, before: Bool, half: CMTime, at time: CMTime,
+                                in track: AVMutableCompositionTrack) async throws -> CompositorLayer {
+        let clip = layer.clip
+        func make(_ source: CompositorLayer.Source, _ size: CGSize, _ transform: CGAffineTransform) -> CompositorLayer {
+            CompositorLayer(source: source, clip: clip, timelineStart: layer.timelineStart, naturalSize: size, preferredTransform: transform, isMain: true, region: layer.region)
+        }
+        // Pictures, freeze frames and missing media look the same before and after.
+        guard case .track = layer.source, let media = project.asset(id: clip.assetID),
+              let video = try? await asset(media).loadTracks(withMediaType: .video).first else { return layer }
+        let length = CMTimeMultiplyByFloat64(half, multiplier: clip.speed)
+        let source = before ? CMTimeRange(start: clip.sourceStart - length, duration: length) : CMTimeRange(start: clip.sourceRange.end, duration: length)
+        let available = try await video.load(.timeRange)
+        if source.start >= available.start, source.end <= available.end {
+            try track.insertTimeRange(source, of: video, at: time)
+            track.scaleTimeRange(CMTimeRange(start: time, duration: source.duration), toDuration: half)
+            return make(.track(track.trackID), layer.naturalSize, layer.preferredTransform)
+        }
+        let held = before ? clip.sourceStart : clip.sourceTime(atOffset: clip.duration - .oneFrame)
+        if let still = await FrameStills.still(of: media.url, at: held) {
+            return make(.frame(still), still.naturalSize, still.preferredTransform)
+        }
+        return make(.none, Project.canvasSize, .identity)
     }
 }
 

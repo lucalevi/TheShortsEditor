@@ -11,6 +11,8 @@ nonisolated struct CompositorLayer: Sendable {
         case track(CMPersistentTrackID)
         /// A still picture file.
         case image(URL)
+        /// One picture of a video (a freeze frame, or a clip held at the edge of a transition).
+        case frame(FrameStills.Still)
         /// Nothing to draw (missing media): the layer shows black (main) or nothing (overlay).
         case none
     }
@@ -35,6 +37,17 @@ nonisolated struct CompositorLayer: Sendable {
     }
 }
 
+/// A transition under way: the main clip of the instruction is changing into, or from, `other`.
+nonisolated struct TransitionDrawing: Sendable {
+    let kind: TransitionKind
+    /// When the whole transition plays, for how far through it a frame is.
+    let range: CMTimeRange
+    /// The clip that isn't the main one of this stretch.
+    let other: CompositorLayer
+    /// True before the cut (the other clip is the one coming in), false after it.
+    let otherIsIncoming: Bool
+}
+
 /// What the compositor needs for one stretch of the timeline where the same clips are on screen.
 nonisolated final class ShortsInstruction: NSObject, AVVideoCompositionInstructionProtocol, @unchecked Sendable {
     let timeRange: CMTimeRange
@@ -48,13 +61,15 @@ nonisolated final class ShortsInstruction: NSObject, AVVideoCompositionInstructi
     let layers: [CompositorLayer]
     let captions: CaptionTrack
     let titles: TitleTrack
+    let transition: TransitionDrawing?
 
-    init(timeRange: CMTimeRange, layers: [CompositorLayer], captions: CaptionTrack, titles: TitleTrack) {
+    init(timeRange: CMTimeRange, layers: [CompositorLayer], captions: CaptionTrack, titles: TitleTrack, transition: TransitionDrawing? = nil) {
         self.timeRange = timeRange
         self.layers = layers
         self.captions = captions
         self.titles = titles
-        let trackIDs = layers.compactMap { layer -> CMPersistentTrackID? in
+        self.transition = transition
+        let trackIDs = (layers + (transition.map { [$0.other] } ?? [])).compactMap { layer -> CMPersistentTrackID? in
             if case .track(let id) = layer.source { id } else { nil }
         }
         requiredSourceTrackIDs = trackIDs.isEmpty ? nil : trackIDs.map { NSNumber(value: $0) }
@@ -111,30 +126,24 @@ nonisolated final class ShortsCompositor: NSObject, AVVideoCompositing, Sendable
         let canvas = CGRect(origin: .zero, size: Project.canvasSize)
         var image = CIImage(color: .black).cropped(to: canvas)
 
-        for layer in instruction.layers {
-            let region = layer.region
-            // Core Image's origin is at the bottom left.
+        var layers = instruction.layers[...]
+        if let transition = instruction.transition, let main = layers.first, main.isMain {
+            // Both clips drawn whole, then mixed; B-roll, titles and captions go on top as usual.
+            let black = CIImage(color: .black).cropped(to: canvas)
+            let mainImage = draw(main, at: time, request: request, over: black)
+            let otherImage = draw(transition.other, at: time, request: request, over: black)
+            let region = main.region
             let ciRegion = CGRect(x: region.minX, y: canvas.height - region.maxY, width: region.width, height: region.height)
-            guard let source = sourceImage(for: layer, request: request) else {
-                if layer.isMain { image = CIImage(color: .black).cropped(to: ciRegion).composited(over: image) }
-                continue
-            }
-            let sourceTime = layer.clip.sourceTime(atOffset: time - layer.timelineStart)
-            let placement = LivePreview.placement(for: layer.clip.id) ?? layer.clip.placement(atSourceTime: sourceTime)
-            // Framed to the region's size, then moved, resized and turned around its middle, then put in place.
-            let transform = layer.clip.framing.transform(naturalSize: layer.naturalSize, preferredTransform: layer.preferredTransform, canvas: region.size)
-                .concatenating(placement.transform(in: region))
-            let height = source.extent.height
-            if layer.isMain {
-                let covers = layer.clip.framing.placedFrame(of: Self.displaySize(layer), placement: placement, region: region).covers(region)
-                let behind = layer.clip.background == .blur && !covers
-                    ? Self.blurredBackground(source, layer: layer, sourceHeight: height)
-                    : CIImage(color: .black)
-                image = behind.cropped(to: ciRegion).composited(over: image)
-            }
-            let placed = source.transformed(by: Self.flipped(transform, sourceHeight: height))
-            // Cut to the region (the canvas, or half of it) so a big picture doesn't spill over.
-            image = placed.cropped(to: ciRegion).composited(over: image)
+            // Counted from the middle of each frame, so the first and last frames are equally far in.
+            let into = (time - transition.range.start).seconds + 0.5 / Double(Project.frameRate)
+            let progress = min(max(into / max(transition.range.duration.seconds, 0.001), 0), 1)
+            let mixed = TransitionMixer.mix(transition.kind, from: transition.otherIsIncoming ? mainImage : otherImage,
+                                            to: transition.otherIsIncoming ? otherImage : mainImage, progress: progress, in: ciRegion)
+            image = mixed.cropped(to: ciRegion).composited(over: image)
+            layers = layers.dropFirst()
+        }
+        for layer in layers {
+            image = draw(layer, at: time, request: request, over: image)
         }
 
         for state in instruction.titles.states(at: time) {
@@ -153,12 +162,49 @@ nonisolated final class ShortsCompositor: NSObject, AVVideoCompositing, Sendable
         request.finish(withComposedVideoFrame: output)
     }
 
+    /// Draws one layer over `image`: its picture framed and placed in its region (over a blurred
+    /// copy of itself or black for a main clip), see-through as far as its opacity and fades say.
+    private func draw(_ layer: CompositorLayer, at time: CMTime, request: AVAsynchronousVideoCompositionRequest, over image: CIImage) -> CIImage {
+        let canvas = CGRect(origin: .zero, size: Project.canvasSize)
+        let region = layer.region
+        // Core Image's origin is at the bottom left.
+        let ciRegion = CGRect(x: region.minX, y: canvas.height - region.maxY, width: region.width, height: region.height)
+        guard let source = sourceImage(for: layer, request: request) else {
+            return layer.isMain ? CIImage(color: .black).cropped(to: ciRegion).composited(over: image) : image
+        }
+        var image = image
+        let offset = time - layer.timelineStart
+        let sourceTime = layer.clip.sourceTime(atOffset: offset)
+        let placement = LivePreview.placement(for: layer.clip.id) ?? layer.clip.placement(atSourceTime: sourceTime)
+        // Framed to the region's size, then moved, resized and turned around its middle, then put in place.
+        let transform = layer.clip.framing.transform(naturalSize: layer.naturalSize, preferredTransform: layer.preferredTransform, canvas: region.size)
+            .concatenating(placement.transform(in: region))
+        let height = source.extent.height
+        if layer.isMain {
+            let covers = layer.clip.framing.placedFrame(of: Self.displaySize(layer), placement: placement, region: region).covers(region)
+            let behind = layer.clip.background == .blur && !covers
+                ? Self.blurredBackground(source, layer: layer, sourceHeight: height)
+                : CIImage(color: .black)
+            image = behind.cropped(to: ciRegion).composited(over: image)
+        }
+        // Cut to the region (the canvas, or half of it) so a big picture doesn't spill over.
+        var placed = source.transformed(by: Self.flipped(transform, sourceHeight: height)).cropped(to: ciRegion)
+        let opacity = placement.opacity * (layer.isMain ? 1 : layer.clip.pictureFade(atOffset: offset))
+        if opacity <= 0 { return image }
+        if opacity < 1 {
+            placed = placed.applyingFilter("CIColorMatrix", parameters: ["inputAVector": CIVector(x: 0, y: 0, z: 0, w: opacity)])
+        }
+        return placed.composited(over: image)
+    }
+
     private func sourceImage(for layer: CompositorLayer, request: AVAsynchronousVideoCompositionRequest) -> CIImage? {
         switch layer.source {
         case .track(let id):
             return request.sourceFrame(byTrackID: id).map { CIImage(cvPixelBuffer: $0) }
         case .image(let url):
             return StillImages.image(at: url).map { CIImage(cgImage: $0) }
+        case .frame(let still):
+            return CIImage(cvPixelBuffer: still.buffer)
         case .none:
             return nil
         }

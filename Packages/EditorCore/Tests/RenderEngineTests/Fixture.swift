@@ -13,7 +13,8 @@ enum Fixture {
         width: Int, height: Int, seconds: Int = 1,
         bgra: (UInt8, UInt8, UInt8, UInt8), bottomBGRA: (UInt8, UInt8, UInt8, UInt8)? = nil,
         transform: CGAffineTransform = .identity,
-        toneFrom: Double? = nil
+        toneFrom: Double? = nil,
+        laterBGRA: (UInt8, UInt8, UInt8, UInt8)? = nil, laterFrom: Double = 0
     ) async throws -> URL {
         let url = FileManager.default.temporaryDirectory.appending(path: "fixture-\(UUID().uuidString).mov")
         let writer = try AVAssetWriter(outputURL: url, fileType: .mov)
@@ -39,6 +40,9 @@ enum Fixture {
         writer.startSession(atSourceTime: .zero)
 
         let buffer = try solidBuffer(width: width, height: height, bgra: bgra, bottom: bottomBGRA ?? bgra)
+        // With `laterBGRA`, the picture changes to that colour from `laterFrom` seconds on.
+        let later = try laterBGRA.map { try solidBuffer(width: width, height: height, bgra: $0, bottom: $0) }
+        let laterFrame = Int((laterFrom * 30).rounded())
         // Feed whichever input is ready: the writer interleaves sound and picture, so waiting on
         // one while it wants the other would never finish.
         let frames = 30 * seconds
@@ -46,7 +50,7 @@ enum Fixture {
         while nextVideo < frames || nextAudio < frames {
             var progressed = false
             if nextVideo < frames, input.isReadyForMoreMediaData {
-                guard adaptor.append(buffer, withPresentationTime: CMTime(value: Int64(nextVideo), timescale: 30)) else {
+                guard adaptor.append(later != nil && nextVideo >= laterFrame ? later! : buffer, withPresentationTime: CMTime(value: Int64(nextVideo), timescale: 30)) else {
                     throw writer.error ?? WriteError()
                 }
                 nextVideo += 1

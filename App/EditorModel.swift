@@ -142,6 +142,10 @@ final class EditorModel {
     var voiceCleaning: [MediaAsset.ID: Double] = [:]
     /// Clips whose voice effect or EQ is being made, with how far it has got (0…1).
     var soundProcessing: [Clip.ID: Double] = [:]
+    /// Clips being turned round: how far the backwards copy of their file is (0…1).
+    var reversing: [Clip.ID: Double] = [:]
+    /// The cut whose transition is being chosen (the clip before it), for the picker on the timeline.
+    var transitionPickerCut: Clip.ID?
     /// Processed sounds being made in the background (`prepareMissingProcessedSounds`).
     @ObservationIgnored var preparingSounds: Set<String> = []
     /// A clip whose subject is being found for reframing, with how far it has got.
@@ -1140,7 +1144,7 @@ final class EditorModel {
 
     /// Makes what is drawn for a file: its thumbnail, the stills along it, and its sound levels.
     /// `again` makes them anew, e.g. after the file was found somewhere else.
-    private func loadPreviews(for asset: MediaAsset, again: Bool = false) {
+    func loadPreviews(for asset: MediaAsset, again: Bool = false) {
         if again {
             thumbnails[asset.id] = nil
             filmstrips[asset.id] = nil

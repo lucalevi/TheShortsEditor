@@ -46,6 +46,7 @@ struct SpeedSection: View {
             Text(speed > 1 ? "Faster and shorter. Voices keep their pitch." : speed < 1 ? "Slow motion: longer. Voices keep their pitch." : "As recorded.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
+            TimeExtras(model: model, clips: clips)
         }
     }
 
@@ -351,6 +352,13 @@ struct RangeInspector: View {
                     }
                 }
                 .controlSize(.small)
+                Text("The picture eases into and out of the new speed. Turn that off under Speed on the clip.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                Button("Instant Replay", systemImage: "gobackward") { model.addInstantReplay() }
+                    .controlSize(.small)
+                    .help("Show this part once more straight after itself, at half speed")
             }
             VStack(alignment: .leading, spacing: 6) {
                 Text("Volume of this part").font(.subheadline.weight(.semibold))

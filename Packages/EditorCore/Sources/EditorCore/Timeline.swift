@@ -35,6 +35,16 @@ public struct Clip: Identifiable, Codable, Equatable, Sendable {
     /// The sound has been moved to its own item on the sound row (`SoundClip.detachedFrom`),
     /// so the clip itself is silent.
     public var soundDetached: Bool
+    /// How this clip changes into the next main clip (nil: a plain cut). See `Transitions.swift`.
+    public var transitionOut: ClipTransition?
+    /// A freeze frame: the clip shows the one picture at `sourceStart` for its whole length, silent.
+    public var isFrozen: Bool
+    /// How long the picture takes to appear and to go (timeline time). Used for clips over the main ones.
+    public var pictureFadeIn: CMTime
+    public var pictureFadeOut: CMTime
+    /// Where the clip carries on from a neighbour of the same recording at another speed, the
+    /// speed changes gradually instead of in one jump (see `Timeline.speedSegments(forClipAt:)`).
+    public var smoothSpeed: Bool
 
     public static let maxVolume = 2.0
     /// No clip is shorter than this, so it can still be seen and grabbed on the timeline.
@@ -48,7 +58,9 @@ public struct Clip: Identifiable, Codable, Equatable, Sendable {
         volume: Double = 1, isMuted: Bool = false, placement: Placement = .identity, keyframes: [Keyframe] = [],
         background: ClipBackground = .blur, speed: Double = 1, cleansVoice: Bool = false,
         fadeIn: CMTime = .zero, fadeOut: CMTime = .zero, volumeKeys: [VolumeKey] = [],
-        voiceEffect: VoiceEffect? = nil, equalizer: SoundEQ? = nil, soundDetached: Bool = false
+        voiceEffect: VoiceEffect? = nil, equalizer: SoundEQ? = nil, soundDetached: Bool = false,
+        transitionOut: ClipTransition? = nil, isFrozen: Bool = false, pictureFadeIn: CMTime = .zero, pictureFadeOut: CMTime = .zero,
+        smoothSpeed: Bool = true
     ) {
         self.id = id
         self.assetID = assetID
@@ -68,23 +80,31 @@ public struct Clip: Identifiable, Codable, Equatable, Sendable {
         self.voiceEffect = voiceEffect
         self.equalizer = equalizer
         self.soundDetached = soundDetached
+        self.transitionOut = transitionOut
+        self.isFrozen = isFrozen
+        self.pictureFadeIn = pictureFadeIn
+        self.pictureFadeOut = pictureFadeOut
+        self.smoothSpeed = smoothSpeed
     }
 
-    /// How much of the source the clip shows.
+    /// How much of the source the clip shows (nothing but one picture for a freeze frame).
     public var sourceDuration: CMTime {
-        speed == 1 ? duration : CMTimeMultiplyByFloat64(duration, multiplier: speed).convertScale(600, method: .roundHalfAwayFromZero)
+        if isFrozen { return .zero }
+        return speed == 1 ? duration : CMTimeMultiplyByFloat64(duration, multiplier: speed).convertScale(600, method: .roundHalfAwayFromZero)
     }
 
     public var sourceRange: CMTimeRange { CMTimeRange(start: sourceStart, duration: sourceDuration) }
 
     /// The source time playing `offset` into the clip.
     public func sourceTime(atOffset offset: CMTime) -> CMTime {
-        speed == 1 ? sourceStart + offset : sourceStart + CMTimeMultiplyByFloat64(offset, multiplier: speed)
+        if isFrozen { return sourceStart }
+        return speed == 1 ? sourceStart + offset : sourceStart + CMTimeMultiplyByFloat64(offset, multiplier: speed)
     }
 
     /// How far into the clip a source time plays (it may be outside the clip).
     public func timelineOffset(ofSourceTime time: CMTime) -> CMTime {
-        speed == 1 ? time - sourceStart : CMTimeMultiplyByFloat64(time - sourceStart, multiplier: 1 / speed)
+        if isFrozen { return .zero }
+        return speed == 1 ? time - sourceStart : CMTimeMultiplyByFloat64(time - sourceStart, multiplier: 1 / speed)
     }
 
     /// A stretch of the source as it lasts on the timeline.
@@ -93,7 +113,7 @@ public struct Clip: Identifiable, Codable, Equatable, Sendable {
     }
 
     /// The volume actually played (before the volume line and fades).
-    public var effectiveVolume: Double { isMuted || soundDetached ? 0 : volume }
+    public var effectiveVolume: Double { isMuted || soundDetached || isFrozen ? 0 : volume }
 
     /// Another piece of the same source with the same settings (framing, sound, placement and
     /// motion), e.g. after a split.
@@ -180,6 +200,7 @@ extension Clip {
     private enum CodingKeys: String, CodingKey {
         case id, assetID, sourceStart, duration, framing, volume, isMuted, placement, keyframes, background, speed, cleansVoice
         case fadeIn, fadeOut, volumeKeys, voiceEffect, equalizer, soundDetached
+        case transitionOut, isFrozen, pictureFadeIn, pictureFadeOut, smoothSpeed
     }
 
     public init(from decoder: any Decoder) throws {
@@ -203,6 +224,11 @@ extension Clip {
         voiceEffect = try? c.decodeIfPresent(VoiceEffect.self, forKey: .voiceEffect)
         equalizer = try? c.decodeIfPresent(SoundEQ.self, forKey: .equalizer)
         soundDetached = try c.decodeIfPresent(Bool.self, forKey: .soundDetached) ?? false
+        transitionOut = try? c.decodeIfPresent(ClipTransition.self, forKey: .transitionOut)
+        isFrozen = try c.decodeIfPresent(Bool.self, forKey: .isFrozen) ?? false
+        pictureFadeIn = c.contains(.pictureFadeIn) ? try c.decodeTime(forKey: .pictureFadeIn) : .zero
+        pictureFadeOut = c.contains(.pictureFadeOut) ? try c.decodeTime(forKey: .pictureFadeOut) : .zero
+        smoothSpeed = try c.decodeIfPresent(Bool.self, forKey: .smoothSpeed) ?? true
     }
 
     public func encode(to encoder: any Encoder) throws {
@@ -225,5 +251,10 @@ extension Clip {
         try c.encodeIfPresent(voiceEffect, forKey: .voiceEffect)
         try c.encodeIfPresent(equalizer, forKey: .equalizer)
         if soundDetached { try c.encode(soundDetached, forKey: .soundDetached) }
+        try c.encodeIfPresent(transitionOut, forKey: .transitionOut)
+        if isFrozen { try c.encode(isFrozen, forKey: .isFrozen) }
+        if pictureFadeIn > .zero { try c.encode(time: pictureFadeIn, forKey: .pictureFadeIn) }
+        if pictureFadeOut > .zero { try c.encode(time: pictureFadeOut, forKey: .pictureFadeOut) }
+        if !smoothSpeed { try c.encode(smoothSpeed, forKey: .smoothSpeed) }
     }
 }

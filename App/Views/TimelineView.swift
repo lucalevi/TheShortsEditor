@@ -630,6 +630,18 @@ struct TimelineView: View {
                         clipView(clip, index: index)
                     }
                 }
+                if reorder == nil, clipTrim == nil {
+                    // Transitions: a band over the time each plays, and a marker on its cut.
+                    ForEach(model.project.timeline.transitionSpans, id: \.from) { span in
+                        RoundedRectangle(cornerRadius: 2)
+                            .fill(LinearGradient(colors: [.white.opacity(0.05), .white.opacity(0.55), .white.opacity(0.05)], startPoint: .leading, endPoint: .trailing))
+                            .frame(width: max(width(of: span.range.duration), 4), height: trackHeight - ClipBlock.waveHeight - 6)
+                            .offset(x: width(of: span.range.start), y: 3)
+                            .allowsHitTesting(false)
+                        CutBadge(model: model, clipID: span.from, kind: span.kind)
+                            .offset(x: width(of: span.cut) - 10, y: (trackHeight - ClipBlock.waveHeight) / 2 - 10)
+                    }
+                }
                 if let reorder {
                     // Where the dragged clip will go.
                     let others = clips.filter { $0.id != reorder.id }
@@ -660,11 +672,13 @@ struct TimelineView: View {
             levels: model.audioLevels[clip.assetID],
             tooLoud: model.tooLoudRanges(of: clip),
             pointsPerSecond: pointsPerSecond,
-            isSelected: model.isSelected(.clip(clip.id))
+            isSelected: model.isSelected(.clip(clip.id)),
+            isReversed: asset?.reversedFrom != nil,
+            progress: model.reversing[clip.id]
         )
         .equatable()
         .overlay(alignment: .bottom) {
-            if trim == nil, !clip.soundDetached, model.audioLevels[clip.assetID] != nil, slot > 16 {
+            if trim == nil, !clip.soundDetached, !clip.isFrozen, model.audioLevels[clip.assetID] != nil, slot > 16 {
                 volumeEditor(for: clip, item: .clip(clip.id))
                     .frame(height: ClipBlock.waveHeight - 2)
                     .padding(.horizontal, 1)
@@ -734,7 +748,27 @@ struct TimelineView: View {
             Button(model.isPunchedIn([clip]) ? "Remove Punch-In" : "Punch In") { model.togglePunchIn([clip.id]) }
                 .disabled(clip.hasMotion)
             Divider()
-            if clip.soundDetached {
+            if index + 1 < model.project.timeline.clips.count {
+                Menu("Transition into the Next Clip") {
+                    Button("None") { model.setTransition(nil, after: clip.id) }
+                    Divider()
+                    ForEach(TransitionKind.allCases) { kind in
+                        Button(kind.displayName) { model.setTransition(kind, after: clip.id) }
+                    }
+                }
+            }
+            Button("Add Freeze Frame at Playhead") { model.addFreezeFrame() }
+            Button("Instant Replay") {
+                model.selectedClipID = clip.id
+                model.addInstantReplay()
+            }
+            if model.project.canReverse(clip) {
+                Button(model.project.isReversed(clip) ? "Play Forwards" : "Play Backwards") { model.toggleBackwards(for: [clip.id]) }
+            }
+            Divider()
+            if clip.isFrozen {
+                // A freeze frame has no sound.
+            } else if clip.soundDetached {
                 Button("Bring Sound Back") { model.reattachSound(of: clip.id) }
             } else if model.audioLevels[clip.assetID] != nil {
                 Button("Detach Sound") { model.detachSound(of: [clip.id]) }
@@ -1382,6 +1416,9 @@ private struct OverlayBlock: View {
                     Text(name).lineLimit(1)
                     if overlay.clip.isMuted { Image(systemName: "speaker.slash.fill").help("No sound") }
                     if overlay.clip.hasMotion { Image(systemName: "move.3d").help("Moves") }
+                    if overlay.clip.placement.opacity < 1 || overlay.clip.hasPictureFades {
+                        Image(systemName: "circle.lefthalf.striped.horizontal").help("See-through, or fades in or out")
+                    }
                 }
                 .font(.caption2.weight(.medium))
                 .padding(.horizontal, 4)
@@ -1415,9 +1452,13 @@ private struct ClipBlock: View, Equatable {
     let tooLoud: [CMTimeRange]
     let pointsPerSecond: CGFloat
     let isSelected: Bool
+    /// Plays a backwards copy of its file.
+    var isReversed = false
+    /// Being turned round: how far the backwards copy is.
+    var progress: Double?
 
     nonisolated static func == (a: ClipBlock, b: ClipBlock) -> Bool {
-        a.clip == b.clip && a.name == b.name && a.tooLoud == b.tooLoud && a.aspect == b.aspect && a.pointsPerSecond == b.pointsPerSecond
+        a.clip == b.clip && a.isReversed == b.isReversed && a.progress == b.progress && a.name == b.name && a.tooLoud == b.tooLoud && a.aspect == b.aspect && a.pointsPerSecond == b.pointsPerSecond
             && a.isSelected == b.isSelected && a.levels?.decibels.count == b.levels?.decibels.count
             && a.filmstrip?.images.count == b.filmstrip?.images.count
     }
@@ -1429,12 +1470,19 @@ private struct ClipBlock: View, Equatable {
         RoundedRectangle(cornerRadius: 6)
             .fill(Color.accentColor.opacity(0.25))
             .overlay(alignment: .top) {
-                FilmstripView(filmstrip: filmstrip, sourceStart: clip.sourceStart, pointsPerSecond: pointsPerSecond / CGFloat(clip.speed), aspect: aspect)
+                // A freeze frame shows its one picture all along.
+                FilmstripView(filmstrip: filmstrip, sourceStart: clip.sourceStart, pointsPerSecond: clip.isFrozen ? 1_000_000 : pointsPerSecond / CGFloat(clip.speed), aspect: aspect)
                     .padding(.bottom, levels == nil ? 0 : waveHeight)
                     .opacity(0.85)
             }
             .overlay(alignment: .bottom) {
-                if let levels, clip.soundDetached {
+                if levels != nil, clip.isFrozen {
+                    Label("Freeze frame", systemImage: "snowflake")
+                        .font(.caption2)
+                        .frame(maxWidth: .infinity, maxHeight: waveHeight, alignment: .leading)
+                        .padding(.leading, 4)
+                        .background(Color.black.opacity(0.35))
+                } else if let levels, clip.soundDetached {
                     Label("Sound detached", systemImage: "waveform.path")
                         .font(.caption2)
                         .frame(maxWidth: .infinity, maxHeight: waveHeight, alignment: .leading)
@@ -1474,6 +1522,12 @@ private struct ClipBlock: View, Equatable {
                         if clip.speed != 1 {
                             Text("\(clip.speed.formatted(.number.precision(.fractionLength(0...2))))×").help("Speed")
                         }
+                        if clip.isFrozen {
+                            Image(systemName: "snowflake").help("Freeze frame")
+                        }
+                        if isReversed {
+                            Image(systemName: "backward.fill").help("Plays backwards")
+                        }
                         if clip.cleansVoice {
                             Image(systemName: "waveform.badge.magnifyingglass").help("Voice cleaned up")
                         }
@@ -1495,6 +1549,15 @@ private struct ClipBlock: View, Equatable {
                 .padding(.vertical, 2)
                 .background(.black.opacity(0.45), in: RoundedRectangle(cornerRadius: 4))
                 .padding(4)
+            }
+            .overlay(alignment: .bottom) {
+                if let progress {
+                    ProgressView(value: progress)
+                        .progressViewStyle(.linear)
+                        .padding(.horizontal, 6)
+                        .padding(.bottom, waveHeight + 4)
+                        .help("Turning the clip round…")
+                }
             }
             .clipShape(RoundedRectangle(cornerRadius: 6))
             .overlay {

@@ -37,14 +37,16 @@ public extension Project {
     func trimLimits(for clip: Clip, edge: ClipEdge) -> CMTimeRange? {
         guard let asset = asset(id: clip.assetID) else { return nil }
         let shortest = clip.duration - Clip.minimumDuration
+        // A freeze frame is one picture, so it can be any length, like a picture file.
+        let isStill = asset.isImage || clip.isFrozen
         switch edge {
         case .start:
             // Right: until the clip is as short as allowed. Left: back to the start of the file
             // (a picture can grow as long as it may be shown).
-            let leftmost = asset.isImage ? -(MediaAsset.imageDuration - clip.duration) : -clip.timelineDuration(ofSource: clip.sourceStart)
+            let leftmost = isStill ? -(MediaAsset.imageDuration - clip.duration) : -clip.timelineDuration(ofSource: clip.sourceStart)
             return CMTimeRange(start: min(leftmost, .zero), end: max(shortest, .zero))
         case .end:
-            let available = asset.isImage ? MediaAsset.imageDuration : clip.timelineDuration(ofSource: asset.duration - clip.sourceStart)
+            let available = isStill ? MediaAsset.imageDuration : clip.timelineDuration(ofSource: asset.duration - clip.sourceStart)
             return CMTimeRange(start: min(-shortest, .zero), end: max(available - clip.duration, .zero))
         }
     }
@@ -255,7 +257,7 @@ public extension Project {
     /// Changes how fast a clip (main or B-roll) plays. It keeps showing the same part of its
     /// source, so it gets shorter when faster and longer when slower. Pictures have no speed.
     mutating func setSpeed(_ speed: Double, for id: Clip.ID) {
-        guard let clip = anyClip(id: id), asset(id: clip.assetID)?.isImage != true else { return }
+        guard let clip = anyClip(id: id), asset(id: clip.assetID)?.isImage != true, !clip.isFrozen else { return }
         let speed = min(max(speed, Clip.speedRange.lowerBound), Clip.speedRange.upperBound)
         let source = clip.sourceDuration
         updateAnyClip(id) { clip in
