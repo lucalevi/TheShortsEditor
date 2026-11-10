@@ -174,7 +174,7 @@ public enum CompositionBuilder {
             }
             instructions.append(ShortsInstruction(
                 timeRange: CMTimeRange(start: from, end: to), layers: [main.with(region: regions.main)] + over, captions: captions, titles: titles,
-                transition: drawing
+                transition: drawing, look: project.look
             ))
         }
         var missing = media.missing
@@ -337,7 +337,12 @@ private struct MediaSources {
                 if clip.speed != 1 { track.scaleTimeRange(CMTimeRange(start: start, duration: clip.sourceRange.duration), toDuration: clip.duration) }
             }
             let (naturalSize, preferredTransform) = try await video.load(.naturalSize, .preferredTransform)
-            return make(.track(track.trackID), naturalSize, preferredTransform)
+            var layer = make(.track(track.trackID), naturalSize, preferredTransform)
+            // Stabilize: only once the file's shake has been measured (the app measures it, then rebuilds).
+            if clip.steadiness > 0, let path = ShakeCache.path(for: media.url) {
+                layer.steadying = Steadying(path: path, clip: clip)
+            }
+            return layer
         }
         // A file that was moved or deleted (or can't be opened any more) can't be read.
         if let media { missing.insert(media.id) }
@@ -352,7 +357,8 @@ private struct MediaSources {
                                 in track: AVMutableCompositionTrack) async throws -> CompositorLayer {
         let clip = layer.clip
         func make(_ source: CompositorLayer.Source, _ size: CGSize, _ transform: CGAffineTransform) -> CompositorLayer {
-            CompositorLayer(source: source, clip: clip, timelineStart: layer.timelineStart, naturalSize: size, preferredTransform: transform, isMain: true, region: layer.region)
+            CompositorLayer(source: source, clip: clip, timelineStart: layer.timelineStart, naturalSize: size, preferredTransform: transform, isMain: true, region: layer.region,
+                            steadying: layer.steadying)
         }
         // Pictures, freeze frames and missing media look the same before and after.
         guard case .track = layer.source, let media = project.asset(id: clip.assetID),

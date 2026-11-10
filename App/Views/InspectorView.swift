@@ -111,6 +111,11 @@ private struct MultipleInspector: View {
                 }
             }
 
+            let pictureClips = clips.filter { model.project.asset(id: $0.assetID)?.hasVideo == true }
+            if !pictureClips.isEmpty {
+                MultipleLookSection(model: model, clips: pictureClips)
+            }
+
             let videoClips = clips.filter { model.project.asset(id: $0.assetID)?.isImage != true }
             if !videoClips.isEmpty {
                 SpeedSection(model: model, clips: videoClips)
@@ -159,6 +164,14 @@ private struct ClipInspector: View {
 
             PictureSection(model: model, clip: clip, isMain: true)
                 .id(clip.id)
+
+            LookSection(model: model, clip: clip)
+                .id(clip.id)
+
+            if model.canStabilize(clip) {
+                SteadySection(model: model, clip: clip)
+                    .id(clip.id)
+            }
 
             MotionSection(model: model, clip: clip)
 
@@ -275,6 +288,14 @@ private struct OverlayInspector: View {
             SeeThroughSection(model: model, clip: overlay.clip)
                 .id(overlay.id)
 
+            LookSection(model: model, clip: overlay.clip)
+                .id(overlay.id)
+
+            if model.canStabilize(overlay.clip) {
+                SteadySection(model: model, clip: overlay.clip)
+                    .id(overlay.id)
+            }
+
             MotionSection(model: model, clip: overlay.clip)
 
             if asset?.isImage != true {
@@ -328,6 +349,10 @@ private struct ProjectInspector: View {
                         .foregroundStyle(.red)
                         .font(.caption)
                 }
+            }
+
+            if !model.project.timeline.clips.isEmpty {
+                ShortLookSection(model: model)
             }
 
             VStack(alignment: .leading, spacing: 6) {

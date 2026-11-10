@@ -45,6 +45,10 @@ public struct Clip: Identifiable, Codable, Equatable, Sendable {
     /// Where the clip carries on from a neighbour of the same recording at another speed, the
     /// speed changes gradually instead of in one jump (see `Timeline.speedSegments(forClipAt:)`).
     public var smoothSpeed: Bool
+    /// Colour adjustments and filter (see `Look.swift`).
+    public var look: ClipLook
+    /// How strongly camera shake is smoothed out, 0…1 (0: Stabilize is off). See `Stabilization.swift`.
+    public var steadiness: Double
 
     public static let maxVolume = 2.0
     /// No clip is shorter than this, so it can still be seen and grabbed on the timeline.
@@ -60,7 +64,7 @@ public struct Clip: Identifiable, Codable, Equatable, Sendable {
         fadeIn: CMTime = .zero, fadeOut: CMTime = .zero, volumeKeys: [VolumeKey] = [],
         voiceEffect: VoiceEffect? = nil, equalizer: SoundEQ? = nil, soundDetached: Bool = false,
         transitionOut: ClipTransition? = nil, isFrozen: Bool = false, pictureFadeIn: CMTime = .zero, pictureFadeOut: CMTime = .zero,
-        smoothSpeed: Bool = true
+        smoothSpeed: Bool = true, look: ClipLook = ClipLook(), steadiness: Double = 0
     ) {
         self.id = id
         self.assetID = assetID
@@ -85,6 +89,8 @@ public struct Clip: Identifiable, Codable, Equatable, Sendable {
         self.pictureFadeIn = pictureFadeIn
         self.pictureFadeOut = pictureFadeOut
         self.smoothSpeed = smoothSpeed
+        self.look = look
+        self.steadiness = steadiness
     }
 
     /// How much of the source the clip shows (nothing but one picture for a freeze frame).
@@ -201,6 +207,7 @@ extension Clip {
         case id, assetID, sourceStart, duration, framing, volume, isMuted, placement, keyframes, background, speed, cleansVoice
         case fadeIn, fadeOut, volumeKeys, voiceEffect, equalizer, soundDetached
         case transitionOut, isFrozen, pictureFadeIn, pictureFadeOut, smoothSpeed
+        case look, steadiness
     }
 
     public init(from decoder: any Decoder) throws {
@@ -229,6 +236,8 @@ extension Clip {
         pictureFadeIn = c.contains(.pictureFadeIn) ? try c.decodeTime(forKey: .pictureFadeIn) : .zero
         pictureFadeOut = c.contains(.pictureFadeOut) ? try c.decodeTime(forKey: .pictureFadeOut) : .zero
         smoothSpeed = try c.decodeIfPresent(Bool.self, forKey: .smoothSpeed) ?? true
+        look = (try? c.decodeIfPresent(ClipLook.self, forKey: .look)) ?? ClipLook()
+        steadiness = try c.decodeIfPresent(Double.self, forKey: .steadiness) ?? 0
     }
 
     public func encode(to encoder: any Encoder) throws {
@@ -256,5 +265,7 @@ extension Clip {
         if pictureFadeIn > .zero { try c.encode(time: pictureFadeIn, forKey: .pictureFadeIn) }
         if pictureFadeOut > .zero { try c.encode(time: pictureFadeOut, forKey: .pictureFadeOut) }
         if !smoothSpeed { try c.encode(smoothSpeed, forKey: .smoothSpeed) }
+        if look != ClipLook() { try c.encode(look, forKey: .look) }
+        if steadiness > 0 { try c.encode(steadiness, forKey: .steadiness) }
     }
 }

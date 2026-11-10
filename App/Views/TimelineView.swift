@@ -1537,6 +1537,14 @@ private struct ClipBlock: View, Equatable {
                         if !tooLoud.isEmpty, !clip.isMuted {
                             Image(systemName: "exclamationmark.triangle.fill").help("Too loud in places: it may crackle")
                         }
+                        if let filter = clip.look.filter, filter.strength > 0 {
+                            Image(systemName: "camera.filters").help("Filter: \(filter.filter.displayName)")
+                        } else if !clip.look.color.isNeutral {
+                            Image(systemName: "paintpalette").help("Colour changed")
+                        }
+                        if clip.steadiness > 0 {
+                            Image(systemName: "hand.raised.slash").help("Steadied")
+                        }
                         if clip.hasMotion {
                             Image(systemName: "move.3d").help("The picture moves")
                         } else if clip.placement.scale != 1 {

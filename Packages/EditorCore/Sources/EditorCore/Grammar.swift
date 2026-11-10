@@ -372,6 +372,8 @@ public enum SettingsKind: String, CaseIterable, Identifiable, Sendable {
     case speed
     /// Volume, mute and voice clean-up.
     case sound
+    /// Colour, filter and Stabilize.
+    case look
 
     public var id: String { rawValue }
 
@@ -381,6 +383,7 @@ public enum SettingsKind: String, CaseIterable, Identifiable, Sendable {
         case .motion: "Motion"
         case .speed: "Speed"
         case .sound: "Sound"
+        case .look: "Look"
         }
     }
 }
@@ -423,6 +426,10 @@ public extension Project {
                 clip.equalizer = source.equalizer
                 clip.copyVolumeKeys(from: source)
             }
+            if kinds.contains(.look) {
+                clip.look = source.look
+                clip.steadiness = source.steadiness
+            }
         }
     }
 
@@ -448,6 +455,10 @@ public extension Project {
                 clip.resetSoundShaping()
                 if isMain || isSound { clip.isMuted = false }
             }
+            if kinds.contains(.look) {
+                clip.look = ClipLook()
+                clip.steadiness = 0
+            }
         }
     }
 
@@ -462,6 +473,7 @@ public extension Project {
         if !clip.keyframes.isEmpty { kinds.insert(.motion) }
         if clip.speed != 1 { kinds.insert(.speed) }
         if clip.volume != 1 || clip.cleansVoice || clip.hasSoundShaping || (isMain && clip.isMuted) { kinds.insert(.sound) }
+        if !clip.look.isNeutral || clip.steadiness > 0 { kinds.insert(.look) }
         return kinds
     }
 

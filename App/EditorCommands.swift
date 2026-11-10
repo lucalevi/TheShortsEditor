@@ -139,6 +139,27 @@ struct EditorCommands: Commands {
                     .disabled(model.project.transitionCount == 0)
             }
             .disabled(model.project.timeline.clips.count < 2)
+            Divider()
+            let lookTargets = model.lookTargets
+            Button("Enhance") { model.enhance(lookTargets.map(\.id)) }
+                .keyboardShortcut("e", modifiers: .option)
+                .disabled(lookTargets.isEmpty)
+            Menu("Filter") {
+                Button("None") { model.setFilter(nil, for: lookTargets.map(\.id)) }
+                Divider()
+                ForEach(LookFilter.allCases) { filter in
+                    Button(filter.displayName) { model.setFilter(filter, for: lookTargets.map(\.id)) }
+                }
+            }
+            .disabled(lookTargets.isEmpty)
+            Toggle("Compare with Original", isOn: Binding(get: { model.showsOriginalLook }, set: { model.showsOriginalLook = $0 }))
+                .keyboardShortcut("c", modifiers: .option)
+                .disabled(model.project.timeline.clips.isEmpty)
+            let steadiable = lookTargets.filter(model.canStabilize)
+            Toggle("Steady Shaky Video", isOn: Binding(get: { !steadiable.isEmpty && steadiable.allSatisfy { $0.steadiness > 0 } },
+                                                      set: { on in model.setSteadiness(on ? Clip.defaultSteadiness : 0, for: steadiable.map(\.id)) }))
+                .disabled(steadiable.isEmpty)
+            Divider()
             Button("Follow the Subject") { if let clip = selectedClips.first { model.followSubject(clip.id) } }
                 .disabled(selectedClips.count != 1 || model.reframing != nil)
             Menu("Motion") {

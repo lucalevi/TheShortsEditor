@@ -19,4 +19,15 @@ public enum ProjectPoster {
         generator.maximumSize = maxSize
         return try await generator.image(at: time(in: project)).image
     }
+
+    /// The finished Short's picture at `time`, exactly (for picking a colour in the viewer).
+    public static func frame(of project: Project, at time: CMTime, maxSize: CGSize = Project.canvasSize) async throws -> CGImage {
+        let built = try await CompositionBuilder.build(project)
+        let generator = AVAssetImageGenerator(asset: built.composition)
+        generator.videoComposition = built.videoComposition
+        generator.maximumSize = maxSize
+        generator.requestedTimeToleranceBefore = .zero
+        generator.requestedTimeToleranceAfter = .zero
+        return try await generator.image(at: time).image
+    }
 }

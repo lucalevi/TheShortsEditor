@@ -72,6 +72,11 @@ final class EditorKeys {
             model.cutWords(model.scriptSelection)
             return true
         }
+        // Picking white or skin in the viewer: Escape stops.
+        if event.keyCode == 53, model.colorPick != nil {
+            model.colorPick = nil
+            return true
+        }
         // A picked range: ⌫ deletes it, Escape lets go of it.
         if model.timelineRange != nil, event.keyCode == 51 || event.keyCode == 117 {
             model.deleteRange()

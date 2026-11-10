@@ -30,10 +30,12 @@ nonisolated struct CompositorLayer: Sendable {
     /// Where on the canvas it is drawn (canvas pixels, origin top left): the whole canvas, or half
     /// of it in a split screen. The picture is framed inside it and cut to it.
     let region: CGRect
+    /// How to steady a shaky video (Stabilize), once its file has been measured.
+    var steadying: Steadying? = nil
 
     func with(region: CGRect) -> CompositorLayer {
         CompositorLayer(source: source, clip: clip, timelineStart: timelineStart, naturalSize: naturalSize,
-                        preferredTransform: preferredTransform, isMain: isMain, region: region)
+                        preferredTransform: preferredTransform, isMain: isMain, region: region, steadying: steadying)
     }
 }
 
@@ -62,13 +64,17 @@ nonisolated final class ShortsInstruction: NSObject, AVVideoCompositionInstructi
     let captions: CaptionTrack
     let titles: TitleTrack
     let transition: TransitionDrawing?
+    /// The filter over the whole Short, drawn over the clips (not the titles and captions).
+    let look: FilterChoice?
 
-    init(timeRange: CMTimeRange, layers: [CompositorLayer], captions: CaptionTrack, titles: TitleTrack, transition: TransitionDrawing? = nil) {
+    init(timeRange: CMTimeRange, layers: [CompositorLayer], captions: CaptionTrack, titles: TitleTrack, transition: TransitionDrawing? = nil,
+         look: FilterChoice? = nil) {
         self.timeRange = timeRange
         self.layers = layers
         self.captions = captions
         self.titles = titles
         self.transition = transition
+        self.look = look
         let trackIDs = (layers + (transition.map { [$0.other] } ?? [])).compactMap { layer -> CMPersistentTrackID? in
             if case .track(let id) = layer.source { id } else { nil }
         }
@@ -87,10 +93,38 @@ public nonisolated enum LivePreview {
 
     public static func clearAll() {
         placements.withLock { $0.removeAll() }
+        looks.withLock { $0.removeAll() }
+        shortLook.withLock { $0 = nil }
     }
 
     static func placement(for clipID: Clip.ID) -> Placement? {
         placements.withLock { $0[clipID] }
+    }
+
+    // Colour sliders being dragged: the look they would give, shown at once.
+    private static let looks = Mutex<[Clip.ID: ClipLook]>([:])
+    private static let shortLook = Mutex<FilterChoice??>(nil)
+    private static let original = Mutex(false)
+
+    public static func setLook(_ look: ClipLook?, for clipID: Clip.ID) {
+        looks.withLock { $0[clipID] = look }
+    }
+
+    static func look(for clipID: Clip.ID) -> ClipLook? {
+        looks.withLock { $0[clipID] }
+    }
+
+    /// The whole Short's filter while its strength slider is dragged (`.some(nil)`: no filter).
+    public static func setShortLook(_ choice: FilterChoice??) {
+        shortLook.withLock { $0 = choice }
+    }
+
+    static var shortLookOverride: FilterChoice?? { shortLook.withLock { $0 } }
+
+    /// Before/after: while true, every picture is drawn without its look (colour and filters).
+    public static var showsOriginal: Bool {
+        get { original.withLock { $0 } }
+        set { original.withLock { $0 = newValue } }
     }
 }
 
@@ -145,6 +179,9 @@ nonisolated final class ShortsCompositor: NSObject, AVVideoCompositing, Sendable
         for layer in layers {
             image = draw(layer, at: time, request: request, over: image)
         }
+        if !LivePreview.showsOriginal, let look = LivePreview.shortLookOverride ?? instruction.look {
+            image = LookRenderer.apply(look, to: image.cropped(to: canvas))
+        }
 
         for state in instruction.titles.states(at: time) {
             guard state.opacity > 0, let title = titleImage(state) else { continue }
@@ -169,15 +206,21 @@ nonisolated final class ShortsCompositor: NSObject, AVVideoCompositing, Sendable
         let region = layer.region
         // Core Image's origin is at the bottom left.
         let ciRegion = CGRect(x: region.minX, y: canvas.height - region.maxY, width: region.width, height: region.height)
-        guard let source = sourceImage(for: layer, request: request) else {
+        guard var source = sourceImage(for: layer, request: request) else {
             return layer.isMain ? CIImage(color: .black).cropped(to: ciRegion).composited(over: image) : image
+        }
+        if !LivePreview.showsOriginal {
+            source = LookRenderer.apply(LivePreview.look(for: layer.clip.id) ?? layer.clip.look, to: source)
         }
         var image = image
         let offset = time - layer.timelineStart
         let sourceTime = layer.clip.sourceTime(atOffset: offset)
         let placement = LivePreview.placement(for: layer.clip.id) ?? layer.clip.placement(atSourceTime: sourceTime)
-        // Framed to the region's size, then moved, resized and turned around its middle, then put in place.
-        let transform = layer.clip.framing.transform(naturalSize: layer.naturalSize, preferredTransform: layer.preferredTransform, canvas: region.size)
+        // Steadied (moved against the shake and zoomed in a little), then framed to the region's
+        // size, then moved, resized and turned around its middle, then put in place.
+        let steady = layer.steadying?.transform(atSourceTime: sourceTime, naturalSize: layer.naturalSize) ?? .identity
+        let transform = steady
+            .concatenating(layer.clip.framing.transform(naturalSize: layer.naturalSize, preferredTransform: layer.preferredTransform, canvas: region.size))
             .concatenating(placement.transform(in: region))
         let height = source.extent.height
         if layer.isMain {

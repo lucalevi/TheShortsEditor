@@ -72,6 +72,78 @@ enum Fixture {
         return url
     }
 
+    /// A video of a fixed random pattern of grey blocks with a white square in the middle, moved
+    /// by `offsets[frame]` pixels (x right, y down) on each frame, like a shaky camera. Frames past
+    /// the end of `offsets` repeat the last one.
+    static func shakyVideo(width: Int = 320, height: Int = 180, seconds: Int = 2, offsets: [(Int, Int)]) async throws -> URL {
+        let url = FileManager.default.temporaryDirectory.appending(path: "fixture-\(UUID().uuidString).mov")
+        let writer = try AVAssetWriter(outputURL: url, fileType: .mov)
+        let input = AVAssetWriterInput(mediaType: .video, outputSettings: [
+            AVVideoCodecKey: AVVideoCodecType.h264, AVVideoWidthKey: width, AVVideoHeightKey: height,
+        ])
+        input.expectsMediaDataInRealTime = false
+        let adaptor = AVAssetWriterInputPixelBufferAdaptor(assetWriterInput: input, sourcePixelBufferAttributes: nil)
+        writer.add(input)
+        guard writer.startWriting() else { throw writer.error ?? WriteError() }
+        writer.startSession(atSourceTime: .zero)
+        // Grey levels per 12-pixel block, from a fixed seed so every run is the same.
+        var seed: UInt64 = 42
+        func next() -> UInt8 {
+            seed = seed &* 6364136223846793005 &+ 1442695040888963407
+            return UInt8(40 + (seed >> 33) % 140)
+        }
+        let blocks = (0..<4096).map { _ in next() }
+        func value(_ x: Int, _ y: Int) -> UInt8 {
+            if abs(x - width / 2) < 10, abs(y - height / 2) < 10 { return 255 }
+            let bx = (x + 1200) / 12, by = (y + 1200) / 12
+            return blocks[(bx * 31 + by * 17) % blocks.count]
+        }
+        for frame in 0..<(30 * seconds) {
+            let (dx, dy) = offsets[min(frame, offsets.count - 1)]
+            var buffer: CVPixelBuffer?
+            CVPixelBufferCreate(kCFAllocatorDefault, width, height, kCVPixelFormatType_32BGRA, nil, &buffer)
+            guard let buffer else { throw WriteError() }
+            CVPixelBufferLockBaseAddress(buffer, [])
+            let base = CVPixelBufferGetBaseAddress(buffer)!.assumingMemoryBound(to: UInt8.self)
+            let bytesPerRow = CVPixelBufferGetBytesPerRow(buffer)
+            for y in 0..<height {
+                for x in 0..<width {
+                    let v = value(x - dx, y - dy)
+                    let p = base + y * bytesPerRow + x * 4
+                    (p[0], p[1], p[2], p[3]) = (v, v, v, 255)
+                }
+            }
+            CVPixelBufferUnlockBaseAddress(buffer, [])
+            while !input.isReadyForMoreMediaData { try await Task.sleep(for: .milliseconds(2)) }
+            guard adaptor.append(buffer, withPresentationTime: CMTime(value: Int64(frame), timescale: 30)) else { throw writer.error ?? WriteError() }
+        }
+        input.markAsFinished()
+        await writer.finishWriting()
+        guard writer.status == .completed else { throw writer.error ?? WriteError() }
+        return url
+    }
+
+    /// The middle of the near-white pixels of `image` (origin top left), or nil when there are none.
+    static func whiteCentre(_ image: CGImage) -> CGPoint? {
+        let width = image.width, height = image.height
+        var data = [UInt8](repeating: 0, count: width * height * 4)
+        let context = CGContext(data: &data, width: width, height: height, bitsPerComponent: 8, bytesPerRow: width * 4,
+                                space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+        context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
+        var sx = 0.0, sy = 0.0, n = 0.0
+        for y in 0..<height {
+            for x in 0..<width {
+                let i = (y * width + x) * 4
+                if data[i] > 235, data[i + 1] > 235, data[i + 2] > 235 {
+                    sx += Double(x)
+                    sy += Double(y)
+                    n += 1
+                }
+            }
+        }
+        return n > 0 ? CGPoint(x: sx / n, y: sy / n) : nil
+    }
+
     /// A sound file (like a song): a steady tone at `amplitude` (0…1 of full scale) for `seconds`.
     static func sound(seconds: Int, frequency: Double = 660, amplitude: Double = 0.3) async throws -> URL {
         let url = FileManager.default.temporaryDirectory.appending(path: "fixture-\(UUID().uuidString).m4a")

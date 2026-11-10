@@ -26,6 +26,7 @@ struct ViewerView: View {
                         .overlay { CaptionHandle(model: model) }
                         .overlay { TitleHandles(model: model) }
                         .overlay { VoiceOverBadge(model: model) }
+                        .overlay { ColorPickOverlay(model: model) }
                         .aspectRatio(canvasAspect, contentMode: .fit)
                         .clipShape(RoundedRectangle(cornerRadius: 4))
                         .shadow(radius: 6)

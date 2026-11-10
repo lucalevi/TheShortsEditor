@@ -150,6 +150,22 @@ final class EditorModel {
     @ObservationIgnored var preparingSounds: Set<String> = []
     /// A clip whose subject is being found for reframing, with how far it has got.
     var reframing: (clipID: Clip.ID, progress: Double)?
+    /// Waiting for a click in the viewer to pick white or skin for a clip (see `EditorModel+Look`).
+    var colorPick: ColorPick?
+    /// Before/after: while on, the viewer shows every picture without its colour and filters.
+    var showsOriginalLook = false {
+        didSet {
+            LivePreview.showsOriginal = showsOriginalLook
+            // A seek to the same time doesn't always draw the paused frame again; a fresh item does.
+            refreshPlayback()
+        }
+    }
+    /// Files whose shake is being measured for Stabilize, with how far it has got (0…1).
+    var steadying: [MediaAsset.ID: Double] = [:]
+    /// Files whose shake couldn't be measured, so it isn't tried again after every rebuild.
+    @ObservationIgnored var unsteadiable: Set<MediaAsset.ID> = []
+    /// Clips being looked at for Enhance or Match Color.
+    var analysingLook: Set<Clip.ID> = []
     /// While recording a voice-over: counting down, then recording from a time.
     var voiceOver: VoiceOverState?
     /// Words selected in the Script panel.
@@ -1119,6 +1135,7 @@ final class EditorModel {
                 LivePreview.clearAll()
                 seek(to: time)
                 prepareMissingProcessedSounds()
+                prepareMissingSteadiness()
             } catch {
                 guard !Task.isCancelled else { return }
                 alert = AlertMessage(title: "Playback problem", message: error.localizedDescription)

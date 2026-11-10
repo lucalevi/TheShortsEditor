@@ -221,9 +221,15 @@ extension EditorModel {
 
     // MARK: Private
 
-    /// Draws the frame at the playhead again (after a live placement change).
-    private func redrawCurrentFrame() {
+    /// Draws the frame at the playhead again (after a live placement or look change).
+    func redrawCurrentFrame() {
         guard player.currentItem != nil, !isPlaying else { return }
-        player.seek(to: currentTime, toleranceBefore: .zero, toleranceAfter: .zero)
+        // A paused player may keep the frame it has for a seek to the very same time, so every
+        // other redraw asks for a millisecond later: the same picture, but drawn anew.
+        redrawNudged.toggle()
+        let time = currentTime.snappedToFrame() + (redrawNudged ? CMTime(value: 1, timescale: 1000) : .zero)
+        player.seek(to: time, toleranceBefore: .zero, toleranceAfter: .zero)
     }
 }
+
+@MainActor private var redrawNudged = false
