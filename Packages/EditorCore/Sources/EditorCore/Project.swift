@@ -30,11 +30,13 @@ public struct Project: Codable, Equatable, Sendable {
     public var sounds: [SoundClip] = []
     /// A filter over the whole Short (on top of each clip's own look), if any.
     public var look: FilterChoice?
+    /// Named points on the timeline (M), sorted by time.
+    public var markers: [Marker] = []
 
     public init() {}
 
     private enum CodingKeys: String, CodingKey {
-        case assets, timeline, transcripts, captions, titles, music, overlays, sounds, look
+        case assets, timeline, transcripts, captions, titles, music, overlays, sounds, look, markers
     }
 
     /// Reads what older versions saved too: anything they didn't have yet starts empty.
@@ -49,6 +51,7 @@ public struct Project: Codable, Equatable, Sendable {
         overlays = try c.decodeIfPresent([Overlay].self, forKey: .overlays) ?? []
         sounds = try c.decodeIfPresent([SoundClip].self, forKey: .sounds) ?? []
         look = try? c.decodeIfPresent(FilterChoice.self, forKey: .look)
+        markers = try c.decodeIfPresent([Marker].self, forKey: .markers) ?? []
     }
 
     public var duration: CMTime { timeline.duration }

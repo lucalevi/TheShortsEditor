@@ -166,6 +166,12 @@ final class EditorModel {
     @ObservationIgnored var unsteadiable: Set<MediaAsset.ID> = []
     /// Clips being looked at for Enhance or Match Color.
     var analysingLook: Set<Clip.ID> = []
+    /// The marker whose name is being typed (its pop-up on the ruler is open).
+    var markerBeingRenamed: Marker.ID?
+    /// The clip shown in the clip trimmer (⌘\), if it is open.
+    var trimmerClipID: Clip.ID?
+    /// Photos library items being copied in (downloaded from iCloud first if needed), by local identifier.
+    var photoDownloads: [String: Double] = [:]
     /// While recording a voice-over: counting down, then recording from a time.
     var voiceOver: VoiceOverState?
     /// Words selected in the Script panel.
@@ -215,6 +221,7 @@ final class EditorModel {
 
     enum Sidebar: String, CaseIterable, Identifiable {
         case media = "Media"
+        case photos = "Photos"
         case captions = "Captions"
         case script = "Script"
         case sounds = "Sounds"
@@ -285,7 +292,8 @@ final class EditorModel {
     /// Applies an edit as one undoable step.
     func apply(_ actionName: String, _ edit: (inout Project) -> Void) {
         var updated = project
-        edit(&updated)
+        // New clips start as Settings say (picture length and placement, slow motion).
+        NewClipSettings.$current.withValue(newClipSettings) { edit(&updated) }
         // Titles, B-roll and sounds stay with the clip under them.
         updated.followClips(from: project)
         if updated.timeline != project.timeline { timelineRange = nil }

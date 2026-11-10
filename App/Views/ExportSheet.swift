@@ -70,6 +70,8 @@ struct ExportSheet: View {
                 ? "captions: \(model.project.captions.style.displayName)" : "no captions"
             let music = model.project.musicRange != nil ? " · music" : ""
             Text("\(TimeFormat.string(model.duration)) · vertical 1080 × 1920 · \(captions)\(music)")
+            Text("File size: \(model.exportSizeEstimate)")
+                .foregroundStyle(.secondary)
             Text("MP4 file with YouTube's recommended settings (H.264, 30 fps, AAC sound).")
                 .font(.caption)
                 .foregroundStyle(.secondary)

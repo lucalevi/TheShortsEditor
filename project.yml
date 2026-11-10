@@ -34,6 +34,7 @@ targets:
         LSApplicationCategoryType: public.app-category.video
         NSSpeechRecognitionUsageDescription: Captions are made on this Mac from what is said in your clips.
         NSMicrophoneUsageDescription: To record a voice-over for your Short.
+        NSPhotoLibraryUsageDescription: To add videos and photos from your Photos library to your Short. Only the items you add are copied.
         NSHumanReadableCopyright: "© 2026 Luca Iacolettig"
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
@@ -72,6 +73,8 @@ targets:
         com.apple.security.files.bookmarks.app-scope: true
         # Recording voice-overs.
         com.apple.security.device.audio-input: true
+        # The Photos tab (reading the library, with the user's permission).
+        com.apple.security.personal-information.photos-library: true
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.lucalevi.TheShortsEditor

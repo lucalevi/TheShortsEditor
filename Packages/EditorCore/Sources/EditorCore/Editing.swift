@@ -149,7 +149,7 @@ public extension Project {
     @discardableResult
     mutating func addOverlay(of assetID: MediaAsset.ID, at time: CMTime) -> Clip.ID? {
         guard let asset = asset(id: assetID), asset.hasVideo else { return nil }
-        let wanted = asset.isImage ? MediaAsset.imageClipDuration : min(asset.duration, Overlay.defaultVideoDuration)
+        let wanted = asset.isImage ? NewClipSettings.current.pictureLength : min(asset.duration, Overlay.defaultVideoDuration)
         let length = duration > .zero ? duration : wanted
         var start = time.snappedToFrame().clamped(.zero, length)
         if length - start < wanted { start = max(.zero, length - wanted) }
@@ -277,7 +277,7 @@ public enum Snapping {
     /// Times worth sticking to: the start and end of the Short, the cuts between clips, the edges
     /// of titles and overlays, and the playhead. The items in `excluding` don't count (so a
     /// dragged item doesn't stick to itself).
-    public static func targets(in project: Project, playhead: CMTime?, excluding: Set<TimelineItem> = []) -> [CMTime] {
+    public static func targets(in project: Project, playhead: CMTime?, excluding: Set<TimelineItem> = [], excludingMarker: Marker.ID? = nil) -> [CMTime] {
         var times: [CMTime] = [.zero, project.duration]
         var start = CMTime.zero
         for clip in project.timeline.clips {
@@ -288,6 +288,7 @@ public enum Snapping {
         for title in project.titles where !excluding.contains(.title(title.id)) { times += [title.start, title.end] }
         for overlay in project.overlays where !excluding.contains(.overlay(overlay.id)) { times += [overlay.start, overlay.end] }
         for sound in project.sounds where !excluding.contains(.sound(sound.id)) { times += [sound.start, sound.end] }
+        for marker in project.markers where marker.id != excludingMarker && marker.time <= project.duration { times.append(marker.time) }
         if let playhead { times.append(playhead) }
         return times
     }

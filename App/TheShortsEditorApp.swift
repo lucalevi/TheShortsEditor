@@ -24,6 +24,10 @@ struct TheShortsEditorApp: App {
         .commands {
             EditorCommands(model: model)
         }
+
+        Settings {
+            SettingsView()
+        }
     }
 }
 

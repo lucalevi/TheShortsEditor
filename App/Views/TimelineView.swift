@@ -132,6 +132,8 @@ struct TimelineView: View {
                     ZStack(alignment: .topLeading) {
                         marqueeArea
                         ruler
+                        TimelineMarkers(model: model, leadingInset: leadingInset, pointsPerSecond: pointsPerSecond,
+                                        rulerHeight: rulerHeight, height: contentHeight)
                         titleLane.offset(y: titlesY)
                         overlayLane.offset(y: overlaysY)
                         pinLines
@@ -169,9 +171,18 @@ struct TimelineView: View {
                 }
             }
             .overlay(alignment: .bottom) {
+                if let id = model.trimmerClipID {
+                    ClipTrimmerView(model: model, clipID: id)
+                        .onChange(of: model.selection) {
+                            // Follows the selection to another clip; closes when there is none.
+                            model.trimmerClipID = model.trimmableClip?.id
+                        }
+                }
+            }
+            .overlay(alignment: .bottom) {
                 if let tip = model.tip {
                     TipBanner(tip: tip) { model.dismissTip() }
-                        .padding(.bottom, 8)
+                        .padding(.bottom, model.trimmerClipID == nil ? 8 : 128)
                         .transition(.opacity)
                 }
             }

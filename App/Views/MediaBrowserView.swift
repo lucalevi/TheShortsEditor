@@ -81,6 +81,8 @@ struct SidebarView: View {
                 }
                 .pickerStyle(.segmented)
                 .labelsHidden()
+                // Five tabs: the small size keeps them inside the panel.
+                .controlSize(.small)
                 if model.isImporting { ProgressView().controlSize(.small) }
             }
             .padding(.horizontal, 10)
@@ -92,6 +94,7 @@ struct SidebarView: View {
             Group {
                 switch model.sidebar {
                 case .media: MediaBrowserView(model: model)
+                case .photos: PhotosView(model: model)
                 case .captions: CaptionsView(model: model)
                 case .script: ScriptView(model: model)
                 case .sounds: SoundsView(model: model)

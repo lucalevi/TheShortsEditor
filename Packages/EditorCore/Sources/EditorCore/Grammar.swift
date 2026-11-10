@@ -50,9 +50,12 @@ public extension Project {
     /// A new clip of `assetID`: the whole file (a picture for a few seconds), or `part` of it.
     func makeClip(of assetID: MediaAsset.ID, part: CMTimeRange? = nil) -> Clip? {
         guard let asset = asset(id: assetID), asset.hasVideo, asset.duration > .zero else { return nil }
+        let settings = NewClipSettings.current
         if asset.isImage {
-            let length = part.map { max($0.duration.snappedToFrame(), Clip.minimumDuration) } ?? asset.defaultClipDuration
-            return Clip(assetID: assetID, sourceStart: .zero, duration: length, framing: asset.defaultFraming)
+            let length = part.map { max($0.duration.snappedToFrame(), Clip.minimumDuration) } ?? settings.pictureLength
+            var clip = Clip(assetID: assetID, sourceStart: .zero, duration: length, framing: asset.newClipFraming(settings))
+            if settings.picturePlacement == .slowZoom { clip.applyMotion(.slowZoomIn, playheadSource: .zero) }
+            return clip
         }
         var range = CMTimeRange(start: .zero, duration: asset.duration)
         if let part { range = part.intersection(range) }
@@ -60,7 +63,7 @@ public extension Project {
         let length = max(range.duration.snappedToFrame(), Clip.minimumDuration).clamped(Clip.minimumDuration, asset.duration - start)
         var clip = Clip(assetID: assetID, sourceStart: start, duration: length, framing: asset.defaultFraming)
         // Footage filmed for slow motion starts slowed down, as it was meant to be seen.
-        if asset.defaultSpeed != 1 {
+        if asset.defaultSpeed != 1, settings.slowsDownSlowMotion {
             clip.speed = asset.defaultSpeed
             clip.duration = max(CMTimeMultiplyByFloat64(length, multiplier: 1 / asset.defaultSpeed).snappedToFrame(), Clip.minimumDuration)
         }
@@ -294,6 +297,12 @@ public extension Project {
         func followed(_ time: CMTime) -> CMTime? {
             guard let (index, offset) = old.timeline.locate(time.snappedToFrame()) else { return nil }
             let anchor = old.timeline.clips[index]
+            // A freeze frame shows one picture for its whole length, so a moment in it can't be
+            // found by its source time: it stays the same distance into the same freeze frame.
+            if anchor.isFrozen {
+                guard let i = timeline.clips.firstIndex(where: { $0.id == anchor.id }) else { return nil }
+                return (starts[i] + min(offset, timeline.clips[i].duration)).snappedToFrame()
+            }
             let source = anchor.sourceTime(atOffset: offset)
             var nearest: (time: CMTime, distance: Double)?
             var containing: [CMTime] = []
@@ -329,6 +338,12 @@ public extension Project {
             guard let was = oldSounds[sounds[i].id], was == sounds[i].start, let now = followed(was) else { continue }
             sounds[i].start = now
         }
+        let oldMarkers = Dictionary(old.markers.map { ($0.id, $0.time) }) { a, _ in a }
+        for i in markers.indices where markers[i].followsClip {
+            guard let was = oldMarkers[markers[i].id], was == markers[i].time, let now = followed(was) else { continue }
+            markers[i].time = now
+        }
+        markers.sort { $0.time < $1.time }
     }
 
     /// Whether an item moves with its clip.

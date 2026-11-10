@@ -33,6 +33,9 @@ struct EditorCommands: Commands {
             Button("Export Short…") { model.beginExport() }
                 .keyboardShortcut("e")
                 .disabled(model.project.timeline.clips.isEmpty || model.exportPhase != nil)
+            Button("Save Frame as Picture…") { model.saveFrame() }
+                .keyboardShortcut("e", modifiers: [.command, .shift])
+                .disabled(model.project.timeline.clips.isEmpty || model.screen == .home)
         }
 
         CommandGroup(after: .pasteboard) {
@@ -172,6 +175,9 @@ struct EditorCommands: Commands {
                     .disabled(model.adjustableClip?.hasMotion != true)
             }
             .disabled(model.adjustableClip == nil)
+            Button(model.trimmerClipID == nil ? "Show Clip Trimmer" : "Hide Clip Trimmer") { model.toggleClipTrimmer() }
+                .keyboardShortcut("\\", modifiers: .command)
+                .disabled(model.trimmerClipID == nil && model.trimmableClip == nil)
             Button("Reset All Settings") { model.resetSelectedClips() }
                 .disabled(selectedClips.isEmpty)
             Divider()
@@ -270,6 +276,20 @@ struct EditorCommands: Commands {
                 .keyboardShortcut(";", modifiers: [])
             Button("Next Edit") { model.goToEdit(forward: true) }
                 .keyboardShortcut("'", modifiers: [])
+            Divider()
+            Button("Add Marker") { model.addMarker() }
+                .keyboardShortcut("m", modifiers: [])
+                .disabled(model.project.timeline.clips.isEmpty)
+            Button("Previous Marker") { model.goToMarker(forward: false) }
+                .keyboardShortcut(";", modifiers: .control)
+                .disabled(model.project.markers.isEmpty)
+            Button("Next Marker") { model.goToMarker(forward: true) }
+                .keyboardShortcut("'", modifiers: .control)
+                .disabled(model.project.markers.isEmpty)
+            Button("Rename Marker at Playhead…") { if let marker = model.markerAtPlayhead { model.markerBeingRenamed = marker.id } }
+                .disabled(model.markerAtPlayhead == nil)
+            Button("Delete Marker at Playhead") { if let marker = model.markerAtPlayhead { model.deleteMarker(marker.id) } }
+                .disabled(model.markerAtPlayhead == nil)
             Divider()
             Button("Play Selection") { model.playSelection() }
                 .keyboardShortcut("/", modifiers: [])

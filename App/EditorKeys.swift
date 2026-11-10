@@ -34,6 +34,19 @@ final class EditorKeys {
             model.selectAllOnTimeline()
             return true
         }
+        // ⌘\ opens the clip trimmer; ⌃; and ⌃' jump between markers. Matched by character, as below.
+        let modifiers = event.modifierFlags.intersection([.command, .control, .option, .shift])
+        if !(event.window?.firstResponder is NSText) {
+            let character = event.charactersIgnoringModifiers
+            if modifiers.subtracting(.shift) == .command, character == "\\" {
+                model.toggleClipTrimmer()
+                return true
+            }
+            if modifiers.subtracting(.shift) == .control, character == ";" || character == "'" {
+                model.goToMarker(forward: character == "'")
+                return true
+            }
+        }
         guard event.modifierFlags.intersection([.command, .control, .option]).isEmpty,
               !(event.window?.firstResponder is NSText)
         else { return false }
@@ -82,6 +95,10 @@ final class EditorKeys {
             model.deleteRange()
             return true
         }
+        if event.keyCode == 53, model.trimmerClipID != nil {
+            model.trimmerClipID = nil
+            return true
+        }
         if event.keyCode == 53, model.timelineRange != nil || model.mediaRange != nil {
             model.clearRanges()
             return true
@@ -107,6 +124,7 @@ final class EditorKeys {
         case 1: model.snapsToEdges.toggle()        // S
         case 15: model.isRangeKeyDown = true       // R (held while dragging a range)
         case 7: model.selectClipRange()            // X
+        case 46: model.addMarker()                 // M
         case 14: break                             // E without a file selected
         case 123: model.step(frames: -1)           // ←
         case 124: model.step(frames: 1)            // →

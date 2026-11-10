@@ -77,6 +77,8 @@
 	<string>© 2026 Luca Iacolettig</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>To record a voice-over for your Short.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>To add videos and photos from your Photos library to your Short. Only the items you add are copied.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>Captions are made on this Mac from what is said in your clips.</string>
 	<key>UTExportedTypeDeclarations</key>

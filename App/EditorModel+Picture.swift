@@ -76,7 +76,7 @@ extension EditorModel {
     // MARK: Snapping
 
     /// How close an edge must come to stick, as time at the current timeline zoom.
-    private var snapTolerance: CMTime {
+    var snapTolerance: CMTime {
         CMTime(seconds: Snapping.distance / Double(timelineZoom), preferredTimescale: 600)
     }
 
