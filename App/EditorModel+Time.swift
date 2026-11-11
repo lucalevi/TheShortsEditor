@@ -60,7 +60,7 @@ extension EditorModel {
             alert = AlertMessage(title: "A transition needs two clips", message: "Transitions go between two clips. Add another clip, or split this one (B), then try again.")
             return
         }
-        setTransition(kind ?? preferredTransition.kind, after: cut)
+        setTransition(kind ?? project.style?.transition?.kind ?? preferredTransition.kind, after: cut)
         showTip(.transitions)
     }
 

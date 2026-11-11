@@ -163,7 +163,9 @@ public extension Project {
         let wanted = min(TextOverlay.defaultDuration, length)
         var start = time.snappedToFrame().clamped(.zero, length)
         if length - start < wanted { start = max(.zero, length - wanted) }
-        let title = TextOverlay(text: text, start: start.snappedToFrame(), duration: wanted.snappedToFrame())
+        var title = TextOverlay(text: text, start: start.snappedToFrame(), duration: wanted.snappedToFrame())
+        // In a styled Short, new titles match the others.
+        if let style { title.takeLook(of: style) }
         titles.append(title)
         return title.id
     }

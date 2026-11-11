@@ -351,6 +351,8 @@ private struct ProjectInspector: View {
                 }
             }
 
+            ShortStyleSection(model: model)
+
             if !model.project.timeline.clips.isEmpty {
                 ShortLookSection(model: model)
             }

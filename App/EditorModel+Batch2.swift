@@ -349,7 +349,7 @@ extension EditorModel {
         }
     }
 
-    private func loadPreviewsIfNeeded(_ media: MediaAsset) {
+    func loadPreviewsIfNeeded(_ media: MediaAsset) {
         guard media.hasAudio, audioLevelsMissing(media.id) else { return }
         Task {
             if let levels = await LevelCache.levels(of: media.url) { setAudioLevels(levels, for: media.id) }

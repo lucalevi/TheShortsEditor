@@ -12,7 +12,8 @@ public struct ProjectFile: Codable, Equatable, Sendable {
     /// 4: transitions, freeze frames, clips played backwards, see-through B-roll.
     /// 5: colour, filters (per clip and for the whole Short), Stabilize.
     /// 6: markers.
-    public static let currentVersion = 6
+    /// 7: styles, app-made music, storyboards.
+    public static let currentVersion = 7
     public static let fileExtension = "shortsproject"
 
     public var version: Int

@@ -10,11 +10,27 @@ struct EditorCommands: Commands {
         CommandGroup(replacing: .newItem) {
             Button("New Short") { model.newShort() }
                 .keyboardShortcut("n")
+            Button("New Magic Short…") { model.newMagicShort() }
+                .keyboardShortcut("n", modifiers: [.command, .option])
+            Button("New Short from Storyboard…") { model.choosesStoryboard = true }
             Button("Open…") { model.openProjectPanel() }
                 .keyboardShortcut("o")
             Button("All Shorts") { model.showHome() }
                 .keyboardShortcut("0", modifiers: [.command, .shift])
                 .disabled(model.screen == .home)
+            Divider()
+            Menu("Style") {
+                ForEach([nil] + ShortStyle.allCases.map(Optional.some), id: \.self) { (style: ShortStyle?) in
+                    Toggle(style?.displayName ?? "None", isOn: Binding(get: { model.project.style == style }, set: { if $0 { model.setStyle(style) } }))
+                }
+            }
+            .disabled(model.screen == .home || model.styleBeingMade != nil)
+            Button("Magic Short…") { model.beginMagic() }
+                .disabled(model.screen == .home || model.project.timeline.clips.isEmpty)
+            Button(model.project.storyboard == nil ? "Storyboard…" : "Show Storyboard") {
+                if model.project.storyboard == nil { model.choosesStoryboard = true } else { model.sidebar = .storyboard }
+            }
+            .disabled(model.screen == .home)
         }
 
         CommandGroup(replacing: .saveItem) {

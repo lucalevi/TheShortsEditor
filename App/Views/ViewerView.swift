@@ -37,7 +37,12 @@ struct ViewerView: View {
                 }
             }
             .dropDestination(for: URL.self) { urls, _ in
-                model.importFiles(urls, addToTimeline: true)
+                // A storyboard's empty Short: the first clip fills the first shot.
+                if model.project.timeline.clips.isEmpty, let first = model.project.storyboard?.slots.first {
+                    model.fill(first.id, withFiles: urls)
+                } else {
+                    model.importFiles(urls, addToTimeline: true)
+                }
                 return true
             } isTargeted: { isDropTargeted = $0 }
             TransportBar(model: model)
@@ -50,16 +55,37 @@ struct ViewerView: View {
             .foregroundStyle(isDropTargeted ? Color.accentColor : Color.secondary.opacity(0.5))
             .background(isDropTargeted ? Color.accentColor.opacity(0.08) : .clear, in: RoundedRectangle(cornerRadius: 12))
             .overlay {
-                VStack(spacing: 12) {
-                    Image(systemName: "arrow.down.to.line.compact")
-                        .font(.system(size: 36))
-                    Text("Drop your videos or pictures here to start")
-                        .font(.title3)
-                    Text("They go straight onto the timeline, in order.")
-                        .foregroundStyle(.secondary)
-                    Button("Choose Videos…") { MediaImportPanel.run(model: model, addToTimeline: true) }
-                        .controlSize(.large)
-                        .padding(.top, 4)
+                if let first = model.project.storyboard?.slots.first {
+                    // Started from a storyboard: the first shot says what to film.
+                    VStack(spacing: 12) {
+                        Image(systemName: "video.badge.plus")
+                            .font(.system(size: 36))
+                        Text("First shot: \(first.shot.name), \(Int(first.shot.length.seconds)) s")
+                            .font(.title3)
+                        Text(first.shot.direction)
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.center)
+                        Text("Fill the shots in the shot list on the left. Drop a clip here for this one.")
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.center)
+                        Button("Choose Clip…") { model.chooseFile(for: first.id) }
+                            .controlSize(.large)
+                            .padding(.top, 4)
+                    }
+                    .padding(.horizontal, 20)
+                } else {
+                    VStack(spacing: 12) {
+                        Image(systemName: "arrow.down.to.line.compact")
+                            .font(.system(size: 36))
+                        Text("Drop your videos or pictures here to start")
+                            .font(.title3)
+                        Text("They go straight onto the timeline, in order.")
+                            .foregroundStyle(.secondary)
+                        Button("Choose Videos…") { MediaImportPanel.run(model: model, addToTimeline: true) }
+                            .controlSize(.large)
+                            .padding(.top, 4)
+                    }
                 }
             }
             .aspectRatio(canvasAspect, contentMode: .fit)

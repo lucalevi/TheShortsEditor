@@ -23,9 +23,13 @@ struct HomeView: View {
                 if search.isEmpty {
                     LazyVGrid(columns: columns, alignment: .leading, spacing: 22) {
                         NewShortTile { model.newShort() }
+                        StartTile(title: "Magic Short", systemImage: "wand.and.stars",
+                                  help: "Choose clips and get a first cut: pauses out, captions, a hook title and music") { model.newMagicShort() }
+                        StartTile(title: "Storyboard", systemImage: "list.bullet.rectangle.portrait",
+                                  help: "Start from a shot list that tells you what to film (how-to, review, top 3…)") { model.choosesStoryboard = true }
                     }
                     if model.shorts.isEmpty {
-                        Text("Your Shorts will appear here. Each one is saved as you edit it, so you can come back to it any time.")
+                        Text("Start an empty Short, let Magic Short make a first cut from your clips, or follow a storyboard. Your Shorts will appear here. Each one is saved as you edit it, so you can come back to it any time.")
                             .foregroundStyle(.secondary)
                             .frame(maxWidth: 460, alignment: .leading)
                     }

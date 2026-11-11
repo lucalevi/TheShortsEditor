@@ -12,9 +12,12 @@ public struct BackgroundMusic: Codable, Equatable, Sendable {
     public var lowersUnderSpeech: Bool
     public var fadesIn: Bool
     public var fadesOut: Bool
+    /// Set when the app made this music for a style (see `ShortStyles.swift`).
+    public var mood: MusicMood?
 
     public init(assetID: MediaAsset.ID, sourceStart: CMTime = .zero, volume: Double = BackgroundMusic.defaultVolume,
-                lowersUnderSpeech: Bool = true, fadesIn: Bool = true, fadesOut: Bool = true) {
+                lowersUnderSpeech: Bool = true, fadesIn: Bool = true, fadesOut: Bool = true, mood: MusicMood? = nil) {
+        self.mood = mood
         self.assetID = assetID
         self.sourceStart = sourceStart
         self.volume = volume
@@ -296,7 +299,7 @@ public struct LoudnessMeter: Sendable {
 
 extension BackgroundMusic {
     private enum CodingKeys: String, CodingKey {
-        case assetID, sourceStart, volume, lowersUnderSpeech, fadesIn, fadesOut
+        case assetID, sourceStart, volume, lowersUnderSpeech, fadesIn, fadesOut, mood
     }
 
     public init(from decoder: any Decoder) throws {
@@ -307,6 +310,7 @@ extension BackgroundMusic {
         lowersUnderSpeech = try c.decode(Bool.self, forKey: .lowersUnderSpeech)
         fadesIn = try c.decode(Bool.self, forKey: .fadesIn)
         fadesOut = try c.decode(Bool.self, forKey: .fadesOut)
+        mood = try? c.decodeIfPresent(MusicMood.self, forKey: .mood)
     }
 
     public func encode(to encoder: any Encoder) throws {
@@ -317,5 +321,6 @@ extension BackgroundMusic {
         try c.encode(lowersUnderSpeech, forKey: .lowersUnderSpeech)
         try c.encode(fadesIn, forKey: .fadesIn)
         try c.encode(fadesOut, forKey: .fadesOut)
+        try c.encodeIfPresent(mood, forKey: .mood)
     }
 }

@@ -32,11 +32,15 @@ public struct Project: Codable, Equatable, Sendable {
     public var look: FilterChoice?
     /// Named points on the timeline (M), sorted by time.
     public var markers: [Marker] = []
+    /// The ready-made style of the whole Short, if one was chosen (see `ShortStyles.swift`).
+    public var style: ShortStyle?
+    /// The shot list the Short is being filmed from, if it was started from one (see `Storyboards.swift`).
+    public var storyboard: Storyboard?
 
     public init() {}
 
     private enum CodingKeys: String, CodingKey {
-        case assets, timeline, transcripts, captions, titles, music, overlays, sounds, look, markers
+        case assets, timeline, transcripts, captions, titles, music, overlays, sounds, look, markers, style, storyboard
     }
 
     /// Reads what older versions saved too: anything they didn't have yet starts empty.
@@ -52,6 +56,8 @@ public struct Project: Codable, Equatable, Sendable {
         sounds = try c.decodeIfPresent([SoundClip].self, forKey: .sounds) ?? []
         look = try? c.decodeIfPresent(FilterChoice.self, forKey: .look)
         markers = try c.decodeIfPresent([Marker].self, forKey: .markers) ?? []
+        style = try? c.decodeIfPresent(ShortStyle.self, forKey: .style)
+        storyboard = try? c.decodeIfPresent(Storyboard.self, forKey: .storyboard)
     }
 
     public var duration: CMTime { timeline.duration }

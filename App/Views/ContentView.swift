@@ -27,6 +27,13 @@ struct ContentView: View {
         .sheet(isPresented: Binding(get: { model.exportPhase != nil }, set: { if !$0 { model.endExport() } })) {
             ExportSheet(model: model)
         }
+        .sheet(isPresented: Binding(get: { model.magic != nil }, set: { if !$0 { model.cancelMagic() } })) {
+            MagicShortSheet(model: model)
+                .interactiveDismissDisabled()
+        }
+        .sheet(isPresented: $model.choosesStoryboard) {
+            StoryboardChooser(model: model)
+        }
         .alert(item: $model.alert) { alert in
             Alert(title: Text(alert.title), message: Text(alert.message))
         }

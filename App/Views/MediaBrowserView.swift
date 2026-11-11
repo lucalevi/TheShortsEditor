@@ -77,7 +77,7 @@ struct SidebarView: View {
         VStack(spacing: 0) {
             HStack {
                 Picker("Show", selection: $model.sidebar) {
-                    ForEach(EditorModel.Sidebar.allCases) { Text($0.rawValue).tag($0) }
+                    ForEach(EditorModel.Sidebar.allCases.filter { $0 != .storyboard }) { Text($0.rawValue).tag($0) }
                 }
                 .pickerStyle(.segmented)
                 .labelsHidden()
@@ -91,6 +91,25 @@ struct SidebarView: View {
             .background(Theme.header)
             .overlay(alignment: .bottom) { Divider() }
 
+            // A Short started from a storyboard has its shot list above the tabs.
+            if let board = model.project.storyboard {
+                Button { model.sidebar = .storyboard } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: board.kind.systemImage)
+                        Text("Shot List: \(board.kind.displayName)").fontWeight(model.sidebar == .storyboard ? .bold : .regular)
+                        Spacer(minLength: 0)
+                        if model.sidebar == .storyboard { Image(systemName: "checkmark") }
+                    }
+                    .padding(.horizontal, 12)
+                    .frame(height: 28)
+                    .background(model.sidebar == .storyboard ? Color.accentColor.opacity(0.35) : Theme.header)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .overlay(alignment: .bottom) { Divider() }
+                .help("What to film for each shot, and which clip fills it")
+            }
+
             Group {
                 switch model.sidebar {
                 case .media: MediaBrowserView(model: model)
@@ -98,6 +117,7 @@ struct SidebarView: View {
                 case .captions: CaptionsView(model: model)
                 case .script: ScriptView(model: model)
                 case .sounds: SoundsView(model: model)
+                case .storyboard: StoryboardView(model: model)
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)

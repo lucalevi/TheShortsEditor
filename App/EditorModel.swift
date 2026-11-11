@@ -174,6 +174,12 @@ final class EditorModel {
     var photoDownloads: [String: Double] = [:]
     /// While recording a voice-over: counting down, then recording from a time.
     var voiceOver: VoiceOverState?
+    /// The style whose music is being made, while it is.
+    var styleBeingMade: ShortStyle?
+    /// The Magic Short sheet, when it is open.
+    var magic: MagicSession?
+    /// The storyboard chooser sheet is open.
+    var choosesStoryboard = false
     /// Words selected in the Script panel.
     var scriptSelection: Set<WordRef> = []
     @ObservationIgnored var effectPlayer: AVAudioPlayer?
@@ -207,6 +213,11 @@ final class EditorModel {
     private var undoManager: UndoManager? { (window ?? NSApp.mainWindow)?.undoManager }
 
     @ObservationIgnored private var rebuildTask: Task<Void, Never>?
+    /// Set while a style is being applied, so its own motion isn't taken for hand-made motion.
+    @ObservationIgnored var isRestyling = false
+    @ObservationIgnored var magicTask: Task<Void, Never>?
+    /// Music files made for styles, ready to use without waiting.
+    @ObservationIgnored var preparedMusic: [MusicMood: MediaAsset] = [:]
     @ObservationIgnored private var captionTask: Task<Void, Never>?
     @ObservationIgnored private var exportTask: Task<Void, Never>?
     @ObservationIgnored private var timeObserver: Any?
@@ -225,6 +236,8 @@ final class EditorModel {
         case captions = "Captions"
         case script = "Script"
         case sounds = "Sounds"
+        /// Only while the Short has a storyboard.
+        case storyboard = "Shots"
         var id: String { rawValue }
     }
 
@@ -296,6 +309,9 @@ final class EditorModel {
         NewClipSettings.$current.withValue(newClipSettings) { edit(&updated) }
         // Titles, B-roll and sounds stay with the clip under them.
         updated.followClips(from: project)
+        // A style's motion moved by hand becomes the user's own; style music ends on the beat.
+        if !isRestyling { updated.claimHandMadeMotion(from: project) }
+        updated.fitMoodMusic()
         if updated.timeline != project.timeline { timelineRange = nil }
         replaceProject(with: updated, actionName: actionName)
     }
@@ -828,6 +844,9 @@ final class EditorModel {
         set { renameOpenShort(to: newValue) }
     }
 
+    /// A Short with media in it, or a storyboard waiting to be filmed, is kept in the library.
+    var isWorthKeeping: Bool { !project.assets.isEmpty || project.storyboard != nil }
+
     /// The name shown in the window's title.
     var documentName: String { screen == .home ? "Shorts" : openShortName }
 
@@ -837,7 +856,7 @@ final class EditorModel {
         autosaveTask?.cancel()
         autosaveTask = nil
         guard hasUnsavedChanges, let id = openShortID else { return }
-        if project.assets.isEmpty {
+        if !isWorthKeeping {
             try? FileManager.default.removeItem(at: ProjectStore.fileURL(for: id))
             hasUnsavedChanges = false
             return
@@ -897,7 +916,7 @@ final class EditorModel {
     func showHome() {
         player.pause()
         saveNow()
-        if let id = openShortID, project.assets.isEmpty {
+        if let id = openShortID, !isWorthKeeping {
             // A Short left empty isn't kept.
             try? FileManager.default.removeItem(at: ProjectStore.fileURL(for: id))
         }
@@ -969,7 +988,7 @@ final class EditorModel {
     private func renameOpenShort(to typed: String) {
         guard let name = ShortsLibrary.cleanedName(typed), name != openShortName else { return }
         openShortName = name
-        if !project.assets.isEmpty {
+        if isWorthKeeping {
             hasUnsavedChanges = true
             saveNow()
         }
@@ -1045,6 +1064,7 @@ final class EditorModel {
         currentTime = .zero
         undoManager?.removeAllActions()
         for asset in project.assets { loadPreviews(for: asset) }
+        sidebar = project.storyboard != nil ? .storyboard : sidebar == .storyboard ? .media : sidebar
         projectDidChange(autosave: false)
     }
 
@@ -1144,10 +1164,23 @@ final class EditorModel {
                 seek(to: time)
                 prepareMissingProcessedSounds()
                 prepareMissingSteadiness()
+                remakeMissingStyleMusic()
             } catch {
                 guard !Task.isCancelled else { return }
                 alert = AlertMessage(title: "Playback problem", message: error.localizedDescription)
             }
+        }
+    }
+
+    /// Music made by the app for a style can be made again (on another Mac, or after its folder
+    /// was cleared): it is remade and the Short points at the new file, without an undo step.
+    private func remakeMissingStyleMusic() {
+        guard let music = project.music, let mood = music.mood, missingAssets.contains(music.assetID) else { return }
+        Task {
+            guard let url = try? await MusicLibrary.fileURL(for: mood), project.music?.assetID == music.assetID else { return }
+            project.relink(music.assetID, to: url)
+            preparedMusic[mood] = nil
+            projectDidChange()
         }
     }
 

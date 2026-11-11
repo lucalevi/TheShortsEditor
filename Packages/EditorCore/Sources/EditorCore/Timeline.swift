@@ -49,6 +49,8 @@ public struct Clip: Identifiable, Codable, Equatable, Sendable {
     public var look: ClipLook
     /// How strongly camera shake is smoothed out, 0…1 (0: Stabilize is off). See `Stabilization.swift`.
     public var steadiness: Double
+    /// The placement and motion came from the Short's style, so another style may replace them.
+    public var styledMotion: Bool = false
 
     public static let maxVolume = 2.0
     /// No clip is shorter than this, so it can still be seen and grabbed on the timeline.
@@ -207,7 +209,7 @@ extension Clip {
         case id, assetID, sourceStart, duration, framing, volume, isMuted, placement, keyframes, background, speed, cleansVoice
         case fadeIn, fadeOut, volumeKeys, voiceEffect, equalizer, soundDetached
         case transitionOut, isFrozen, pictureFadeIn, pictureFadeOut, smoothSpeed
-        case look, steadiness
+        case look, steadiness, styledMotion
     }
 
     public init(from decoder: any Decoder) throws {
@@ -238,6 +240,7 @@ extension Clip {
         smoothSpeed = try c.decodeIfPresent(Bool.self, forKey: .smoothSpeed) ?? true
         look = (try? c.decodeIfPresent(ClipLook.self, forKey: .look)) ?? ClipLook()
         steadiness = try c.decodeIfPresent(Double.self, forKey: .steadiness) ?? 0
+        styledMotion = try c.decodeIfPresent(Bool.self, forKey: .styledMotion) ?? false
     }
 
     public func encode(to encoder: any Encoder) throws {
@@ -267,5 +270,6 @@ extension Clip {
         if !smoothSpeed { try c.encode(smoothSpeed, forKey: .smoothSpeed) }
         if look != ClipLook() { try c.encode(look, forKey: .look) }
         if steadiness > 0 { try c.encode(steadiness, forKey: .steadiness) }
+        if styledMotion { try c.encode(styledMotion, forKey: .styledMotion) }
     }
 }
