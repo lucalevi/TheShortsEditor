@@ -1,6 +1,6 @@
 # Feature roadmap: from good Shorts editor to CapCut substitute
 
-_Written 2026-11-09. Distilled from `capcut-reverse-engineering.md` (what CapCut has), `shorts-creator-tools-research.md` (what creators use, gap table §5) and `shorts-editor-research.md` (YouTube's rules). This is the build list. **Building starts only when the user asks.**_
+_Written 2026-11-09. Distilled from `capcut/capcut-bundle-analysis.md` (what CapCut has), `shorts-creator-tools-research.md` (what creators use, gap table §5) and `shorts-editor-research.md` (YouTube's rules). This is the build list. **Building starts only when the user asks.**_
 
 ---
 

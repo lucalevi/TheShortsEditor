@@ -1,6 +1,6 @@
 # What Shorts creators actually use
 
-_Research date: 2026-11-09. Companion to `capcut-reverse-engineering.md` (what CapCut has) and `shorts-editor-research.md` (platform rules, first P0 list). This file answers: **which of CapCut's tools matter for YouTube Shorts, and in what order should Shorts Editor get them?**_
+_Research date: 2026-11-09. Companion to `capcut/capcut-bundle-analysis.md` (what CapCut has) and `shorts-editor-research.md` (platform rules, first P0 list). This file answers: **which of CapCut's tools matter for YouTube Shorts, and in what order should Shorts Editor get them?**_
 
 **How reliable this is.** No independent, methodologically sound survey of Shorts creators' tools was found. Most 2026 material comes from CapCut's own blog, competing vendors (Opus Clip, Submagic, Splice) or affiliate sites. Below, numbers from such sources are marked **(vendor)** or **(unverified)**. Patterns that many independent guides repeat are treated as reliable; exact percentages are not.
 

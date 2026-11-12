@@ -1,6 +1,6 @@
 # Project status
 
-_Last updated: 2026-11-10 (Stage E). Read this first when picking the project back up, then update it at the end of each session._
+_Last updated: 2026-11-12 (CapCut research, stages G–L planned). Read this first when picking the project back up, then update it at the end of each session._
 
 ## Where we are
 
@@ -16,7 +16,7 @@ Stages 1–7 are done, tested on screen, committed and pushed to https://github.
 | 6 | Audio: clip volume, music with ducking, loudness on export | 2026-11-09 |
 | 7 | Save/open projects, autosave, missing media | 2026-11-09 |
 
-**Pick up here (2026-11-11, latest):** Stage F of the iMovie list ("One-click Shorts", `research/imovie/imovie-reverse-engineering.md`) is built, tested, checked on screen and committed. With it, every stage of the iMovie list (A–F) is done. Stage E is committed (5e708e6); its Photos tab is still unchecked on screen. Next: ask the user (see "What's next"). Test footage and a closed scratch iMovie library are in `~/Movies/ShortsEditorResearch` (safe to delete). Test Shorts "My Short 5"–"My Short 12" are in the library (safe to delete); "My Short 12" has a look, Stabilize, two markers and a slid clip from the on-screen checks.
+**Pick up here (2026-11-12, latest):** CapCut was researched (`research/capcut/README.md`); next is Stage G (captions), see "CapCut list: stages G–L" below. **Before that (2026-11-11):** Stage F of the iMovie list ("One-click Shorts", `research/imovie/imovie-reverse-engineering.md`) is built, tested, checked on screen and committed. With it, every stage of the iMovie list (A–F) is done. Stage E is committed (5e708e6); its Photos tab is still unchecked on screen. Next: ask the user (see "What's next"). Test footage and a closed scratch iMovie library are in `~/Movies/ShortsEditorResearch` (safe to delete). Test Shorts "My Short 5"–"My Short 12" are in the library (safe to delete); "My Short 12" has a look, Stabilize, two markers and a slid clip from the on-screen checks.
 
 ### Stage F: one-click Shorts (2026-11-11): done, committed
 
@@ -110,7 +110,7 @@ Tests: 212 model + 56 render + 3 transcription = 271, all pass. `Tools/uitest/ui
 Verified on screen: skimming (viewer frame, white line, playhead unmoved), Space from the skimmer, R-drag range + 2× on it (clip split into 4.8 / 1.7 at 2× / 3.5), title following when the first clip was deleted (0:12.1 → 0:07.3, pin line), live length label at a trimmed edge with the edge frame in the viewer, drop from Media on a clip → menu → Insert, W at 0:03.2 and E, a part chosen on the Media bar added with E (+1.5 s), Punch In → Copy Settings → Paste onto the next clip, Reset All, Next Edit, Loop + / (still looping inside the clip after 13 s), full screen in and out, X + ⌫ + undo, Media hover skimming, tips.
 Not yet verified on screen: audio skimming by ear, Replace / Replace from Start/End, Split Screen and Picture in Picture from the drop menu, the "Put in here" bar (drop on a cut), dropping files from Finder on a clip, Paste Motion, the follow switch turned off, Remove Pauses carrying a title (unit tested), the volume fade by ear (render-tested), ; and \ on screen.
 
-Earlier: the P0 list from the research is complete. On 2026-11-09 CapCut was analysed (`research/capcut-reverse-engineering.md`) and creator tool usage researched (`research/shorts-creator-tools-research.md`, with a gap table in §5), then distilled into the build list `research/feature-roadmap.md` (12 features, stages 8–16).
+Earlier: the P0 list from the research is complete. On 2026-11-09 CapCut was analysed (`research/capcut/capcut-bundle-analysis.md`) and creator tool usage researched (`research/shorts-creator-tools-research.md`, with a gap table in §5), then distilled into the build list `research/feature-roadmap.md` (12 features, stages 8–16).
 
 ### Delete media from the media panel (2026-11-09): done
 Select a file in the Media panel and press ⌫, or right-click ▸ Delete. It also removes the file's clips, B-roll, sounds, music and captions; one undo restores everything (`Project.removeAsset`, `EditorModel.removeAssets`). Checked on screen (key, right-click, undo). Not checked: deleting several files at once.
@@ -237,6 +237,7 @@ Features 1–5 (2026-11-09, on the test Short): picture opened from Finder (3 s 
 - Caption languages: **English, Italian, German, French**. All four are available in Apple's on-device `SpeechTranscriber` (checked on this Mac).
 - Support all kinds of footage, with **very friendly, intuitive UX** as the top requirement.
 - Repo is public on GitHub.
+- **Direction (2026-11-12): iMovie's look and feel, CapCut's features.** New features come from the CapCut list (stages G–L), shaped to iMovie's grammar.
 
 ## What's next, in order
 
@@ -251,9 +252,68 @@ The P0 list from `research/shorts-editor-research.md` §5. Each stage ends with 
 7. **Roadmap features 1–5 done** (2026-11-09, `research/feature-roadmap.md`): timeline you can touch, B-roll, pictures, framing in the viewer, motion.
 8. **Roadmap features 6–12 done** (2026-11-09): speed, text design, captions that pop, edit by text, sound layer, auto reframe, layouts.
 9. **iMovie list stages A–F done** (2026-11-09 … 11-11, `research/imovie/imovie-reverse-engineering.md`). This covered most of the roadmap's "next 20%" (markers, filters, transitions, copy/paste settings, templates as storyboards and styles, long video → Short as Magic Short).
-10. **Next (ask the user first):** what is left of `research/feature-roadmap.md` §4: beats (cuts on the music's beat, now possible with the app's own music), loop preview and cover frame, background removal, text to speech, stickers. Or polish: check the Photos tab and Stage F's music by ear, a Developer ID and a .dmg for sharing.
+10. **CapCut research done (2026-11-12, `research/capcut/`)**: the user wants **iMovie's look and feel with CapCut's features**. Stages G–L with checklists: **"CapCut list: stages G–L"** below (details in `research/capcut/capcut-reverse-engineering.md` §7).
+11. **Next:** Stage G, captions the CapCut way (the user asked for "auto captions" on 2026-11-12; we already have them, so G is what's missing: captions from voice-overs and B-roll, a Phrase style, split/merge lines, caption looks with word animations, smarter words with Foundation Models, SRT). Confirm the scope with the user before building.
+
+## CapCut list: stages G–L (to do, decided 2026-11-12)
+
+**The rule for all of them: CapCut's features, iMovie's look and feel.** Native SwiftUI, the existing inspector sections and menus, plain words, a short curated set made by the app (no store of hundreds of tiles), "None" first in every grid, previews drawn from the user's own frame, everything on device and free. Don't copy CapCut's look, names, assets or effects. Full reasoning, the ranked inventory and what CapCut does for each item: `research/capcut/capcut-reverse-engineering.md` §5–8; panel-by-panel details: `research/capcut/capcut-reference.md`.
+
+**Order: G → I → H → J → K → L.** Same routine as stages A–F: model + tests in `EditorCore`, drawing in `ShortsCompositor`, UI + `EditorModel` method, on-screen check, summary, commit only when the user says so.
+
+| Stage | What | State |
+|---|---|---|
+| G | Captions, the CapCut way | **next**: confirm scope with the user first (all of G, or voice-over captions alone) |
+| I | Rhythm: beats and speed curves | to do |
+| H | Text, stickers and voice | to do |
+| J | Effects | to do |
+| K | Cut-outs | to do |
+| L | Templates and finding moments | to do |
+
+### Stage G: captions, the CapCut way
+Why first: the user asked for it, and their real CapCut Short ("Studiare per la vita", 14 s) is a voice-over with 14 captions typed by hand (CapCut's auto captions are Pro). We already have free on-device captions; G adds what's missing.
+- [ ] Captions from **voice-overs** and **B-roll** sound (transcripts stored per file, like now)
+- [ ] **Phrase** style: 2–4 words a page, big, centred, the caption font; emoji typed in a caption drawn in colour
+- [ ] Edit like text: ↩ splits a caption at the cursor, ⌘↩ new line, ⌫ at the start merges with the one before; nudge timing by dragging its edges on the captions lane
+- [ ] **Caption looks** grid (8–12, word animations: pop, karaoke fill, glow, bounce, typewriter, box, outline, subtitles), drawn live from the Short's frame
+- [ ] Smarter key words, emoji and real filler words ("like", "tipo", "allora") with Apple **Foundation Models**, falling back to today's rules
+- [ ] **SRT** import/export (File menu)
+- [ ] Later in G: translated second line (Translation framework), more languages with auto-detect
+
+### Stage I: rhythm
+- [ ] Beat markers on the music (the app's own music knows its beats; files by onset detection)
+- [ ] Snap to beats; **Cut to the Beat** (clips trimmed so cuts land on beats)
+- [ ] **Speed curve presets**: Montage, Hero, Bullet, Jump Cut, Flash In, Flash Out (named shapes of our gradual speed)
+- [ ] Smooth slow motion (frame interpolation, `VTFrameProcessor`)
+- [ ] Clip In/Out animations (shared with text)
+- [ ] Music that starts later or loops
+
+### Stage H: text, stickers and voice
+- [ ] Title looks grid (~12 presets); exits and loop animations
+- [ ] 4–6 text templates: Hook, Subscribe, Part 2, Top 3 number, Question, "Link in description"
+- [ ] Stickers: emoji, arrows, shapes (SF Symbols), with the same animations
+- [ ] Titles and stickers **follow a subject** (Vision tracking)
+- [ ] **Text to speech** from a title or script line (system voices / Personal Voice), placed as a voice-over and captioned by G
+
+### Stage J: effects
+- [ ] ~12 effects attached to a clip and following it: Shake, Flash, Zoom Pulse, Glitch, RGB Split, VHS, Film Grain, Light Leak, Blur In/Out, Vignette Pulse, Mirror, Black & White Pop; strength + length
+- [ ] ~12 more sound effects
+
+### Stage K: cut-outs
+- [ ] Remove background (Vision person/foreground mask, offline per file, cached like Stabilize)
+- [ ] Chroma key (picker, strength, edge softness, spill)
+- [ ] Masks: line, circle, rectangle (feather, invert); canvas colour; blend modes for overlays
+
+### Stage L: templates and finding moments
+- [ ] Templates = storyboards with fixed timings, text and transitions, cut on the beat ("Fill a template")
+- [ ] Magic Short picks the best 30/60 s from the transcript (Foundation Models) instead of keeping the start
+- [ ] Cover picker on export (frame + title, 1080×1920 JPEG)
+
+**Not taking** (decided): generative AI (video, images, avatars, lip sync, eye contact, relight, retouch, AI expand/remove), cloud agent, a store of trending assets, accounts/cloud, extra ratios/resolutions/codecs, several timelines, compound clips.
 
 ## Open questions for the user
+
+- Stage G scope: build all of it, or voice-over captions alone first? (Asked 2026-11-12.)
 
 - Should the editor link exported Shorts to `channel_lab` plans (`~/Documents/Programming/YouTube`)? Recommended: not now; maybe later.
 

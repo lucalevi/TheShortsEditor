@@ -1,0 +1,90 @@
+# CapCut 9.7.1 default keyboard map (Custom1 = CapCut default), with the Final Cut Pro X and Premiere Pro presets
+# Read from ~/Movies/CapCut/User Data/Config/Shortcut/*.json on 2026-11-12. Ctrl = Command on Mac.
+command                      CapCut                             Final Cut Pro X            Premiere Pro
+activeSpeedControl           Ctrl+R                             Ctrl+R                     Ctrl+R
+addBasicKeyframe             Shift+Alt+K                        Shift+Alt+K                Shift+Alt+K
+addKeyframe                  Shift+LeftMouseButton              Shift+LeftMouseButton      Shift+LeftMouseButton
+adsorb                       S                                  N                          S
+agentVoiceInput              Ctrl+D                             Ctrl+D                     Ctrl+D
+autoWrap                     Alt+LeftMouseButton                Alt+LeftMouseButton        Alt+LeftMouseButton
+backwardSelect               A                                  ], 】                       A
+batchCut                     Ctrl+Shift+K                       Ctrl+Shift+B               Ctrl+Shift+K
+cancelRangeSelect            Alt+X                              Alt+X                      Alt+X
+closeDialog                  Escape                             Escape                     Escape
+closeWindow                  Ctrl+W                             Ctrl+W                     Ctrl+W
+copy                         Ctrl+C                             Ctrl+C                     Ctrl+C
+copySegAttribute             Ctrl+Alt+C                         Ctrl+Shift+C               Ctrl+Alt+C
+customMattingSwitchAiEraser  Alt                                Alt                        Alt
+cut                          Ctrl+X                             Ctrl+X                     Ctrl+X
+cutLeft                      Q                                  Q                          Q
+cutRight                     W                                  W                          W
+cutoff                       Ctrl+K                             Ctrl+B                     Ctrl+K
+del                          Backspace, Del                     Backspace, Del             Backspace, Del
+disableAlignment             Ctrl_hold                          Ctrl_hold                  Ctrl_hold
+divideSpeedSegment           Shift+B                            Shift+B                    Shift+B
+expandKeyframePanel          Alt+K                              Alt+K                      Alt+K
+exportVideo                  Ctrl+M                             Ctrl+E                     Ctrl+M
+fastAdjustSpinBox            Shift+LeftMouseButton              Shift+LeftMouseButton      Shift+LeftMouseButton
+forwardSelect                Shift+A                            [, 【                       Shift+A
+hidePlayerRuler              Ctrl+Alt+R                         Ctrl+Alt+R                 Ctrl+Alt+R
+hideReferenceLine            Ctrl+;, Ctrl+；                     Ctrl+;, Ctrl+；             Ctrl+;, Ctrl+；
+importMedia                  Ctrl+I                             Ctrl+I                     Ctrl+I
+largeNextFrame               Shift+Right                        Shift+Right                Shift+Right
+largePreFrame                Shift+Left                         Shift+Left                 Shift+Left
+linkage                      Ctrl+L                             `, ·                       Ctrl+L
+locateFirstFrame             Home                               Home                       Home
+locateLastFrame              End                                End                        End
+mainTrackAdsorb              Shift+Backspace                    P                          Shift+Backspace
+mark                         M                                  M                          M
+markBeat                     Ctrl+J                             Ctrl+J                     Ctrl+J
+markWithAnotherColor         Alt+M                              Alt+M                      Alt+M
+newProject                   Ctrl+N                             Ctrl+N                     Ctrl+N
+nextCutPoint                 Down                               Down                       Down
+nextFrame                    Right                              Right                      Right
+nextTimeMark                 Shift+M                            Shift+M                    Shift+M
+paste                        Ctrl+V                             Ctrl+V                     Ctrl+V
+pasteSegAttribute            Ctrl+Alt+V                         Ctrl+Shift+V               Ctrl+Alt+V
+playerZoomFit                Alt+Shift+Z                        Alt+Shift+Z                Alt+Shift+Z
+playerZoomIn                 Alt+Shift++, Alt+Shift+=           Alt+Shift++, Alt+Shift+=   Alt+Shift++, Alt+Shift+=
+playerZoomOut                Alt+Shift+-                        Alt+Shift+-                Alt+Shift+-
+prerenderSelectArea          Shift+Return                       Shift+Return               Shift+Return
+prevCutPoint                 Up                                 Up                         Up
+prevFrame                    Left                               Left                       Left
+prevTimeMark                 Alt+Shift+M                        Alt+Shift+M                Alt+Shift+M
+preview                      Shift+P                            S                          Shift+P
+quicklyAdjustZoomFit         Shift+Z                            Shift+Z                    Shift+Z
+quit                         Ctrl+Q                             Ctrl+Q                     Ctrl+Q
+redo                         Ctrl+Shift+Z                       Ctrl+Shift+Z               Ctrl+Shift+Z
+refreshCloudDraft            Ctrl+R                             Ctrl+R                     Ctrl+R
+returnDraftPage              Ctrl+Alt+Q                         Ctrl+Alt+Q                 Ctrl+Alt+Q
+scrollTrackH                 Alt+Wheel                          Alt+Wheel                  Alt+Wheel
+scrollTrackScale             Ctrl+Wheel                         Ctrl+Wheel                 Ctrl+Wheel
+scrollTrackV                 Wheel                              Wheel                      Wheel
+segmentCombination           Alt+G                              Alt+G                      Alt+G
+segmentMakeGroup             Ctrl+G                             Ctrl+G                     Ctrl+G
+segmentRemoveCombination     Alt+Shift+G                        Alt+Shift+G                Alt+Shift+G
+segmentRemoveGroup           Ctrl+Shift+G                       Ctrl+Shift+G               Ctrl+Shift+G
+selectAll                    Ctrl+A                             Ctrl+A                     Ctrl+A
+selectRangeBySegment         Shift+X                            Shift+X                    Shift+X
+selectRangeEnd               O                                  O                          O
+selectRangeStart             I                                  I                          I
+showFullscreen               Ctrl+Meta+F                        Ctrl+Meta+F                Ctrl+Meta+F
+speedPlayBackward            J                                  J                          J
+speedPlayForward             L                                  L                          L
+speedPlayPause               K                                  K                          K
+storeSingelFrame             -                                  -                          -
+subtitleNewLine              Ctrl+Return                        Ctrl+Return                Ctrl+Return
+subtitleSplit                Return                             Return                     Return
+switchTab                    Tab                                Tab                        Tab
+switchToCut                  C                                  B                          C
+switchToSelect               V                                  A                          V
+toggleFullscreen             `, ·                               Ctrl+Shift+F               `, ·
+togglePlay                   Space                              Space                      Space
+toggleSegmentVisibe          Shift+E                            V                          Shift+E
+toggleVideoAudio             Ctrl+Shift+L                       Shift+Meta+S               Ctrl+Shift+L
+undo                         Ctrl+Z                             Ctrl+Z                     Ctrl+Z
+videoRecord                  Ctrl+Alt+P                         Ctrl+Alt+P                 Ctrl+Alt+P
+voiceDown                    Ctrl+,, Ctrl+，                     Ctrl+,, Ctrl+，             Ctrl+,, Ctrl+，
+voiceUp                      Ctrl+., Ctrl+。                     Ctrl+., Ctrl+。             Ctrl+., Ctrl+。
+zoomIn                       +, =                               Ctrl++, Ctrl+=             +, =
+zoomOut                      -                                  Ctrl+-                     -
