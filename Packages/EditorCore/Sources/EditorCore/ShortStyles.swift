@@ -299,6 +299,20 @@ public extension Project {
         fitMoodMusic()
     }
 
+    /// Uses the app's own music for `mood` (its file, `asset`) as the Short's music, in place of any
+    /// song. Like a style's music, it fits itself to the Short's end; earlier app-made music no longer
+    /// used leaves Media.
+    mutating func setMoodMusic(_ asset: MediaAsset, mood: MusicMood) {
+        let oldMusic = music
+        let id = addAsset(asset)
+        if oldMusic?.assetID == id, oldMusic?.mood == mood { return }
+        music = BackgroundMusic(assetID: id, volume: mood.volume, mood: mood)
+        if let oldMusic, oldMusic.isMoodMusic, oldMusic.assetID != id, usageCount(of: oldMusic.assetID) == 0 {
+            assets.removeAll { $0.id == oldMusic.assetID }
+        }
+        fitMoodMusic()
+    }
+
     /// Uses `asset` (the style's music file) as the music, when the Short has a style and no music yet.
     mutating func addStyleMusic(_ asset: MediaAsset) {
         guard let style, music == nil else { return }

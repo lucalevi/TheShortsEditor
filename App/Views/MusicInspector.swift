@@ -85,7 +85,8 @@ struct MusicInspector: View {
             }
 
             HStack {
-                Button("Change Song…") { MusicImportPanel.run(model: model) }
+                Menu("Change Music") { MusicChoices(model: model) }
+                    .fixedSize()
                 Button("Remove Music", systemImage: "trash", role: .destructive) { model.removeMusic() }
             }
         }

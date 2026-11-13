@@ -322,7 +322,7 @@ struct EditorCommands: Commands {
             }
             .disabled(model.project.timeline.clips.isEmpty)
             Divider()
-            Button("Add Music…") { MusicImportPanel.run(model: model) }
+            Menu(model.project.music == nil ? "Add Music" : "Change Music") { MusicChoices(model: model) }
                 .disabled(model.project.timeline.clips.isEmpty)
             Button("Remove Music") { model.removeMusic() }
                 .disabled(model.project.music == nil)
@@ -461,6 +461,19 @@ enum OverlayImportPanel {
 }
 
 /// The Open panel for choosing a song. It becomes the music straight away.
+/// Add Music's choices: the app's own music (free to upload anywhere), then a song from a file.
+struct MusicChoices: View {
+    let model: EditorModel
+
+    var body: some View {
+        ForEach(MusicMood.allCases) { mood in
+            Button("\(mood.displayName) (\(mood.hint.prefix(1).lowercased() + mood.hint.dropFirst()))") { model.addMoodMusic(mood) }
+        }
+        Divider()
+        Button("From a File…") { MusicImportPanel.run(model: model) }
+    }
+}
+
 enum MusicImportPanel {
     static func run(model: EditorModel) {
         let panel = NSOpenPanel()

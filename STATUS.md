@@ -1,6 +1,6 @@
 # Project status
 
-_Last updated: 2026-11-13 (known gaps fixed: committed and pushed, 1757bcc). Read this first when picking the project back up, then update it at the end of each session._
+_Last updated: 2026-11-13 (automated dogfooding pass 1: fixes not yet committed). Read this first when picking the project back up, then update it at the end of each session._
 
 ## Where we are
 
@@ -16,7 +16,24 @@ Stages 1–7 are done, tested on screen, committed and pushed to https://github.
 | 6 | Audio: clip volume, music with ducking, loudness on export | 2026-11-09 |
 | 7 | Save/open projects, autosave, missing media | 2026-11-09 |
 
-**Pick up here (2026-11-13, latest): known gaps fixed, committed and pushed (1757bcc).** Next: the user dogfooding real Shorts. The user asked to fix the "known gaps" first (before dogfooding). Several notes in "Known limitations" turned out to be stale (B-roll does follow its clip, sound files can be sounds, titles have fonts, colours, rows and snapping); those were corrected. What was done:
+**Pick up here (2026-11-13, latest): automated dogfooding, pass 1 (not committed yet).** The user doesn't want to test by hand yet, so I made three typical Shorts through the app with `Tools/uitest` (synthetic clips) and checked each exported MP4 with ffprobe/ffmpeg (codec, size, 30 fps, AAC, −14 LUFS, peak, fast start, frames sampled every second, sound and picture the same length):
+1. **Voice-over Short** ("My Short 25"): two talking clips, Remove Pauses (21.1 → 15.9 s), captions, hook title, B-roll at 0:05, a song lowered under speech, export. All correct (−14.0 LUFS, peak −1.9 dB).
+2. **Magic Short** ("My Short 26"): the 44 s talk to ~30 s (18.4 s, 5 of 18 sentences by Apple Intelligence), cover with new text, **Save Cover…** (1080×1920 JPEG, checked), cover shown in All Shorts, export. Correct.
+3. **Template** ("My Short 27"): Travel Diary from 3 clips (6 shots of 4 beats at 84 bpm = 17.1 s), shot 3 swapped with **Replace…** (same length and transition kept), export. Correct.
+
+Found and fixed (574 tests pass; each checked on screen):
+- **Add Music offered only files**: the app's own music was reachable only through a style. Sound ▸ Add Music (Change Music once there is music), the toolbar ♪ and the empty music lane are now menus: the six moods, then From a File…; the Music inspector's "Change Song…" became a "Change Music" menu. `Project.setMoodMusic(_:mood:)` (fits to a bar, old app-made music leaves Media, a style later replaces it); `EditorModel.addMoodMusic`. Undo says "Add Focus Music".
+- **Hook titles**: "Okay, did you know that…" became "Did you know that most people…": lead-in words (okay, so, well, allora, also, alors…) are skipped, a shortened title keeps 6 words and doesn't end on a little word (that, the, to, di, der, de…). `MagicShort.leadIns`/`weakEndings`.
+- **Order of chosen clips** (templates, Magic Short): an Open panel returns files in its own order, not the click order, so "in the order they should play" was untrue. Files are now put in the order they were filmed (file creation date, then name; `EditorModel.inFilmingOrder`) and the texts say so.
+- **Export/cover file names** came from the first clip ("talking-sample Short.mp4"); now the Short's name ("My Short 25.mp4"), like Save Frame and the subtitle file.
+- A narrow clip's length wrapped onto a second line on the timeline; now one line, cut off.
+- View ▸ Show Tab Bar / Show All Tabs (and the Window menu's tab items) are gone (`NSWindow.allowsAutomaticWindowTabbing = false`).
+
+Noticed, not changed: sliders use the Mac's decimal comma ("0,5 s") while times use a dot ("0:05.2"); the template chooser sheet sits slightly off-centre; Vlog-style titles are small. Test Shorts "My Short 25"–"My Short 30" are from these checks (safe to delete); exports are in the session scratchpad only.
+
+Next (the plan agreed with the user, in order): pass 1 commit when the user says so; then **check the edit-lists question on export** (YouTube asks for none; try `AVVideoAllowFrameReorderingKey: false` and compare), then the "Not yet verified on screen" items in each stage below, then whole-Short "golden" export tests in the package.
+
+**Before that (2026-11-13): known gaps fixed, committed and pushed (1757bcc).** Next: the user dogfooding real Shorts. The user asked to fix the "known gaps" first (before dogfooding). Several notes in "Known limitations" turned out to be stale (B-roll does follow its clip, sound files can be sounds, titles have fonts, colours, rows and snapping); those were corrected. What was done:
 - **First import undoable**: opening several files from Finder makes SwiftUI create extra hidden windows, which reported themselves to `EditorModel.window`, so the import's undo went to a hidden window's undo manager. `EditorModel.undoManager` now prefers a visible window, and `ContentView`'s `WindowReader` ignores hidden ones. Reproduced before (Undo disabled after `open -a … three files`) and checked after on screen.
 - **Titles update while typing**: `LivePreview.setTitleText` (drawn by `ShortsCompositor.titleImage`) and `EditorModel.typedTitle` (the viewer's box follows the wrapped text); saved on Return as before. Checked on screen. Quitting while typing still loses the typed text.
 - **Extra songs lowered under speech**: `SoundClip.lowersUnderSpeech` (on by default for sound files ≥ 20 s, `SoundClip.songLength`; never for voice-overs or detached clip sound), "Lower while people talk" in the sound inspector (titled "Song"), `AudioMix.loweredFactor`/`lowered(_:startingAt:speech:)` shared with the music, used in `CompositionBuilder`. Media's menu says "Add as Extra Song at Playhead" for long files. Tested in the model and on the built audio mix; checked on screen (not by ear).
@@ -374,7 +391,8 @@ The P0 list from `research/shorts-editor-research.md` §5. Each stage ends with 
 16. ~~Stage L, templates and finding moments~~ (done 2026-11-13, all of it, committed).
 17. ~~Hardening pass~~ (done 2026-11-13, committed 9e79f25): undo names, sound crossfades, disk clean-up, performance measured, big files split, accessibility, CI.
 18. ~~Known gaps~~ (done 2026-11-13, committed 1757bcc): first import undoable, titles while typing, extra songs lowered under speech, sentence translation, more split layouts, pause length and voice-only pauses.
-19. **Next:** the user making real Shorts in the app (dogfooding), then features chosen from what is missing. Ask the user (see "Not yet verified on screen" in each stage, and the "Later" items in `research/capcut/capcut-reverse-engineering.md` §5).
+19. **Automated dogfooding** (2026-11-13, user's choice: I drive the app, the user doesn't test by hand yet): pass 1 done (three Shorts made and exported, six fixes); then the export edit-lists check, the unverified on-screen items, golden export tests.
+20. **Later:** the user making real Shorts in the app (dogfooding), then features chosen from what is missing. Ask the user (see "Not yet verified on screen" in each stage, and the "Later" items in `research/capcut/capcut-reverse-engineering.md` §5).
 
 ## CapCut list: stages G–L (to do, decided 2026-11-12)
 

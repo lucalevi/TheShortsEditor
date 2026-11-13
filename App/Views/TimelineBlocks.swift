@@ -291,7 +291,8 @@ struct ClipBlock: View, Equatable {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(name).font(.caption.weight(.medium)).lineLimit(1)
                     HStack(spacing: 4) {
-                        Text(TimeFormat.string(clip.duration))
+                        // On a narrow clip the length is cut off, never wrapped onto a second line.
+                        Text(TimeFormat.string(clip.duration)).lineLimit(1).fixedSize()
                         if clip.soundDetached {
                             // Its sound settings live on the detached sound now.
                         } else if clip.isMuted {

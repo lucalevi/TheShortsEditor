@@ -83,14 +83,38 @@ public enum MagicShort {
     public static let endPadding = CMTime(value: 6, timescale: Project.frameRate)
     public static let placeholderHook = "Your hook here"
 
+    /// Words that only lead into what is said ("Okay, did you know…"), in the caption languages.
+    /// A hook title starts after them.
+    static let leadIns: Set<String> = [
+        "okay", "ok", "so", "well", "alright", "right", "now", "and", "but", "um", "uh", "hey", "yeah",
+        "allora", "dunque", "ecco", "ok", "e", "ma", "beh", "cioè",
+        "also", "na", "gut", "und", "aber", "ja",
+        "alors", "bon", "donc", "et", "mais", "bref", "voilà",
+    ]
+    /// Words a shortened title shouldn't stop on ("Did you know that…"): articles, little joining
+    /// words, prepositions.
+    static let weakEndings: Set<String> = [
+        "a", "an", "the", "that", "this", "to", "of", "in", "on", "at", "for", "with", "and", "or", "but",
+        "my", "your", "is", "are", "was", "most", "some", "how", "what", "why", "if", "because",
+        "il", "lo", "la", "i", "gli", "le", "un", "uno", "una", "di", "da", "a", "in", "con", "su", "per", "che", "e", "o", "il", "come",
+        "der", "die", "das", "ein", "eine", "zu", "von", "mit", "und", "oder", "dass", "wie",
+        "le", "la", "les", "un", "une", "de", "du", "des", "à", "en", "avec", "pour", "que", "et", "ou", "comment",
+    ]
+
     /// The first sentence said, shortened to a title: the whole sentence when it is short,
-    /// otherwise its first words and "…". Nil when nothing is said.
+    /// otherwise its first words and "…". Lead-in words ("Okay,", "So") are left out, and a
+    /// shortened title doesn't stop on a little word like "that". Nil when nothing is said.
     public static func hookText(from words: [TimedWord]) -> String? {
         var sentence: [String] = []
         for word in words {
             sentence.append(word.text)
             if let last = word.text.last, ".?!…".contains(last) { break }
         }
+        func bare(_ word: String) -> String {
+            word.lowercased().trimmingCharacters(in: .punctuationCharacters)
+        }
+        // Lead-ins go while something is left after them.
+        while sentence.count > 2, leadIns.contains(bare(sentence[0])) { sentence.removeFirst() }
         guard !sentence.isEmpty else { return nil }
         var text: String
         if sentence.count <= hookWords {
@@ -98,7 +122,9 @@ public enum MagicShort {
             // A question keeps its mark; a full stop isn't wanted on a title.
             while let last = text.last, ".,;:".contains(last) { text.removeLast() }
         } else {
-            text = sentence.prefix(hookWords - 2).joined(separator: " ")
+            var kept = Array(sentence.prefix(hookWords - 1))
+            while kept.count > 3, let last = kept.last, weakEndings.contains(bare(last)) { kept.removeLast() }
+            text = kept.joined(separator: " ")
             while let last = text.last, ".,;:!?".contains(last) { text.removeLast() }
             text += "…"
         }

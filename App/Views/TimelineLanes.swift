@@ -474,13 +474,20 @@ extension TimelineView {
                 .accessibilityLabel("Music: \(song.name)")
                 .accessibilityAddTraits(isSelected ? .isSelected : [])
         } else if !model.project.timeline.clips.isEmpty {
-            Button("Add Music…", systemImage: "music.note") { MusicImportPanel.run(model: model) }
+            Menu {
+                MusicChoices(model: model)
+            } label: {
+                Label("Add Music", systemImage: "music.note")
+            }
+                .menuStyle(.button)
                 .buttonStyle(.borderless)
-                .font(.caption)
+                .menuIndicator(.hidden)
+                .controlSize(.small)
+                .fixedSize()
                 .foregroundStyle(.secondary)
                 .frame(height: musicLaneHeight)
                 .offset(x: leadingInset + 4)
-                .help("Add a song to play under your Short. You can also drop a sound file here.")
+                .help("Add music to play under your Short: the app's own, or a song from a file. You can also drop a sound file here.")
         }
     }
 

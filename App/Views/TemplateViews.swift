@@ -83,7 +83,7 @@ struct TemplateChooser: View {
                 .frame(width: 320, height: 320)
             }
             HStack {
-                Text("Choose clips in the order they should play. Fewer than the shots is fine.")
+                Text("Your clips play in the order they were filmed; swap any shot afterwards. Fewer than the shots is fine.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 Spacer()

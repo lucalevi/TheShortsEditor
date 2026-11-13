@@ -73,7 +73,7 @@ extension EditorModel {
     /// Trims the clips so every cut lands on a beat (finding the beats first when needed).
     func cutToBeat(_ spacing: BeatSpacing) {
         guard project.music != nil else {
-            alert = AlertMessage(title: "Cut to the Beat needs music", message: "Add a song first (Sound ▸ Add Music…), then cut to its beat.")
+            alert = AlertMessage(title: "Cut to the Beat needs music", message: "Add music first (Sound ▸ Add Music), then cut to its beat.")
             return
         }
         withBeats {

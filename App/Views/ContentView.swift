@@ -130,10 +130,20 @@ struct EditorView: View {
                     }
             }
             ToolbarItem {
-                Button("Music", systemImage: "music.note") {
-                    if model.project.music != nil { model.selection = .music } else { MusicImportPanel.run(model: model) }
+                Group {
+                    if model.project.music != nil {
+                        Button("Music", systemImage: "music.note") { model.selection = .music }
+                            .help("Change the music's volume and settings")
+                    } else {
+                        Menu {
+                            MusicChoices(model: model)
+                        } label: {
+                            Label("Music", systemImage: "music.note")
+                        }
+                        .menuIndicator(.hidden)
+                        .help("Add music to play under your Short: the app's own, or a song from a file")
+                    }
                 }
-                .help(model.project.music != nil ? "Change the music's volume and settings" : "Add a song to play under your Short")
                 .disabled(model.project.timeline.clips.isEmpty)
             }
             ToolbarItem {

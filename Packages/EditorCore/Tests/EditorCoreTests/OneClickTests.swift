@@ -135,6 +135,30 @@ struct ShortStyleTests {
         #expect(abs(after - after.rounded()) < 0.001)
     }
 
+    @Test func moodMusicWithoutAStyle() {
+        var p = Project()
+        p.appendClip(of: p.addAsset(video("a.mov", seconds: 10)))
+        // Over the user's own song: replaces it, and the song stays in Media.
+        let own = p.addAsset(song("mine.mp3"))
+        p.setMusic(own)
+        p.setMoodMusic(song("Chill.m4a"), mood: .chill)
+        #expect(p.style == nil)
+        #expect(p.music?.mood == .chill)
+        #expect(p.music?.volume == MusicMood.chill.volume)
+        #expect(p.music?.lowersUnderSpeech == true)
+        #expect(p.assets.contains { $0.id == own })
+        let bar = MusicMood.chill.barLength.seconds
+        let bars = (p.music!.sourceStart.seconds + p.duration.seconds) / bar
+        #expect(abs(bars - bars.rounded()) < 0.001)
+        // Another mood: the old app-made file leaves Media.
+        p.setMoodMusic(song("Calm.m4a"), mood: .calm)
+        #expect(p.music?.mood == .calm)
+        #expect(!p.assets.contains { $0.name == "Chill.m4a" })
+        // A style later replaces it with its own music, as with any app-made music.
+        p.applyStyle(.bold, music: song("Upbeat.m4a"))
+        #expect(p.music?.mood == .upbeat)
+    }
+
     @Test func stylesAreSaved() throws {
         var p = Project()
         p.appendClip(of: p.addAsset(video("a.mov")))
@@ -155,7 +179,14 @@ struct MagicShortTests {
         }
         #expect(MagicShort.hookText(from: timed(["this", "is", "my", "trick.", "And", "more"])) == "This is my trick")
         #expect(MagicShort.hookText(from: timed(["did", "you", "know?", "Yes"])) == "Did you know?")
-        #expect(MagicShort.hookText(from: timed(["one", "two", "three", "four", "five", "six", "seven", "eight."])) == "One two three four five…")
+        #expect(MagicShort.hookText(from: timed(["one", "two", "three", "four", "five", "six", "seven", "eight."])) == "One two three four five six…")
+        // Lead-ins are left out, and a shortened title doesn't stop on a little word.
+        #expect(MagicShort.hookText(from: timed(["Okay,", "did", "you", "know", "that", "most", "people", "waste", "hours?"]))
+                == "Did you know that most people…")
+        #expect(MagicShort.hookText(from: timed(["So", "here's", "the", "trick", "to", "it", "all", "really.", "Yes"])) == "Here's the trick to it all really")
+        #expect(MagicShort.hookText(from: timed(["Allora,", "ecco", "il", "mio", "trucco."])) == "Il mio trucco")
+        // A sentence that is only lead-ins keeps them.
+        #expect(MagicShort.hookText(from: timed(["Okay", "so."])) == "Okay so")
         #expect(MagicShort.hookText(from: []) == nil)
     }
 

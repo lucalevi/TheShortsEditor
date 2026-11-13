@@ -61,6 +61,24 @@ extension EditorModel {
         }
     }
 
+    /// Uses the app's own music for `mood`, in place of any song. It is made the first time
+    /// (a few seconds, once per Mac).
+    func addMoodMusic(_ mood: MusicMood) {
+        guard !project.timeline.clips.isEmpty else { return }
+        Task {
+            guard let asset = await styleMusic(mood) else {
+                alert = AlertMessage(title: "The music couldn't be made",
+                                     message: "Try again, or add a song from a file (Sound ▸ Add Music ▸ From a File…).")
+                return
+            }
+            apply("Add \(mood.displayName) Music") { $0.setMoodMusic(asset, mood: mood) }
+            if let music = project.music, let added = project.asset(id: music.assetID) {
+                loadPreviewsIfNeeded(added)
+                selection = .music
+            }
+        }
+    }
+
     /// Starts making a mood's music in the background, so it is ready when it is chosen.
     func prepareMusic(_ mood: MusicMood) {
         guard preparedMusic[mood] == nil else { return }
@@ -86,10 +104,10 @@ extension EditorModel {
         panel.allowsMultipleSelection = true
         panel.canChooseDirectories = false
         panel.prompt = "Make Magic Short"
-        panel.message = "Choose the clips for your Short: one long video, or several clips in the order they should play"
+        panel.message = "Choose the clips for your Short: one long video, or several clips (they play in the order they were filmed)"
         guard panel.runModal() == .OK, !panel.urls.isEmpty else { return }
         newShort()
-        importFiles(panel.urls, to: .timelineEnd, actionName: "Add Clips")
+        importFiles(Self.inFilmingOrder(panel.urls), to: .timelineEnd, actionName: "Add Clips")
         beginMagic()
     }
 

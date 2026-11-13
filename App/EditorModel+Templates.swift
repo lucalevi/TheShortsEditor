@@ -16,10 +16,10 @@ extension EditorModel {
         panel.allowsMultipleSelection = true
         panel.canChooseDirectories = false
         panel.prompt = "Fill \(template.displayName)"
-        panel.message = "Choose up to \(template.shots.count) clips or pictures, in the order they should play. Fewer is fine: they are used again."
+        panel.message = "Choose up to \(template.shots.count) clips or pictures. They play in the order they were filmed; swap any shot afterwards. Fewer is fine: they are used again."
         guard panel.runModal() == .OK, !panel.urls.isEmpty else { return }
         choosesTemplate = false
-        let urls = Array(panel.urls.prefix(template.shots.count))
+        let urls = Array(Self.inFilmingOrder(panel.urls).prefix(template.shots.count))
         Task {
             // The music first, so the Short comes in one step with its beat.
             let music = await styleMusic(template.style.music)
@@ -34,6 +34,21 @@ extension EditorModel {
             }
             if let music { loadPreviewsIfNeeded(music) }
             sidebar = .storyboard
+        }
+    }
+
+    /// Files chosen together, in the order they were made (filmed or taken), oldest first; by name
+    /// when that is the same. An Open panel gives its own order, not the order of the clicks.
+    static func inFilmingOrder(_ urls: [URL]) -> [URL] {
+        func made(_ url: URL) -> Date {
+            let values = try? url.resourceValues(forKeys: [.creationDateKey, .contentModificationDateKey])
+            return values?.creationDate ?? values?.contentModificationDate ?? .distantFuture
+        }
+        let dates = Dictionary(urls.map { ($0, made($0)) }, uniquingKeysWith: { first, _ in first })
+        return urls.sorted { a, b in
+            let da = dates[a] ?? .distantFuture, db = dates[b] ?? .distantFuture
+            if da != db { return da < db }
+            return a.lastPathComponent.localizedStandardCompare(b.lastPathComponent) == .orderedAscending
         }
     }
 

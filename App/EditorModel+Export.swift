@@ -53,10 +53,12 @@ extension EditorModel {
         exportPhase = nil
     }
 
-    /// A file name for the export, from the first clip's name.
+    /// A file name for the export: the Short's name, as in All Shorts (like Save Frame and the
+    /// subtitle file).
     var suggestedExportName: String {
-        let base = project.timeline.clips.first.flatMap { project.asset(id: $0.assetID)?.name } ?? "My"
-        return "\(base) Short.mp4"
+        let name = openShortName.replacingOccurrences(of: "/", with: "-").replacingOccurrences(of: ":", with: "-")
+            .trimmingCharacters(in: .whitespaces)
+        return "\(name.isEmpty ? "My Short" : name).mp4"
     }
 
     // MARK: Removing pauses

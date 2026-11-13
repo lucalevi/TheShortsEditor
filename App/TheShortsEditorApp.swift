@@ -56,6 +56,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationWillFinishLaunching(_ notification: Notification) {
         // A video editor looks like one: dark greys around the picture, whatever the Mac's setting.
         NSApp.appearance = NSAppearance(named: .darkAqua)
+        // One window: no window tabs, and no "Show Tab Bar" or "Show All Tabs" in the menus.
+        NSWindow.allowsAutomaticWindowTabbing = false
     }
 
     func application(_ application: NSApplication, open urls: [URL]) {
