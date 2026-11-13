@@ -1,6 +1,6 @@
 # Project status
 
-_Last updated: 2026-11-13 (export edit-lists check: B-frames off, not committed yet). Read this first when picking the project back up, then update it at the end of each session._
+_Last updated: 2026-11-13 (unverified on-screen items, pass 1: two fixes, not committed yet). Read this first when picking the project back up, then update it at the end of each session._
 
 ## Where we are
 
@@ -16,14 +16,23 @@ Stages 1–7 are done, tested on screen, committed and pushed to https://github.
 | 6 | Audio: clip volume, music with ducking, loudness on export | 2026-11-09 |
 | 7 | Save/open projects, autosave, missing media | 2026-11-09 |
 
-**Pick up here (2026-11-13, latest): export edit-lists check done (not committed yet).** Exported the same Short with and without B-frames (`AVVideoAllowFrameReorderingKey`) from a moving 1080×1920 test pattern and from `talking-sample.mp4`, and read the MP4 boxes:
+**Pick up here (2026-11-13, latest): "Not yet verified on screen" items, pass 1 (not committed yet).** Made "My Short 31" through the UI (menus by name via System Events, clicks with `ui.sh`) with almost every kind of layer, exported it twice from the app and checked the MP4s (H.264 High, no B-frames, 1080×1920, 30 fps, −14.0/−14.5 LUFS with −1.0 dB peak, sound and picture the same length, frames sampled at each feature). Verified now:
+- Export with: a look (Film) + effect (Glitch) on a main clip, a speed curve (Hero: 6.0 → 4.5 s) + Spin entrance, a green-screen key (black behind), a dissolve on every cut (Clip ▸ Transition ▸ Same on Every Cut), app music lowered under speech (Upbeat), an emoji sticker, the Subscribe ready-made text (pill + bell), B-roll with a Heart shape, Difference blend, Zoom Pulse and a Slide Up entrance, a freeze frame of the keyed clip (keeps the key).
+- Markers: M twice, Playback ▸ Next/Previous Marker (0:05.2 → 0:10.2 → 0:05.2). Beats by hand: Sound ▸ Show Beats, Add Beat at Playhead (app music's tempo beats are written out, 362 + 1), Remove Beat at Playhead (back to 362). Effect timing on B-roll (Whole clip / At the start / At the end, Length appears). Mask Size slider dragged: the viewer follows while dragging. Blend pop-up (Difference).
+- Fixed: **"Around it" said Blurred on a cut-out clip** while black is drawn; the picker now shows Black and offers only Black and Colour for a see-through clip (`PictureInspector.shownBackground`). **The selected title's box stayed on the viewer while skimming elsewhere** (it followed the playhead, not the frame shown); it now uses `skimTime ?? currentTime`.
+- **Open bug, not fixed (cosmetic):** in the B-roll inspector the whole page sometimes shifts ~7 pt left (the right edge clipped, the Effects grid gets a 4th column) after a layout change, e.g. choosing a shape or switching an effect between Whole clip and At the start/end; selecting the item again lays it out correctly. Seen with a landscape B-roll (`broll-sample`). Tried and dropped: pinning the scroll content's width (`containerRelativeFrame`, a measured width), letting the cut-out/effect sliders shrink, drawing tile pictures as overlays. Next idea: find which row reports ~306 pt (temporary `onGeometryChange` logging per section).
+- Notes: adding an effect plays its part (intended). The Save panel remembers the folder of the last Open panel (Add Over Clips), so an export can land in an unexpected folder; macOS behaviour. The export sheet's size estimate is high (35 MB estimated, 26.5 MB written for 21 s).
+
+Next: the rest of the "Not yet verified on screen" items (Stage C length slider/freeze buttons/right-click menus, Stage E trimmer and slow-motion switch, Stage F Use Selected and dropping on a shot, Library Save a Copy…/Open…, deleting several media files), then golden export tests.
+
+**Before that (2026-11-13): export edit-lists check done (committed and pushed, 269b48d).** Exported the same Short with and without B-frames (`AVVideoAllowFrameReorderingKey`) from a moving 1080×1920 test pattern and from `talking-sample.mp4`, and read the MP4 boxes:
 - **With B-frames (before)**: the video's edit list skipped 2 frames of decoding delay (media time 40/600), so a tool that ignores edit lists showed the picture 67 ms late (`ffprobe -ignore_editlist 1`: video start 0.067). GOPs were uneven: 29 frames first, then 13.
 - **Without (now)**: the video's edit list starts at 0 and covers the track as it is (AVAssetWriter always writes one), no `ctts`, a key frame exactly every 15 frames. Ignoring edit lists changes nothing.
 - Both: every key frame is IDR (NAL type 5), so the GOPs are closed. The sound keeps its edit list dropping AAC's 2112 priming samples, as every AAC file does; removing it would need our own muxer and would put 44 ms of priming at the start.
 - Quality: the same at 12 Mbps (SSIM 0.9744 vs 0.9742 against the source; the two talk exports are 51 dB PSNR apart). Same file size (fixed bitrate).
 - `Exporter.videoSettings` now has `AVVideoAllowFrameReorderingKey: false`; `ExporterTests.videoHasNoReorderingAndEvenKeyFrames` reads the boxes (no `ctts`, edit list media time 0, key frames 1, 16, 31, 46) and fails with B-frames on (checked). 575 tests pass. Not done: an export through the app's UI (same `Exporter`), uploading to YouTube.
 
-Next: the "Not yet verified on screen" items in each stage, then whole-Short "golden" export tests in the package.
+Next (then): the "Not yet verified on screen" items in each stage, then whole-Short "golden" export tests in the package.
 
 **Before that (2026-11-13): automated dogfooding, pass 1 (committed and pushed, 576d8d9).** The user doesn't want to test by hand yet, so I made three typical Shorts through the app with `Tools/uitest` (synthetic clips) and checked each exported MP4 with ffprobe/ffmpeg (codec, size, 30 fps, AAC, −14 LUFS, peak, fast start, frames sampled every second, sound and picture the same length):
 1. **Voice-over Short** ("My Short 25"): two talking clips, Remove Pauses (21.1 → 15.9 s), captions, hook title, B-roll at 0:05, a song lowered under speech, export. All correct (−14.0 LUFS, peak −1.9 dB).
@@ -100,7 +109,7 @@ Model in `EditorCore/Cutouts.swift` (`CutoutSubject`, `ColorKey`, `ClipMask`, `B
 
 Tests: 409 model + 129 render + 3 transcription = 541, all pass.
 Verified on screen: green screen found automatically on a main clip and on B-roll, Pick from Video, the shape grid on the clip's frame, Heart (soft edge, badge), Main subject removal with progress, the copy used (backdrop gone), Colour behind (white, yellow), Lighten on B-roll, all kept after quitting and reopening.
-Not yet verified on screen: People on real footage with a person (no such sample; Vision ran on test patterns only), dragging the key and mask sliders (live preview), other shapes and blend modes on screen (all pixel-tested), the Clip menu items, export with cut-outs, a freeze frame of a cut-out clip.
+Not yet verified on screen: People on real footage with a person (no such sample; Vision ran on test patterns only), dragging the key slider (live preview; the mask Size slider done 2026-11-13), ~~other shapes and blend modes~~ (Heart, Star, Difference done), the Clip menu items, ~~export with cut-outs, a freeze frame of a cut-out clip~~ (done 2026-11-13).
 
 ### Stage J: effects (2026-11-13): done, committed (2098287)
 
@@ -111,7 +120,7 @@ Model in `EditorCore/Effects.swift` (`EffectKind`, `EffectPart`, `ClipEffect`, `
 
 Tests: 400 model + 120 render + 3 transcription = 523, all pass.
 Verified on screen: the Effects grid on the clip's frame, adding Glitch (badge on the clip, bands jumping with their colours), the new sounds in the Sounds panel.
-Not yet verified on screen: every effect while playing (all pixel-tested), start/end timing and the sliders, effects on B-roll, listening to the new sounds by ear, export with effects.
+Not yet verified on screen: every effect while playing (all pixel-tested), ~~start/end timing and the sliders, effects on B-roll~~ (done 2026-11-13), listening to the new sounds by ear, ~~export with effects~~ (done).
 
 ### Stage H: text, stickers and voice (2026-11-13): done, committed (2609751)
 
@@ -125,7 +134,7 @@ Model in `EditorCore/Stickers.swift` (stickers, `TitleLoop`, exits, `TrackPoint`
 
 Tests: 395 model + 112 render + 3 transcription = 510, all pass.
 Verified on screen: sticker picker, Subscribe template (pill + bell), look grid with the title's words, the reorganised title/sticker inspector, Read It Aloud → Ava (Premium) voice-over placed and marked voice-over, Follow on the bell sticker (finished; nothing moved under it in that footage).
-Not yet verified on screen: following a real moving subject (only the test's moving square), loops/exits while playing (pixel-tested for fade and tracking), Personal Voice, Speak Text from the Script panel, the new looks over real footage, export with stickers.
+Not yet verified on screen: following a real moving subject (only the test's moving square), loops/exits while playing (pixel-tested for fade and tracking), Personal Voice, Speak Text from the Script panel, the new looks over real footage, ~~export with stickers~~ (done 2026-11-13).
 
 ### Stage I: rhythm (2026-11-13): done, committed (bd5ef08)
 
@@ -140,7 +149,7 @@ Model in `EditorCore/Rhythm.swift` (beats, `BeatFinder`, music placement and pas
 
 Tests: 381 model + 105 render + 3 transcription = 489, all pass.
 Verified on screen: beats found on music-sample and drawn on the lane; Cut to the Beat ▸ Every Bar (cuts on the bar ticks); Hero and Bullet tiles (clip lengths change, labels on the clips, playback through both); Spin entrance drawn mid-turn; music dragged to 0:02 (fade and ticks moved); smooth slow motion made a 150 fps copy (~40 s for a 5 s 1080p file) and played it; reopening the Short.
-Not yet verified on screen: beats of a real song by ear, Loop the song with a short song, Add/Remove Beat by hand, animations on B-roll, exporting a Short with curves/animations/looped music, a curve on a talking clip (how the stepped sound sounds).
+Not yet verified on screen: beats of a real song by ear, Loop the song with a short song, ~~Add/Remove Beat by hand, animations on B-roll~~ (done 2026-11-13), exporting a Short with looped music (curves/animations done), a curve on a talking clip (how the stepped sound sounds).
 
 ### Stage G: captions the CapCut way (2026-11-13): done, committed
 
@@ -181,7 +190,7 @@ Model in `EditorCore/Finishing.swift` (`FinishingTests`: 15 tests); `RenderEngin
 
 Tests: 300 model + 88 render + 3 transcription = 391, all pass.
 Verified on screen: M twice (two flags, tip), double-click rename to "Hook ends", the clip trimmer (whole file, bright part), sliding it (viewer showed 0:02.7 while dragging; then 2.7–4.5 at the same length), which found the freeze-frame bug (fixed and unit tested), Save Frame as Picture to a PNG (1080 × 1920), the export sheet's size, the Settings window, picture length 5 s → a photo opened from Finder added 5.0 s, the Photos tab's access screen, five tabs fitting.
-Not yet verified on screen: **the Photos library itself** (granting access is the user's decision: click "Show My Photos" in the Photos tab, then try Add to End on a video and on an iCloud-only item), trimming by dragging an end in the trimmer, marker dragging and ⌃; ⌃', Slow zoom and Show all placements, the transition length setting, the slow-motion switch with a real Slo-mo clip.
+Not yet verified on screen: **the Photos library itself** (granting access is the user's decision: click "Show My Photos" in the Photos tab, then try Add to End on a video and on an iCloud-only item), trimming by dragging an end in the trimmer, marker dragging (~~⌃; ⌃'~~ done 2026-11-13 via the menu), Slow zoom and Show all placements, the transition length setting, the slow-motion switch with a real Slo-mo clip.
 
 ### Stage B: look (2026-11-10): done, committed
 
@@ -215,7 +224,7 @@ Model in `EditorCore/Transitions.swift` and `EditorCore/TimeEffects.swift` (`Tra
 
 Tests: 254 model + 76 render + 3 transcription = 333, all pass.
 Verified on screen: toolbar Transition → picker pop-up, choosing Slide (plays it; the frame on the cut shows both clips), the marker staying on its cut through later edits, ⌥F at 0:02 (2.0 / 3.0 freeze / 4.0, "Freeze frame" on the clip), Instant Replay of the last clip (8.0 s at 0.5×), Play Backwards on the horizontal clip (copy made in a few seconds, "(backwards)" file in Media, badge on the clip), B-roll at 45% solid with a 0.8 s fade in (blend in the viewer, badge on the block), speed 0.5× on half of a split clip → "Change speed gradually" on, playing 14 s straight through freeze, speed change, transition and backwards clip, quit + relaunch keeps everything, ⌥F and ⌥T from the keyboard.
-Not yet verified on screen: the other transition kinds by eye (render-tested), the Length slider, Use on Every Cut / Remove All, the right-click menus, the freeze length buttons, the Fade out slider, opacity keyframes, Play Forwards again, a real 120/240 fps clip, the backwards sound by ear, an export of such a Short from the app (transitions in an export are render-tested).
+Not yet verified on screen: the other transition kinds by eye (render-tested), the Length slider, ~~Use on Every Cut~~ (done 2026-11-13) / Remove All, the right-click menus, the freeze length buttons, the Fade out slider, opacity keyframes, Play Forwards again, a real 120/240 fps clip, the backwards sound by ear, an export of such a Short from the app (transitions in an export are render-tested).
 
 ### Stage D: sound like iMovie (2026-11-09): done, committed (99a303b)
 
@@ -400,7 +409,7 @@ The P0 list from `research/shorts-editor-research.md` §5. Each stage ends with 
 16. ~~Stage L, templates and finding moments~~ (done 2026-11-13, all of it, committed).
 17. ~~Hardening pass~~ (done 2026-11-13, committed 9e79f25): undo names, sound crossfades, disk clean-up, performance measured, big files split, accessibility, CI.
 18. ~~Known gaps~~ (done 2026-11-13, committed 1757bcc): first import undoable, titles while typing, extra songs lowered under speech, sentence translation, more split layouts, pause length and voice-only pauses.
-19. **Automated dogfooding** (2026-11-13, user's choice: I drive the app, the user doesn't test by hand yet): pass 1 done (three Shorts made and exported, six fixes); export edit-lists check done (B-frames off); then the unverified on-screen items, golden export tests.
+19. **Automated dogfooding** (2026-11-13, user's choice: I drive the app, the user doesn't test by hand yet): pass 1 done (three Shorts made and exported, six fixes); export edit-lists check done (B-frames off); unverified on-screen items pass 1 done (two fixes, one open layout bug); then the rest of the unverified on-screen items, golden export tests.
 20. **Later:** the user making real Shorts in the app (dogfooding), then features chosen from what is missing. Ask the user (see "Not yet verified on screen" in each stage, and the "Later" items in `research/capcut/capcut-reverse-engineering.md` §5).
 
 ## CapCut list: stages G–L (to do, decided 2026-11-12)

@@ -457,8 +457,10 @@ private struct TitleHandles: View {
     var body: some View {
         GeometryReader { geometry in
             let scale = geometry.size.width / Project.canvasSize.width
-            ForEach(model.project.titlesOnScreen(at: model.currentTime).map(model.withTypedText)) { title in
-                if let frame = TitlePreview.frame(of: title), let shown = TitlePreview.frame(of: title, at: model.currentTime) {
+            // The moment the viewer shows: the skimmed frame while skimming, else the playhead.
+            let time = model.skimTime ?? model.currentTime
+            ForEach(model.project.titlesOnScreen(at: time).map(model.withTypedText)) { title in
+                if let frame = TitlePreview.frame(of: title), let shown = TitlePreview.frame(of: title, at: time) {
                     let isSelected = model.selectedTitleID == title.id
                     let offset = drag?.id == title.id ? drag!.offset : .zero
                     // Where it is now (following something, it has moved from where it was put).

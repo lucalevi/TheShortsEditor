@@ -22,6 +22,11 @@ struct PictureSection: View {
     }
     private var isOnScreen: Bool { model.adjustableClip?.id == clip.id }
 
+    /// What is actually drawn around the picture: black for a see-through picture set to Blurred.
+    private var shownBackground: ClipBackground {
+        clip.background == .blur && clip.cutout.isSeeThrough ? .black : clip.background
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Picture").font(.subheadline.weight(.semibold))
@@ -36,8 +41,10 @@ struct PictureSection: View {
             if isMain {
                 HStack {
                     Text("Around it")
-                    Picker("Around it", selection: Binding(get: { clip.background }, set: { model.setBackground($0, for: [clip.id]) })) {
-                        ForEach(ClipBackground.allCases) { Text($0.displayName).tag($0) }
+                    // A see-through picture can't have its blurred copy behind it (it would show
+                    // through), so it is drawn on black: say so in the picker itself.
+                    Picker("Around it", selection: Binding(get: { shownBackground }, set: { model.setBackground($0, for: [clip.id]) })) {
+                        ForEach(ClipBackground.allCases.filter { !clip.cutout.isSeeThrough || $0 != .blur }) { Text($0.displayName).tag($0) }
                     }
                     .labelsHidden()
                     .fixedSize()
@@ -56,9 +63,9 @@ struct PictureSection: View {
                         .help("Any other colour")
                     }
                 }
-                Text(clip.background == .blur && clip.cutout.isSeeThrough
+                Text(clip.cutout.isSeeThrough && shownBackground == .black
                      ? "A cut-out picture shows black behind it. Choose Colour for another colour."
-                     : Self.backgroundHint(clip.background))
+                     : Self.backgroundHint(shownBackground))
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
