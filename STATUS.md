@@ -1,6 +1,6 @@
 # Project status
 
-_Last updated: 2026-11-13 (automated dogfooding pass 1: committed and pushed, 576d8d9). Read this first when picking the project back up, then update it at the end of each session._
+_Last updated: 2026-11-13 (export edit-lists check: B-frames off, not committed yet). Read this first when picking the project back up, then update it at the end of each session._
 
 ## Where we are
 
@@ -16,7 +16,16 @@ Stages 1–7 are done, tested on screen, committed and pushed to https://github.
 | 6 | Audio: clip volume, music with ducking, loudness on export | 2026-11-09 |
 | 7 | Save/open projects, autosave, missing media | 2026-11-09 |
 
-**Pick up here (2026-11-13, latest): automated dogfooding, pass 1 (committed and pushed, 576d8d9).** The user doesn't want to test by hand yet, so I made three typical Shorts through the app with `Tools/uitest` (synthetic clips) and checked each exported MP4 with ffprobe/ffmpeg (codec, size, 30 fps, AAC, −14 LUFS, peak, fast start, frames sampled every second, sound and picture the same length):
+**Pick up here (2026-11-13, latest): export edit-lists check done (not committed yet).** Exported the same Short with and without B-frames (`AVVideoAllowFrameReorderingKey`) from a moving 1080×1920 test pattern and from `talking-sample.mp4`, and read the MP4 boxes:
+- **With B-frames (before)**: the video's edit list skipped 2 frames of decoding delay (media time 40/600), so a tool that ignores edit lists showed the picture 67 ms late (`ffprobe -ignore_editlist 1`: video start 0.067). GOPs were uneven: 29 frames first, then 13.
+- **Without (now)**: the video's edit list starts at 0 and covers the track as it is (AVAssetWriter always writes one), no `ctts`, a key frame exactly every 15 frames. Ignoring edit lists changes nothing.
+- Both: every key frame is IDR (NAL type 5), so the GOPs are closed. The sound keeps its edit list dropping AAC's 2112 priming samples, as every AAC file does; removing it would need our own muxer and would put 44 ms of priming at the start.
+- Quality: the same at 12 Mbps (SSIM 0.9744 vs 0.9742 against the source; the two talk exports are 51 dB PSNR apart). Same file size (fixed bitrate).
+- `Exporter.videoSettings` now has `AVVideoAllowFrameReorderingKey: false`; `ExporterTests.videoHasNoReorderingAndEvenKeyFrames` reads the boxes (no `ctts`, edit list media time 0, key frames 1, 16, 31, 46) and fails with B-frames on (checked). 575 tests pass. Not done: an export through the app's UI (same `Exporter`), uploading to YouTube.
+
+Next: the "Not yet verified on screen" items in each stage, then whole-Short "golden" export tests in the package.
+
+**Before that (2026-11-13): automated dogfooding, pass 1 (committed and pushed, 576d8d9).** The user doesn't want to test by hand yet, so I made three typical Shorts through the app with `Tools/uitest` (synthetic clips) and checked each exported MP4 with ffprobe/ffmpeg (codec, size, 30 fps, AAC, −14 LUFS, peak, fast start, frames sampled every second, sound and picture the same length):
 1. **Voice-over Short** ("My Short 25"): two talking clips, Remove Pauses (21.1 → 15.9 s), captions, hook title, B-roll at 0:05, a song lowered under speech, export. All correct (−14.0 LUFS, peak −1.9 dB).
 2. **Magic Short** ("My Short 26"): the 44 s talk to ~30 s (18.4 s, 5 of 18 sentences by Apple Intelligence), cover with new text, **Save Cover…** (1080×1920 JPEG, checked), cover shown in All Shorts, export. Correct.
 3. **Template** ("My Short 27"): Travel Diary from 3 clips (6 shots of 4 beats at 84 bpm = 17.1 s), shot 3 swapped with **Replace…** (same length and transition kept), export. Correct.
@@ -31,7 +40,7 @@ Found and fixed (574 tests pass; each checked on screen):
 
 Noticed, not changed: sliders use the Mac's decimal comma ("0,5 s") while times use a dot ("0:05.2"); the template chooser sheet sits slightly off-centre; Vlog-style titles are small. Test Shorts "My Short 25"–"My Short 30" are from these checks (safe to delete); exports are in the session scratchpad only.
 
-Next (the plan agreed with the user, in order): **check the edit-lists question on export** (YouTube asks for none; try `AVVideoAllowFrameReorderingKey: false` and compare), then the "Not yet verified on screen" items in each stage below, then whole-Short "golden" export tests in the package.
+Next (the plan agreed with the user, in order): ~~check the edit-lists question on export~~ (done, see above), then the "Not yet verified on screen" items in each stage below, then whole-Short "golden" export tests in the package.
 
 **Before that (2026-11-13): known gaps fixed, committed and pushed (1757bcc).** Next: the user dogfooding real Shorts. The user asked to fix the "known gaps" first (before dogfooding). Several notes in "Known limitations" turned out to be stale (B-roll does follow its clip, sound files can be sounds, titles have fonts, colours, rows and snapping); those were corrected. What was done:
 - **First import undoable**: opening several files from Finder makes SwiftUI create extra hidden windows, which reported themselves to `EditorModel.window`, so the import's undo went to a hidden window's undo manager. `EditorModel.undoManager` now prefers a visible window, and `ContentView`'s `WindowReader` ignores hidden ones. Reproduced before (Undo disabled after `open -a … three files`) and checked after on screen.
@@ -391,7 +400,7 @@ The P0 list from `research/shorts-editor-research.md` §5. Each stage ends with 
 16. ~~Stage L, templates and finding moments~~ (done 2026-11-13, all of it, committed).
 17. ~~Hardening pass~~ (done 2026-11-13, committed 9e79f25): undo names, sound crossfades, disk clean-up, performance measured, big files split, accessibility, CI.
 18. ~~Known gaps~~ (done 2026-11-13, committed 1757bcc): first import undoable, titles while typing, extra songs lowered under speech, sentence translation, more split layouts, pause length and voice-only pauses.
-19. **Automated dogfooding** (2026-11-13, user's choice: I drive the app, the user doesn't test by hand yet): pass 1 done (three Shorts made and exported, six fixes); then the export edit-lists check, the unverified on-screen items, golden export tests.
+19. **Automated dogfooding** (2026-11-13, user's choice: I drive the app, the user doesn't test by hand yet): pass 1 done (three Shorts made and exported, six fixes); export edit-lists check done (B-frames off); then the unverified on-screen items, golden export tests.
 20. **Later:** the user making real Shorts in the app (dogfooding), then features chosen from what is missing. Ask the user (see "Not yet verified on screen" in each stage, and the "Later" items in `research/capcut/capcut-reverse-engineering.md` §5).
 
 ## CapCut list: stages G–L (to do, decided 2026-11-12)
@@ -458,7 +467,7 @@ Why first: the user asked for it, and their real CapCut Short ("Studiare per la 
 
 - Undo was silently broken before 2026-11-08: opening files from Finder briefly creates a second window, and the model had attached to its undo manager. Now the model asks its window (re-set each time the window becomes active) for the undo manager at every edit.
 - Captions: a whole source file is transcribed even if only part of it is used (fine for Short-length clips, slow for long ones). Lines are grouped by length/pauses/sentence ends, plus the user's splits and joins. Captions move only up/down as a whole (no per-caption position). The test sample is a synthetic voice, so accuracy on real, noisy recordings is untested.
-- Export: the MP4 has edit lists (from B-frames and AAC priming, standard for AVFoundation and iPhone files). YouTube's encoding page says "no edit lists"; untested whether it matters. If an upload ever misbehaves, try `AVVideoAllowFrameReorderingKey: false`. "Closed GOP" isn't verified either (VideoToolbox key frames are normally IDR).
+- Export: since 2026-11-13 there are no B-frames, so the video's edit list is a plain one (starts at 0) and GOPs are exactly 15 frames, all IDR (closed). The sound's edit list (AAC priming) stays, as in every AAC file. Not yet confirmed by an actual YouTube upload.
 - Test fixtures with sound must mark the audio input finished as soon as the last chunk is in; otherwise `AVAssetWriter` stalls the video waiting for more audio.
 - Remove Pauses: detection is by loudness (of the whole sound, or of the voice alone with "Listen to the voice only", which separates each file once). Clips whose file has no sound are left alone. Magic Short still uses the whole sound.
 - Playback times from AVPlayer are in nanoseconds; compare them with model times only after `snappedToFrame()` (a skip loop came from this).

@@ -33,6 +33,37 @@ struct ExporterTests {
         return names
     }
 
+    /// Every box of an MP4 file with its body, in file order, looking inside the boxes that hold others.
+    private func allBoxes(_ data: Data, from start: Int = 0, to end: Int? = nil) -> [(type: String, body: Data)] {
+        let containers: Set = ["moov", "trak", "edts", "mdia", "minf", "stbl"]
+        let bytes = [UInt8](data)
+        func number(_ at: Int, _ count: Int) -> Int { bytes[at..<at + count].reduce(0) { $0 << 8 | Int($1) } }
+        var boxes: [(type: String, body: Data)] = []
+        var offset = start
+        let end = end ?? bytes.count
+        while offset + 8 <= end {
+            var size = number(offset, 4), header = 8
+            if size == 1 { size = number(offset + 8, 8); header = 16 }
+            guard size >= header, offset + size <= end else { break }
+            let type = String(decoding: bytes[offset + 4..<offset + 8], as: UTF8.self)
+            boxes.append((type, Data(bytes[offset + header..<offset + size])))
+            if containers.contains(type) { boxes += allBoxes(data, from: offset + header, to: offset + size) }
+            offset += size
+        }
+        return boxes
+    }
+
+    /// The boxes of the file's video track.
+    private func videoTrackBoxes(_ url: URL) throws -> [(type: String, body: Data)] {
+        let boxes = allBoxes(try Data(contentsOf: url))
+        let tracks = boxes.indices.filter { boxes[$0].type == "trak" }
+        for (n, first) in tracks.enumerated() {
+            let track = Array(boxes[first..<(n + 1 < tracks.count ? tracks[n + 1] : boxes.count)])
+            if track.contains(where: { $0.type == "hdlr" && $0.body.dropFirst(8).prefix(4) == Data("vide".utf8) }) { return track }
+        }
+        return []
+    }
+
     @Test(.timeLimit(.minutes(1)))
     func exportsPicturesAndBRollWithTheirSound() async throws {
         // A 2 s video, then a 3 s picture; B-roll with its own sound over the start.
@@ -94,6 +125,35 @@ struct ExporterTests {
         let frame = try await generator.image(at: CMTime(value: 1, timescale: 1)).image
         let pixel = Fixture.pixel(frame, x: 540, y: 960)
         #expect(pixel.r > 200 && pixel.g < 60 && pixel.b < 60)
+    }
+
+    /// YouTube asks for no edit lists and closed GOPs of half the frame rate. Without B-frames the
+    /// video's edit list starts at the track's first frame (nothing skipped), there are no reordered
+    /// frames, and a key frame comes every 15 frames.
+    @Test(.timeLimit(.minutes(1)))
+    func videoHasNoReorderingAndEvenKeyFrames() async throws {
+        let source = try await Fixture.video(width: 180, height: 320, seconds: 2, bgra: red)
+        let url = outputURL()
+        try await Exporter.export(try await project(source), to: url)
+        let video = try videoTrackBoxes(url)
+        #expect(!video.isEmpty)
+        #expect(!video.contains { $0.type == "ctts" })
+
+        func number(_ data: Data, _ at: Int, _ count: Int) -> Int {
+            data.dropFirst(at).prefix(count).reduce(0) { $0 << 8 | Int($1) }
+        }
+        for edits in video.filter({ $0.type == "elst" }).map(\.body) {
+            let wide = edits.first == 1
+            let entries = number(edits, 4, 4)
+            for entry in 0..<entries {
+                let mediaTime = wide ? number(edits, 8 + entry * 20 + 8, 8) : number(edits, 8 + entry * 12 + 4, 4)
+                #expect(mediaTime == 0)
+            }
+        }
+
+        let sync = try #require(video.first { $0.type == "stss" }?.body)
+        let keyFrames = (0..<number(sync, 4, 4)).map { number(sync, 8 + $0 * 4, 4) }
+        #expect(keyFrames == [1, 16, 31, 46])
     }
 
     @Test(.timeLimit(.minutes(1)))

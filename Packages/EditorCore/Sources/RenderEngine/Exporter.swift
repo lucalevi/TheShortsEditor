@@ -2,7 +2,7 @@
 import EditorCore
 
 /// Writes a project to an MP4 file that matches YouTube's recommended upload settings:
-/// H.264 High profile, 1080×1920 at 30 fps, closed GOPs of half a second, AAC-LC 48 kHz stereo,
+/// H.264 High profile without B-frames, 1080×1920 at 30 fps, closed GOPs of half a second, AAC-LC 48 kHz stereo,
 /// and the index at the front of the file ("fast start").
 ///
 /// Frames come from the same `ShortsCompositor` as the preview, so the file looks exactly like
@@ -163,7 +163,13 @@ public enum Exporter {
                 AVVideoExpectedSourceFrameRateKey: Int(Project.frameRate),
                 // A key frame every half second: YouTube asks for closed GOPs of half the frame rate.
                 AVVideoMaxKeyFrameIntervalKey: Int(Project.frameRate) / 2,
-                AVVideoAllowFrameReorderingKey: true,
+                // No B-frames. YouTube asks for no edit lists: with B-frames the video track needs one that
+                // skips two frames of decoding delay, so a tool ignoring it would show the picture 67 ms
+                // late; and its GOPs came out uneven (29 frames, then 13). Without them, every GOP is 15
+                // frames starting on an IDR frame and the edit list only covers the track as it is. At
+                // 12 Mbps the picture is the same (measured 2026-11-13). The sound's edit list, which
+                // drops AAC's 2112 priming samples, is in every AAC file and stays.
+                AVVideoAllowFrameReorderingKey: false,
             ] as [String: Any],
         ]
     }
