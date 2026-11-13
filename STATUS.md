@@ -1,6 +1,6 @@
 # Project status
 
-_Last updated: 2026-11-13 (automated dogfooding pass 1: fixes not yet committed). Read this first when picking the project back up, then update it at the end of each session._
+_Last updated: 2026-11-13 (automated dogfooding pass 1: committed and pushed, 576d8d9). Read this first when picking the project back up, then update it at the end of each session._
 
 ## Where we are
 
@@ -16,7 +16,7 @@ Stages 1–7 are done, tested on screen, committed and pushed to https://github.
 | 6 | Audio: clip volume, music with ducking, loudness on export | 2026-11-09 |
 | 7 | Save/open projects, autosave, missing media | 2026-11-09 |
 
-**Pick up here (2026-11-13, latest): automated dogfooding, pass 1 (not committed yet).** The user doesn't want to test by hand yet, so I made three typical Shorts through the app with `Tools/uitest` (synthetic clips) and checked each exported MP4 with ffprobe/ffmpeg (codec, size, 30 fps, AAC, −14 LUFS, peak, fast start, frames sampled every second, sound and picture the same length):
+**Pick up here (2026-11-13, latest): automated dogfooding, pass 1 (committed and pushed, 576d8d9).** The user doesn't want to test by hand yet, so I made three typical Shorts through the app with `Tools/uitest` (synthetic clips) and checked each exported MP4 with ffprobe/ffmpeg (codec, size, 30 fps, AAC, −14 LUFS, peak, fast start, frames sampled every second, sound and picture the same length):
 1. **Voice-over Short** ("My Short 25"): two talking clips, Remove Pauses (21.1 → 15.9 s), captions, hook title, B-roll at 0:05, a song lowered under speech, export. All correct (−14.0 LUFS, peak −1.9 dB).
 2. **Magic Short** ("My Short 26"): the 44 s talk to ~30 s (18.4 s, 5 of 18 sentences by Apple Intelligence), cover with new text, **Save Cover…** (1080×1920 JPEG, checked), cover shown in All Shorts, export. Correct.
 3. **Template** ("My Short 27"): Travel Diary from 3 clips (6 shots of 4 beats at 84 bpm = 17.1 s), shot 3 swapped with **Replace…** (same length and transition kept), export. Correct.
@@ -31,7 +31,7 @@ Found and fixed (574 tests pass; each checked on screen):
 
 Noticed, not changed: sliders use the Mac's decimal comma ("0,5 s") while times use a dot ("0:05.2"); the template chooser sheet sits slightly off-centre; Vlog-style titles are small. Test Shorts "My Short 25"–"My Short 30" are from these checks (safe to delete); exports are in the session scratchpad only.
 
-Next (the plan agreed with the user, in order): pass 1 commit when the user says so; then **check the edit-lists question on export** (YouTube asks for none; try `AVVideoAllowFrameReorderingKey: false` and compare), then the "Not yet verified on screen" items in each stage below, then whole-Short "golden" export tests in the package.
+Next (the plan agreed with the user, in order): **check the edit-lists question on export** (YouTube asks for none; try `AVVideoAllowFrameReorderingKey: false` and compare), then the "Not yet verified on screen" items in each stage below, then whole-Short "golden" export tests in the package.
 
 **Before that (2026-11-13): known gaps fixed, committed and pushed (1757bcc).** Next: the user dogfooding real Shorts. The user asked to fix the "known gaps" first (before dogfooding). Several notes in "Known limitations" turned out to be stale (B-roll does follow its clip, sound files can be sounds, titles have fonts, colours, rows and snapping); those were corrected. What was done:
 - **First import undoable**: opening several files from Finder makes SwiftUI create extra hidden windows, which reported themselves to `EditorModel.window`, so the import's undo went to a hidden window's undo manager. `EditorModel.undoManager` now prefers a visible window, and `ContentView`'s `WindowReader` ignores hidden ones. Reproduced before (Undo disabled after `open -a … three files`) and checked after on screen.
