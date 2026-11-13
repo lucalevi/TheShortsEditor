@@ -8,10 +8,10 @@ TheShortsEditor ("Shorts Editor") is a native macOS 26+ video editor for **YouTu
 
 ## Building
 
-Requires Xcode 26+ and XcodeGen (`brew install xcodegen`). The `.xcodeproj` is generated from `project.yml` and gitignored. Edit `project.yml`, never the project itself.
+Requires Xcode 27+ and XcodeGen (`brew install xcodegen`). The `.xcodeproj` is generated from `project.yml` and gitignored. Edit `project.yml`, never the project itself.
 
 ```
-make test     # EditorCore + RenderEngine + Transcription tests (swift test); CI runs it too (.github/workflows/test.yml)
+make test     # EditorCore + RenderEngine + Transcription tests (swift test); there is no CI, so run it before every commit
 make build    # xcodegen + xcodebuild Debug into ./build (no tests)
 make run      # build, then launch build/Build/Products/Debug/Shorts Editor.app
 make open     # open in Xcode

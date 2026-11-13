@@ -104,10 +104,13 @@ public enum Exporter {
         guard writer.startWriting() else { throw ExportError.cannotWrite(writer.error?.localizedDescription ?? "") }
         writer.startSession(atSourceTime: .zero)
 
+        // A constant copy: closures that run concurrently mustn't capture a `var`.
+        let running = pumps
+
         // Report progress from the video's position, a few times a second.
         let reporter = Task {
             while !Task.isCancelled {
-                let done = pumps[0].lastTime
+                let done = running[0].lastTime
                 if duration > .zero { progress(min(max(done.seconds / duration.seconds, 0), 1)) }
                 try? await Task.sleep(for: .milliseconds(150))
             }
@@ -116,12 +119,12 @@ public enum Exporter {
 
         await withTaskCancellationHandler {
             await withTaskGroup(of: Void.self) { group in
-                for pump in pumps {
+                for pump in running {
                     group.addTask { await pump.run() }
                 }
             }
         } onCancel: {
-            pumps.forEach { $0.cancel() }
+            running.forEach { $0.cancel() }
         }
 
         if Task.isCancelled || pumps.contains(where: \.isCancelled) {
