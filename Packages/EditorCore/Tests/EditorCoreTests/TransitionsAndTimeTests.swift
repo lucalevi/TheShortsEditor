@@ -365,3 +365,49 @@ struct BackwardsTests {
         #expect(back.asset(id: r)?.reversedFrom == p.asset(id: r)?.reversedFrom)
     }
 }
+
+struct SoundCrossfadeTests {
+    /// A 2…6 s of a.mov, then B 2…6 s of b.mov, with a dissolve of `frames` frames.
+    private func trimmed(frames: Int64 = 30) -> Project {
+        var (p, a, b) = twoFiles()
+        p.timeline.clips = [Clip(assetID: a, sourceStart: t(2), duration: t(4)), Clip(assetID: b, sourceStart: t(2), duration: t(4))]
+        p.setTransition(ClipTransition(kind: .dissolve, duration: CMTime(value: frames, timescale: Project.frameRate)), after: p.timeline.clips[0].id)
+        return p
+    }
+
+    @Test func bothClipsAreHeardAcrossATransition() throws {
+        let p = trimmed()
+        let fade = try #require(p.soundCrossfades.first)
+        #expect(fade.span.cut == t(4))
+        // The new clip's sound starts half a second early, the old one's goes on half a second.
+        #expect(fade.incomingSource == CMTimeRange(start: t(1.5), duration: t(0.5)))
+        #expect(fade.outgoingSource == CMTimeRange(start: t(6), duration: t(0.5)))
+        let envelope = AudioMix.storylineEnvelope(p.timeline.clips, crossfades: p.soundCrossfades)
+        #expect(abs(AudioMix.volume(at: t(3.5), in: envelope) - 1) < 0.001)
+        #expect(abs(AudioMix.volume(at: t(3.8), in: envelope) - 0.7) < 0.001)
+        #expect(abs(AudioMix.volume(at: t(4.2), in: envelope) - 0.7) < 0.001)
+        #expect(abs(AudioMix.volume(at: t(4.5), in: envelope) - 1) < 0.001)
+    }
+
+    @Test func soundCutsWhereThereIsNothingToBorrow() {
+        var p = trimmed()
+        // The new clip starts at the very start of its file: nothing before it.
+        p.timeline.clips[1].sourceStart = .zero
+        #expect(p.soundCrossfades.isEmpty)
+        // Faded or muted sound also just cuts.
+        p = trimmed(); p.timeline.clips[0].fadeOut = t(0.3)
+        #expect(p.soundCrossfades.isEmpty)
+        p = trimmed(); p.timeline.clips[1].volume = 0
+        #expect(p.soundCrossfades.isEmpty)
+        #expect(AudioMix.storylineEnvelope(p.timeline.clips, crossfades: p.soundCrossfades) == AudioMix.storylineEnvelope(p.timeline.clips))
+    }
+
+    @Test func fasterClipsBorrowMoreOfTheirFile() throws {
+        var p = trimmed()
+        // 0…8 s of a.mov played in 4 s.
+        p.timeline.clips[0].sourceStart = .zero
+        p.timeline.clips[0].speed = 2
+        let fade = try #require(p.soundCrossfades.first)
+        #expect(fade.outgoingSource.duration == t(1))
+    }
+}

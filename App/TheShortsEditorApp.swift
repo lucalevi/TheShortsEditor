@@ -23,10 +23,11 @@ struct TheShortsEditorApp: App {
         .defaultSize(width: 1400, height: 900)
         .commands {
             EditorCommands(model: model)
+            UndoCommands()
         }
 
         Settings {
-            SettingsView()
+            SettingsView(model: model)
         }
     }
 }

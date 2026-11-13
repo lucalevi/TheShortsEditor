@@ -183,6 +183,7 @@ struct StyleChip: View {
 /// Every caption, in order, with its words editable.
 private struct CaptionList: View {
     @Bindable var model: EditorModel
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         ScrollViewReader { proxy in
@@ -198,7 +199,7 @@ private struct CaptionList: View {
                 if model.isPlaying, let id { proxy.scrollTo(id, anchor: .center) }
             }
             .onChange(of: model.focusedCaptionID) { _, id in
-                if let id { withAnimation { proxy.scrollTo(id, anchor: .center) } }
+                if let id { withAnimation(reduceMotion ? nil : .default) { proxy.scrollTo(id, anchor: .center) } }
             }
             .safeAreaInset(edge: .bottom) {
                 Text("Click a caption to fix it. ↩ splits it at the cursor, ⌘↩ starts a new line, ⌫ at the start joins it to the one before.")
@@ -426,6 +427,7 @@ private struct CaptionsMoreMenu: View {
         .menuIndicator(.hidden)
         .fixedSize()
         .help("Subtitle files, caption breaks, delete captions")
+        .accessibilityLabel("More caption actions")
     }
 }
 

@@ -421,6 +421,7 @@ struct TimelineMarkers: View {
 
 /// Shorts Editor ▸ Settings (⌘,): how new clips start, like iMovie's settings.
 struct SettingsView: View {
+    let model: EditorModel
     @AppStorage(SettingsKey.pictureSeconds) private var pictureSeconds = MediaAsset.imageClipDuration.seconds
     @AppStorage(SettingsKey.picturePlacement) private var placement: NewClipSettings.PicturePlacement = .automatic
     @AppStorage(SettingsKey.slowMotionAutomatically) private var slowMotion = true
@@ -471,6 +472,8 @@ struct SettingsView: View {
             } header: {
                 Text("New videos")
             }
+
+            StorageSettings(model: model)
         }
         .formStyle(.grouped)
         .frame(width: 460)

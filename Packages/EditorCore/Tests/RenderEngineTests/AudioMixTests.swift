@@ -105,3 +105,38 @@ struct AudioMixTests {
         #expect(abs(try #require(try await loudness(of: untouched)) - before) < 0.5)
     }
 }
+
+@MainActor
+struct TransitionSoundTests {
+    private let red: (UInt8, UInt8, UInt8, UInt8) = (0, 0, 255, 255)
+    private func range(_ from: Double, _ to: Double) -> CMTimeRange {
+        CMTimeRange(start: CMTime(seconds: from, preferredTimescale: 600), end: CMTime(seconds: to, preferredTimescale: 600))
+    }
+
+    /// A clip with silent sound (0…2 s of its file), then 1…3 s of a file with a tone throughout, with a
+    /// one-second dissolve between them.
+    @Test func theNextClipIsHeardFadingInBeforeTheCut() async throws {
+        let quiet = try await Fixture.video(width: 180, height: 320, seconds: 3, bgra: red, toneFrom: 10)
+        let loud = try await Fixture.video(width: 180, height: 320, seconds: 4, bgra: red, toneFrom: 0)
+        var p = Project()
+        let a = p.addAsset(try await MediaProbe.probe(quiet))
+        let b = p.addAsset(try await MediaProbe.probe(loud))
+        p.timeline.clips = [Clip(assetID: a, sourceStart: .zero, duration: CMTime(value: 2, timescale: 1)),
+                            Clip(assetID: b, sourceStart: CMTime(value: 1, timescale: 1), duration: CMTime(value: 2, timescale: 1))]
+        let noFade = try await AudioProbe.peak(of: p, in: range(1.6, 1.95))
+        #expect(noFade == nil || noFade! < 0.001)
+        p.setTransition(ClipTransition(kind: .dissolve, duration: CMTime(value: 30, timescale: Project.frameRate)), after: p.timeline.clips[0].id)
+        #expect(p.soundCrossfades.count == 1)
+
+        let built = try await CompositionBuilder.build(p)
+        #expect(built.composition.tracks(withMediaType: .audio).count == 2)
+        #expect(abs(built.composition.duration.seconds - 4) < 0.01)
+        let full = try #require(try await AudioProbe.peak(of: p, in: range(3, 3.5)))
+        // Rising towards half just before the cut, half straight after it, full by the end.
+        let early = try #require(try await AudioProbe.peak(of: p, in: range(1.55, 1.7)))
+        let late = try #require(try await AudioProbe.peak(of: p, in: range(1.85, 1.98)))
+        #expect(early < late && late < full * 0.55)
+        let afterCut = try #require(try await AudioProbe.peak(of: p, in: range(2.02, 2.1)))
+        #expect(afterCut > late * 0.9 && afterCut < full * 0.8)
+    }
+}

@@ -1,4 +1,5 @@
 import AVFoundation
+import os
 import EditorCore
 
 /// What AVFoundation needs to play (and later export) a project.
@@ -44,6 +45,8 @@ public enum CompositionBuilder {
     /// `gain` scales all sound, for bringing the export to YouTube's loudness.
     public static func build(_ project: Project, gain: Double = 1) async throws -> PlayableComposition {
         guard !project.timeline.clips.isEmpty else { throw BuildError.emptyTimeline }
+        let signpost = Signposts.render.beginInterval("Build")
+        defer { Signposts.render.endInterval("Build", signpost) }
 
         let composition = AVMutableComposition()
         guard
@@ -57,7 +60,9 @@ public enum CompositionBuilder {
         let clipSound = AVMutableAudioMixInputParameters(track: audioTrack)
         // Volumes, volume lines and fades of the clips, with quick fades where a range of a
         // recording got another volume.
-        apply(AudioMix.storylineEnvelope(project.timeline.clips), at: .zero, gain: gain, to: clipSound)
+        // Across a transition both clips are heard, crossfading (the borrowed halves are added below).
+        let crossfades = project.soundCrossfades
+        apply(AudioMix.storylineEnvelope(project.timeline.clips, crossfades: crossfades), at: .zero, gain: gain, to: clipSound)
 
         // The main clips, back to back.
         var layers: [(range: CMTimeRange, layer: CompositorLayer)] = []
@@ -126,8 +131,37 @@ public enum CompositionBuilder {
         }
         if let transitionTrack, transitionTrack.segments.isEmpty { composition.removeTrack(transitionTrack) }
 
-        // Overlays: each row of overlapping ones gets its own video (and sound) track.
+        // The sound the crossfades borrow: the new clip's from before its start, fading in up to
+        // the cut, and the old clip's from after its end, fading out after it.
         var mixInputs: [AVAudioMixInputParameters] = []
+        if !crossfades.isEmpty, let fadeTrack = composition.addMutableTrack(withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid) {
+            let parameters = AVMutableAudioMixInputParameters(track: fadeTrack)
+            parameters.setVolume(0, at: .zero)
+            for fade in crossfades {
+                guard let from = layers.first(where: { $0.layer.clip.id == fade.span.from })?.layer.clip,
+                      let to = layers.first(where: { $0.layer.clip.id == fade.span.to })?.layer.clip else { continue }
+                let halves: [(clip: Clip, source: CMTimeRange, at: CMTime, volumes: (Double, Double))] = [
+                    (to, fade.incomingSource, fade.span.range.start, (0, fade.incomingLevel * 0.5)),
+                    (from, fade.outgoingSource, fade.span.cut, (fade.outgoingLevel * 0.5, 0)),
+                ]
+                for half in halves {
+                    guard let sourceAudio = try await media.audioTrack(for: half.clip) else { continue }
+                    let available = try await sourceAudio.load(.timeRange)
+                    // Only whole halves: a sliver of sound stalls the player.
+                    guard half.source.start >= available.start, half.source.end <= available.end else { continue }
+                    let insertAt = insertionTime(fadeTrack, half.at)
+                    padToTime(fadeTrack, insertAt)
+                    try fadeTrack.insertTimeRange(half.source, of: sourceAudio, at: insertAt)
+                    let end = half.at + fade.span.half
+                    fadeTrack.scaleTimeRange(CMTimeRange(start: insertAt, duration: half.source.duration), toDuration: end - insertAt)
+                    parameters.setVolumeRamp(fromStartVolume: Float(half.volumes.0 * gain), toEndVolume: Float(half.volumes.1 * gain),
+                                             timeRange: CMTimeRange(start: insertAt, end: end))
+                }
+            }
+            if fadeTrack.segments.isEmpty { composition.removeTrack(fadeTrack) } else { mixInputs.append(parameters) }
+        }
+
+        // Overlays: each row of overlapping ones gets its own video (and sound) track.
         let visible = project.overlays.compactMap { overlay in overlay.visibleRange(in: project).map { (overlay, $0) } }
         let rows = LanePacking.rows(visible.map { (id: $0.0.id, range: $0.1) })
         var rowVideo: [Int: AVMutableCompositionTrack] = [:]
@@ -492,4 +526,9 @@ extension CompositionBuilder {
         try track.insertTimeRange(second, of: black.track, at: start)
         track.scaleTimeRange(CMTimeRange(start: start, duration: second.duration), toDuration: duration)
     }
+}
+
+/// Signposts for Instruments' Points of Interest: each frame drawn and each rebuild after an edit.
+nonisolated enum Signposts {
+    static let render = OSSignposter(subsystem: "com.lucalevi.TheShortsEditor", category: .pointsOfInterest)
 }

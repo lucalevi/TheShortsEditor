@@ -129,6 +129,7 @@ private struct ShortTile: View {
     @State private var typedName = ""
     @State private var isHovered = false
     @FocusState private var nameFocused: Bool
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var isRenaming: Bool { renamingID == entry.id }
 
@@ -159,8 +160,9 @@ private struct ShortTile: View {
                     }
                 }
                 .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(.white.opacity(isHovered ? 0.8 : 0), lineWidth: 2))
-                .scaleEffect(isHovered ? 1.02 : 1)
-                .animation(.easeOut(duration: 0.12), value: isHovered)
+                // With Reduce Motion the border alone shows the pointer is over it.
+                .scaleEffect(isHovered && !reduceMotion ? 1.02 : 1)
+                .animation(reduceMotion ? nil : .easeOut(duration: 0.12), value: isHovered)
             }
             .buttonStyle(.plain)
             .onHover { isHovered = $0 }

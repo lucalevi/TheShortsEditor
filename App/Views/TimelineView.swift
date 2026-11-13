@@ -8,29 +8,29 @@ import UniformTypeIdentifiers
 /// with a ruler for scrubbing and the playhead.
 struct TimelineView: View {
     @Bindable var model: EditorModel
-    @State private var scrollPosition = ScrollPosition(edge: .leading)
-    @State private var visibleRect: CGRect = .zero
-    @State private var isDropTargeted = false
+    @State var scrollPosition = ScrollPosition(edge: .leading)
+    @State var visibleRect: CGRect = .zero
+    @State var isDropTargeted = false
     /// A title or B-roll clip being dragged: moved, or one of its edges.
-    @State private var blockDrag: BlockDrag?
+    @State var blockDrag: BlockDrag?
     /// A main clip being dragged to a new place in the storyline.
-    @State private var reorder: Reorder?
+    @State var reorder: Reorder?
     /// An edge of a main clip being dragged.
-    @State private var clipTrim: ClipTrim?
+    @State var clipTrim: ClipTrim?
     /// Where a dragged edge is sticking, to draw a line there.
-    @State private var snapLine: CMTime?
+    @State var snapLine: CMTime?
     /// The rectangle being drawn across the timeline to select what it covers.
-    @State private var marquee: CGRect?
+    @State var marquee: CGRect?
     /// The selection when the rectangle was started, which it adds to while ⌘ or ⇧ is held.
-    @State private var marqueeBase: TimelineSelection?
+    @State var marqueeBase: TimelineSelection?
     /// Where a range being dragged with R started.
-    @State private var rangeAnchor: CMTime?
+    @State var rangeAnchor: CMTime?
     /// Where files are being dragged over the clips, for the landing marker.
-    @State private var dropX: CGFloat?
+    @State var dropX: CGFloat?
     /// A caption edge being dragged in the captions lane, and where it is now.
-    @State private var captionEdgeDrag: (pageID: CaptionPage.ID, edge: CaptionEdge, time: CMTime)?
+    @State var captionEdgeDrag: (pageID: CaptionPage.ID, edge: CaptionEdge, time: CMTime)?
     /// While the music is dragged along the timeline: how far it has moved.
-    @State private var musicDrag: CMTime?
+    @State var musicDrag: CMTime?
 
     struct BlockDrag {
         enum Kind { case move, start, end }
@@ -54,54 +54,54 @@ struct TimelineView: View {
 
     // MARK: Layout
 
-    private let rulerHeight: CGFloat = 24
-    private let trackHeight: CGFloat = 72
-    private let captionLaneHeight: CGFloat = 22
-    private let titleRowHeight: CGFloat = 22
-    private let overlayRowHeight: CGFloat = 40
-    private let musicLaneHeight: CGFloat = 30
-    private let soundRowHeight: CGFloat = 34
-    private let rowGap: CGFloat = 3
-    private let leadingInset: CGFloat = 12
+    let rulerHeight: CGFloat = 24
+    let trackHeight: CGFloat = 72
+    let captionLaneHeight: CGFloat = 22
+    let titleRowHeight: CGFloat = 22
+    let overlayRowHeight: CGFloat = 40
+    let musicLaneHeight: CGFloat = 30
+    let soundRowHeight: CGFloat = 34
+    let rowGap: CGFloat = 3
+    let leadingInset: CGFloat = 12
 
-    private var titleRows: [TextOverlay.ID: Int] {
+    var titleRows: [TextOverlay.ID: Int] {
         LanePacking.rows(model.project.titles.map { (id: $0.id, range: $0.range) })
     }
-    private var overlayRows: [Clip.ID: Int] {
+    var overlayRows: [Clip.ID: Int] {
         LanePacking.rows(model.project.overlays.map { (id: $0.id, range: $0.range) })
     }
-    private var soundRows: [Clip.ID: Int] {
+    var soundRows: [Clip.ID: Int] {
         LanePacking.rows(model.project.sounds.map { (id: $0.id, range: $0.range) })
     }
-    private var titleRowCount: Int { LanePacking.count(titleRows) }
-    private var overlayRowCount: Int { LanePacking.count(overlayRows) }
+    var titleRowCount: Int { LanePacking.count(titleRows) }
+    var overlayRowCount: Int { LanePacking.count(overlayRows) }
 
-    private var titlesY: CGFloat { rulerHeight + 6 }
-    private var titlesHeight: CGFloat { CGFloat(titleRowCount) * (titleRowHeight + 2) }
-    private var overlaysY: CGFloat { titlesY + titlesHeight + rowGap }
-    private var overlaysHeight: CGFloat { CGFloat(overlayRowCount) * (overlayRowHeight + rowGap) }
-    private var clipsY: CGFloat { overlaysY + overlaysHeight + 2 }
-    private var captionsY: CGFloat { clipsY + trackHeight + 6 }
-    private var soundsY: CGFloat { captionsY + captionLaneHeight + 4 }
-    private var soundsHeight: CGFloat { CGFloat(LanePacking.count(soundRows)) * (soundRowHeight + 2) }
-    private var musicY: CGFloat { soundsY + soundsHeight + 2 }
-    private var contentHeight: CGFloat { musicY + musicLaneHeight + 12 }
+    var titlesY: CGFloat { rulerHeight + 6 }
+    var titlesHeight: CGFloat { CGFloat(titleRowCount) * (titleRowHeight + 2) }
+    var overlaysY: CGFloat { titlesY + titlesHeight + rowGap }
+    var overlaysHeight: CGFloat { CGFloat(overlayRowCount) * (overlayRowHeight + rowGap) }
+    var clipsY: CGFloat { overlaysY + overlaysHeight + 2 }
+    var captionsY: CGFloat { clipsY + trackHeight + 6 }
+    var soundsY: CGFloat { captionsY + captionLaneHeight + 4 }
+    var soundsHeight: CGFloat { CGFloat(LanePacking.count(soundRows)) * (soundRowHeight + 2) }
+    var musicY: CGFloat { soundsY + soundsHeight + 2 }
+    var contentHeight: CGFloat { musicY + musicLaneHeight + 12 }
 
-    private var pointsPerSecond: CGFloat { model.timelineZoom }
+    var pointsPerSecond: CGFloat { model.timelineZoom }
 
-    private func x(for time: CMTime) -> CGFloat {
+    func x(for time: CMTime) -> CGFloat {
         leadingInset + CGFloat(time.seconds) * pointsPerSecond
     }
 
-    private func width(of duration: CMTime) -> CGFloat {
+    func width(of duration: CMTime) -> CGFloat {
         CGFloat(duration.seconds) * pointsPerSecond
     }
 
-    private func time(at x: CGFloat) -> CMTime {
+    func time(at x: CGFloat) -> CMTime {
         CMTime(seconds: max(0, Double((x - leadingInset) / pointsPerSecond)), preferredTimescale: 600)
     }
 
-    private func seconds(_ points: CGFloat) -> CMTime {
+    func seconds(_ points: CGFloat) -> CMTime {
         CMTime(seconds: Double(points / pointsPerSecond), preferredTimescale: 600)
     }
 
@@ -210,10 +210,10 @@ struct TimelineView: View {
     }
 
     /// Coordinates of the whole timeline content, the same ones `time(at:)` understands.
-    private static let contentSpace = "timelineContent"
+    static let contentSpace = "timelineContent"
 
     /// A plain click on an item (not ⌘/⇧) also moves the playhead to where it was clicked, as in CapCut or iMovie.
-    private func clickTap(_ select: @escaping (EditorModel.Selection?, NSEvent.ModifierFlags) -> Void) -> some Gesture {
+    func clickTap(_ select: @escaping (EditorModel.Selection?, NSEvent.ModifierFlags) -> Void) -> some Gesture {
         SpatialTapGesture(coordinateSpace: .named(Self.contentSpace)).onEnded { value in
             let modifiers = NSEvent.modifierFlags
             select(nil, modifiers)
@@ -223,14 +223,14 @@ struct TimelineView: View {
         }
     }
 
-    private var contentWidth: CGFloat {
+    var contentWidth: CGFloat {
         x(for: model.duration) + 10 * pointsPerSecond
     }
 
     /// In a right-click menu: deletes all selected items when this one is among several selected,
     /// otherwise just this one.
     @ViewBuilder
-    private func deleteButton(for item: EditorModel.Selection, single: String) -> some View {
+    func deleteButton(for item: EditorModel.Selection, single: String) -> some View {
         let count = model.timelineSelection.count
         if model.isSelected(item), count > 1 {
             Button("Delete \(count) Selected Items", role: .destructive) { model.deleteSelection() }
@@ -246,14 +246,14 @@ struct TimelineView: View {
 
     /// The empty space behind everything: click to deselect, drag to select with a rectangle
     /// (holding ⌘ or ⇧ adds to what is already selected).
-    private var marqueeArea: some View {
+    var marqueeArea: some View {
         Color.clear
             .contentShape(Rectangle())
             .gesture(emptySpaceGesture)
     }
 
     /// Click: deselect and move the playhead. Drag: select with a rectangle.
-    private var emptySpaceGesture: some Gesture {
+    var emptySpaceGesture: some Gesture {
         DragGesture(minimumDistance: 0, coordinateSpace: .named(Self.contentSpace))
                 .onChanged { value in
                     if rangeAnchor != nil || (marquee == nil && model.isRangeKeyDown && abs(value.translation.width) > 3) {
@@ -294,7 +294,7 @@ struct TimelineView: View {
     }
 
     @ViewBuilder
-    private var marqueeRectangle: some View {
+    var marqueeRectangle: some View {
         if let marquee {
             Rectangle()
                 .fill(Color.accentColor.opacity(0.15))
@@ -307,7 +307,7 @@ struct TimelineView: View {
     }
 
     /// The clips, overlays, titles and music a rectangle on the timeline touches.
-    private func items(in rect: CGRect) -> Set<EditorModel.Selection> {
+    func items(in rect: CGRect) -> Set<EditorModel.Selection> {
         let lanes: [(TimelineLane, CGFloat, CGFloat)] = [
             (.titles, titlesY, titlesHeight),
             (.overlays, overlaysY, overlaysHeight),
@@ -324,7 +324,7 @@ struct TimelineView: View {
     // MARK: Ruler, playhead, markers
 
     /// Seconds along the top. Click or drag here to move the playhead.
-    private var ruler: some View {
+    var ruler: some View {
         Canvas { context, size in
             let step = rulerStep
             var second = 0.0
@@ -346,13 +346,13 @@ struct TimelineView: View {
     }
 
     /// A label every 1, 2, 5, 10… seconds, whichever keeps them about 60 points apart.
-    private var rulerStep: Double {
+    var rulerStep: Double {
         [1.0, 2, 5, 10, 15, 30, 60].first { $0 * pointsPerSecond >= 60 } ?? 60
     }
 
     /// A red line at 3:00, the longest a Short can be.
     @ViewBuilder
-    private var limitMarker: some View {
+    var limitMarker: some View {
         let limitX = x(for: Project.maxDuration)
         if limitX < contentWidth {
             Rectangle()
@@ -365,7 +365,7 @@ struct TimelineView: View {
 
     /// Where a dragged edge is sticking.
     @ViewBuilder
-    private var snapIndicator: some View {
+    var snapIndicator: some View {
         if let snapLine {
             Rectangle()
                 .fill(Color.yellow)
@@ -376,7 +376,7 @@ struct TimelineView: View {
         }
     }
 
-    private var playhead: some View {
+    var playhead: some View {
         VStack(spacing: 0) {
             Image(systemName: "arrowtriangle.down.fill")
                 .font(.system(size: 10))
@@ -392,7 +392,7 @@ struct TimelineView: View {
 
     /// The white line under the pointer while skimming.
     @ViewBuilder
-    private var skimmer: some View {
+    var skimmer: some View {
         if let skim = model.skimTime, !model.isPlaying, reorder == nil, clipTrim == nil, blockDrag == nil, rangeAnchor == nil {
             Rectangle()
                 .fill(Color.white)
@@ -405,7 +405,7 @@ struct TimelineView: View {
 
     /// The range picked with R (or X), over the clips.
     @ViewBuilder
-    private var rangeOverlay: some View {
+    var rangeOverlay: some View {
         if let range = model.timelineRange {
             RoundedRectangle(cornerRadius: 4)
                 .fill(Color.yellow.opacity(0.18))
@@ -427,7 +427,7 @@ struct TimelineView: View {
     }
 
     @ViewBuilder
-    private var rangeMenuItems: some View {
+    var rangeMenuItems: some View {
         Button("Delete Range") { model.deleteRange() }
         Button("Trim to Range") { model.trimToRange() }
         Menu("Speed of Range") {
@@ -442,7 +442,7 @@ struct TimelineView: View {
 
     /// Copy, paste and reset settings, for a clip's right-click menu.
     @ViewBuilder
-    private func settingsMenuItems(for item: TimelineItem, clipID: Clip.ID) -> some View {
+    func settingsMenuItems(for item: TimelineItem, clipID: Clip.ID) -> some View {
         Button("Copy Settings") {
             if !model.isSelected(item) { model.selection = item }
             model.copySettings()
@@ -459,13 +459,13 @@ struct TimelineView: View {
             .disabled(model.project.changedSettings(of: clipID).isEmpty)
     }
 
-    private func pasteSettings(_ kinds: Set<SettingsKind>, onto item: TimelineItem) {
+    func pasteSettings(_ kinds: Set<SettingsKind>, onto item: TimelineItem) {
         if !model.isSelected(item) { model.selection = item }
         model.pasteSettings(kinds)
     }
 
     /// Thin lines from titles, B-roll and sounds down (or up) to the clip they move with.
-    private var pinLines: some View {
+    var pinLines: some View {
         let titleRows = titleRows, overlayRows = overlayRows, soundRows = soundRows
         let end = model.duration
         var pins: [(item: TimelineItem, time: CMTime, top: CGFloat, bottom: CGFloat)] = []
@@ -499,7 +499,7 @@ struct TimelineView: View {
 
     /// While dragging: the new length at a trimmed edge, or where the dragged item lands.
     @ViewBuilder
-    private var dragLabel: some View {
+    var dragLabel: some View {
         if let (text, time) = dragLabelInfo {
             Text(text)
                 .font(.caption.weight(.semibold).monospacedDigit())
@@ -514,7 +514,7 @@ struct TimelineView: View {
         }
     }
 
-    private var dragLabelInfo: (String, CMTime)? {
+    var dragLabelInfo: (String, CMTime)? {
         if let trim = clipTrim, let clip = model.project.anyClip(id: trim.id), let range = model.project.timeline.range(of: trim.id) {
             let length = trim.edge == .start ? clip.duration - trim.delta : clip.duration + trim.delta
             let edge = trim.edge == .start ? range.start + trim.delta : range.end + trim.delta
@@ -538,7 +538,7 @@ struct TimelineView: View {
         return nil
     }
 
-    private func duration(of item: TimelineItem) -> CMTime? {
+    func duration(of item: TimelineItem) -> CMTime? {
         switch item {
         case .title(let id): model.project.title(id: id)?.duration
         case .overlay(let id): model.project.overlay(id: id)?.duration
@@ -548,13 +548,13 @@ struct TimelineView: View {
     }
 
     /// "+0:00.5" or "−0:00.5".
-    private func signed(_ delta: CMTime) -> String {
+    func signed(_ delta: CMTime) -> String {
         delta < .zero ? "−\(TimeFormat.string(-delta))" : "+\(TimeFormat.string(delta))"
     }
 
     // MARK: Dropping on the clips
 
-    private enum DropTarget: Equatable {
+    enum DropTarget: Equatable {
         /// Between clips (or at the end): put in there.
         case cut(CMTime)
         /// On a clip: ask what to do.
@@ -562,7 +562,7 @@ struct TimelineView: View {
     }
 
     /// A drop near a cut goes in there; on a clip, it asks.
-    private func dropTarget(at x: CGFloat) -> DropTarget {
+    func dropTarget(at x: CGFloat) -> DropTarget {
         var cuts: [CMTime] = [.zero]
         for clip in model.project.timeline.clips { cuts.append(cuts.last! + clip.duration) }
         if let near = cuts.min(by: { abs(self.x(for: $0) - x) < abs(self.x(for: $1) - x) }), abs(self.x(for: near) - x) <= 12 {
@@ -573,12 +573,12 @@ struct TimelineView: View {
         return .clip(model.project.timeline.clips[index].id, time.snappedToFrame())
     }
 
-    private func dropHover(_ x: CGFloat?) {
+    func dropHover(_ x: CGFloat?) {
         dropX = x
         if x != nil { model.showTip(.dropOnClip) }
     }
 
-    private func drop(_ urls: [URL], at x: CGFloat) {
+    func drop(_ urls: [URL], at x: CGFloat) {
         dropX = nil
         guard !urls.isEmpty else { return }
         // Songs and Short files do what they always did (become the music, open the Short).
@@ -598,7 +598,7 @@ struct TimelineView: View {
 
     /// Where dragged files would land: a bar on a cut ("put in here"), or a frame around a clip.
     @ViewBuilder
-    private var dropMarker: some View {
+    var dropMarker: some View {
         if let dropX, !model.project.timeline.clips.isEmpty {
             switch dropTarget(at: dropX) {
             case .cut(let time):
@@ -631,7 +631,7 @@ struct TimelineView: View {
     // MARK: Main clips
 
     @ViewBuilder
-    private var clipsRow: some View {
+    var clipsRow: some View {
         let clips = model.project.timeline.clips
         if clips.isEmpty {
             Text("Drop videos or pictures here, or double-click one in Media")
@@ -672,7 +672,7 @@ struct TimelineView: View {
         }
     }
 
-    private func clipView(_ clip: Clip, index: Int) -> some View {
+    func clipView(_ clip: Clip, index: Int) -> some View {
         let slot = max(width(of: clip.duration), 2)
         let trim = clipTrim?.id == clip.id ? clipTrim : nil
         let delta = trim.map { width(of: $0.delta) } ?? 0
@@ -801,7 +801,7 @@ struct TimelineView: View {
     }
 
     /// Where a clip dragged by `dx` lands among the others: after every clip whose middle it passed.
-    private func destination(for clip: Clip, index: Int, dx: CGFloat) -> Int {
+    func destination(for clip: Clip, index: Int, dx: CGFloat) -> Int {
         let clips = model.project.timeline.clips
         let start = width(of: model.project.timeline.startTime(ofClipAt: index))
         let middle = start + width(of: clip.duration) / 2 + dx
@@ -815,7 +815,7 @@ struct TimelineView: View {
         return count
     }
 
-    private func updateClipTrim(_ clip: Clip, edge: ClipEdge, points: CGFloat) {
+    func updateClipTrim(_ clip: Clip, edge: ClipEdge, points: CGFloat) {
         model.pause()
         if !model.isSelected(.clip(clip.id)) { model.selectedClipID = clip.id }
         guard let range = model.project.timeline.range(of: clip.id),
@@ -832,946 +832,15 @@ struct TimelineView: View {
         model.showEdgeFrame(ofClip: clip.id, edge: edge, delta: delta)
     }
 
-    private func endClipTrim() {
+    func endClipTrim() {
         if let trim = clipTrim { model.showEdgeFrame(ofClip: trim.id, edge: trim.edge, delta: nil) }
         if let trim = clipTrim, trim.delta != .zero { model.trimClip(trim.id, edge: trim.edge, by: trim.delta) }
         clipTrim = nil
         snapLine = nil
     }
 
-    private func aspect(of asset: MediaAsset?) -> CGFloat {
+    func aspect(of asset: MediaAsset?) -> CGFloat {
         guard let size = asset?.displaySize, size.height > 0 else { return 9 / 16 }
         return min(max(size.width / size.height, 0.5), 1.8)
-    }
-
-    // MARK: B-roll
-
-    /// Videos and pictures over the clips. Drag to move, drag an edge to trim, drop files here to
-    /// add them at that time.
-    private var overlayLane: some View {
-        let rows = overlayRows
-        return ZStack(alignment: .topLeading) {
-            Color.clear
-                .frame(width: max(contentWidth, 1), height: overlaysHeight)
-                .contentShape(Rectangle())
-                .gesture(emptySpaceGesture)
-                .dropDestination(for: URL.self) { urls, location in
-                    model.importFiles(urls, to: .overlay(at: time(at: location.x)))
-                    return true
-                }
-                .allowsHitTesting(true)
-            if model.project.overlays.isEmpty {
-                Label("Drop B-roll or pictures here to show them over your clips", systemImage: "rectangle.on.rectangle")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .frame(height: overlayRowHeight)
-                    .offset(x: leadingInset + 4)
-                    .allowsHitTesting(false)
-            }
-            ForEach(model.project.overlays) { overlay in
-                overlayView(overlay, row: rows[overlay.id] ?? 0)
-            }
-        }
-    }
-
-    private func overlayView(_ overlay: Overlay, row: Int) -> some View {
-        let item = TimelineItem.overlay(overlay.id)
-        let (start, length) = shownRange(of: item, start: overlay.start, duration: overlay.duration)
-        let asset = model.project.asset(id: overlay.clip.assetID)
-        return OverlayBlock(
-            overlay: overlay,
-            name: asset?.name ?? "Missing",
-            aspect: aspect(of: asset),
-            filmstrip: model.filmstrips[overlay.clip.assetID],
-            pointsPerSecond: pointsPerSecond,
-            sourceStart: overlay.clip.sourceTime(atOffset: start - overlay.start),
-            isSelected: model.isSelected(item),
-            isAfterEnd: overlay.visibleRange(in: model.project) == nil
-        )
-        .overlay(alignment: .leading) {
-            EdgeHandle(edge: .leading, help: "Drag to trim the start") { dx in
-                updateBlockDrag(item, kind: .start, points: dx, start: overlay.start, duration: overlay.duration)
-            } onEnd: { endBlockDrag() }
-        }
-        .overlay(alignment: .trailing) {
-            EdgeHandle(edge: .trailing, help: "Drag to trim the end") { dx in
-                updateBlockDrag(item, kind: .end, points: dx, start: overlay.start, duration: overlay.duration)
-            } onEnd: { endBlockDrag() }
-        }
-        .frame(width: max(width(of: length) - 2, 6), height: overlayRowHeight)
-        .offset(x: x(for: start) + 1, y: CGFloat(row) * (overlayRowHeight + rowGap))
-        .zIndex(blockDrag?.item == item ? 1 : 0)
-        .gesture(clickTap { _, modifiers in
-            if modifiers.isDisjoint(with: [.command, .shift]) {
-                model.selectOverlay(overlay.id)
-            } else {
-                model.click(item, modifiers: modifiers)
-            }
-        })
-        .gesture(DragGesture(minimumDistance: 3)
-            .onChanged { value in
-                updateBlockDrag(item, kind: .move, points: value.translation.width, start: overlay.start, duration: overlay.duration)
-            }
-            .onEnded { _ in endBlockDrag() })
-        .contextMenu {
-            Button("Split at Playhead") {
-                model.selection = item
-                model.splitAtPlayhead()
-            }
-            Button("Start at Playhead") { model.moveOverlay(overlay.id, to: model.currentTime) }
-            Button(overlay.clip.isMuted ? "Turn Sound On" : "Turn Sound Off") { model.setClipMuted(overlay.id, !overlay.clip.isMuted) }
-                .disabled(asset?.hasAudio != true)
-            Divider()
-            settingsMenuItems(for: item, clipID: overlay.id)
-            Divider()
-            deleteButton(for: item, single: "Delete")
-        }
-    }
-
-    // MARK: Titles
-
-    /// The titles, above everything. Click to select, drag to move, drag the right edge to change the length.
-    private var titleLane: some View {
-        let rows = titleRows
-        return ZStack(alignment: .topLeading) {
-            if model.project.titles.isEmpty, !model.project.timeline.clips.isEmpty {
-                Label("Titles go here: ⌘T adds one at the playhead", systemImage: "textformat")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                    .frame(height: titleRowHeight)
-                    .offset(x: leadingInset + 4)
-                    .allowsHitTesting(false)
-            }
-            ForEach(model.project.titles) { title in
-                let item = TimelineItem.title(title.id)
-                let (start, length) = shownRange(of: item, start: title.start, duration: title.duration)
-                let isAfterEnd = title.visibleRange(in: model.project) == nil
-                TitleBlock(title: title, isSelected: model.isSelected(item), isAfterEnd: isAfterEnd) { dx in
-                    updateBlockDrag(item, kind: .end, points: dx, start: title.start, duration: title.duration)
-                } onResizeEnd: {
-                    endBlockDrag()
-                }
-                .frame(width: max(width(of: length) - 2, 6), height: titleRowHeight)
-                .offset(x: x(for: start) + 1, y: CGFloat(rows[title.id] ?? 0) * (titleRowHeight + 2))
-                .zIndex(blockDrag?.item == item ? 1 : 0)
-                .gesture(clickTap { _, modifiers in
-                    if modifiers.isDisjoint(with: [.command, .shift]) {
-                        model.selectTitle(title.id)
-                    } else {
-                        model.click(item, modifiers: modifiers)
-                    }
-                })
-                .gesture(DragGesture(minimumDistance: 3).onChanged { value in
-                    updateBlockDrag(item, kind: .move, points: value.translation.width, start: title.start, duration: title.duration)
-                }.onEnded { _ in
-                    endBlockDrag()
-                    if model.timelineSelection.count <= 1 { model.selectTitle(title.id) }
-                })
-                .contextMenu {
-                    Button("Start at Playhead") { model.moveTitle(title.id, to: model.currentTime) }
-                    Divider()
-                    Button("Copy Title Design") {
-                        if !model.isSelected(item) { model.selection = item }
-                        model.copySettings()
-                    }
-                    Button("Paste Title Design") {
-                        if !model.isSelected(item) { model.selection = item }
-                        model.pasteTitleDesign()
-                    }
-                    .disabled(model.copiedTitle == nil)
-                    Divider()
-                    deleteButton(for: item, single: "Delete Title")
-                }
-            }
-        }
-    }
-
-    // MARK: Dragging titles and B-roll
-
-    /// Where a title or overlay is drawn: where it is, or where it is being dragged to.
-    private func shownRange(of item: TimelineItem, start: CMTime, duration: CMTime) -> (CMTime, CMTime) {
-        guard let drag = blockDrag, drag.item == item else { return (start, duration) }
-        switch drag.kind {
-        case .move: return (start + drag.delta, duration)
-        case .start: return (start + drag.delta, duration - drag.delta)
-        case .end: return (start, duration + drag.delta)
-        }
-    }
-
-    private func updateBlockDrag(_ item: TimelineItem, kind: BlockDrag.Kind, points: CGFloat, start: CMTime, duration: CMTime) {
-        model.pause()
-        if !model.isSelected(item) { model.selection = item }
-        var delta = seconds(points)
-        snapLine = nil
-        switch kind {
-        case .move:
-            let moved = max(.zero, start + delta)
-            if let stuck = model.snappedStart(moved, duration: duration, excluding: item) {
-                delta = stuck - start
-                // Draw the line at whichever edge stuck.
-                let targets = Snapping.targets(in: model.project, playhead: model.currentTime, excluding: [item])
-                snapLine = targets.contains(stuck) ? stuck : stuck + duration
-            }
-            delta = max(delta, -start)
-        case .start:
-            if let stuck = model.snapped(start + delta, excluding: item) {
-                delta = stuck - start
-                snapLine = stuck
-            }
-            delta = min(max(delta, -start), duration - Clip.minimumDuration)
-        case .end:
-            if let stuck = model.snapped(start + duration + delta, excluding: item) {
-                delta = stuck - start - duration
-                snapLine = stuck
-            }
-            delta = max(delta, Clip.minimumDuration - duration)
-        }
-        blockDrag = BlockDrag(item: item, kind: kind, delta: delta.snappedToFrame())
-    }
-
-    private func endBlockDrag() {
-        defer {
-            blockDrag = nil
-            snapLine = nil
-        }
-        guard let drag = blockDrag, drag.delta != .zero else { return }
-        switch (drag.item, drag.kind) {
-        case (.title(let id), .move):
-            if let title = model.project.title(id: id) { model.moveTitle(id, to: title.start + drag.delta) }
-        case (.title(let id), .end):
-            if let title = model.project.title(id: id) { model.setTitleDuration(id, title.duration + drag.delta) }
-        case (.overlay(let id), .move):
-            if let overlay = model.project.overlay(id: id) { model.moveOverlay(id, to: overlay.start + drag.delta) }
-        case (.overlay(let id), .start):
-            model.trimOverlay(id, edge: .start, by: drag.delta)
-        case (.overlay(let id), .end):
-            model.trimOverlay(id, edge: .end, by: drag.delta)
-        case (.sound(let id), .move):
-            if let sound = model.project.sound(id: id) { model.moveSound(id, to: sound.start + drag.delta) }
-        case (.sound(let id), .start):
-            model.trimSound(id, edge: .start, by: drag.delta)
-        case (.sound(let id), .end):
-            model.trimSound(id, edge: .end, by: drag.delta)
-        default:
-            break
-        }
-    }
-
-    // MARK: Sound effects and voice-overs
-
-    /// Sound effects and voice-overs, under the captions. Drop sound files here to add them.
-    private var soundLane: some View {
-        let rows = soundRows
-        return ZStack(alignment: .topLeading) {
-            Color.clear
-                .frame(width: max(contentWidth, 1), height: soundsHeight)
-                .contentShape(Rectangle())
-                .gesture(emptySpaceGesture)
-                .dropDestination(for: URL.self) { urls, location in
-                    model.importFiles(urls, to: .sound(at: time(at: location.x)))
-                    return true
-                }
-            if model.project.sounds.isEmpty, !model.project.timeline.clips.isEmpty {
-                Label("Sound effects and voice-overs go here (Sounds panel, or drop a sound file)", systemImage: "waveform")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                    .frame(height: soundRowHeight)
-                    .offset(x: leadingInset + 4)
-                    .allowsHitTesting(false)
-            }
-            ForEach(model.project.sounds) { sound in
-                soundView(sound, row: rows[sound.id] ?? 0)
-            }
-        }
-    }
-
-    private func soundView(_ sound: SoundClip, row: Int) -> some View {
-        let item = TimelineItem.sound(sound.id)
-        let (start, length) = shownRange(of: item, start: sound.start, duration: sound.duration)
-        let name = model.project.asset(id: sound.clip.assetID)?.name ?? "Missing"
-        let isSelected = model.isSelected(item)
-        return RoundedRectangle(cornerRadius: 4)
-            .fill((sound.isVoiceOver ? Color.pink : Color.indigo).opacity(isSelected ? 0.6 : 0.4))
-            .overlay(alignment: .bottom) {
-                if let levels = model.audioLevels[sound.clip.assetID] {
-                    WaveformView(levels: levels, sourceStart: sound.clip.sourceTime(atOffset: start - sound.start),
-                                 pointsPerSecond: pointsPerSecond / CGFloat(sound.clip.averageSpeed),
-                                 tooLoud: model.tooLoudRanges(of: sound.clip).map { CMTimeRange(start: $0.start - (start - sound.start), duration: $0.duration) })
-                        .frame(height: soundRowHeight - 14)
-                        .opacity(sound.clip.isMuted ? 0.3 : 0.8)
-                }
-            }
-            .overlay(alignment: .topLeading) {
-                Label(sound.detachedFrom != nil ? "Sound of \(name)" : name,
-                      systemImage: sound.isVoiceOver ? "mic.fill" : sound.detachedFrom != nil ? "waveform.path" : "waveform")
-                    .font(.caption2.weight(.medium))
-                    .lineLimit(1)
-                    .padding(.horizontal, 4)
-            }
-            .clipShape(RoundedRectangle(cornerRadius: 4))
-            .overlay {
-                RoundedRectangle(cornerRadius: 4)
-                    .strokeBorder(isSelected ? Color.yellow : Color.white.opacity(0.4), lineWidth: isSelected ? 2 : 1)
-            }
-            .overlay(alignment: .bottom) {
-                if blockDrag?.item != item, model.audioLevels[sound.clip.assetID] != nil, width(of: length) > 16 {
-                    volumeEditor(for: sound.clip, item: item)
-                        .frame(height: soundRowHeight - 14)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
-            }
-            .overlay(alignment: .leading) {
-                EdgeHandle(edge: .leading, help: "Drag to trim the start") { dx in
-                    updateBlockDrag(item, kind: .start, points: dx, start: sound.start, duration: sound.duration)
-                } onEnd: { endBlockDrag() }
-            }
-            .overlay(alignment: .trailing) {
-                EdgeHandle(edge: .trailing, help: "Drag to trim the end") { dx in
-                    updateBlockDrag(item, kind: .end, points: dx, start: sound.start, duration: sound.duration)
-                } onEnd: { endBlockDrag() }
-            }
-            .frame(width: max(width(of: length) - 2, 6), height: soundRowHeight)
-            .contentShape(Rectangle())
-            .offset(x: x(for: start) + 1, y: CGFloat(row) * (soundRowHeight + 2))
-            .zIndex(blockDrag?.item == item ? 1 : 0)
-            .gesture(clickTap { _, modifiers in
-                if modifiers.isDisjoint(with: [.command, .shift]) { model.selectSound(sound.id) } else { model.click(item, modifiers: modifiers) }
-            })
-            .gesture(DragGesture(minimumDistance: 3)
-                .onChanged { value in updateBlockDrag(item, kind: .move, points: value.translation.width, start: sound.start, duration: sound.duration) }
-                .onEnded { _ in endBlockDrag() })
-            .contextMenu {
-                Button("Split at Playhead") {
-                    model.selection = item
-                    model.splitAtPlayhead()
-                }
-                Button("Start at Playhead") { model.moveSound(sound.id, to: model.currentTime) }
-                Divider()
-                deleteButton(for: item, single: "Delete")
-            }
-            .help("\(sound.isVoiceOver ? "Voice-over" : "Sound"): \(name). Drag to move, drag an edge to trim.")
-            .accessibilityElement(children: .combine)
-            .accessibilityLabel("\(sound.isVoiceOver ? "Voice-over" : "Sound"): \(name)")
-            .accessibilityAddTraits(isSelected ? .isSelected : [])
-    }
-
-    /// The volume line over a clip's or sound's waveform.
-    private func volumeEditor(for clip: Clip, item: TimelineItem) -> some View {
-        VolumeLineEditor(
-            clip: clip,
-            pointsPerSecond: pointsPerSecond,
-            showsHandles: model.isSelected(item),
-            onSelect: { model.selection = item },
-            onVolume: { model.setClipVolume(clip.id, $0) },
-            onAddPoint: { model.addVolumePoint(to: clip.id, atOffset: $0) },
-            onPointLevel: { model.setVolumePoint($0, of: clip.id, level: $1) },
-            onRemovePoint: { model.removeVolumePoint($0, of: clip.id) },
-            onFade: { model.setFade($0, to: $1, for: [clip.id]) }
-        )
-    }
-
-    // MARK: Captions, music, pauses
-
-    /// The captions, under the clips they belong to. Click one to go there and fix its words; drag
-    /// its left or right edge to change when it comes and goes.
-    private var captionLane: some View {
-        ZStack(alignment: .topLeading) {
-            ForEach(model.captionPages) { page in
-                let isCurrent = model.currentCaption?.id == page.id
-                let range = shownRange(of: page)
-                Text(page.plainText)
-                    .font(.caption2.weight(.medium))
-                    .lineLimit(1)
-                    .padding(.horizontal, 5)
-                    .frame(width: max(width(of: range.duration) - 2, 3), height: captionLaneHeight, alignment: .leading)
-                    .background(
-                        Color.orange.opacity(isCurrent ? 0.55 : 0.3),
-                        in: RoundedRectangle(cornerRadius: 4)
-                    )
-                    .overlay(alignment: .leading) {
-                        if page.source == .sound {
-                            // Heard in a voice-over: a small mark so it reads apart from the clip's own.
-                            Rectangle().fill(.primary.opacity(0.5)).frame(width: 2).padding(.vertical, 4)
-                        }
-                    }
-                    .clipped()
-                    .overlay { captionEdges(page) }
-                    .offset(x: x(for: range.start) + 1)
-                    .onTapGesture {
-                        model.pause()
-                        model.seek(to: page.firstFrame)
-                        model.sidebar = .captions
-                        model.focusedCaptionID = page.id
-                    }
-                    .help(page.text + "\nDrag an edge to change when it shows")
-            }
-        }
-        .opacity(model.project.captions.isVisible ? 1 : 0.4)
-    }
-
-    /// Where a caption is drawn: where it is, or where its edge is being dragged to.
-    private func shownRange(of page: CaptionPage) -> CMTimeRange {
-        guard let drag = captionEdgeDrag, drag.pageID == page.id else { return page.range }
-        switch drag.edge {
-        case .start: return CMTimeRange(start: min(drag.time, page.range.end - .oneFrame), end: page.range.end)
-        case .end: return CMTimeRange(start: page.range.start, end: max(drag.time, page.range.start + .oneFrame))
-        }
-    }
-
-    private func captionEdges(_ page: CaptionPage) -> some View {
-        HStack(spacing: 0) {
-            captionEdgeHandle(page, .start)
-            Spacer(minLength: 0)
-            captionEdgeHandle(page, .end)
-        }
-    }
-
-    private func captionEdgeHandle(_ page: CaptionPage, _ edge: CaptionEdge) -> some View {
-        Rectangle()
-            .fill(Color.primary.opacity(captionEdgeDrag?.pageID == page.id && captionEdgeDrag?.edge == edge ? 0.6 : 0.001))
-            .frame(width: 6)
-            .contentShape(Rectangle())
-            .pointerStyle(.frameResize(position: edge == .start ? .leading : .trailing))
-            .gesture(
-                DragGesture(minimumDistance: 2, coordinateSpace: .global)
-                    .onChanged { value in
-                        let base = edge == .start ? page.range.start : page.range.end
-                        let time = max(base + seconds(value.translation.width), .zero).snappedToFrame()
-                        captionEdgeDrag = (page.id, edge, time)
-                        model.pause()
-                        model.seek(to: time)
-                    }
-                    .onEnded { _ in
-                        if let drag = captionEdgeDrag { model.moveCaptionEdge(page, drag.edge, to: drag.time) }
-                        captionEdgeDrag = nil
-                    }
-            )
-            .help(edge == .start ? "Drag to change when this caption starts" : "Drag to change when this caption ends")
-    }
-
-    /// The song, under everything else, with a line showing its volume (it dips where people talk).
-    @ViewBuilder
-    private var musicLane: some View {
-        if let range = model.project.musicRange, let song = model.musicAsset {
-            let width = max(width(of: range.duration) - 2, 6)
-            let isSelected = model.isSelected(.music)
-            let shift = musicDrag ?? .zero
-            RoundedRectangle(cornerRadius: 4)
-                .fill(Color.green.opacity(isSelected ? 0.45 : 0.25))
-                .overlay {
-                    VolumeLine(points: model.musicEnvelope, origin: range.start, fullVolume: model.project.music?.volume ?? 1, pointsPerSecond: pointsPerSecond)
-                        .stroke(Color.primary.opacity(0.75), lineWidth: 1.5)
-                        .padding(.top, 14)
-                        .padding(.bottom, 3)
-                }
-                .overlay {
-                    if model.project.music?.showsBeats == true {
-                        BeatMarks(beats: model.project.timelineBeats, origin: range.start, pointsPerSecond: pointsPerSecond)
-                            .allowsHitTesting(false)
-                    }
-                }
-                .overlay(alignment: .topLeading) {
-                    Label(song.name, systemImage: "music.note")
-                        .font(.caption2.weight(.medium))
-                        .lineLimit(1)
-                        .padding(.horizontal, 4)
-                        .padding(.top, 1)
-                }
-                .clipShape(RoundedRectangle(cornerRadius: 4))
-                .overlay {
-                    RoundedRectangle(cornerRadius: 4)
-                        .strokeBorder(isSelected ? Color.yellow : Color.green.opacity(0.8), lineWidth: isSelected ? 2 : 1)
-                }
-                .frame(width: width, height: musicLaneHeight)
-                .contentShape(Rectangle())
-                .offset(x: x(for: range.start + shift) + 1)
-                .gesture(clickTap { _, modifiers in model.click(.music, modifiers: modifiers) })
-                .gesture(DragGesture(minimumDistance: 3)
-                    .onChanged { value in
-                        model.pause()
-                        if !model.isSelected(.music) { model.selection = .music }
-                        var start = max(.zero, range.start + seconds(value.translation.width))
-                        snapLine = nil
-                        if let stuck = model.snapped(start) {
-                            start = stuck
-                            snapLine = stuck
-                        }
-                        start = min(start, max(.zero, model.duration - CMTime(value: 1, timescale: 1)))
-                        musicDrag = (start - range.start).snappedToFrame()
-                    }
-                    .onEnded { _ in
-                        if let drag = musicDrag, drag != .zero { model.setMusicTimelineStart(range.start + drag) }
-                        musicDrag = nil
-                        snapLine = nil
-                    })
-                .contextMenu {
-                    deleteButton(for: .music, single: "Remove Music")
-                }
-                .help("Music: \(song.name). The line shows its volume; it dips while people talk. Drag it to start the music later.")
-                .accessibilityElement(children: .combine)
-                .accessibilityLabel("Music: \(song.name)")
-                .accessibilityAddTraits(isSelected ? .isSelected : [])
-        } else if !model.project.timeline.clips.isEmpty {
-            Button("Add Music…", systemImage: "music.note") { MusicImportPanel.run(model: model) }
-                .buttonStyle(.borderless)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .frame(height: musicLaneHeight)
-                .offset(x: leadingInset + 4)
-                .help("Add a song to play under your Short. You can also drop a sound file here.")
-        }
-    }
-
-    /// While choosing pauses to remove: the parts that would be cut, over the clips.
-    @ViewBuilder
-    private var pauseCuts: some View {
-        if let cuts = model.silenceSession?.plan.timelineCuts {
-            ZStack(alignment: .topLeading) {
-                ForEach(Array(cuts.enumerated()), id: \.offset) { _, cut in
-                    Rectangle()
-                        .fill(Color.red.opacity(0.45))
-                        .overlay(Rectangle().strokeBorder(Color.red, lineWidth: 1))
-                        .frame(width: max(width(of: cut.duration), 1), height: trackHeight)
-                        .offset(x: x(for: cut.start))
-                }
-            }
-            .allowsHitTesting(false)
-            .accessibilityHidden(true)
-        }
-    }
-}
-
-// MARK: - Pieces
-
-/// A volume curve drawn across the music: full height is the music's chosen volume, so the dips
-/// under speech and the fades are easy to see.
-private nonisolated struct VolumeLine: Shape {
-    let points: [VolumePoint]
-    /// The timeline time at the left edge of the shape.
-    var origin: CMTime = .zero
-    let fullVolume: Double
-    let pointsPerSecond: CGFloat
-
-    func path(in rect: CGRect) -> Path {
-        Path { path in
-            for (index, point) in points.enumerated() {
-                let location = CGPoint(
-                    x: rect.minX + CGFloat((point.time - origin).seconds) * pointsPerSecond,
-                    y: rect.maxY - rect.height * CGFloat(fullVolume > 0 ? min(point.volume / fullVolume, 1) : 0)
-                )
-                if index == 0 { path.move(to: location) } else { path.addLine(to: location) }
-            }
-        }
-    }
-}
-
-/// The music's beats: a short tick on each, a taller one where a bar begins, along its bottom.
-private struct BeatMarks: View {
-    let beats: [TimelineBeat]
-    let origin: CMTime
-    let pointsPerSecond: CGFloat
-
-    var body: some View {
-        Canvas { context, size in
-            var small = Path(), tall = Path()
-            for beat in beats {
-                let x = CGFloat((beat.time - origin).seconds) * pointsPerSecond
-                guard x >= 0, x <= size.width else { continue }
-                if beat.isBarStart {
-                    tall.move(to: CGPoint(x: x, y: size.height * 0.35))
-                    tall.addLine(to: CGPoint(x: x, y: size.height))
-                } else {
-                    small.move(to: CGPoint(x: x, y: size.height * 0.7))
-                    small.addLine(to: CGPoint(x: x, y: size.height))
-                }
-            }
-            context.stroke(small, with: .color(.primary.opacity(0.55)), lineWidth: 1)
-            context.stroke(tall, with: .color(.primary.opacity(0.9)), lineWidth: 1.5)
-        }
-        .accessibilityHidden(true)
-    }
-}
-
-/// A grip on the left or right edge of a block, for trimming it.
-private struct EdgeHandle: View {
-    let edge: HorizontalEdge
-    let help: String
-    let onChange: (CGFloat) -> Void
-    let onEnd: () -> Void
-
-    var body: some View {
-        Rectangle()
-            .fill(Color.white.opacity(0.001))
-            .frame(width: 8)
-            .overlay {
-                Capsule().fill(Color.white.opacity(0.7)).frame(width: 3, height: 16)
-            }
-            .frame(maxHeight: .infinity)
-            .contentShape(Rectangle())
-            .pointerStyle(.frameResize(position: edge == .leading ? .leading : .trailing))
-            .gesture(DragGesture(minimumDistance: 1, coordinateSpace: .global)
-                .onChanged { onChange($0.translation.width) }
-                .onEnded { _ in onEnd() })
-            .help(help)
-    }
-}
-
-/// Stills along a clip, one after another at the clip's own shape.
-private struct FilmstripView: View {
-    let filmstrip: Filmstrip?
-    let sourceStart: CMTime
-    let pointsPerSecond: CGFloat
-    let aspect: CGFloat
-
-    var body: some View {
-        Canvas { context, size in
-            guard let filmstrip else { return }
-            let tile = max(size.height * aspect, 12)
-            var x: CGFloat = 0
-            while x < size.width {
-                let time = sourceStart + CMTime(seconds: Double((x + tile / 2) / pointsPerSecond), preferredTimescale: 600)
-                if let image = filmstrip.image(at: time) {
-                    context.draw(Image(decorative: image, scale: 1), in: CGRect(x: x, y: 0, width: tile, height: size.height))
-                }
-                x += tile
-            }
-        }
-    }
-}
-
-/// The sound of a clip as bars, from its file's measured loudness.
-private struct WaveformView: View {
-    let levels: AudioLevels
-    let sourceStart: CMTime
-    let pointsPerSecond: CGFloat
-    /// Where the sound is loud enough to crackle (offsets from the left edge, in timeline time):
-    /// those bars are drawn red, full height, with a dark top edge.
-    var tooLoud: [CMTimeRange] = []
-
-    var body: some View {
-        Canvas { context, size in
-            let framesPerPoint = Double(Project.frameRate) / Double(pointsPerSecond)
-            let first = sourceStart.seconds * Double(Project.frameRate)
-            var path = Path()
-            var loud = Path()
-            let loudX = tooLoud.map { (CGFloat($0.start.seconds) * pointsPerSecond, CGFloat($0.end.seconds) * pointsPerSecond) }
-            var x: CGFloat = 0
-            while x < size.width {
-                let from = Int(first + Double(x) * framesPerPoint)
-                let to = max(from + 1, Int(first + Double(x + 2) * framesPerPoint))
-                guard from < levels.decibels.count else { break }
-                let loudest = levels.decibels[max(from, 0)..<min(to, levels.decibels.count)].max() ?? AudioLevels.silence
-                let height = CGFloat(min(max((loudest + 50) / 50, 0), 1)) * size.height
-                if loudX.contains(where: { x + 1 >= $0.0 && x < $0.1 }) {
-                    loud.addRect(CGRect(x: x, y: 0, width: 1.5, height: size.height))
-                } else if height > 0.5 {
-                    path.addRect(CGRect(x: x, y: size.height - height, width: 1.5, height: height))
-                }
-                x += 2
-            }
-            context.fill(path, with: .color(.white.opacity(0.75)))
-            context.fill(loud, with: .color(.red))
-        }
-    }
-}
-
-/// One title on the timeline, with a handle on the right edge for changing its length.
-private struct TitleBlock: View {
-    let title: TextOverlay
-    let isSelected: Bool
-    let isAfterEnd: Bool
-    let onResize: (CGFloat) -> Void
-    let onResizeEnd: () -> Void
-
-    var body: some View {
-        RoundedRectangle(cornerRadius: 4)
-            .fill(Color.purple.opacity(isSelected ? 0.6 : 0.35))
-            .overlay(alignment: .leading) {
-                Label(title.text.replacingOccurrences(of: "\n", with: " "), systemImage: title.isSticker ? "face.smiling" : title.track != nil ? "scope" : "textformat")
-                    .font(.caption2.weight(.medium))
-                    .lineLimit(1)
-                    .padding(.horizontal, 4)
-                    .padding(.trailing, 6)
-            }
-            .clipShape(RoundedRectangle(cornerRadius: 4))
-            .overlay {
-                RoundedRectangle(cornerRadius: 4)
-                    .strokeBorder(isSelected ? Color.yellow : Color.purple.opacity(0.8), lineWidth: isSelected ? 2 : 1)
-            }
-            .overlay(alignment: .trailing) {
-                EdgeHandle(edge: .trailing, help: "Drag to change how long the title stays", onChange: onResize, onEnd: onResizeEnd)
-            }
-            .opacity(isAfterEnd ? 0.4 : 1)
-            .contentShape(Rectangle())
-            .help(isAfterEnd ? "After the end of your Short, so it won't be seen" : title.text)
-            .accessibilityElement(children: .combine)
-            .accessibilityLabel("Title: \(title.text)")
-            .accessibilityAddTraits(isSelected ? .isSelected : [])
-    }
-}
-
-/// A video or picture over the clips (B-roll), on its own row.
-private struct OverlayBlock: View {
-    let overlay: Overlay
-    let name: String
-    let aspect: CGFloat
-    let filmstrip: Filmstrip?
-    let pointsPerSecond: CGFloat
-    let sourceStart: CMTime
-    let isSelected: Bool
-    let isAfterEnd: Bool
-
-    var body: some View {
-        RoundedRectangle(cornerRadius: 5)
-            .fill(Color.teal.opacity(0.35))
-            .overlay {
-                FilmstripView(filmstrip: filmstrip, sourceStart: sourceStart, pointsPerSecond: pointsPerSecond / CGFloat(overlay.clip.averageSpeed), aspect: aspect)
-                    .opacity(0.75)
-            }
-            .overlay(alignment: .topLeading) {
-                HStack(spacing: 3) {
-                    Image(systemName: "rectangle.on.rectangle")
-                    Text(name).lineLimit(1)
-                    if overlay.clip.isMuted { Image(systemName: "speaker.slash.fill").help("No sound") }
-                    if overlay.clip.hasMotion { Image(systemName: "move.3d").help("Moves") }
-                    if overlay.clip.placement.opacity < 1 || overlay.clip.hasPictureFades {
-                        Image(systemName: "circle.lefthalf.striped.horizontal").help("See-through, or fades in or out")
-                    }
-                }
-                .font(.caption2.weight(.medium))
-                .padding(.horizontal, 4)
-                .padding(.vertical, 1)
-                .background(.black.opacity(0.45), in: RoundedRectangle(cornerRadius: 3))
-                .padding(3)
-            }
-            .clipShape(RoundedRectangle(cornerRadius: 5))
-            .overlay {
-                RoundedRectangle(cornerRadius: 5)
-                    .strokeBorder(isSelected ? Color.yellow : Color.teal.opacity(0.9), lineWidth: isSelected ? 2 : 1)
-            }
-            .opacity(isAfterEnd ? 0.4 : 1)
-            .contentShape(Rectangle())
-            .help(isAfterEnd ? "After the end of your Short, so it won't be seen"
-                  : "Over the clips: \(name). Drag to move, drag an edge to trim.")
-            .accessibilityElement(children: .combine)
-            .accessibilityLabel("Over the clips: \(name)")
-            .accessibilityAddTraits(isSelected ? .isSelected : [])
-    }
-}
-
-/// A clip on the main storyline: stills along it, its sound, and what has been done to it.
-private struct ClipBlock: View, Equatable {
-    let clip: Clip
-    let name: String
-    let aspect: CGFloat
-    let filmstrip: Filmstrip?
-    let levels: AudioLevels?
-    /// Where the sound may crackle, as offsets into the clip.
-    let tooLoud: [CMTimeRange]
-    let pointsPerSecond: CGFloat
-    let isSelected: Bool
-    /// Plays a backwards copy of its file.
-    var isReversed = false
-    /// Being turned round: how far the backwards copy is.
-    var progress: Double?
-
-    nonisolated static func == (a: ClipBlock, b: ClipBlock) -> Bool {
-        a.clip == b.clip && a.isReversed == b.isReversed && a.progress == b.progress && a.name == b.name && a.tooLoud == b.tooLoud && a.aspect == b.aspect && a.pointsPerSecond == b.pointsPerSecond
-            && a.isSelected == b.isSelected && a.levels?.decibels.count == b.levels?.decibels.count
-            && a.filmstrip?.images.count == b.filmstrip?.images.count
-    }
-
-    static let waveHeight: CGFloat = 24
-    private var waveHeight: CGFloat { Self.waveHeight }
-
-    var body: some View {
-        RoundedRectangle(cornerRadius: 6)
-            .fill(Color.accentColor.opacity(0.25))
-            .overlay(alignment: .top) {
-                // A freeze frame shows its one picture all along.
-                FilmstripView(filmstrip: filmstrip, sourceStart: clip.sourceStart, pointsPerSecond: clip.isFrozen ? 1_000_000 : pointsPerSecond / CGFloat(clip.averageSpeed), aspect: aspect)
-                    .padding(.bottom, levels == nil ? 0 : waveHeight)
-                    .opacity(0.85)
-            }
-            .overlay(alignment: .bottom) {
-                if levels != nil, clip.isFrozen {
-                    Label("Freeze frame", systemImage: "snowflake")
-                        .font(.caption2)
-                        .frame(maxWidth: .infinity, maxHeight: waveHeight, alignment: .leading)
-                        .padding(.leading, 4)
-                        .background(Color.black.opacity(0.35))
-                } else if let levels, clip.soundDetached {
-                    Label("Sound detached", systemImage: "waveform.path")
-                        .font(.caption2)
-                        .frame(maxWidth: .infinity, maxHeight: waveHeight, alignment: .leading)
-                        .padding(.leading, 4)
-                        .background(Color.black.opacity(0.35))
-                        .opacity(levels.decibels.isEmpty ? 0 : 0.8)
-                } else if let levels {
-                    WaveformView(levels: levels, sourceStart: clip.sourceStart, pointsPerSecond: pointsPerSecond / CGFloat(clip.averageSpeed), tooLoud: tooLoud)
-                        .frame(height: waveHeight - 2)
-                        .padding(.bottom, 1)
-                        .background(Color.black.opacity(0.35))
-                        .opacity(clip.isMuted ? 0.3 : 1)
-                }
-            }
-            .overlay(alignment: .bottomLeading) {
-                // Keyframes: where the picture's motion changes.
-                ForEach(clip.visibleKeyframes) { keyframe in
-                    Image(systemName: "diamond.fill")
-                        .font(.system(size: 8))
-                        .foregroundStyle(.yellow)
-                        .shadow(color: .black, radius: 1)
-                        .offset(x: CGFloat(clip.timelineOffset(ofSourceTime: keyframe.time).seconds) * pointsPerSecond - 4, y: -waveHeight - 1)
-                }
-            }
-            .overlay(alignment: .topLeading) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(name).font(.caption.weight(.medium)).lineLimit(1)
-                    HStack(spacing: 4) {
-                        Text(TimeFormat.string(clip.duration))
-                        if clip.soundDetached {
-                            // Its sound settings live on the detached sound now.
-                        } else if clip.isMuted {
-                            Image(systemName: "speaker.slash.fill").help("Muted")
-                        } else if clip.volume != 1 {
-                            Text("\(Int((clip.volume * 100).rounded()))%").help("Volume")
-                        }
-                        if clip.speed != 1 {
-                            Text("\(clip.speed.formatted(.number.precision(.fractionLength(0...2))))×").help("Speed")
-                        }
-                        if let curve = clip.speedCurve {
-                            Label(curve.shape.displayName, systemImage: "speedometer").help("Speed curve: \(curve.shape.displayName)")
-                        }
-                        if clip.animationIn != nil || clip.animationOut != nil {
-                            Image(systemName: "sparkles").help("Comes in or goes out with an animation")
-                        }
-                        if !clip.effects.isEmpty {
-                            Label("\(clip.effects.count)", systemImage: "wand.and.stars")
-                                .help("Effects: " + clip.effects.map(\.kind.displayName).joined(separator: ", "))
-                        }
-                        if clip.isFrozen {
-                            Image(systemName: "snowflake").help("Freeze frame")
-                        }
-                        if isReversed {
-                            Image(systemName: "backward.fill").help("Plays backwards")
-                        }
-                        if clip.cleansVoice {
-                            Image(systemName: "waveform.badge.magnifyingglass").help("Voice cleaned up")
-                        }
-                        if let effect = clip.voiceEffect, !clip.soundDetached {
-                            Image(systemName: effect.systemImage).help("Voice effect: \(effect.displayName)")
-                        }
-                        if !tooLoud.isEmpty, !clip.isMuted {
-                            Image(systemName: "exclamationmark.triangle.fill").help("Too loud in places: it may crackle")
-                        }
-                        if let filter = clip.look.filter, filter.strength > 0 {
-                            Image(systemName: "camera.filters").help("Filter: \(filter.filter.displayName)")
-                        } else if !clip.look.color.isNeutral {
-                            Image(systemName: "paintpalette").help("Colour changed")
-                        }
-                        if clip.steadiness > 0 {
-                            Image(systemName: "hand.raised.slash").help("Steadied")
-                        }
-                        if clip.cutout.removeBackground != nil {
-                            Image(systemName: "person.and.background.dotted").help("Background removed")
-                        } else if clip.cutout.key != nil {
-                            Image(systemName: "person.crop.square.filled.and.at.rectangle").help("Green screen taken away")
-                        }
-                        if let mask = clip.cutout.mask {
-                            Image(systemName: mask.shape.systemImage).help("Shape: \(mask.shape.displayName)")
-                        }
-                        if clip.hasMotion {
-                            Image(systemName: "move.3d").help("The picture moves")
-                        } else if clip.placement.scale != 1 {
-                            Image(systemName: "plus.magnifyingglass").help("Zoomed to \(Int((clip.placement.scale * 100).rounded()))%")
-                        }
-                    }
-                    .font(.caption2)
-                }
-                .padding(.horizontal, 4)
-                .padding(.vertical, 2)
-                .background(.black.opacity(0.45), in: RoundedRectangle(cornerRadius: 4))
-                .padding(4)
-            }
-            .overlay(alignment: .bottom) {
-                if let progress {
-                    ProgressView(value: progress)
-                        .progressViewStyle(.linear)
-                        .padding(.horizontal, 6)
-                        .padding(.bottom, waveHeight + 4)
-                        .help("Turning the clip round…")
-                }
-            }
-            .clipShape(RoundedRectangle(cornerRadius: 6))
-            .overlay {
-                RoundedRectangle(cornerRadius: 6)
-                    .strokeBorder(isSelected ? Color.yellow : Color.accentColor.opacity(0.6), lineWidth: isSelected ? 2 : 1)
-            }
-            .padding(.horizontal, 1)
-            .contentShape(Rectangle())
-            .help("\(name). Drag to move it, drag an edge to trim.")
-            .accessibilityElement(children: .combine)
-            .accessibilityAddTraits(isSelected ? .isSelected : [])
-            .accessibilityValue(clip.isMuted ? "Muted" : "")
-    }
-}
-
-/// Files dragged over the main clips: tells where they are (for the landing marker) and hands
-/// over the files when dropped.
-private struct ClipRowDrop: DropDelegate {
-    let onUpdate: (CGFloat?) -> Void
-    let onDrop: ([URL], CGFloat) -> Void
-
-    func validateDrop(info: DropInfo) -> Bool { info.hasItemsConforming(to: [.fileURL]) }
-
-    func dropUpdated(info: DropInfo) -> DropProposal? {
-        onUpdate(info.location.x)
-        return DropProposal(operation: .copy)
-    }
-
-    func dropExited(info: DropInfo) { onUpdate(nil) }
-
-    func performDrop(info: DropInfo) -> Bool {
-        let providers = info.itemProviders(for: [.fileURL])
-        let x = info.location.x
-        onUpdate(nil)
-        Task { @MainActor in
-            var urls: [URL] = []
-            for provider in providers {
-                if let url = await Self.url(from: provider) { urls.append(url) }
-            }
-            onDrop(urls, x)
-        }
-        return true
-    }
-
-    private static func url(from provider: NSItemProvider) async -> URL? {
-        await withCheckedContinuation { continuation in
-            _ = provider.loadObject(ofClass: URL.self) { url, _ in continuation.resume(returning: url) }
-        }
-    }
-}
-
-/// A one-time hint across the top of the timeline.
-private struct TipBanner: View {
-    let tip: EditorTip
-    let dismiss: () -> Void
-
-    var body: some View {
-        HStack(spacing: 10) {
-            Image(systemName: tip.systemImage).font(.title3)
-            Text(tip.text).fixedSize(horizontal: false, vertical: true)
-            Button("Got It", action: dismiss).controlSize(.small)
-        }
-        .font(.callout)
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .frame(maxWidth: 620)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 10))
-        .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(Color.white.opacity(0.3), lineWidth: 1))
-        .shadow(radius: 8)
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("Tip: \(tip.text)")
     }
 }

@@ -206,7 +206,31 @@ public extension AudioMix {
     /// The volume of the main clips' sound over the whole storyline. Where a clip continues the
     /// same recording at another volume (a range had its volume changed), the sound moves to it
     /// over `Clip.continuityFade` instead of jumping.
-    static func storylineEnvelope(_ clips: [Clip]) -> [VolumePoint] {
+    ///
+    /// Across each of `crossfades` the clip going out fades to half by the cut and the clip coming
+    /// in rises from half after it; the other half of each is heard on a track of its own.
+    static func storylineEnvelope(_ clips: [Clip], crossfades: [SoundCrossfade] = []) -> [VolumePoint] {
+        var points = plainStorylineEnvelope(clips)
+        for fade in crossfades {
+            let range = fade.span.range
+            guard let out = clips.first(where: { $0.id == fade.span.from }), let into = clips.first(where: { $0.id == fade.span.to }) else { continue }
+            let before = points.filter { $0.time <= range.start }
+            let after = points.filter { $0.time >= range.end }
+            var middle: [VolumePoint] = []
+            if before.last?.time != range.start {
+                middle.append(VolumePoint(time: range.start, volume: out.soundLevel(atOffset: out.duration - fade.span.half)))
+            }
+            middle.append(VolumePoint(time: fade.span.cut, volume: fade.outgoingLevel * 0.5))
+            middle.append(VolumePoint(time: fade.span.cut, volume: fade.incomingLevel * 0.5))
+            if after.first?.time != range.end {
+                middle.append(VolumePoint(time: range.end, volume: into.soundLevel(atOffset: fade.span.half)))
+            }
+            points = before + middle + after
+        }
+        return points
+    }
+
+    private static func plainStorylineEnvelope(_ clips: [Clip]) -> [VolumePoint] {
         var points: [VolumePoint] = []
         var start = CMTime.zero
         var previous: Clip?
@@ -288,5 +312,47 @@ public extension Project {
         guard let index = timeline.index(of: clipID), timeline.clips[index].soundDetached else { return }
         sounds.removeAll { $0.detachedFrom == clipID }
         timeline.clips[index].soundDetached = false
+    }
+}
+
+/// The sound across a transition: both clips are heard, the old one fading out as the new one
+/// fades in. The old clip's sound goes on past the cut and the new one's starts before it, from
+/// more of their files (like the picture), on a track of their own.
+public struct SoundCrossfade: Equatable, Sendable {
+    public let span: TransitionSpan
+    /// The part of the incoming clip's file heard in the half before the cut.
+    public let incomingSource: CMTimeRange
+    /// The part of the outgoing clip's file heard in the half after the cut.
+    public let outgoingSource: CMTimeRange
+    /// How loud each clip plays where it meets the cut (volume, line), before the crossfade.
+    public let incomingLevel: Double
+    public let outgoingLevel: Double
+}
+
+public extension Project {
+    /// The transitions whose sound crossfades. Only where both clips play their own sound at an
+    /// even speed, without a fade of their own at the cut, and their files have the sound to
+    /// borrow; elsewhere the sound simply cuts.
+    var soundCrossfades: [SoundCrossfade] {
+        let clips = timeline.clips
+        return timeline.transitionSpans.compactMap { span in
+            guard let out = clips.first(where: { $0.id == span.from }), let into = clips.first(where: { $0.id == span.to }),
+                  let outgoing = borrowedSound(of: out, afterEnd: true, half: span.half),
+                  let incoming = borrowedSound(of: into, afterEnd: false, half: span.half) else { return nil }
+            return SoundCrossfade(span: span, incomingSource: incoming, outgoingSource: outgoing,
+                                  incomingLevel: into.soundLevel(atOffset: .zero), outgoingLevel: out.soundLevel(atOffset: out.duration))
+        }
+    }
+
+    /// The `half` of `clip`'s file just after its end or just before its start, if it has sound there.
+    private func borrowedSound(of clip: Clip, afterEnd: Bool, half: CMTime) -> CMTimeRange? {
+        guard let media = asset(id: clip.assetID), media.hasAudio, !media.isImage, !clip.isFrozen, !clip.soundDetached,
+              clip.speedCurve == nil, clip.effectiveVolume > 0,
+              (afterEnd ? clip.heardFades.out : clip.heardFades.in) == .zero else { return nil }
+        let length = CMTimeMultiplyByFloat64(half, multiplier: clip.speed)
+        let range = afterEnd ? CMTimeRange(start: clip.sourceRange.end, duration: length)
+                             : CMTimeRange(start: clip.sourceStart - length, duration: length)
+        guard range.start >= .zero, range.end <= media.duration else { return nil }
+        return range
     }
 }

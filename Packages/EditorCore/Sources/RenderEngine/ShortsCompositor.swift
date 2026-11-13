@@ -1,4 +1,5 @@
 @preconcurrency import AVFoundation
+import os
 import CoreImage
 import EditorCore
 import ImageIO
@@ -162,6 +163,9 @@ nonisolated final class ShortsCompositor: NSObject, AVVideoCompositing, Sendable
     func renderContextChanged(_ newRenderContext: AVVideoCompositionRenderContext) {}
 
     func startRequest(_ request: AVAsynchronousVideoCompositionRequest) {
+        // Shows up in Instruments (Points of Interest), one interval per drawn frame.
+        let signpost = Signposts.render.beginInterval("Frame")
+        defer { Signposts.render.endInterval("Frame", signpost) }
         guard let instruction = request.videoCompositionInstruction as? ShortsInstruction,
               let output = request.renderContext.newPixelBuffer()
         else {
