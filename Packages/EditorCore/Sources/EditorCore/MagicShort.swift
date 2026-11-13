@@ -38,6 +38,12 @@ public struct MagicOptions: Equatable, Sendable {
     public var showsCaptions = true
     public var addsHookTitle = true
     public var addsMusic = true
+    /// Finds the best moments when cutting to a length (else the start is kept).
+    public var findsBestMoments = true
+    /// The sentences to keep, by their first word: worked out before (see `Project.magicSentences`).
+    public var keptSentences: Set<Word.ID>?
+    /// Whether the language model picked them.
+    public var momentsByModel = false
 
     public init(style: ShortStyle = .bold, length: MagicLength = .keepAll) {
         self.style = style
@@ -56,6 +62,11 @@ public struct MagicReport: Equatable, Sendable {
     public var hookTitleID: TextOverlay.ID?
     /// The hook title still says "Your hook here": no speech to take it from.
     public var hookNeedsText = false
+    /// How many sentences were kept, out of how many, when the best moments were picked.
+    public var keptSentences: Int?
+    public var sentencesSaid: Int?
+    /// Whether the language model picked them (else the rules did).
+    public var momentsByModel = false
 
     public init() {}
 }
@@ -111,23 +122,14 @@ public extension Project {
         let speaking = speakingAssets
         report.hasSpeech = hasCaptions
 
-        if options.removesFillers, report.hasSpeech {
-            let fillers = Set(fillerAndRepeatedWords())
-            report.removedFillers = fillers.count
-            if !fillers.isEmpty { apply(cutPlan(removing: fillers)) }
-        }
+        cleanUpForMagic(options, levels: levels, report: &report)
+        report.momentsByModel = options.momentsByModel
 
-        if options.removesPauses {
-            // Only where someone talks: in quiet footage, every moment is a "pause".
-            let speechLevels = levels.filter { speaking.contains($0.key) }
-            if !speechLevels.isEmpty {
-                var settings = SilenceSettings()
-                let main = timeline.clips.filter { speaking.contains($0.assetID) }.max { $0.duration < $1.duration }?.assetID
-                if let main, let mainLevels = speechLevels[main] { settings.threshold = mainLevels.suggestedThreshold.rounded() }
-                let plan = SilencePlan.make(for: self, levels: speechLevels, settings: settings)
-                report.removedPauses = plan.timelineCuts.count
-                apply(plan)
-            }
+        if let kept = options.keptSentences {
+            let before = spokenSentences.count
+            keepSentences(startingWith: kept)
+            report.keptSentences = spokenSentences.count
+            report.sentencesSaid = before
         }
 
         if timeline.clips.count > 1 { shortenQuietClips(speaking: speaking) }
@@ -155,6 +157,43 @@ public extension Project {
         makeLoopFriendlyEnding()
         report.removedTime = max(startLength - duration, .zero)
         return report
+    }
+
+    /// The sentences Magic Short will choose from: said after filler words and pauses are cut,
+    /// as `makeMagic` cuts them. Empty when nothing needs choosing (it already fits, or no speech).
+    func magicSentences(_ options: MagicOptions, levels: [MediaAsset.ID: AudioLevels]) -> [SpokenSentence] {
+        guard options.findsBestMoments, options.length != .keepAll, hasCaptions else { return [] }
+        var trial = self
+        var report = MagicReport()
+        trial.cleanUpForMagic(options, levels: levels, report: &report)
+        guard trial.duration > options.length.target else { return [] }
+        return trial.spokenSentences
+    }
+
+    /// Filler words and pauses out (the first part of Magic Short).
+    mutating func cleanUpForMagic(_ options: MagicOptions, levels: [MediaAsset.ID: AudioLevels], report: inout MagicReport) {
+        let speaking = speakingAssets
+        let hasSpeech = hasCaptions
+
+        if options.removesFillers, hasSpeech {
+            let fillers = Set(fillerAndRepeatedWords())
+            report.removedFillers = fillers.count
+            if !fillers.isEmpty { apply(cutPlan(removing: fillers)) }
+        }
+
+        if options.removesPauses {
+            // Only where someone talks: in quiet footage, every moment is a "pause".
+            let speechLevels = levels.filter { speaking.contains($0.key) }
+            if !speechLevels.isEmpty {
+                var settings = SilenceSettings()
+                let main = timeline.clips.filter { speaking.contains($0.assetID) }.max { $0.duration < $1.duration }?.assetID
+                if let main, let mainLevels = speechLevels[main] { settings.threshold = mainLevels.suggestedThreshold.rounded() }
+                let plan = SilencePlan.make(for: self, levels: speechLevels, settings: settings)
+                report.removedPauses = plan.timelineCuts.count
+                apply(plan)
+            }
+        }
+
     }
 
     /// Cuts clips nobody talks in down to `MagicShort.quietClipLength`, keeping their middle.

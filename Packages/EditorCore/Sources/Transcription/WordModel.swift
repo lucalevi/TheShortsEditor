@@ -53,7 +53,54 @@ public enum WordModel {
         return all
     }
 
-    private static func instructions(language: CaptionLanguage?) -> String {
+    /// Reads what is said, sentence by sentence, and picks the ones that make the best Short of
+    /// at most `target` seconds (indexes into `sentences`, in order, tidied by `MomentPicker`).
+    /// A long talk is read in pieces, each asked for its share. Nil when nothing usable came back.
+    public static func bestMoments(_ sentences: [SpokenSentence], target: Double, language: CaptionLanguage?) async throws -> [Int]? {
+        let total = sentences.reduce(0) { $0 + $1.seconds }
+        guard total > 0 else { return nil }
+        var picks: [Int] = []
+        var start = 0
+        while start < sentences.count {
+            // About 900 words a piece, well inside what the model reads at once.
+            var end = start, words = 0
+            while end < sentences.count, words + sentences[end].wordCount <= 900 || end == start {
+                words += sentences[end].wordCount
+                end += 1
+            }
+            try _Concurrency.Task.checkCancellation()
+            let piece = Array(sentences[start..<end])
+            let pieceSeconds = piece.reduce(0) { $0 + $1.seconds }
+            let share = max(target * pieceSeconds / total, min(target, 8))
+            let listed = piece.enumerated().map { index, sentence in
+                "[\(index + 1)] (\(Int(sentence.seconds.rounded())) s) \(sentence.text)"
+            }.joined(separator: "\n")
+            let session = LanguageModelSession(instructions: instructions(language: language, unit: "sentences"))
+            let prompt = """
+            Pick the sentences that make the best Short of at most \(Int(share)) seconds in total: \
+            an opening that makes people stay, the most interesting, surprising, funny or useful part, \
+            and a clear ending. Leave out greetings, small talk and repeats. Keep the story making sense.
+            """ + "\n\n" + listed
+            let answer = try await session.respond(to: prompt, generating: MomentAnswer.self, options: GenerationOptions(temperature: 0.2)).content
+            picks += answer.sentences.map { start + $0 - 1 }
+            start = end
+        }
+        return MomentPicker.tidy(picks, in: sentences, target: target)
+    }
+
+    private static func instructions(language: CaptionLanguage?, unit: String = "words") -> String {
+        if unit == "sentences" {
+            let spoken = language.map { " The speaker talks in \(Locale(identifier: "en").localizedString(forLanguageCode: $0.rawValue) ?? $0.rawValue)." } ?? ""
+            return """
+            You help cut a long video into a short vertical video (a YouTube Short).\(spoken) \
+            You get what is said as numbered sentences with how long each takes, like "[1] (4 s) Hello everyone." \
+            Answer only with sentence numbers from the list.
+            """
+        }
+        return instructionsForWords(language: language)
+    }
+
+    private static func instructionsForWords(language: CaptionLanguage?) -> String {
         let spoken = language.map { " The speaker talks in \(Locale(identifier: "en").localizedString(forLanguageCode: $0.rawValue) ?? $0.rawValue)." } ?? ""
         return """
         You help make captions for a short vertical video (a YouTube Short).\(spoken) \
@@ -72,6 +119,12 @@ public enum WordModel {
             "Pick a few words that call for an emoji and the emoji to show with them, at most one every ten words, only where the emoji clearly matches the word's meaning."
         }
     }
+}
+
+@Generable
+struct MomentAnswer {
+    @Guide(description: "Numbers of the sentences to keep, in order")
+    var sentences: [Int]
 }
 
 @Generable

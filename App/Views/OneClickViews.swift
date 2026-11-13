@@ -206,6 +206,9 @@ struct MagicShortSheet: View {
                 toggle("Cut filler words (um, eh) and repeats", \.removesFillers)
                 toggle("Cut the pauses between sentences", \.removesPauses)
                 toggle("Captions of what is said", \.showsCaptions)
+                if session.options.length != .keepAll {
+                    toggle("Keep the best moments, not just the start", \.findsBestMoments)
+                }
                 toggle("A hook title from the first sentence", \.addsHookTitle)
                 toggle("\(session.options.style.music.displayName) music, made by the app (free to use)", \.addsMusic)
                 Text("Clips with nobody talking are cut to their middle 4 seconds. The end comes right after the last word, so the Short loops back to the start cleanly.")
@@ -295,6 +298,9 @@ struct MagicShortSheet: View {
             lines.append("Cut \(cuts.joined(separator: " and ")), \(String(format: "%.1f", report.removedTime.seconds)) s in all")
         } else if report.removedTime > .zero {
             lines.append("Made \(String(format: "%.1f", report.removedTime.seconds)) s shorter")
+        }
+        if let kept = report.keptSentences, let said = report.sentencesSaid {
+            lines.append("Kept the best \(kept) of \(said) sentences, \(report.momentsByModel ? "picked by Apple Intelligence" : "the liveliest run")")
         }
         if model.project.captions.isVisible, report.hasSpeech { lines.append("Captions in the \(model.project.style?.displayName ?? "") style") }
         if let id = report.hookTitleID, !report.hookNeedsText, let title = model.project.title(id: id) { lines.append("Hook title: “\(title.text)”") }

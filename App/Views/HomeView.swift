@@ -27,6 +27,8 @@ struct HomeView: View {
                                   help: "Choose clips and get a first cut: pauses out, captions, a hook title and music") { model.newMagicShort() }
                         StartTile(title: "Storyboard", systemImage: "list.bullet.rectangle.portrait",
                                   help: "Start from a shot list that tells you what to film (how-to, review, top 3…)") { model.choosesStoryboard = true }
+                        StartTile(title: "Template", systemImage: "square.grid.3x3.square",
+                                  help: "Choose clips and get a Short cut on the beat, with text and transitions (montage, top 5, recipe…)") { model.choosesTemplate = true }
                     }
                     if model.shorts.isEmpty {
                         Text("Start an empty Short, let Magic Short make a first cut from your clips, or follow a storyboard. Your Shorts will appear here. Each one is saved as you edit it, so you can come back to it any time.")

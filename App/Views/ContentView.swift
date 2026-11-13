@@ -35,6 +35,12 @@ struct ContentView: View {
         .sheet(isPresented: $model.choosesStoryboard) {
             StoryboardChooser(model: model)
         }
+        .sheet(isPresented: $model.choosesTemplate) {
+            TemplateChooser(model: model)
+        }
+        .sheet(isPresented: Binding(get: { model.coverDraft != nil }, set: { if !$0 { model.coverDraft = nil } })) {
+            if let cover = model.coverDraft { CoverSheet(model: model, cover: cover) }
+        }
         .sheet(item: $model.speechRequest) { request in
             SpeechSheet(model: model, request: request)
         }

@@ -95,8 +95,8 @@ struct SidebarView: View {
             if let board = model.project.storyboard {
                 Button { model.sidebar = .storyboard } label: {
                     HStack(spacing: 6) {
-                        Image(systemName: board.kind.systemImage)
-                        Text("Shot List: \(board.kind.displayName)").fontWeight(model.sidebar == .storyboard ? .bold : .regular)
+                        Image(systemName: board.template?.systemImage ?? board.kind.systemImage)
+                        Text("Shot List: \(board.name)").fontWeight(model.sidebar == .storyboard ? .bold : .regular)
                         Spacer(minLength: 0)
                         if model.sidebar == .storyboard { Image(systemName: "checkmark") }
                     }

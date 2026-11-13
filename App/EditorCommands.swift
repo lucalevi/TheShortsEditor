@@ -13,6 +13,7 @@ struct EditorCommands: Commands {
             Button("New Magic Short…") { model.newMagicShort() }
                 .keyboardShortcut("n", modifiers: [.command, .option])
             Button("New Short from Storyboard…") { model.choosesStoryboard = true }
+            Button("New Short from Template…") { model.choosesTemplate = true }
             Button("Open…") { model.openProjectPanel() }
                 .keyboardShortcut("o")
             Button("All Shorts") { model.showHome() }
@@ -38,6 +39,8 @@ struct EditorCommands: Commands {
                 .keyboardShortcut("s")
                 .disabled(model.screen == .home)
             Button("Save a Copy…") { model.saveCopy() }
+            Button("Cover…") { model.beginCover() }
+                .disabled(model.screen == .home || model.project.timeline.clips.isEmpty)
                 .keyboardShortcut("s", modifiers: [.command, .shift])
                 .disabled(model.screen == .home || model.project.assets.isEmpty)
             Divider()

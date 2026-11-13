@@ -16,7 +16,9 @@ Stages 1–7 are done, tested on screen, committed and pushed to https://github.
 | 6 | Audio: clip volume, music with ducking, loudness on export | 2026-11-09 |
 | 7 | Save/open projects, autosave, missing media | 2026-11-09 |
 
-**Pick up here (2026-11-13, latest):** Stage K (cut-outs) is built, tested, checked on screen, committed and pushed. Next: Stage L (templates and finding moments). "My Short 17" now also has `greenscreen-sample` as its last main clip (Main subject removed, heart shape, yellow behind) and as B-roll at 0:07.8 (green screen, Lighten). `Tools/uitest/.samples/greenscreen-sample.mp4` was added (also in `make-samples.sh`).
+**Pick up here (2026-11-13, latest):** Stage L (templates and finding moments) is built, tested, checked on screen, committed and pushed. With it, the whole CapCut list (G–L) is done; next: ask the user. Test Shorts "My Short 18" (Top 5 template from the samples, cover "My top apps") and "My Short 19" (Magic Short of `long-talk-sample.mp4` to 30 s: 5 of 18 sentences picked by Apple Intelligence) are in the library (safe to delete). `Tools/uitest/.samples/long-talk-sample.mp4` (44 s of talk) was added, also in `make-samples.sh`.
+
+**Before that (2026-11-13):** Stage K (cut-outs) is built, tested, checked on screen, committed and pushed (9261f84). "My Short 17" now also has `greenscreen-sample` as its last main clip (Main subject removed, heart shape, yellow behind) and as B-roll at 0:07.8 (green screen, Lighten). `Tools/uitest/.samples/greenscreen-sample.mp4` was added (also in `make-samples.sh`).
 
 **Before that (2026-11-13):** Stage J (effects) is built, tested, checked on screen, committed and pushed (2098287). "My Short 17" now also has a Glitch effect on its first clip.
 
@@ -28,7 +30,19 @@ Stages 1–7 are done, tested on screen, committed and pushed to https://github.
 
 **Before that (2026-11-12):** CapCut was researched (`research/capcut/README.md`); next is Stage G (captions), see "CapCut list: stages G–L" below. **Before that (2026-11-11):** Stage F of the iMovie list ("One-click Shorts", `research/imovie/imovie-reverse-engineering.md`) is built, tested, checked on screen and committed. With it, every stage of the iMovie list (A–F) is done. Stage E is committed (5e708e6); its Photos tab is still unchecked on screen. Next: ask the user (see "What's next"). Test footage and a closed scratch iMovie library are in `~/Movies/ShortsEditorResearch` (safe to delete). Test Shorts "My Short 5"–"My Short 12" are in the library (safe to delete); "My Short 12" has a look, Stabilize, two markers and a slid clip from the on-screen checks.
 
-### Stage K: cut-outs (2026-11-13): done, committed
+### Stage L: templates and finding moments (2026-11-13): done, committed
+
+Model in `EditorCore/Templates.swift`, `Moments.swift`, `Cover.swift`; `Shot` gained `transition`/`entrance`/`fitsExactly` and `Storyboard` a `template` (all optional in the file); `MagicShort.swift` split into `cleanUpForMagic` + the rest, with `MagicOptions.findsBestMoments/keptSentences`; `Project.cover` (`TemplateTests`, `CoverTests`: 15). `Transcription.WordModel.bestMoments`; `ProjectPoster.cover` and the poster uses the cover (`CoverRenderTests`: 1). App: `App/EditorModel+Templates.swift`, `App/Views/TemplateViews.swift`; Home tile **Template**, File ▸ New Short from Template…, File ▸ Cover…, "Make a Cover…" in the Export sheet, Magic Short toggle and report line.
+1. **Templates** (Home ▸ Template, File ▸ New Short from Template…): Quick Montage, Top 5, Before and After, Travel Diary, Recipe, Product Reveal. The chooser lists each shot with its length, text and whether it comes in with a transition. **Choose Clips…** (up to one per shot, fewer are used again from a different part when long enough) makes a new Short in one step: every shot exactly a whole number of beats of the style's music (cuts within half a frame of the beat, the whole a number of bars so app music ends on a bar), its text for the whole shot, transitions, an entrance on the first shot, the style and its music. A clip too short for its shot is slowed down to fill it (to 0.25× at most). It is a storyboard, so the Shots panel ("Shot List: Top 5") swaps any shot and the new clip takes the same length and transition.
+2. **Magic Short finds the best moments**: with "About 30 seconds"/"About 1 minute" and speech, "Keep the best moments, not just the start" (on by default) splits what is said into sentences (after fillers and pauses are cut), asks Apple's on-device model for the sentences that make the best Short (read in ~900-word pieces), tidies the answer (in order, fits the length) and cuts the rest, sentence by sentence. Without Apple Intelligence, the liveliest run of sentences that fits (questions, exclamations, numbers, long words, pace). The report says "Kept the best 5 of 18 sentences, picked by Apple Intelligence".
+3. **Cover** (File ▸ Cover…, or "Make a Cover…" in the Export sheet): pick the moment (slider or Use Playhead), big text in the Short's style (starts with the hook title), its place, captions on or off; live preview. **Keep** stores it with the Short (the All Shorts picture becomes the cover), **Save Cover…** writes a 1080×1920 JPEG.
+4. Fixes found on screen: the Shots panel header said the storyboard kind ("Story Time") for templates; the Top 5 hint was cut off; the montage text said "15 seconds" for a 16 s Short.
+
+Tests: 422 model + 131 render + 3 transcription = 556, all pass.
+Verified on screen: the Template tile and chooser, Top 5 filled from 7 sample files (24.4 s, #5…#1 titles, Bold, Upbeat music, Shot List: Top 5), the cover sheet (Use Playhead, typing text, live preview, Keep) and the cover as the All Shorts picture, Magic Short of a 44 s talk to 30 s (greeting, set-up chatter, weather and lunch dropped; 18.4 s), "Make a Cover…" from the Export sheet.
+Not yet verified on screen: hearing the cuts land on the beat while playing (tested in the model), the other five templates, swapping a template shot in the Shots panel (tested in the model), Save Cover… writing the JPEG through the save panel, Magic Short without Apple Intelligence (the rules; tested in the model), a long talk read in several pieces.
+
+### Stage K: cut-outs (2026-11-13): done, committed (9261f84)
 
 Model in `EditorCore/Cutouts.swift` (`CutoutSubject`, `ColorKey`, `ClipMask`, `BlendMode`, `ClipCutout` on `Clip.cutout`) plus `ClipBackground.color`/`Clip.backgroundColor`; settings kind `.cutout` ("Cut-out") for Copy/Paste/Reset Settings (`CutoutTests`: 9). `RenderEngine/CutoutRenderer.swift` (key, masks, blends) used in `ShortsCompositor`; `RenderEngine/CutoutMaker.swift` (`CutoutMaker`, `CutoutCache`) (`CutoutRenderTests`: 9). App: `App/EditorModel+Cutouts.swift`, `App/Views/CutoutViews.swift`, Picture section (Colour), Clip menu, timeline badges. New fields are optional in the file (no version bump).
 1. **Remove Background** (clip and B-roll inspector ▸ Cut-out; Clip ▸ Remove Background): Off / People (Vision person segmentation, accurate) / Main subject (Vision subject lifting). A see-through copy of the file is made once, in the background with a progress bar (≈0.1 s a frame: a 30 s clip takes about a minute), and kept in `Caches/Shorts Editor/Cut-outs` (HEVC with transparency, same frame times, at most 1920 px; a PNG for pictures). Until it is made the clip shows its whole picture. Edges are smoothed a little from frame to frame. A cut-out main clip shows black or its colour behind it; cut-out B-roll shows the clips under it.
@@ -337,7 +351,8 @@ The P0 list from `research/shorts-editor-research.md` §5. Each stage ends with 
 13. ~~Stage H, text, stickers and voice~~ (done 2026-11-13, all of it, committed).
 14. ~~Stage J, effects~~ (done 2026-11-13, all of it, committed).
 15. ~~Stage K, cut-outs~~ (done 2026-11-13, all of it, committed).
-16. **Next:** Stage L, templates and finding moments.
+16. ~~Stage L, templates and finding moments~~ (done 2026-11-13, all of it, committed).
+17. **Next:** the CapCut list is done. Ask the user what comes next (see "Not yet verified on screen" in each stage, and the "Later" items in `research/capcut/capcut-reverse-engineering.md` §5).
 
 ## CapCut list: stages G–L (to do, decided 2026-11-12)
 
@@ -352,7 +367,7 @@ The P0 list from `research/shorts-editor-research.md` §5. Each stage ends with 
 | H | Text, stickers and voice | **done** 2026-11-13, committed |
 | J | Effects | **done** 2026-11-13, committed |
 | K | Cut-outs | **done** 2026-11-13, committed |
-| L | Templates and finding moments | **next** |
+| L | Templates and finding moments | **done** 2026-11-13, committed |
 
 ### Stage G: captions, the CapCut way
 Why first: the user asked for it, and their real CapCut Short ("Studiare per la vita", 14 s) is a voice-over with 14 captions typed by hand (CapCut's auto captions are Pro). We already have free on-device captions; G adds what's missing.
@@ -389,9 +404,9 @@ Why first: the user asked for it, and their real CapCut Short ("Studiare per la 
 - [x] Masks: line, circle, rectangle (feather, invert); canvas colour; blend modes for overlays (plus band, heart, star)
 
 ### Stage L: templates and finding moments
-- [ ] Templates = storyboards with fixed timings, text and transitions, cut on the beat ("Fill a template")
-- [ ] Magic Short picks the best 30/60 s from the transcript (Foundation Models) instead of keeping the start
-- [ ] Cover picker on export (frame + title, 1080×1920 JPEG)
+- [x] Templates = storyboards with fixed timings, text and transitions, cut on the beat ("Fill a template")
+- [x] Magic Short picks the best 30/60 s from the transcript (Foundation Models) instead of keeping the start
+- [x] Cover picker on export (frame + title, 1080×1920 JPEG)
 
 **Not taking** (decided): generative AI (video, images, avatars, lip sync, eye contact, relight, retouch, AI expand/remove), cloud agent, a store of trending assets, accounts/cloud, extra ratios/resolutions/codecs, several timelines, compound clips.
 

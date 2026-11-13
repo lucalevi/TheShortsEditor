@@ -32,6 +32,7 @@ struct ExportSheet: View {
                 }
                 .toggleStyle(.checkbox)
                 buttons {
+                    coverButton
                     Button("Cancel", role: .cancel) { model.endExport() }
                     Button("Export…") { chooseFile() }
                         .keyboardShortcut(.defaultAction)
@@ -48,6 +49,7 @@ struct ExportSheet: View {
                     .foregroundStyle(.green)
                     .frame(minHeight: 80)
                 buttons {
+                    coverButton
                     Button("Show in Finder") { NSWorkspace.shared.activateFileViewerSelecting([url]) }
                     Button("Done") { model.endExport() }
                         .keyboardShortcut(.defaultAction)
@@ -76,6 +78,15 @@ struct ExportSheet: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
+    }
+
+    /// Opens the cover sheet in place of this one.
+    private var coverButton: some View {
+        Button(model.project.cover == nil ? "Make a Cover…" : "Cover…") {
+            model.endExport()
+            model.beginCover()
+        }
+        .help("A frame of your Short with big text, to upload as its thumbnail")
     }
 
     private func buttons<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {

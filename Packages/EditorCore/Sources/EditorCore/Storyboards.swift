@@ -130,16 +130,27 @@ public struct Shot: Codable, Equatable, Sendable {
     /// Someone talking: the whole clip is kept, as cutting a sentence short would spoil it. Other
     /// shots are trimmed to their length.
     public var isTalking: Bool
+    /// How its clip changes into the next (templates).
+    public var transition: TransitionKind? = nil
+    /// How its clip comes in (templates).
+    public var entrance: MotionAnimation? = nil
+    /// The clip is made exactly this long, slowed down if it is shorter, and its title stays
+    /// for the whole shot (templates: the cuts fall on the beat).
+    public var fitsExactly = false
 
-    public init(name: String, direction: String, length: CMTime, title: String? = nil, isTalking: Bool = false) {
+    public init(name: String, direction: String, length: CMTime, title: String? = nil, isTalking: Bool = false,
+                transition: TransitionKind? = nil, entrance: MotionAnimation? = nil, fitsExactly: Bool = false) {
         self.name = name
         self.direction = direction
         self.length = length
         self.title = title
         self.isTalking = isTalking
+        self.transition = transition
+        self.entrance = entrance
+        self.fitsExactly = fitsExactly
     }
 
-    private enum CodingKeys: String, CodingKey { case name, direction, length, title, isTalking }
+    private enum CodingKeys: String, CodingKey { case name, direction, length, title, isTalking, transition, entrance, fitsExactly }
 
     public init(from decoder: any Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -148,6 +159,9 @@ public struct Shot: Codable, Equatable, Sendable {
         length = try c.decodeTime(forKey: .length)
         title = try c.decodeIfPresent(String.self, forKey: .title)
         isTalking = try c.decodeIfPresent(Bool.self, forKey: .isTalking) ?? false
+        transition = try? c.decodeIfPresent(TransitionKind.self, forKey: .transition)
+        entrance = try? c.decodeIfPresent(MotionAnimation.self, forKey: .entrance)
+        fitsExactly = try c.decodeIfPresent(Bool.self, forKey: .fitsExactly) ?? false
     }
 
     public func encode(to encoder: any Encoder) throws {
@@ -157,6 +171,9 @@ public struct Shot: Codable, Equatable, Sendable {
         try c.encode(time: length, forKey: .length)
         try c.encodeIfPresent(title, forKey: .title)
         try c.encode(isTalking, forKey: .isTalking)
+        try c.encodeIfPresent(transition, forKey: .transition)
+        try c.encodeIfPresent(entrance, forKey: .entrance)
+        if fitsExactly { try c.encode(fitsExactly, forKey: .fitsExactly) }
     }
 }
 
@@ -181,11 +198,16 @@ public struct Storyboard: Codable, Equatable, Sendable {
 
     public var kind: StoryboardKind
     public var slots: [Slot]
+    /// The template it was made from, when it was (see `Templates.swift`).
+    public var template: ShortTemplate? = nil
 
     public init(kind: StoryboardKind) {
         self.kind = kind
         slots = kind.shots.map { Slot(shot: $0) }
     }
+
+    /// Its name, to show.
+    public var name: String { template?.displayName ?? kind.displayName }
 
     /// The planned length of the whole Short.
     public var plannedLength: CMTime { slots.reduce(.zero) { $0 + $1.shot.length } }
@@ -231,6 +253,15 @@ public extension Project {
             let start = (clip.sourceStart + CMTimeMultiplyByRatio(max(spare, .zero), multiplier: 1, divisor: 2)).snappedToFrame()
             clip = clip.piece(id: clip.id, sourceStart: start, duration: wanted)
             clip.keyframes = []
+        } else if slot.shot.fitsExactly, !clip.isFrozen, clip.duration < wanted {
+            // Too short for its beat: slowed down to fill it (as far as slow motion goes).
+            let source = clip.sourceDuration
+            clip.speed = max(source.seconds / wanted.seconds, Clip.speedRange.lowerBound)
+            clip.duration = min(wanted, CMTime(seconds: source.seconds / clip.speed, preferredTimescale: 600).snappedToFrame())
+        }
+        if slot.shot.fitsExactly {
+            clip.transitionOut = slot.shot.transition.map { ClipTransition(kind: $0) }
+            clip.animationIn = slot.shot.entrance.map { ClipAnimation($0, duration: CMTime(value: 2, timescale: 5)) }
         }
 
         // Where it goes: in place of the shot's clip, else after the last filled shot before it,
@@ -254,8 +285,8 @@ public extension Project {
         if let oldTitle = slot.titleID { removeTitle(oldTitle) }
         board.slots[slotIndex].titleID = nil
         if let text = slot.shot.title, let range = timeline.range(of: clip.id) {
-            var title = TextOverlay(text: text, start: range.start,
-                                    duration: min(CMTime(value: 2, timescale: 1), range.duration).snappedToFrame())
+            let length = slot.shot.fitsExactly ? range.duration : min(CMTime(value: 2, timescale: 1), range.duration)
+            var title = TextOverlay(text: text, start: range.start, duration: length.snappedToFrame())
             if let style { title.takeLook(of: style) }
             titles.append(title)
             board.slots[slotIndex].titleID = title.id

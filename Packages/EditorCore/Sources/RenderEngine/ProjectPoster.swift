@@ -7,13 +7,14 @@ public enum ProjectPoster {
     /// When the poster is taken: a second in (past fades and the black first frame), or the
     /// middle of a shorter Short.
     public static func time(in project: Project) -> CMTime {
+        if let time = project.posterTime { return time }
         let duration = project.duration
         let second = CMTime(value: 1, timescale: 1)
         return duration > second + second ? second : CMTime(seconds: duration.seconds / 2, preferredTimescale: 600)
     }
 
     public static func image(of project: Project, maxSize: CGSize = CGSize(width: 360, height: 640)) async throws -> CGImage {
-        let built = try await CompositionBuilder.build(project)
+        let built = try await CompositionBuilder.build(project.cover.map(project.coverProject) ?? project)
         let generator = AVAssetImageGenerator(asset: built.composition)
         generator.videoComposition = built.videoComposition
         generator.maximumSize = maxSize
@@ -29,5 +30,11 @@ public enum ProjectPoster {
         generator.requestedTimeToleranceBefore = .zero
         generator.requestedTimeToleranceAfter = .zero
         return try await generator.image(at: time).image
+    }
+
+    /// The cover picture at full size (1080 × 1920): its frame with its text.
+    public static func cover(of project: Project, _ cover: ShortCover, maxSize: CGSize = Project.canvasSize) async throws -> CGImage {
+        let time = cover.time.clamped(.zero, max(.zero, project.duration - .oneFrame))
+        return try await frame(of: project.coverProject(cover), at: time, maxSize: maxSize)
     }
 }

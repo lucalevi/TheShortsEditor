@@ -20,4 +20,8 @@ ffmpeg -loglevel error -y -f lavfi -i "testsrc=size=1600x1200:rate=1" -frames:v 
 ffmpeg -loglevel error -y -f lavfi -i "rgbtestsrc=size=1080x1920:rate=1" -frames:v 1 $OUT/portrait-sample.png
 # A green screen with a moving patterned square in front, for Stage K (keying, Remove Background).
 ffmpeg -loglevel error -y -f lavfi -i "color=c=0x33BF4D:s=1080x1920:r=30:d=5" -f lavfi -i "testsrc2=size=500x700:rate=30:duration=5" -filter_complex "[0][1]overlay=x='200+150*sin(t*2)':y=600,format=yuv420p" -c:v h264_videotoolbox -allow_sw 1 -b:v 6M $OUT/greenscreen-sample.mp4
+# 44 s of talk with dull and lively sentences, for Magic Short's best moments (Stage L).
+say -v Samantha -o $OUT/long.aiff "Hi everyone, welcome back to the channel. So, today I want to talk about something. Let me just get set up here. Okay. Did you know that most people waste two hours a day on their phone without noticing? I tracked my screen time for 30 days and the results shocked me. On the first day, I spent five hours on social media. By the end of the month, I was down to forty minutes. The trick was simple: I moved every app off my home screen. Every time I wanted to scroll, I had to search for it, and that tiny pause was enough to stop me. Anyway, the weather has been nice lately. I also had pasta for lunch. If you want to try it, start tonight, and tell me in the comments how it goes. Thanks for watching, see you next time."
+ffmpeg -loglevel error -y -f lavfi -i "testsrc2=size=1080x1920:rate=30" -i $OUT/long.aiff -c:v h264_videotoolbox -allow_sw 1 -b:v 4M -c:a aac -shortest $OUT/long-talk-sample.mp4
+rm $OUT/long.aiff
 echo $OUT

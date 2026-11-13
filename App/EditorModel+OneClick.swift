@@ -157,9 +157,21 @@ extension EditorModel {
                 music = await styleMusic(options.style.music)
             }
             guard !Task.isCancelled, magic != nil else { return }
+            var options = options
+            let levels = audioLevels
+            // 4. Cut to a length: the best moments, not just the start.
+            var trial = project
+            trial.transcripts.merge(transcripts) { $1 }
+            if !trial.magicSentences(options, levels: levels).isEmpty {
+                show(WordModel.isAvailable(for: language) ? "Finding the best moments with Apple Intelligence…" : "Finding the best moments…")
+                if let moments = await bestMoments(in: trial, options: options, levels: levels, language: language) {
+                    options.keptSentences = moments.kept
+                    options.momentsByModel = moments.byModel
+                }
+            }
+            guard !Task.isCancelled, magic != nil else { return }
             show("Putting it together…")
             var report = MagicReport()
-            let levels = audioLevels
             isRestyling = true
             apply("Magic Short") { project in
                 project.transcripts.merge(transcripts) { $1 }

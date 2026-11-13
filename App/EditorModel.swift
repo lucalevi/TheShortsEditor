@@ -199,6 +199,10 @@ final class EditorModel {
     var magic: MagicSession?
     /// The storyboard chooser sheet is open.
     var choosesStoryboard = false
+    /// The template chooser sheet is open.
+    var choosesTemplate = false
+    /// The cover being made (the cover sheet is open while it is set).
+    var coverDraft: ShortCover?
     /// Words selected in the Script panel.
     var scriptSelection: Set<WordRef> = []
     @ObservationIgnored var effectPlayer: AVAudioPlayer?
