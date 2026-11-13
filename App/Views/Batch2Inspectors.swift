@@ -108,16 +108,33 @@ struct LayoutSection: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text("Layout").font(.subheadline.weight(.semibold))
-            Picker("Layout", selection: Binding(get: { overlay.layout }, set: { model.setLayout($0, for: overlay.id) })) {
-                ForEach(OverlayLayout.allCases) { Text($0.displayName).tag($0) }
+            Picker("Layout", selection: Binding(get: { overlay.layout.isSplit }, set: { split in
+                model.setLayout(split ? .top : .free, for: overlay.id)
+            })) {
+                Text("Over").tag(false)
+                Text("Split Screen").tag(true)
             }
             .pickerStyle(.segmented)
             .labelsHidden()
             Text(overlay.layout == .free ? "Over the clip below it. Or put it small in a corner:"
-                 : "Split screen: this clip fills one half, the clip below it the other.")
+                 : "This clip fills the part chosen below, the clip under it the rest. Two split clips at once can share the screen in three, like a top and a bottom third.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
+            if overlay.layout.isSplit {
+                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 4) {
+                    ForEach(OverlayLayout.splits) { layout in
+                        let isChosen = overlay.layout == layout
+                        Button { model.setLayout(layout, for: overlay.id) } label: {
+                            Label(layout.displayName, systemImage: isChosen ? "checkmark" : layout.symbolName)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                        .help("This clip in the \(layout.displayName.lowercased()) of the screen")
+                        .accessibilityAddTraits(isChosen ? .isSelected : [])
+                    }
+                }
+                .controlSize(.small)
+            }
             if overlay.layout == .free {
                 LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 4) {
                     ForEach(PictureCorner.allCases) { corner in
@@ -162,6 +179,15 @@ struct SoundInspector: View {
                     model.apply(on ? "Mark as Voice-Over" : "Mark as Sound Effect") { $0.updateSound(sound.id) { $0.isVoiceOver = on } }
                 }))
                 Text("The music is lowered under voice-overs, as under people talking in your clips.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            if sound.canLowerUnderSpeech {
+                Toggle("Lower while people talk", isOn: Binding(get: { sound.lowersUnderSpeech }, set: { on in
+                    model.apply(on ? "Lower Sound Under Speech" : "Keep Sound Level") { $0.updateSound(sound.id) { $0.lowersUnderSpeech = on } }
+                }))
+                Text("For a second song or background sound: it goes quieter whenever someone speaks, like the music.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -382,6 +408,19 @@ struct RangeInspector: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+}
+
+extension OverlayLayout {
+    /// A small picture of where the clip goes.
+    var symbolName: String {
+        switch self {
+        case .free: "rectangle"
+        case .top, .topThird: "rectangle.tophalf.filled"
+        case .bottom, .bottomThird: "rectangle.bottomhalf.filled"
+        case .left: "rectangle.lefthalf.filled"
+        case .right: "rectangle.righthalf.filled"
         }
     }
 }

@@ -1,5 +1,6 @@
 import CoreMedia
 import EditorCore
+import RenderEngine
 import SwiftUI
 
 /// Choosing how much of the pauses to cut, with the result marked on the timeline before anything changes.
@@ -36,7 +37,7 @@ struct SilencePanel: View {
         VStack(alignment: .leading, spacing: 4) {
             if plan.isEmpty {
                 Text("No pauses long enough to cut.").font(.headline)
-                Text("Try counting quieter sounds as pauses.").font(.caption).foregroundStyle(.secondary)
+                Text("Try a shorter pause, or counting softer sounds as pauses. With music or noise behind the voice, listen to the voice only.").font(.caption).foregroundStyle(.secondary)
             } else {
                 let count = plan.timelineCuts.count
                 Text("Cuts \(TimeFormat.string(plan.removedDuration)) in \(count) \(count == 1 ? "place" : "places")")
@@ -52,6 +53,22 @@ struct SilencePanel: View {
 
     private func controls(_ settings: SilenceSettings) -> some View {
         VStack(alignment: .leading, spacing: 14) {
+            if VoiceCleaner.isAvailable, let session = model.silenceSession {
+                VStack(alignment: .leading, spacing: 4) {
+                    Toggle("Listen to the voice only", isOn: Binding(
+                        get: { session.listensToVoiceOnly },
+                        set: { model.setPausesListenToVoiceOnly($0) }
+                    ))
+                    .disabled(session.separating != nil)
+                    if let fraction = session.separating {
+                        ProgressView(value: fraction) { Text("Separating the voice…").font(.caption) }
+                    }
+                    Text("For music or noise behind the voice: pauses are found in the voice alone, separated on this Mac (once per file).")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
             VStack(alignment: .leading, spacing: 4) {
                 Text("What counts as a pause").font(.subheadline.weight(.semibold))
                 Slider(value: Binding(
@@ -64,6 +81,29 @@ struct SilencePanel: View {
                 } maximumValueLabel: {
                     Text("Soft sounds").font(.caption)
                 }
+            }
+            VStack(alignment: .leading, spacing: 4) {
+                HStack {
+                    Text("Shortest pause to cut").font(.subheadline.weight(.semibold))
+                    Spacer()
+                    Text("\(settings.minimumPause.seconds.formatted(.number.precision(.fractionLength(1)))) s")
+                        .font(.caption)
+                        .monospacedDigit()
+                        .foregroundStyle(.secondary)
+                }
+                Slider(value: Binding(
+                    get: { settings.minimumPause.seconds },
+                    set: { var s = settings; s.minimumPause = CMTime(seconds: ($0 * 10).rounded() / 10, preferredTimescale: 600); model.updateSilenceSettings(s) }
+                ), in: SilenceSettings.minimumPauseRange.lowerBound.seconds ... SilenceSettings.minimumPauseRange.upperBound.seconds) {
+                    EmptyView()
+                } minimumValueLabel: {
+                    Text("Short").font(.caption)
+                } maximumValueLabel: {
+                    Text("Long").font(.caption)
+                }
+                Text("Shorter pauses are natural and stay.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
             VStack(alignment: .leading, spacing: 4) {
                 Text("Room around words").font(.subheadline.weight(.semibold))

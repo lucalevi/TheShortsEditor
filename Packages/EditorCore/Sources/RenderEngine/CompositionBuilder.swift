@@ -196,6 +196,9 @@ public enum CompositionBuilder {
         let audible = project.sounds.compactMap { sound in sound.audibleRange(in: project).map { (sound, $0) } }
         let soundRows = LanePacking.rows(audible.map { (id: $0.0.id, range: $0.1) })
         var soundTracks: [Int: (track: AVMutableCompositionTrack, parameters: AVMutableAudioMixInputParameters)] = [:]
+        // A second song is lowered under speech like the main one (speech is measured only when needed).
+        let lowersAny = audible.contains { $0.0.lowersUnderSpeech && $0.0.canLowerUnderSpeech }
+        let soundSpeech = lowersAny ? await speech(in: project) : []
         for (sound, range) in audible where sound.clip.effectiveVolume > 0 {
             guard let sourceAudio = try await media.audioTrack(for: sound.clip) else {
                 if project.asset(id: sound.clip.assetID) != nil { media.reportMissing(sound.clip.assetID) }
@@ -213,7 +216,11 @@ public enum CompositionBuilder {
             let at = sound.start + clip.timelineOffset(ofSourceTime: source.start)
             try target.track.insertTimeRange(source, of: sourceAudio, at: at)
             if clip.speed != 1 { target.track.scaleTimeRange(CMTimeRange(start: at, duration: source.duration), toDuration: clip.timelineDuration(ofSource: source.duration)) }
-            apply(sound.clip.soundEnvelope(), at: sound.start, gain: gain, to: target.parameters, within: range)
+            var envelope = sound.clip.soundEnvelope()
+            if sound.lowersUnderSpeech, sound.canLowerUnderSpeech {
+                envelope = AudioMix.lowered(envelope, startingAt: sound.start, speech: soundSpeech)
+            }
+            apply(envelope, at: sound.start, gain: gain, to: target.parameters, within: range)
         }
         mixInputs += soundTracks.values.map(\.parameters)
 
@@ -265,7 +272,8 @@ public enum CompositionBuilder {
                 inserted = true
             }
             if inserted {
-                envelope = AudioMix.musicEnvelope(for: project, speech: track.lowersUnderSpeech ? await speech(in: project) : [])
+                let musicSpeech = track.lowersUnderSpeech ? (lowersAny ? soundSpeech : await speech(in: project)) : []
+                envelope = AudioMix.musicEnvelope(for: project, speech: musicSpeech)
                 let parameters = AVMutableAudioMixInputParameters(track: musicTrack)
                 for (a, b) in zip(envelope, envelope.dropFirst()) where b.time > a.time {
                     parameters.setVolumeRamp(fromStartVolume: Float(a.volume * gain), toEndVolume: Float(b.volume * gain),

@@ -244,6 +244,66 @@ struct CaptionTranslationTests {
     }
 }
 
+struct SentenceTranslationTests {
+    /// Captions forced to start at the given word indices.
+    private func project(_ text: String, breaksAt breaks: Set<Int>, gapAfter: Int? = nil) -> Project {
+        var p = Project()
+        let a = asset("main")
+        p.addAsset(a)
+        p.appendClip(of: a.id)
+        var time = 0.0
+        let words = text.split(separator: " ").enumerated().map { index, word in
+            defer { time += index == gapAfter ? 2 : 0.4 }
+            return Word(text: String(word), start: seconds(time), duration: seconds(0.3), captionBreak: breaks.contains(index) ? .newCaption : .joined)
+        }
+        p.transcripts[a.id] = Transcript(language: .italian, words: words)
+        return p
+    }
+
+    @Test func captionsAreGroupedIntoSentences() {
+        let p = project("tipo il trucco più facile del mondo. ciao a tutti", breaksAt: [0, 3, 7])
+        let pages = CaptionLayout.pages(in: p)
+        #expect(pages.map(\.plainText) == ["tipo il trucco", "più facile del mondo.", "ciao a tutti"])
+        let groups = CaptionSentences.groups(pages)
+        #expect(groups.map { $0.count } == [2, 1])
+        #expect(p.sentencesNeedingTranslation().count == 2)
+    }
+
+    @Test func aPauseOrTooManyCaptionsEndASentence() {
+        let paused = project("uno due tre quattro", breaksAt: [0, 2], gapAfter: 1)
+        #expect(CaptionSentences.groups(CaptionLayout.pages(in: paused)).map { $0.count } == [1, 1])
+        let words = (0..<20).map { "w\($0)" }.joined(separator: " ")
+        let long = project(words, breaksAt: Set(0..<20))
+        #expect(CaptionSentences.groups(CaptionLayout.pages(in: long)).map { $0.count } == [8, 8, 4])
+    }
+
+    @Test func aSentenceTranslationIsSharedOutByLength() {
+        var p = project("tipo il trucco più facile del mondo.", breaksAt: [0, 3])
+        let sentence = p.sentencesNeedingTranslation()[0]
+        p.setTranslation("like the easiest trick in the world.", of: sentence)
+        let pages = CaptionLayout.pages(in: p)
+        #expect(pages.map(\.translation) == ["like the easiest", "trick in the world."])
+        #expect(p.sentencesNeedingTranslation().isEmpty)
+        // Editing one caption translates its whole sentence again.
+        p.replaceWords(pages[1].words.map(\.wordID), in: pages[1].assetID, with: "più bello del mondo.")
+        #expect(p.sentencesNeedingTranslation().first?.count == 2)
+    }
+
+    @Test func everyCaptionGetsSomethingAndNothingIsLost() {
+        let p = project("a b c d e f", breaksAt: [0, 1, 2, 5])
+        let pages = CaptionLayout.pages(in: p)
+        #expect(pages.count == 4)
+        let pieces = CaptionSentences.distribute("one two three four five", over: pages)
+        #expect(pieces.allSatisfy { !$0.isEmpty })
+        #expect(pieces.joined(separator: " ") == "one two three four five")
+        // Fewer words than captions: some stay empty, none is repeated.
+        #expect(CaptionSentences.distribute("hi there", over: pages).joined(separator: " ").split(separator: " ") == ["hi", "there"])
+        // Without spaces (Japanese), by characters.
+        #expect(CaptionSentences.distribute("世界で一番簡単", over: Array(pages.prefix(2))).joined() == "世界で一番簡単")
+        #expect(CaptionSentences.distribute("hello", over: Array(pages.prefix(1))) == ["hello"])
+    }
+}
+
 struct SRTTests {
     @Test func readsAnSRTFile() throws {
         let file = "\u{FEFF}1\r\n00:00:01,000 --> 00:00:02,500\r\nHello <i>there</i>\r\nfriend\r\n\r\n2\r\n00:00:03.2 --> 00:00:04,000 X1:0\r\nBye\r\n"

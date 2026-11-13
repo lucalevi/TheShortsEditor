@@ -12,7 +12,7 @@ struct InspectorView: View {
                         : model.timelineSelection.count > 1 ? "\(model.timelineSelection.count) Selected"
                         : model.selectedTitle != nil ? (model.selectedTitle?.isSticker == true ? "Sticker" : "Title")
                         : model.selectedOverlay != nil ? "Over the Clips"
-                        : model.selectedSound != nil ? (model.selectedSound!.isVoiceOver ? "Voice-Over" : model.selectedSound!.detachedFrom != nil ? "Clip Sound" : "Sound Effect")
+                        : model.selectedSound != nil ? (model.selectedSound!.isVoiceOver ? "Voice-Over" : model.selectedSound!.detachedFrom != nil ? "Clip Sound" : model.selectedSound!.lowersUnderSpeech ? "Song" : "Sound Effect")
                         : model.selection == .music && model.project.music != nil ? "Music"
                         : model.selectedClip == nil ? "Your Short" : "Clip")
             ScrollView {

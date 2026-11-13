@@ -40,7 +40,7 @@ struct MediaBrowserView: View {
             if assets.count == 1, let asset = assets.first, asset.hasAudio {
                 Button(asset.hasVideo ? "Use Its Sound as Music" : "Use as Music") { model.useAsMusic(asset.id) }
                 if !asset.hasVideo {
-                    Button("Add as Sound Effect at Playhead") { model.addSound(asset.id) }
+                    Button(asset.duration >= SoundClip.songLength ? "Add as Extra Song at Playhead" : "Add as Sound Effect at Playhead") { model.addSound(asset.id) }
                         .disabled(model.project.timeline.clips.isEmpty)
                 }
             }

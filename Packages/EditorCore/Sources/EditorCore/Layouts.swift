@@ -10,6 +10,14 @@ public enum OverlayLayout: String, Codable, CaseIterable, Identifiable, Sendable
     case top
     /// Split screen: it fills the bottom half, the main clip the top half.
     case bottom
+    /// Side by side: it fills the left half, the main clip the right half.
+    case left
+    /// Side by side: it fills the right half, the main clip the left half.
+    case right
+    /// It fills the top third (a face over gameplay), the main clip the rest.
+    case topThird
+    /// It fills the bottom third, the main clip the rest.
+    case bottomThird
 
     public var id: String { rawValue }
 
@@ -18,8 +26,34 @@ public enum OverlayLayout: String, Codable, CaseIterable, Identifiable, Sendable
         case .free: "Over"
         case .top: "Top Half"
         case .bottom: "Bottom Half"
+        case .left: "Left Half"
+        case .right: "Right Half"
+        case .topThird: "Top Third"
+        case .bottomThird: "Bottom Third"
         }
     }
+
+    /// The split layouts, in the order they are offered.
+    public static let splits: [OverlayLayout] = [.top, .bottom, .topThird, .bottomThird, .left, .right]
+
+    public var isSplit: Bool { self != .free }
+
+    /// The edge of the screen it takes, and how much of it.
+    var split: (edge: SplitEdge, fraction: CGFloat)? {
+        switch self {
+        case .free: nil
+        case .top: (.top, 1 / 2)
+        case .bottom: (.bottom, 1 / 2)
+        case .left: (.left, 1 / 2)
+        case .right: (.right, 1 / 2)
+        case .topThird: (.top, 1 / 3)
+        case .bottomThird: (.bottom, 1 / 3)
+        }
+    }
+}
+
+enum SplitEdge: CaseIterable {
+    case top, bottom, left, right
 }
 
 /// The corners a small picture (picture-in-picture) can go in, clear of YouTube's interface.
@@ -101,18 +135,37 @@ public struct ScreenRegions: Equatable, Sendable {
 }
 
 public extension Project {
-    /// Where the main clip and the B-roll on screen at `time` are drawn: the whole canvas, or the
-    /// halves of a split screen. The topmost B-roll with a split layout decides the split.
+    /// Where the main clip and the B-roll on screen at `time` are drawn: the whole canvas, or
+    /// the parts of a split screen. Each B-roll with a split layout takes its edge of the screen
+    /// (top and bottom strips across the whole width, left and right ones between them) and the
+    /// main clip gets the rest, so a top third and a bottom third leave it the middle. When two
+    /// want the same edge, or the main clip would keep less than a quarter, the topmost wins and
+    /// the other is drawn over everything.
     func regions(at time: CMTime) -> ScreenRegions {
-        let canvas = CGRect(origin: .zero, size: Project.canvasSize)
-        let top = CGRect(x: 0, y: 0, width: canvas.width, height: canvas.height / 2)
-        let bottom = CGRect(x: 0, y: canvas.height / 2, width: canvas.width, height: canvas.height / 2)
-        var regions = ScreenRegions(main: canvas, overlays: [:])
-        let onScreen = overlaysOnScreen(at: time)
-        if let splitting = onScreen.last(where: { $0.layout != .free }) {
-            regions.overlays[splitting.id] = splitting.layout == .top ? top : bottom
-            regions.main = splitting.layout == .top ? bottom : top
+        let size = Project.canvasSize
+        var regions = ScreenRegions(main: CGRect(origin: .zero, size: size), overlays: [:])
+        var claims: [SplitEdge: (id: Clip.ID, fraction: CGFloat)] = [:]
+        for overlay in overlaysOnScreen(at: time).reversed() {
+            guard let split = overlay.layout.split, claims[split.edge] == nil else { continue }
+            let opposite: SplitEdge = switch split.edge {
+            case .top: .bottom
+            case .bottom: .top
+            case .left: .right
+            case .right: .left
+            }
+            guard split.fraction + (claims[opposite]?.fraction ?? 0) <= 0.75 else { continue }
+            claims[split.edge] = (overlay.id, split.fraction)
         }
+        let top = (claims[.top]?.fraction ?? 0) * size.height
+        let bottom = (claims[.bottom]?.fraction ?? 0) * size.height
+        let left = (claims[.left]?.fraction ?? 0) * size.width
+        let right = (claims[.right]?.fraction ?? 0) * size.width
+        let middle = size.height - top - bottom
+        if let id = claims[.top]?.id { regions.overlays[id] = CGRect(x: 0, y: 0, width: size.width, height: top) }
+        if let id = claims[.bottom]?.id { regions.overlays[id] = CGRect(x: 0, y: size.height - bottom, width: size.width, height: bottom) }
+        if let id = claims[.left]?.id { regions.overlays[id] = CGRect(x: 0, y: top, width: left, height: middle) }
+        if let id = claims[.right]?.id { regions.overlays[id] = CGRect(x: size.width - right, y: top, width: right, height: middle) }
+        regions.main = CGRect(x: left, y: top, width: size.width - left - right, height: middle)
         return regions
     }
 }

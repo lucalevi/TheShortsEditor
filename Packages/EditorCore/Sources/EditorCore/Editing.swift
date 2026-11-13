@@ -357,8 +357,12 @@ public struct SoundClip: Identifiable, Codable, Equatable, Sendable {
     public var followsClip: Bool
     /// The main clip whose sound this is, when it was detached from it (`Project.detachSound(of:)`).
     public var detachedFrom: Clip.ID?
+    /// Turned down while someone talks, like the song: for a second song or a music bed.
+    public var lowersUnderSpeech: Bool
 
-    public init(clip: Clip, start: CMTime, isVoiceOver: Bool = false, followsClip: Bool = true, detachedFrom: Clip.ID? = nil) {
+    public init(clip: Clip, start: CMTime, isVoiceOver: Bool = false, followsClip: Bool = true, detachedFrom: Clip.ID? = nil,
+                lowersUnderSpeech: Bool = false) {
+        self.lowersUnderSpeech = lowersUnderSpeech
         self.clip = clip
         self.start = start
         self.isVoiceOver = isVoiceOver
@@ -377,7 +381,13 @@ public struct SoundClip: Identifiable, Codable, Equatable, Sendable {
         return audible.duration > .zero ? audible : nil
     }
 
-    private enum CodingKeys: String, CodingKey { case clip, start, isVoiceOver, followsClip, detachedFrom }
+    /// A sound file at least this long is taken for a song: it is lowered under speech when added.
+    public static let songLength = CMTime(value: 20, timescale: 1)
+
+    /// Whether it can be lowered under speech: not a voice-over or a clip's own sound (those are the speech).
+    public var canLowerUnderSpeech: Bool { !isVoiceOver && detachedFrom == nil }
+
+    private enum CodingKeys: String, CodingKey { case clip, start, isVoiceOver, followsClip, detachedFrom, lowersUnderSpeech }
 
     public init(from decoder: any Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -386,6 +396,7 @@ public struct SoundClip: Identifiable, Codable, Equatable, Sendable {
         isVoiceOver = try c.decodeIfPresent(Bool.self, forKey: .isVoiceOver) ?? false
         followsClip = try c.decodeIfPresent(Bool.self, forKey: .followsClip) ?? true
         detachedFrom = try c.decodeIfPresent(UUID.self, forKey: .detachedFrom)
+        lowersUnderSpeech = try c.decodeIfPresent(Bool.self, forKey: .lowersUnderSpeech) ?? false
     }
 
     public func encode(to encoder: any Encoder) throws {
@@ -395,6 +406,7 @@ public struct SoundClip: Identifiable, Codable, Equatable, Sendable {
         try c.encode(isVoiceOver, forKey: .isVoiceOver)
         try c.encode(followsClip, forKey: .followsClip)
         try c.encodeIfPresent(detachedFrom, forKey: .detachedFrom)
+        if lowersUnderSpeech { try c.encode(lowersUnderSpeech, forKey: .lowersUnderSpeech) }
     }
 }
 
@@ -411,7 +423,9 @@ public extension Project {
         let start = time.snappedToFrame().clamped(.zero, max(duration - .oneFrame, .zero))
         let length = max(min(asset.duration, max(duration - start, Clip.minimumDuration)), Clip.minimumDuration).snappedToFrame()
         let clip = Clip(assetID: assetID, sourceStart: .zero, duration: min(length, asset.duration.snappedToFrame()), framing: .fill)
-        sounds.append(SoundClip(clip: clip, start: start, isVoiceOver: isVoiceOver))
+        // A song (a long sound file) is lowered under speech like the main song; effects aren't.
+        let isSong = !isVoiceOver && !asset.hasVideo && asset.duration >= SoundClip.songLength
+        sounds.append(SoundClip(clip: clip, start: start, isVoiceOver: isVoiceOver, lowersUnderSpeech: isSong))
         return clip.id
     }
 
@@ -464,7 +478,8 @@ public extension Project {
         second.keepFades(isFirst: false, isLast: true)
         sounds[index].clip.duration = offset
         sounds[index].clip.keepFades(isFirst: true, isLast: false)
-        sounds.insert(SoundClip(clip: second, start: time, isVoiceOver: sound.isVoiceOver, followsClip: sound.followsClip, detachedFrom: sound.detachedFrom), at: index + 1)
+        sounds.insert(SoundClip(clip: second, start: time, isVoiceOver: sound.isVoiceOver, followsClip: sound.followsClip, detachedFrom: sound.detachedFrom,
+                                    lowersUnderSpeech: sound.lowersUnderSpeech), at: index + 1)
         return second.id
     }
 

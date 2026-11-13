@@ -29,14 +29,21 @@ public struct SilenceSettings: Equatable, Sendable {
     public var threshold: Float
     /// How much quiet to keep before and after speech, so words aren't clipped and it doesn't feel rushed.
     public var padding: CMTime
-    /// Shorter pauses are natural and stay.
+    /// Quiet shorter than this is a natural pause and stays.
     public var minimumPause: CMTime
 
-    public init(threshold: Float = -40, padding: CMTime = CMTime(value: 4, timescale: 30), minimumPause: CMTime = CMTime(value: 9, timescale: 30)) {
+    public init(threshold: Float = -40, padding: CMTime = CMTime(value: 4, timescale: 30),
+                minimumPause: CMTime = SilenceSettings.defaultMinimumPause) {
         self.threshold = threshold
         self.padding = padding
         self.minimumPause = minimumPause
     }
+
+    public static let defaultMinimumPause = CMTime(value: 1, timescale: 2)
+    /// The range the "Shortest pause" slider offers.
+    public static let minimumPauseRange = CMTime(value: 1, timescale: 5)...CMTime(value: 2, timescale: 1)
+    /// A cut shorter than this (after the room kept around words) is a jump for nothing.
+    public static let shortestCut = CMTime(value: 3, timescale: 30)
 }
 
 /// What removing pauses would cut, worked out before anything changes so it can be previewed.
@@ -60,6 +67,7 @@ public struct SilencePlan: Equatable, Sendable {
         let rate = Int64(Project.frameRate)
         let padding = Int64(settings.padding.convertScale(Project.frameRate, method: .roundHalfAwayFromZero).value)
         let minimum = max(Int64(settings.minimumPause.convertScale(Project.frameRate, method: .roundHalfAwayFromZero).value), 1)
+        let shortestCut = Int64(SilenceSettings.shortestCut.convertScale(Project.frameRate, method: .roundHalfAwayFromZero).value)
         func frame(_ time: CMTime, up: Bool) -> Int64 {
             time.convertScale(Project.frameRate, method: up ? .roundTowardPositiveInfinity : .roundTowardNegativeInfinity).value
         }
@@ -70,6 +78,7 @@ public struct SilencePlan: Equatable, Sendable {
         for clip in project.timeline.clips {
             defer { clipStart = clipStart + clip.duration }
             guard let audio = levels[clip.assetID] else { continue }
+            func isPause(_ index: Int64) -> Bool { isQuiet(audio, index, settings.threshold) }
             let first = frame(clip.sourceStart, up: true)
             let end = frame(clip.sourceRange.end, up: false)
             guard first < end else { continue }
@@ -77,14 +86,18 @@ public struct SilencePlan: Equatable, Sendable {
             var cuts: [CMTimeRange] = []
             var index = first
             while index < end {
-                guard isQuiet(audio, index, settings.threshold) else { index += 1; continue }
+                guard isPause(index) else { index += 1; continue }
                 var runEnd = index
-                while runEnd < end, isQuiet(audio, runEnd, settings.threshold) { runEnd += 1 }
-                let cutStart = index == first ? index : index + padding
-                let cutEnd = runEnd == end ? runEnd : runEnd - padding
+                while runEnd < end, isPause(runEnd) { runEnd += 1 }
+                // A pause just over the shortest keeps less room around it, so every pause at
+                // least `minimumPause` long is cut by at least `shortestCut`.
+                let padded = (index == first ? 0 : 1) + (runEnd == end ? 0 : 1)
+                let room = padded == 0 ? 0 : min(padding, max((runEnd - index - shortestCut) / Int64(padded), 0))
+                let cutStart = index == first ? index : index + room
+                let cutEnd = runEnd == end ? runEnd : runEnd - room
                 // Cutting the whole clip is never what's wanted; leave a clip that's all quiet alone.
                 let wholeClip = index == first && runEnd == end
-                if cutEnd - cutStart >= minimum, !wholeClip {
+                if runEnd - index >= minimum, cutEnd - cutStart >= shortestCut, !wholeClip {
                     cuts.append(CMTimeRange(start: CMTime(value: cutStart, timescale: Int32(rate)), end: CMTime(value: cutEnd, timescale: Int32(rate))))
                 }
                 index = runEnd

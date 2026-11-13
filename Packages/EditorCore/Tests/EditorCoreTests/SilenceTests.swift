@@ -34,9 +34,14 @@ struct SilenceTests {
     }
 
     @Test func shortPausesStay() {
-        let pattern = "#####......#####"  // 6 quiet frames; minus padding leaves 2 < 5.
+        let pattern = "#####....#####"  // 4 quiet frames, shorter than the 5-frame shortest pause.
         let p = project(pattern)
         #expect(SilencePlan.make(for: p, levels: [p.assets[0].id: levels(pattern)], settings: settings).isEmpty)
+        // 6 quiet frames are a pause: 1 frame of room each side instead of 2, so it is still cut.
+        let longer = "#####......#####"
+        let q = project(longer)
+        #expect(SilencePlan.make(for: q, levels: [q.assets[0].id: levels(longer)], settings: settings).timelineCuts
+                == [CMTimeRange(start: frames(6), end: frames(10))])
     }
 
     @Test func quietStartAndEndAreCutCompletely() {
@@ -71,7 +76,7 @@ struct SilenceTests {
         #expect(plan.timelineCuts == [
             CMTimeRange(start: frames(7), end: frames(10)),
             CMTimeRange(start: frames(10), end: frames(13)),
-        ].filter { $0.duration >= frames(5) })
+        ])
         p.apply(plan)
         #expect(p.duration == frames(25) - plan.removedDuration)
     }
@@ -93,6 +98,16 @@ struct SilenceTests {
         ])
         p.apply(SilencePlan.make(for: p, levels: [id: levels(pattern)], settings: settings))
         #expect(CaptionLayout.timelineWords(in: p).map(\.text) == ["hello", "world"])
+    }
+
+    @Test func theShortestPauseIsTheLengthOfTheQuiet() {
+        let pattern = "#####..........##########"   // 10 quiet frames
+        let p = project(pattern)
+        var longer = settings
+        longer.minimumPause = frames(11)
+        #expect(SilencePlan.make(for: p, levels: [p.assets[0].id: levels(pattern)], settings: longer).isEmpty)
+        longer.minimumPause = frames(10)
+        #expect(SilencePlan.make(for: p, levels: [p.assets[0].id: levels(pattern)], settings: longer).timelineCuts.count == 1)
     }
 
     @Test func suggestedThresholdSitsBetweenNoiseAndSpeech() {

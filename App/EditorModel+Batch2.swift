@@ -86,6 +86,7 @@ extension EditorModel {
     // MARK: Split screen and picture-in-picture
 
     func setLayout(_ layout: OverlayLayout, for overlayID: Clip.ID) {
+        guard project.overlay(id: overlayID)?.layout != layout else { return }
         apply(layout == .free ? "Full Screen" : "Split Screen") { project in
             project.updateOverlay(overlayID) { overlay in
                 overlay.layout = layout

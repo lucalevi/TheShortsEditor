@@ -160,21 +160,25 @@ extension EditorModel {
             isTranslating = false
             translationRequest = nil
         }
-        let pages = project.captionsNeedingTranslation()
-        guard !pages.isEmpty, let target = project.captions.translationLanguage else { return }
+        // Whole sentences, so a short caption is translated with the words around it.
+        let sentences = project.sentencesNeedingTranslation()
+        guard !sentences.isEmpty, let target = project.captions.translationLanguage else { return }
         isTranslating = true
         do {
             try await session.prepareTranslation()
-            let responses = try await session.translations(from: Self.translationRequests(pages.map { ($0.plainText, $0.words[0].wordID.uuidString) }))
-            let sources = Dictionary(pages.map { ($0.words[0].wordID, $0.plainText) }, uniquingKeysWith: { first, _ in first })
-            var translations: [Word.ID: CaptionTranslation] = [:]
+            let requests = sentences.map { ($0.map(\.plainText).joined(separator: " "), $0[0].words[0].wordID.uuidString) }
+            let responses = try await session.translations(from: Self.translationRequests(requests))
+            let byID = Dictionary(sentences.map { ($0[0].words[0].wordID, $0) }, uniquingKeysWith: { first, _ in first })
+            var translated: [(sentence: [CaptionPage], text: String)] = []
             for response in responses {
-                guard let id = response.clientIdentifier.flatMap(UUID.init(uuidString:)), let source = sources[id] else { continue }
-                translations[id] = CaptionTranslation(source: source, text: response.targetText)
+                guard let id = response.clientIdentifier.flatMap(UUID.init(uuidString:)), let sentence = byID[id] else { continue }
+                translated.append((sentence, response.targetText))
             }
             // Only if the user didn't pick another language meanwhile.
             guard project.captions.translationLanguage == target else { return }
-            apply("Translate Captions") { $0.setTranslations(translations) }
+            apply("Translate Captions") { project in
+                for (sentence, text) in translated { project.setTranslation(text, of: sentence) }
+            }
         } catch is CancellationError {
         } catch {
             alert = AlertMessage(title: "The captions couldn't be translated", message: error.localizedDescription)

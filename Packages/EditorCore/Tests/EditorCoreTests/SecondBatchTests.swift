@@ -316,6 +316,52 @@ struct LayoutTests {
         #expect(p.regions(at: seconds(0.5)).main.height == 1920)
     }
 
+    @Test func sideBySideAndThirds() throws {
+        var (p, _) = talking()
+        let broll = p.addAsset(video("broll.mov"))
+        let added = p.addOverlay(of: broll, at: seconds(1))
+        let id = try #require(added)
+        p.updateOverlay(id) { $0.layout = .left }
+        var regions = p.regions(at: seconds(2))
+        #expect(regions.overlays[id] == CGRect(x: 0, y: 0, width: 540, height: 1920))
+        #expect(regions.main == CGRect(x: 540, y: 0, width: 540, height: 1920))
+        p.updateOverlay(id) { $0.layout = .bottomThird }
+        regions = p.regions(at: seconds(2))
+        #expect(regions.overlays[id] == CGRect(x: 0, y: 1280, width: 1080, height: 640))
+        #expect(regions.main == CGRect(x: 0, y: 0, width: 1080, height: 1280))
+    }
+
+    @Test func twoSplitClipsShareTheScreenInThree() throws {
+        var (p, _) = talking()
+        let broll = p.addAsset(video("broll.mov"))
+        let one = p.addOverlay(of: broll, at: seconds(1)), two = p.addOverlay(of: broll, at: seconds(1))
+        let first = try #require(one), second = try #require(two)
+        p.updateOverlay(first) { $0.layout = .topThird }
+        p.updateOverlay(second) { $0.layout = .bottomThird }
+        var regions = p.regions(at: seconds(2))
+        #expect(regions.overlays[first] == CGRect(x: 0, y: 0, width: 1080, height: 640))
+        #expect(regions.overlays[second] == CGRect(x: 0, y: 1280, width: 1080, height: 640))
+        #expect(regions.main == CGRect(x: 0, y: 640, width: 1080, height: 640))
+        // A side strip sits between the top and bottom ones.
+        p.updateOverlay(second) { $0.layout = .right }
+        regions = p.regions(at: seconds(2))
+        #expect(regions.overlays[second] == CGRect(x: 540, y: 640, width: 540, height: 1280))
+        #expect(regions.main == CGRect(x: 0, y: 640, width: 540, height: 1280))
+        // Two halves on top of each other would leave nothing: the topmost wins, the other covers all.
+        p.updateOverlay(first) { $0.layout = .top }
+        p.updateOverlay(second) { $0.layout = .bottom }
+        regions = p.regions(at: seconds(2))
+        #expect(regions.overlays[second] == CGRect(x: 0, y: 960, width: 1080, height: 960))
+        #expect(regions.overlays[first] == nil)
+        #expect(regions.main == CGRect(x: 0, y: 0, width: 1080, height: 960))
+        // The same edge twice: the topmost.
+        p.updateOverlay(first) { $0.layout = .bottomThird }
+        #expect(p.regions(at: seconds(2)).overlays[first] == nil)
+        // Old files without the new layouts still read.
+        let back = try JSONDecoder().decode(Project.self, from: JSONEncoder().encode(p))
+        #expect(back.overlays.map(\.layout) == [.bottomThird, .bottom])
+    }
+
     @Test func pictureInPictureCornersStayClearOfYouTubesButtons() {
         for corner in PictureCorner.allCases {
             for size in [CGSize(width: 1080, height: 1920), CGSize(width: 1920, height: 1080)] {

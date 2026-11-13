@@ -143,6 +143,43 @@ struct MusicTests {
         #expect(curve.allSatisfy { $0.volume == BackgroundMusic.defaultVolume })
     }
 
+    @Test func aSongAddedAsASoundGoesDownUnderSpeech() {
+        var p = project()
+        let id = p.addSound(of: p.assets[1].id, at: t(2))!
+        #expect(p.sound(id: id)?.lowersUnderSpeech == true)    // a 30 s file is a song
+        let sound = p.sound(id: id)!
+        let curve = AudioMix.lowered(sound.clip.soundEnvelope(), startingAt: sound.start, speech: [CMTimeRange(start: t(4), end: t(6))])
+        func at(_ s: Double) -> Double { AudioMix.volume(at: t(s) - sound.start, in: curve) }
+        #expect(abs(at(3) - 1) < 0.001)                              // its own level before
+        #expect(abs(at(5) - BackgroundMusic.loweredFraction) < 0.001) // under speech
+        #expect(abs(at(3.9) - (1 - (1 - BackgroundMusic.loweredFraction) * 0.6)) < 0.001)
+        #expect(abs(at(7) - 1) < 0.001)                              // back up
+        #expect(curve.first?.time == .zero && curve.last?.time == sound.duration)
+    }
+
+    @Test func shortSoundsAndVoiceOversAreNotLowered() throws {
+        var p = project(songSeconds: 3)
+        let effect = p.addSound(of: p.assets[1].id, at: t(1))!
+        let voice = p.addSound(of: p.assets[1].id, at: t(5), isVoiceOver: true)!
+        #expect(p.sound(id: effect)?.lowersUnderSpeech == false)
+        #expect(p.sound(id: voice)?.lowersUnderSpeech == false)
+        #expect(p.sound(id: voice)?.canLowerUnderSpeech == false)
+        // Saved only when on, and kept through a split.
+        p.updateSound(effect) { $0.lowersUnderSpeech = true }
+        #expect(try JSONDecoder().decode(Project.self, from: JSONEncoder().encode(p)) == p)
+        p.splitSound(effect, at: t(2))
+        let effects = p.sounds.filter { !$0.isVoiceOver }
+        #expect(effects.count == 2)
+        #expect(effects.allSatisfy { $0.lowersUnderSpeech })
+    }
+
+    @Test func noSpeechLeavesASoundAsItIs() {
+        var p = project()
+        let id = p.addSound(of: p.assets[1].id, at: .zero)!
+        let envelope = p.sound(id: id)!.clip.soundEnvelope()
+        #expect(AudioMix.lowered(envelope, startingAt: .zero, speech: []) == envelope)
+    }
+
     @Test func musicSurvivesSavingAndLoading() throws {
         var p = project()
         p.setMusic(p.assets[1].id)

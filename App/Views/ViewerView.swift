@@ -457,7 +457,7 @@ private struct TitleHandles: View {
     var body: some View {
         GeometryReader { geometry in
             let scale = geometry.size.width / Project.canvasSize.width
-            ForEach(model.project.titlesOnScreen(at: model.currentTime)) { title in
+            ForEach(model.project.titlesOnScreen(at: model.currentTime).map(model.withTypedText)) { title in
                 if let frame = TitlePreview.frame(of: title), let shown = TitlePreview.frame(of: title, at: model.currentTime) {
                     let isSelected = model.selectedTitleID == title.id
                     let offset = drag?.id == title.id ? drag!.offset : .zero

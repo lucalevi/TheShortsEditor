@@ -84,6 +84,33 @@ struct AudioMixTests {
         #expect(flat.allSatisfy { $0.volume == v })
     }
 
+    @Test func aSecondSongGoesDownWhereTheClipHasSpeech() async throws {
+        var p = try await project(seconds: 4, toneFrom: 2)
+        let song = try await MediaProbe.probe(try await Fixture.sound(seconds: 4))
+        let songID = p.addAsset(song)
+        let added = p.addSound(of: songID, at: .zero)
+        let id = try #require(added)
+        p.updateSound(id) { $0.lowersUnderSpeech = true }
+        let built = try await CompositionBuilder.build(p)
+        let inputs = built.audioMix.inputParameters
+        #expect(inputs.count == 2)
+        let parameters = try #require(inputs.last)
+        func volume(at seconds: Double) -> Float? {
+            var from: Float = 0, to: Float = 0, range = CMTimeRange()
+            guard parameters.getVolumeRamp(for: CMTime(seconds: seconds, preferredTimescale: 600), startVolume: &from, endVolume: &to, timeRange: &range) else { return nil }
+            let fraction = range.duration.seconds > 0 ? Float((seconds - range.start.seconds) / range.duration.seconds) : 0
+            return from + (to - from) * fraction
+        }
+        #expect(abs((volume(at: 1) ?? 0) - 1) < 0.01)
+        #expect(abs((volume(at: 3) ?? 0) - Float(BackgroundMusic.loweredFraction)) < 0.01)
+        // Switched off, it stays level.
+        p.updateSound(id) { $0.lowersUnderSpeech = false }
+        let level = try #require(try await CompositionBuilder.build(p).audioMix.inputParameters.last)
+        var from: Float = 0, to: Float = 0, range = CMTimeRange()
+        #expect(level.getVolumeRamp(for: CMTime(value: 3, timescale: 1), startVolume: &from, endVolume: &to, timeRange: &range))
+        #expect(abs(from - 1) < 0.01 && abs(to - 1) < 0.01)
+    }
+
     private func loudness(of url: URL) async throws -> Double? {
         var p = Project()
         let id = p.addAsset(try await MediaProbe.probe(url))

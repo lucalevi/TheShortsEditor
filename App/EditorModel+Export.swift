@@ -85,9 +85,61 @@ extension EditorModel {
     }
 
     func updateSilenceSettings(_ settings: SilenceSettings) {
-        guard silenceSession != nil else { return }
+        guard let session = silenceSession else { return }
         silenceSession?.settings = settings
-        silenceSession?.plan = SilencePlan.make(for: project, levels: audioLevels, settings: settings)
+        silenceSession?.plan = SilencePlan.make(for: project, levels: session.listensToVoiceOnly ? pauseVoiceLevels : audioLevels, settings: settings)
+    }
+
+    /// The levels of the clips' voices alone, for finding pauses under music or noise: each file
+    /// is cleaned once with Apple's voice isolation (kept in Caches, the same copy as Clean Up
+    /// Voice) and measured. A file that can't be cleaned keeps its own levels.
+    var pauseVoiceLevels: [MediaAsset.ID: AudioLevels] {
+        audioLevels.merging(voiceLevels) { _, voice in voice }
+    }
+
+    /// Finds pauses in the voice alone, or in the whole sound again.
+    func setPausesListenToVoiceOnly(_ on: Bool) {
+        guard silenceSession != nil, silenceSession?.separating == nil else { return }
+        silenceSession?.listensToVoiceOnly = on
+        guard on else {
+            suggestPauseSettings(from: audioLevels)
+            return
+        }
+        let assets = Dictionary(project.timeline.clips.compactMap { project.asset(id: $0.assetID) }.filter(\.hasAudio).map { ($0.id, $0) }) { a, _ in a }
+        let missing = assets.values.filter { voiceLevels[$0.id] == nil }
+        guard !missing.isEmpty else {
+            suggestPauseSettings(from: pauseVoiceLevels)
+            return
+        }
+        silenceSession?.separating = 0
+        Task {
+            for (number, asset) in missing.enumerated() {
+                do {
+                    let cleaned = try await VoiceCleaner.clean(asset.url) { fraction in
+                        Task { @MainActor in
+                            if self.silenceSession?.separating != nil {
+                                self.silenceSession?.separating = (Double(number) + fraction) / Double(missing.count)
+                            }
+                        }
+                    }
+                    if let levels = await LevelCache.levels(of: cleaned) { voiceLevels[asset.id] = levels }
+                } catch {
+                    // That file keeps its own levels.
+                }
+                guard silenceSession != nil else { return }
+            }
+            silenceSession?.separating = nil
+            suggestPauseSettings(from: pauseVoiceLevels)
+        }
+    }
+
+    /// Suggests what counts as a pause from the file used most on the timeline, keeping the
+    /// user's other choices.
+    private func suggestPauseSettings(from levels: [MediaAsset.ID: AudioLevels]) {
+        guard var settings = silenceSession?.settings else { return }
+        let main = project.timeline.clips.max { $0.duration < $1.duration }?.assetID
+        if let main, let mainLevels = levels[main] { settings.threshold = mainLevels.suggestedThreshold.rounded() }
+        updateSilenceSettings(settings)
     }
 
     func applySilenceRemoval() {

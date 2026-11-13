@@ -23,7 +23,10 @@ struct ContentView: View {
         }
         .background {
             // Edits are undone through the window's own undo manager (see EditorModel.window).
-            WindowReader { window in model.window = window }
+            WindowReader { window in
+                // A hidden extra window (several files opened from Finder) mustn't take over.
+                if window.isVisible || !(model.window?.isVisible ?? false) { model.window = window }
+            }
         }
         .sheet(isPresented: Binding(get: { model.exportPhase != nil }, set: { if !$0 { model.endExport() } })) {
             ExportSheet(model: model)

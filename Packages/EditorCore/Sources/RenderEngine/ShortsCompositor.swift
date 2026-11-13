@@ -97,6 +97,18 @@ public nonisolated enum LivePreview {
         looks.withLock { $0.removeAll() }
         shortLook.withLock { $0 = nil }
         cutouts.withLock { $0.removeAll() }
+        titleTexts.withLock { $0.removeAll() }
+    }
+
+    // A title's text while it is being typed, shown before it is saved.
+    private static let titleTexts = Mutex<[TextOverlay.ID: String]>([:])
+
+    public static func setTitleText(_ text: String?, for titleID: TextOverlay.ID) {
+        titleTexts.withLock { $0[titleID] = text }
+    }
+
+    static func titleText(for titleID: TextOverlay.ID) -> String? {
+        titleTexts.withLock { $0[titleID] }
     }
 
     // Cut-out sliders being dragged (green screen, mask, blend).
@@ -396,7 +408,9 @@ nonisolated final class ShortsCompositor: NSObject, AVVideoCompositing, Sendable
     }
 
     private func titleImage(_ state: TitleTrack.State) -> CIImage? {
-        let title = state.title, scale = state.scale
+        var title = state.title
+        let scale = state.scale
+        if let typed = LivePreview.titleText(for: title.id) { title.text = typed }
         let key = title.sticker.map { "sticker|\($0.hashValue)" } ?? "title|\(title.look.hashValue)|\(title.text)|\(state.visibleCharacters ?? -1)"
         guard let placement = TitleRenderer.placement(of: title),
               let cgImage = cachedImage(key, make: { TitleRenderer.image(of: title, visibleCharacters: state.visibleCharacters) })

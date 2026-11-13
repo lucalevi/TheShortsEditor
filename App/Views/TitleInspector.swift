@@ -54,6 +54,12 @@ struct TitleInspector: View {
                     .textFieldStyle(.roundedBorder)
                     .focused($isEditing)
                     .onSubmit { isEditing = false }
+                    .onChange(of: draft) { _, typed in
+                        // Shown in the viewer as it is typed; saved when editing ends.
+                        guard isEditing else { return }
+                        let text = typed.trimmingCharacters(in: .whitespacesAndNewlines)
+                        model.previewTitleText(text.isEmpty ? nil : text, for: title.id)
+                    }
                     .onChange(of: isEditing) { _, editing in
                         if editing {
                             draft = title.text
@@ -61,7 +67,7 @@ struct TitleInspector: View {
                             save()
                         }
                     }
-                Text("Press Return when done. Long titles wrap onto more lines by themselves.")
+                Text("The viewer shows it as you type. Press Return when done. Long titles wrap onto more lines by themselves.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -147,7 +153,11 @@ struct TitleInspector: View {
 
     private func save() {
         let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !text.isEmpty, text != title.text else { return }
+        guard !text.isEmpty, text != title.text else {
+            model.previewTitleText(nil, for: title.id)
+            return
+        }
+        // The typed text stays shown until the rebuilt Short (which has it) arrives.
         model.editTitle(title.id, "Edit Title") { $0.text = text }
     }
 }

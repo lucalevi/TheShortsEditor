@@ -246,6 +246,8 @@ final class EditorModel {
     var silenceSession: SilenceSession?
     /// Sound levels of the files, for Remove Pauses and the waveforms on clips (measured by `LevelCache`).
     var audioLevels: [MediaAsset.ID: AudioLevels] = [:]
+    /// Sound levels of the files' voices alone (music and noise removed), for Remove Pauses.
+    @ObservationIgnored var voiceLevels: [MediaAsset.ID: AudioLevels] = [:]
     /// Where a preview skip is heading, so it isn't started again while the seek lands.
     @ObservationIgnored private var skipTarget: CMTime?
 
@@ -255,10 +257,17 @@ final class EditorModel {
     /// briefly create a second window that then closes, so the first window seen isn't reliable,
     /// and neither is SwiftUI's environment undo manager.)
     @ObservationIgnored weak var window: NSWindow?
+    /// A title's text while it is typed, before it is saved (see `previewTitleText`).
+    var typedTitle: (id: TextOverlay.ID, text: String)?
     @ObservationIgnored var autosaveTask: Task<Void, Never>?
     @ObservationIgnored var hasUnsavedChanges = false
     @ObservationIgnored var didReportSaveError = false
-    private var undoManager: UndoManager? { (window ?? NSApp.mainWindow)?.undoManager }
+    /// Opening several files from Finder makes SwiftUI create extra windows that stay hidden and
+    /// report themselves too, so a hidden window is passed over for a visible one.
+    private var undoManager: UndoManager? {
+        let candidates = [window, NSApp.mainWindow].compactMap(\.self)
+        return (candidates.first(where: \.isVisible) ?? candidates.first)?.undoManager
+    }
 
     @ObservationIgnored private var rebuildTask: Task<Void, Never>?
     /// Set while a style is being applied, so its own motion isn't taken for hand-made motion.
@@ -303,6 +312,10 @@ final class EditorModel {
         var isMeasuring = true
         var settings = SilenceSettings()
         var plan = SilencePlan(sourceCuts: [:], timelineCuts: [])
+        /// Pauses are measured on the voice alone (cleaned of music and noise), not the whole sound.
+        var listensToVoiceOnly = false
+        /// While the voice is being separated: how far along, 0…1.
+        var separating: Double?
     }
 
     enum CaptionJob: Equatable {
@@ -624,6 +637,21 @@ final class EditorModel {
         apply(actionName) { $0.updateTitle(id, change) }
     }
 
+    /// Shows a title's text in the viewer while it is typed, before it is saved (nil: its own).
+    func previewTitleText(_ text: String?, for id: TextOverlay.ID) {
+        LivePreview.setTitleText(text, for: id)
+        typedTitle = text.map { (id, $0) }
+        redrawCurrentFrame()
+    }
+
+    /// The title with the text being typed in it, if any (for the viewer's box around it).
+    func withTypedText(_ title: TextOverlay) -> TextOverlay {
+        guard let typedTitle, typedTitle.id == title.id else { return title }
+        var typed = title
+        typed.text = typedTitle.text
+        return typed
+    }
+
     func moveTitle(_ id: TextOverlay.ID, to start: CMTime) {
         apply("Move Title") { $0.moveTitle(id, to: start) }
     }
@@ -817,7 +845,9 @@ final class EditorModel {
         thumbnails = [:]
         filmstrips = [:]
         audioLevels = [:]
+        voiceLevels = [:]
         LivePreview.clearAll()
+        typedTitle = nil
         missingAssets = []
         currentTime = .zero
         undoManager?.removeAllActions()
@@ -854,6 +884,7 @@ final class EditorModel {
                 player.replaceCurrentItem(with: built.makePlayerItem())
                 // The edit a drag in the viewer showed live is now in the composition itself.
                 LivePreview.clearAll()
+                typedTitle = nil
                 seek(to: time)
                 prepareMissingProcessedSounds()
                 prepareMissingSteadiness()

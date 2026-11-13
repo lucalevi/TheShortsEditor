@@ -169,23 +169,7 @@ public enum AudioMix {
         let fadeIn = track.fadesIn ? min(BackgroundMusic.fadeInDuration, CMTimeMultiplyByRatio(range.duration, multiplier: 1, divisor: 3)) : .zero
         let fadeOut = track.fadesOut ? min(BackgroundMusic.fadeOutDuration, CMTimeMultiplyByRatio(range.duration, multiplier: 1, divisor: 3)) : .zero
 
-        func lowered(at t: CMTime) -> Double {
-            var factor = 1.0
-            for r in speech {
-                let f: Double
-                if t <= r.start - down || t >= r.end + up {
-                    f = 1
-                } else if t < r.start {
-                    f = 1 - (1 - BackgroundMusic.loweredFraction) * (t - (r.start - down)).seconds / down.seconds
-                } else if t <= r.end {
-                    f = BackgroundMusic.loweredFraction
-                } else {
-                    f = BackgroundMusic.loweredFraction + (1 - BackgroundMusic.loweredFraction) * (t - r.end).seconds / up.seconds
-                }
-                factor = min(factor, f)
-            }
-            return factor
-        }
+        func lowered(at t: CMTime) -> Double { loweredFactor(at: t, speech: speech) }
         func faded(at t: CMTime) -> Double {
             var f = 1.0
             if fadeIn > .zero, t < range.start + fadeIn { f = min(f, (t - range.start).seconds / fadeIn.seconds) }
@@ -209,6 +193,40 @@ public enum AudioMix {
             }
         }
         return points
+    }
+
+    /// How much a sound that lowers under speech is turned down at `time` (1: not at all, down
+    /// to `BackgroundMusic.loweredFraction`), going down just before speech and back up after it.
+    public static func loweredFactor(at t: CMTime, speech: [CMTimeRange]) -> Double {
+        let down = BackgroundMusic.lowerDuration, up = BackgroundMusic.raiseDuration
+        var factor = 1.0
+        for r in speech {
+            let f: Double
+            if t <= r.start - down || t >= r.end + up {
+                f = 1
+            } else if t < r.start {
+                f = 1 - (1 - BackgroundMusic.loweredFraction) * (t - (r.start - down)).seconds / down.seconds
+            } else if t <= r.end {
+                f = BackgroundMusic.loweredFraction
+            } else {
+                f = BackgroundMusic.loweredFraction + (1 - BackgroundMusic.loweredFraction) * (t - r.end).seconds / up.seconds
+            }
+            factor = min(factor, f)
+        }
+        return factor
+    }
+
+    /// A sound's own volume curve (times from its start, which is at `start` on the timeline),
+    /// lowered around `speech` (timeline times) like the song.
+    public static func lowered(_ envelope: [VolumePoint], startingAt start: CMTime, speech: [CMTimeRange]) -> [VolumePoint] {
+        guard let first = envelope.first?.time, let last = envelope.last?.time, !speech.isEmpty else { return envelope }
+        let down = BackgroundMusic.lowerDuration, up = BackgroundMusic.raiseDuration
+        var times = envelope.map(\.time)
+        for r in speech { times += [r.start - down, r.start, r.end, r.end + up].map { $0 - start } }
+        let sorted = Set(times.map { $0.clamped(first, last) }).sorted()
+        return sorted.map { t in
+            VolumePoint(time: t, volume: volume(at: t, in: envelope) * loweredFactor(at: start + t, speech: speech))
+        }
     }
 
     /// The volume a curve has at `time` (straight lines between points, flat outside them).

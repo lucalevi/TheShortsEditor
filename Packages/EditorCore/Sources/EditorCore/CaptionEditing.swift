@@ -184,6 +184,22 @@ public extension Project {
         CaptionLayout.pages(in: self).filter { $0.translation == nil }
     }
 
+    /// The sentences (runs of captions, see `CaptionSentences`) with a caption that has no
+    /// up-to-date translation. A whole sentence is translated again, so its pieces fit together.
+    func sentencesNeedingTranslation() -> [[CaptionPage]] {
+        CaptionSentences.groups(CaptionLayout.pages(in: self)).filter { $0.contains { $0.translation == nil } }
+    }
+
+    /// Stores the translation of a whole sentence, shared out over its captions.
+    mutating func setTranslation(_ translated: String, of sentence: [CaptionPage]) {
+        let pieces = CaptionSentences.distribute(translated, over: sentence)
+        var translations: [Word.ID: CaptionTranslation] = [:]
+        for (page, piece) in zip(sentence, pieces) {
+            translations[page.words[0].wordID] = CaptionTranslation(source: page.plainText, text: piece)
+        }
+        setTranslations(translations)
+    }
+
     // MARK: SRT
 
     /// Replaces the captions with the cues of a subtitle file, timed on the timeline. Each word goes
@@ -452,5 +468,72 @@ public enum LanguageGuess {
         guard !confidences.isEmpty else { return 0 }
         let sum = confidences.reduce(0) { $0 + ($1 ?? 0.5) }
         return sum / Double(max(confidences.count, fewWords))
+    }
+}
+
+/// Captions are translated a sentence at a time: a short caption alone ("tipo il trucco più") is
+/// translated without what it means, so the sentence is translated whole and its translation
+/// shared out over its captions.
+public enum CaptionSentences {
+    /// A sentence never spans more captions than this (long talk without full stops).
+    public static let maxPages = 8
+    /// A pause this long between captions ends a sentence too.
+    public static let pause = CMTime(value: 1, timescale: 1)
+
+    /// The captions in runs that each make one sentence: a run ends after a caption that ends a
+    /// sentence (. ! ? …), before a pause or a caption heard from another file, or at `maxPages`.
+    public static func groups(_ pages: [CaptionPage]) -> [[CaptionPage]] {
+        var groups: [[CaptionPage]] = []
+        var current: [CaptionPage] = []
+        for page in pages {
+            if let last = current.last, last.source != page.source || page.range.start - last.range.end >= pause || current.count >= maxPages {
+                groups.append(current)
+                current = []
+            }
+            current.append(page)
+            if endsSentence(page.plainText) {
+                groups.append(current)
+                current = []
+            }
+        }
+        if !current.isEmpty { groups.append(current) }
+        return groups
+    }
+
+    static func endsSentence(_ text: String) -> Bool {
+        var trimmed = text.trimmingCharacters(in: .whitespaces)
+        // Closing quotes and brackets after the stop.
+        while let last = trimmed.last, "\"'”’»)]".contains(last) { trimmed.removeLast() }
+        return trimmed.last.map { ".!?…。！？".contains($0) } ?? false
+    }
+
+    /// Shares a translated sentence out over its captions, each getting a part as long as its
+    /// own words are (in characters), with at least one word each when there are enough. Languages
+    /// written without spaces are shared out by characters.
+    public static func distribute(_ translated: String, over pages: [CaptionPage]) -> [String] {
+        let text = translated.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard pages.count > 1 else { return pages.isEmpty ? [] : [text] }
+        let words = text.split(whereSeparator: \.isWhitespace).map(String.init)
+        let bySpaces = words.count >= pages.count || text.contains(" ")
+        let tokens = bySpaces ? words : text.map(String.init)
+        let separator = bySpaces ? " " : ""
+        let weights = pages.map { max(Double($0.plainText.count), 1) }
+        let total = weights.reduce(0, +)
+        var pieces: [String] = []
+        var taken = 0
+        var sum = 0.0
+        for (index, weight) in weights.enumerated() {
+            sum += weight
+            let remainingPages = pages.count - index - 1
+            var end = index == pages.count - 1 ? tokens.count : Int((Double(tokens.count) * sum / total).rounded())
+            if tokens.count >= pages.count {
+                // At least one each: leave enough for the captions still to come.
+                end = min(max(end, taken + 1), tokens.count - remainingPages)
+            }
+            end = min(max(end, taken), tokens.count)
+            pieces.append(tokens[taken..<end].joined(separator: separator))
+            taken = end
+        }
+        return pieces
     }
 }
