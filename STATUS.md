@@ -1,6 +1,6 @@
 # Project status
 
-_Last updated: 2026-11-13 (known gaps fixed: done, not yet committed). Read this first when picking the project back up, then update it at the end of each session._
+_Last updated: 2026-11-13 (known gaps fixed: committed and pushed, 1757bcc). Read this first when picking the project back up, then update it at the end of each session._
 
 ## Where we are
 
@@ -16,7 +16,7 @@ Stages 1–7 are done, tested on screen, committed and pushed to https://github.
 | 6 | Audio: clip volume, music with ducking, loudness on export | 2026-11-09 |
 | 7 | Save/open projects, autosave, missing media | 2026-11-09 |
 
-**Pick up here (2026-11-13, latest): known gaps fixed, built and tested, not yet committed.** The user asked to fix the "known gaps" first (before dogfooding). Several notes in "Known limitations" turned out to be stale (B-roll does follow its clip, sound files can be sounds, titles have fonts, colours, rows and snapping); those were corrected. What was done:
+**Pick up here (2026-11-13, latest): known gaps fixed, committed and pushed (1757bcc).** Next: the user dogfooding real Shorts. The user asked to fix the "known gaps" first (before dogfooding). Several notes in "Known limitations" turned out to be stale (B-roll does follow its clip, sound files can be sounds, titles have fonts, colours, rows and snapping); those were corrected. What was done:
 - **First import undoable**: opening several files from Finder makes SwiftUI create extra hidden windows, which reported themselves to `EditorModel.window`, so the import's undo went to a hidden window's undo manager. `EditorModel.undoManager` now prefers a visible window, and `ContentView`'s `WindowReader` ignores hidden ones. Reproduced before (Undo disabled after `open -a … three files`) and checked after on screen.
 - **Titles update while typing**: `LivePreview.setTitleText` (drawn by `ShortsCompositor.titleImage`) and `EditorModel.typedTitle` (the viewer's box follows the wrapped text); saved on Return as before. Checked on screen. Quitting while typing still loses the typed text.
 - **Extra songs lowered under speech**: `SoundClip.lowersUnderSpeech` (on by default for sound files ≥ 20 s, `SoundClip.songLength`; never for voice-overs or detached clip sound), "Lower while people talk" in the sound inspector (titled "Song"), `AudioMix.loweredFactor`/`lowered(_:startingAt:speech:)` shared with the music, used in `CompositionBuilder`. Media's menu says "Add as Extra Song at Playhead" for long files. Tested in the model and on the built audio mix; checked on screen (not by ear).
@@ -373,7 +373,7 @@ The P0 list from `research/shorts-editor-research.md` §5. Each stage ends with 
 15. ~~Stage K, cut-outs~~ (done 2026-11-13, all of it, committed).
 16. ~~Stage L, templates and finding moments~~ (done 2026-11-13, all of it, committed).
 17. ~~Hardening pass~~ (done 2026-11-13, committed 9e79f25): undo names, sound crossfades, disk clean-up, performance measured, big files split, accessibility, CI.
-18. ~~Known gaps~~ (done 2026-11-13, not yet committed): first import undoable, titles while typing, extra songs lowered under speech, sentence translation, more split layouts, pause length and voice-only pauses.
+18. ~~Known gaps~~ (done 2026-11-13, committed 1757bcc): first import undoable, titles while typing, extra songs lowered under speech, sentence translation, more split layouts, pause length and voice-only pauses.
 19. **Next:** the user making real Shorts in the app (dogfooding), then features chosen from what is missing. Ask the user (see "Not yet verified on screen" in each stage, and the "Later" items in `research/capcut/capcut-reverse-engineering.md` §5).
 
 ## CapCut list: stages G–L (to do, decided 2026-11-12)
