@@ -25,8 +25,13 @@ nonisolated struct TitleTrack: Sendable {
         let title: TextOverlay
         var scale: Double = 1
         var opacity: Double = 1
-        /// Moved down by this many canvas pixels (sliding in).
+        /// Moved down by this many canvas pixels (sliding in, a loop, following something).
         var yOffset: Double = 0
+        /// Moved right by this many canvas pixels.
+        var xOffset: Double = 0
+        /// Degrees, clockwise (its own turn plus a loop's).
+        var rotation: Double = 0
+        var blur: Double = 0
         /// For the typewriter entrance: how many characters are showing (nil: all).
         var visibleCharacters: Int?
     }
@@ -66,6 +71,21 @@ nonisolated struct TitleTrack: Sendable {
             case .none:
                 break
             }
+            // Its own turn, then a loop and the way out, then where what it follows has gone.
+            let offset = time - item.range.start
+            let canvas = Project.canvasSize
+            state.rotation = item.title.rotation
+            if let motion = item.title.motionState(atOffset: offset) {
+                state.scale *= motion.scale
+                state.opacity *= motion.opacity
+                state.rotation += motion.rotation
+                state.xOffset += motion.offsetX * canvas.width
+                state.yOffset += motion.offsetY * canvas.height
+                state.blur = motion.blur
+            }
+            let shift = item.title.trackShift(atOffset: offset)
+            state.xOffset += shift.x * canvas.width
+            state.yOffset += shift.y * canvas.height
             return state
         }
     }
@@ -127,6 +147,9 @@ nonisolated enum TitleRenderer {
         }
         CFAttributedStringSetAttribute(string, all, kCTFontAttributeName, font)
         CFAttributedStringSetAttribute(string, all, kCTParagraphStyleAttributeName, paragraph)
+        if look.letterSpacing != 0 {
+            CFAttributedStringSetAttribute(string, all, kCTKernAttributeName, (size * CGFloat(look.letterSpacing) / 100) as NSNumber)
+        }
         if stroke, let outline = look.outlineColor {
             let color = cgColor(outline)
             CFAttributedStringSetAttribute(string, all, kCTForegroundColorAttributeName, color)
@@ -148,7 +171,8 @@ nonisolated enum TitleRenderer {
             CGSize(width: maxWidth, height: .greatestFiniteMagnitude), nil
         )
         let textSize = CGSize(width: ceil(suggested.width) + 2, height: ceil(suggested.height) + 2)
-        let padding = ceil(size * 0.45)
+        // Room for outlines and shadows, more for a glow.
+        let padding = ceil(size * (look.glowColor != nil ? 0.7 : 0.45))
         let imageSize = CGSize(width: textSize.width + padding * 2, height: textSize.height + padding * 2)
         let textRect = CGRect(origin: CGPoint(x: padding, y: padding), size: textSize)
         return Layout(
@@ -189,11 +213,42 @@ nonisolated enum TitleRenderer {
            let stroke = Self.layout(text: text, look: look, stroke: true, visible: visibleCharacters) {
             CTFrameDraw(CTFramesetterCreateFrame(stroke.framesetter, CFRange(location: 0, length: 0), path, nil), context)
         }
+        if let pop = look.popShadowColor, let solid = Self.layout(text: text, look: recoloured(look, pop), visible: visibleCharacters) {
+            // A solid copy of the letters, down and to the right.
+            let shift = max(4, size * 0.07)
+            context.saveGState()
+            context.translateBy(x: shift, y: -shift)
+            CTFrameDraw(CTFramesetterCreateFrame(solid.framesetter, CFRange(location: 0, length: 0), path, nil), context)
+            context.restoreGState()
+        }
+        if let glow = look.glowColor {
+            // Light around the letters: the letters drawn twice with a wide coloured shadow.
+            context.saveGState()
+            context.setShadow(offset: .zero, blur: size * 0.45, color: cgColor(glow))
+            CTFrameDraw(frame, context)
+            context.setShadow(offset: .zero, blur: size * 0.15, color: cgColor(glow))
+            CTFrameDraw(frame, context)
+            context.restoreGState()
+        }
         if look.shadow {
             context.setShadow(offset: CGSize(width: 0, height: -4), blur: 16, color: CGColor(red: 0, green: 0, blue: 0, alpha: 0.85))
         }
         CTFrameDraw(frame, context)
         return context.makeImage()
+    }
+
+    private static func recoloured(_ look: TextLook, _ color: RGBA) -> TextLook {
+        var copy = look
+        copy.textColor = color
+        copy.outlineColor = nil
+        copy.glowColor = nil
+        return copy
+    }
+
+    /// A title or sticker as an image (see `StickerRenderer` for stickers).
+    static func image(of title: TextOverlay, visibleCharacters: Int? = nil) -> CGImage? {
+        if let sticker = title.sticker { return StickerRenderer.image(sticker) }
+        return image(text: title.text, look: title.look, visibleCharacters: visibleCharacters)
     }
 
     /// A title drawn in a ready-made style's look.
@@ -204,17 +259,25 @@ nonisolated enum TitleRenderer {
     /// Where the title's image goes on the canvas (origin top left), and the part of it that can
     /// be seen. The visible part is centred on the title's position, but never leaves the canvas.
     static func placement(of title: TextOverlay) -> (image: CGRect, content: CGRect)? {
-        guard let layout = layout(text: title.text, look: title.look) else { return nil }
+        let imageSize: CGSize, content: CGRect
+        if let sticker = title.sticker {
+            guard let size = StickerRenderer.image(sticker).map({ CGSize(width: $0.width, height: $0.height) }) else { return nil }
+            imageSize = size
+            content = CGRect(origin: .zero, size: size)
+        } else {
+            guard let layout = layout(text: title.text, look: title.look) else { return nil }
+            imageSize = layout.size
+            content = layout.contentRect
+        }
         let canvas = Project.canvasSize
-        let content = layout.contentRect
         let middle = CGFloat(title.verticalPosition) * canvas.height
         let contentTop = min(max(middle - content.height / 2, 0), max(canvas.height - content.height, 0))
         let centre = CGFloat(title.horizontalPosition) * canvas.width
         let contentLeft = min(max(centre - content.width / 2, 0), max(canvas.width - content.width, 0))
         // The image's own origin is at the bottom left: its top margin is above `content.maxY`.
-        let imageTop = contentTop - (layout.size.height - content.maxY)
+        let imageTop = contentTop - (imageSize.height - content.maxY)
         let imageLeft = contentLeft - content.minX
-        let image = CGRect(x: imageLeft, y: imageTop, width: layout.size.width, height: layout.size.height)
+        let image = CGRect(x: imageLeft, y: imageTop, width: imageSize.width, height: imageSize.height)
         let visible = CGRect(x: contentLeft, y: contentTop, width: content.width, height: content.height)
         return (image, visible)
     }
@@ -235,6 +298,19 @@ public enum TitlePreview {
     /// has no text.
     public static func frame(of title: TextOverlay) -> CGRect? {
         TitleRenderer.placement(of: title)?.content
+    }
+
+    /// The same at timeline `time`, moved with what it follows.
+    public static func frame(of title: TextOverlay, at time: CMTime) -> CGRect? {
+        guard let frame = frame(of: title) else { return nil }
+        let shift = title.trackShift(atOffset: time - title.start)
+        let canvas = Project.canvasSize
+        return frame.offsetBy(dx: shift.x * canvas.width, dy: shift.y * canvas.height)
+    }
+
+    /// A sticker on its own, for the sticker grid.
+    public static func image(for sticker: Sticker) -> CGImage? {
+        StickerRenderer.image(sticker)
     }
 
     /// Where every title is drawn, for the export checks.

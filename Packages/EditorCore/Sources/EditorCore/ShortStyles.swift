@@ -267,7 +267,7 @@ public extension Project {
         style = newStyle
 
         if let newStyle {
-            for index in titles.indices { titles[index].takeLook(of: newStyle) }
+            for index in titles.indices where titles[index].sticker == nil { titles[index].takeLook(of: newStyle) }
             captions.style = newStyle.captionStyle
             captions.accentColor = newStyle.captionAccent
             captions.textColor = nil

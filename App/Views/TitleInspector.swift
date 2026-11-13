@@ -19,6 +19,34 @@ struct TitleInspector: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
+            if let sticker = title.sticker {
+                StickerSection(model: model, title: title, sticker: sticker)
+            } else {
+                textSections
+            }
+
+            TitleMotionSection(model: model, title: title)
+
+            FollowSubjectSection(model: model, title: title)
+
+            FollowClipToggle(model: model, item: .title(title.id))
+
+            positionAndTiming
+
+            if !title.isSticker {
+                Button("Read It Aloud…", systemImage: "waveform") { model.beginSpeech(for: title.id) }
+                    .help("A voice reads this title, added as a voice-over where it starts")
+            }
+
+            Button(title.isSticker ? "Delete Sticker" : "Delete Title", systemImage: "trash", role: .destructive) { model.deleteSelection() }
+        }
+        .onAppear(perform: focusTextIfAsked)
+        .onChange(of: model.wantsTitleTextFocus) { focusTextIfAsked() }
+        .onDisappear { if isEditing { save() } }
+    }
+
+    @ViewBuilder
+    private var textSections: some View {
             VStack(alignment: .leading, spacing: 6) {
                 Text("Text").font(.subheadline.weight(.semibold))
                 TextField("Your title", text: Binding(get: { isEditing ? draft : title.text }, set: { if isEditing { draft = $0 } }), axis: .vertical)
@@ -42,8 +70,10 @@ struct TitleInspector: View {
             VStack(alignment: .leading, spacing: 6) {
                 Text("Style").font(.subheadline.weight(.semibold))
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 72), spacing: 6)], spacing: 6) {
+                    // Each look shown with the title's own first words.
+                    let sample = String(title.text.split(separator: "\n").first?.prefix(10) ?? "Hook")
                     ForEach(TitleStyle.allCases) { style in
-                        StyleChip(name: style.displayName, isSelected: title.style == style, makeImage: { TitlePreview.image(for: style) }) {
+                        StyleChip(name: style.displayName, isSelected: title.style == style, makeImage: { TitlePreview.image(for: style.look, text: sample) }) {
                             model.editTitle(title.id, "Change Title Style") { $0.applyStyle(style) }
                         }
                     }
@@ -51,20 +81,10 @@ struct TitleInspector: View {
             }
 
             TitleLookSection(model: model, title: title)
+    }
 
-            FollowClipToggle(model: model, item: .title(title.id))
-
-            VStack(alignment: .leading, spacing: 6) {
-                Text("Appears with").font(.subheadline.weight(.semibold))
-                Picker("Appears with", selection: Binding(get: { title.entrance }, set: { entrance in
-                    model.editTitle(title.id, "Change Title Animation") { $0.entrance = entrance }
-                })) {
-                    ForEach(TitleEntrance.allCases) { Text($0.displayName).tag($0) }
-                }
-                .labelsHidden()
-                .fixedSize()
-            }
-
+    @ViewBuilder
+    private var positionAndTiming: some View {
             VStack(alignment: .leading, spacing: 6) {
                 Text("Position").font(.subheadline.weight(.semibold))
                 Picker("Position", selection: Binding(get: { TitlePlacement(exactly: title.verticalPosition) }, set: { placement in
@@ -76,7 +96,7 @@ struct TitleInspector: View {
                 .pickerStyle(.segmented)
                 .labelsHidden()
                 HStack {
-                    Text("Or drag the title anywhere in the viewer.")
+                    Text(title.isSticker ? "Or drag it anywhere in the viewer." : "Or drag the title anywhere in the viewer.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     if title.horizontalPosition != 0.5 {
@@ -110,18 +130,12 @@ struct TitleInspector: View {
                     model.setTitleDuration(title.id, title.duration - CMTime(value: 1, timescale: 2))
                 }
                 Button("Start at Playhead") { model.moveTitle(title.id, to: model.currentTime) }
-                    .help("Make the title appear where the playhead is")
+                    .help("Make it appear where the playhead is")
                 Text("You can also drag it on the timeline, or drag its right edge to change how long it stays.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
-
-            Button("Delete Title", systemImage: "trash", role: .destructive) { model.deleteSelection() }
-        }
-        .onAppear(perform: focusTextIfAsked)
-        .onChange(of: model.wantsTitleTextFocus) { focusTextIfAsked() }
-        .onDisappear { if isEditing { save() } }
     }
 
     private func focusTextIfAsked() {

@@ -1487,7 +1487,7 @@ private struct TitleBlock: View {
         RoundedRectangle(cornerRadius: 4)
             .fill(Color.purple.opacity(isSelected ? 0.6 : 0.35))
             .overlay(alignment: .leading) {
-                Label(title.text.replacingOccurrences(of: "\n", with: " "), systemImage: "textformat")
+                Label(title.text.replacingOccurrences(of: "\n", with: " "), systemImage: title.isSticker ? "face.smiling" : title.track != nil ? "scope" : "textformat")
                     .font(.caption2.weight(.medium))
                     .lineLimit(1)
                     .padding(.horizontal, 4)

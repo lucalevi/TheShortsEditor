@@ -25,6 +25,16 @@ public struct TextOverlay: Identifiable, Codable, Equatable, Sendable {
     public var horizontalPosition: Double
     /// Moves with the main clip under its start (see `Project.followClips(from:)`).
     public var followsClip: Bool = true
+    /// How it leaves at its end (nil: it just goes). See `ClipAnimation.swift`.
+    public var exit: ClipAnimation? = nil
+    /// A movement repeated while it is on screen (nil: it holds still).
+    public var loop: TitleLoop? = nil
+    /// Degrees, clockwise.
+    public var rotation: Double = 0
+    /// Set for a sticker (an emoji or symbol drawn instead of the text; `text` is then its name).
+    public var sticker: Sticker? = nil
+    /// Where the thing it follows in the video went, from its start (see `Stickers.swift`).
+    public var track: [TrackPoint]? = nil
 
     public init(
         id: UUID = UUID(), text: String, style: TitleStyle = .bold, look: TextLook? = nil, entrance: TitleEntrance = .pop,
@@ -75,6 +85,22 @@ public enum TitleStyle: String, Codable, CaseIterable, Identifiable, Sendable {
     case dark
     /// White letters with a soft shadow.
     case simple
+    /// Light letters glowing in colour.
+    case neon
+    /// Only the outline of big capitals.
+    case hollow
+    /// White letters with a solid coloured copy behind them.
+    case popShadow
+    /// Yellow capitals with a thick black outline, like a comic.
+    case comic
+    /// White letters on a coloured box.
+    case pill
+    /// Typewriter letters on paper strips.
+    case typewriter
+    /// Thin, widely spaced capitals, like a film title.
+    case cinema
+    /// Handwritten with a marker.
+    case handwritten
 
     public var id: String { rawValue }
 
@@ -85,6 +111,14 @@ public enum TitleStyle: String, Codable, CaseIterable, Identifiable, Sendable {
         case .marker: "Marker"
         case .dark: "Dark Box"
         case .simple: "Simple"
+        case .neon: "Neon"
+        case .hollow: "Hollow"
+        case .popShadow: "Pop Shadow"
+        case .comic: "Comic"
+        case .pill: "Pill"
+        case .typewriter: "Typewriter"
+        case .cinema: "Cinema"
+        case .handwritten: "Handwritten"
         }
     }
 }
@@ -210,6 +244,7 @@ public extension Project {
 extension TextOverlay {
     private enum CodingKeys: String, CodingKey {
         case id, text, style, look, entrance, start, duration, verticalPosition, horizontalPosition, followsClip
+        case exit, loop, rotation, sticker, track
     }
 
     public init(from decoder: any Decoder) throws {
@@ -224,6 +259,11 @@ extension TextOverlay {
         duration = try c.decodeTime(forKey: .duration)
         verticalPosition = try c.decode(Double.self, forKey: .verticalPosition)
         followsClip = try c.decodeIfPresent(Bool.self, forKey: .followsClip) ?? true
+        exit = try? c.decodeIfPresent(ClipAnimation.self, forKey: .exit)
+        loop = try? c.decodeIfPresent(TitleLoop.self, forKey: .loop)
+        rotation = try c.decodeIfPresent(Double.self, forKey: .rotation) ?? 0
+        sticker = try? c.decodeIfPresent(Sticker.self, forKey: .sticker)
+        track = try? c.decodeIfPresent([TrackPoint].self, forKey: .track)
     }
 
     public func encode(to encoder: any Encoder) throws {
@@ -238,5 +278,10 @@ extension TextOverlay {
         try c.encode(time: duration, forKey: .duration)
         try c.encode(verticalPosition, forKey: .verticalPosition)
         try c.encode(followsClip, forKey: .followsClip)
+        try c.encodeIfPresent(exit, forKey: .exit)
+        try c.encodeIfPresent(loop, forKey: .loop)
+        if rotation != 0 { try c.encode(rotation, forKey: .rotation) }
+        try c.encodeIfPresent(sticker, forKey: .sticker)
+        try c.encodeIfPresent(track, forKey: .track)
     }
 }

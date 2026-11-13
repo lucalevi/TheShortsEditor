@@ -1,6 +1,6 @@
 # Project status
 
-_Last updated: 2026-11-13 (Stage I, rhythm: done and committed). Read this first when picking the project back up, then update it at the end of each session._
+_Last updated: 2026-11-13 (Stage H, text, stickers and voice: done and committed). Read this first when picking the project back up, then update it at the end of each session._
 
 ## Where we are
 
@@ -16,13 +16,29 @@ Stages 1–7 are done, tested on screen, committed and pushed to https://github.
 | 6 | Audio: clip volume, music with ducking, loudness on export | 2026-11-09 |
 | 7 | Save/open projects, autosave, missing media | 2026-11-09 |
 
-**Pick up here (2026-11-13, latest):** Stage I (rhythm) is built, tested, checked on screen, committed and pushed. Next after it: Stage H (text, stickers and voice). Test Short "My Short 17" (Hero and Bullet curves, a Spin entrance, music moved to 0:02 with beats shown, cut to the bar) is in the library (safe to delete).
+**Pick up here (2026-11-13, latest):** Stage H (text, stickers and voice) is built, tested, checked on screen, committed and pushed. Next: Stage J (effects). "My Short 17" now also has a Subscribe template (pill title + bell sticker following), and a spoken "Subscribe" voice-over.
+
+**Before that (2026-11-13):** Stage I (rhythm) is built, tested, checked on screen, committed and pushed (bd5ef08). Test Short "My Short 17" (Hero and Bullet curves, a Spin entrance, music moved to 0:02 with beats shown, cut to the bar) is in the library (safe to delete).
 
 **Before that (2026-11-13):** Stage G (captions the CapCut way) is built, tested, checked on screen, committed and pushed. Test Short "My Short 16" (Italian voice-over captions, a German second line, an imported SRT) is in the library (safe to delete); spoken test files `voiceover-sample.m4a` (English) and `italiano-sample.m4a` were made with `say` into `Tools/uitest/.samples`, with `My Short 16.srt` exported there.
 
 **Before that (2026-11-12):** CapCut was researched (`research/capcut/README.md`); next is Stage G (captions), see "CapCut list: stages G–L" below. **Before that (2026-11-11):** Stage F of the iMovie list ("One-click Shorts", `research/imovie/imovie-reverse-engineering.md`) is built, tested, checked on screen and committed. With it, every stage of the iMovie list (A–F) is done. Stage E is committed (5e708e6); its Photos tab is still unchecked on screen. Next: ask the user (see "What's next"). Test footage and a closed scratch iMovie library are in `~/Movies/ShortsEditorResearch` (safe to delete). Test Shorts "My Short 5"–"My Short 12" are in the library (safe to delete); "My Short 12" has a look, Stabilize, two markers and a slid clip from the on-screen checks.
 
-### Stage I: rhythm (2026-11-13): done, committed
+### Stage H: text, stickers and voice (2026-11-13): done, committed
+
+Model in `EditorCore/Stickers.swift` (stickers, `TitleLoop`, exits, `TrackPoint`, `PatchTracker`, `TextTemplate`), new looks in `TextLook.swift`/`Titles.swift` (`StickerTests`: 14 tests); `RenderEngine/StickerRenderer.swift`, `SubjectTracker.swift`, `SpeechMaker.swift`, title motion in `TitleRenderer`/`ShortsCompositor.titleImage` (`StickerRenderTests`: 7); app in `App/EditorModel+Stickers.swift`, `App/Views/StickerViews.swift`, `TitleInspector` reorganised. New fields are optional in the file (`TextOverlay.exit/loop/rotation/sticker/track`, `TextLook.glowColor/popShadowColor/letterSpacing`, `SavedTextStyle.exit/loop`); file version stays 8.
+1. **Title looks grid**: 13 looks (Bold, Label, Marker, Dark Box, Simple + Neon (glow), Hollow (outline only), Pop Shadow (solid offset copy), Comic, Pill, Typewriter (American Typewriter on paper strips), Cinema (Futura, spaced capitals), Handwritten (Marker Felt)). The grid previews each look with the title's own first words.
+2. **Animation for titles and stickers** (inspector "Animation"): Comes in (the old entrances), **While on** (Pulse, Float, Wiggle, Swing, Blink, Spin, Heartbeat), **Goes out** (the clip animations of Stage I: Fade, Pop, Zoom, Slides, Spin, Blur; 0.4 s), and **Turn** (−180…180°). Choosing one plays it. Saved styles keep exit and loop.
+3. **Ready-made texts** (toolbar smiley ▸ picker, Text ▸ Add Ready-Made Text): Hook, Subscribe (pill + yellow bell wiggling), Part 2, Top 3 Number (#3 + label), Question (+ 🤔 swinging), Link in Description (+ arrow floating). Added at the playhead (earlier near the end), the text selected for typing.
+4. **Stickers** (toolbar smiley, Text ▸ Add Sticker): 24 emoji (drawn in colour with Apple Color Emoji) and 24 SF Symbols in Arrows / Shapes / Signs (drawn as shapes in a chosen colour with a soft shadow). A sticker is a `TextOverlay` with `sticker` set: same lane, selection, viewer dragging, timing, follow-the-clip and animations as titles; inspector shows size (80–900 px) and colour instead of text and design. A Short's style never restyles stickers.
+5. **Follow something in the video** (inspector, Text ▸ Follow Something in the Video): put the title/sticker on the subject at its first moment, click Follow. The Short is rendered without titles/captions at 270×480, 15 pictures a second, and a patch of 18% of the width around it is found again in each picture (`PatchTracker`: normalized cross-correlation, coarse then fine search, the patch slowly updated; lost below 0.5). The path is stored relative to the item's start, so moving it later keeps the motion. Stop Following / Follow Again from Here. Apple's `VNTrackObjectRequest` was tried first and lagged then lost even a plainly moving square, so it isn't used.
+6. **Text to speech** (title inspector "Read It Aloud…", Text ▸ Speak Text… (uses words picked in the Script panel)): a sheet with the text, language (the captions' language), voice (Personal Voice first when allowed, then better-quality voices), speed 0.6–1.5×, Listen, Add Voice-Over. `AVSpeechSynthesizer.write` makes a `.caf` in `Application Support/Shorts Editor/Voices` named after the words; it goes in as a voice-over at the title's start (or the playhead) and is captioned when the Short has captions.
+
+Tests: 395 model + 112 render + 3 transcription = 510, all pass.
+Verified on screen: sticker picker, Subscribe template (pill + bell), look grid with the title's words, the reorganised title/sticker inspector, Read It Aloud → Ava (Premium) voice-over placed and marked voice-over, Follow on the bell sticker (finished; nothing moved under it in that footage).
+Not yet verified on screen: following a real moving subject (only the test's moving square), loops/exits while playing (pixel-tested for fade and tracking), Personal Voice, Speak Text from the Script panel, the new looks over real footage, export with stickers.
+
+### Stage I: rhythm (2026-11-13): done, committed (bd5ef08)
 
 Model in `EditorCore/Rhythm.swift` (beats, `BeatFinder`, music placement and passes, Cut to the Beat), `SpeedCurves.swift`, `ClipAnimation.swift` (`RhythmTests`: 26 tests); `RenderEngine/BeatDetector.swift`, `FrameInterpolator.swift`, curves/looping in `CompositionBuilder`, animations in `ShortsCompositor.draw` (`RhythmRenderTests`: 6); app in `App/EditorModel+Rhythm.swift`, `App/Views/RhythmViews.swift`, the music lane in `TimelineView`. Project files are now **version 8** (`Clip.speedCurve`, `smoothSlowMotion`, `animationIn/Out`; `BackgroundMusic.start`, `loops`, `beats`, `showsBeats`).
 1. **Beats** (Music inspector ▸ Beats, Sound ▸ Show Beats): the app's own music knows its beats (tempo, 4 a bar, from 0); any other song is listened to on device (`BeatDetector`: spectral flux with Accelerate, `BeatFinder`: tempo by autocorrelation 70–180 bpm preferring ~120, grid fitted to the onsets by a straight line, bars where the low notes are strongest; a fixed 35 ms latency corrected, checked with a click track). Shown as ticks on the music lane (taller on bars); while shown, every dragged edge snaps to them. Add Beat / Remove Beat at the playhead, Find Again. Beats are stored in the song's time, so they follow its start, a later start and loops.
@@ -289,7 +305,8 @@ The P0 list from `research/shorts-editor-research.md` §5. Each stage ends with 
 10. **CapCut research done (2026-11-12, `research/capcut/`)**: the user wants **iMovie's look and feel with CapCut's features**. Stages G–L with checklists: **"CapCut list: stages G–L"** below (details in `research/capcut/capcut-reverse-engineering.md` §7).
 11. ~~Stage G, captions the CapCut way~~ (done 2026-11-13, all of it, committed).
 12. ~~Stage I, rhythm~~ (done 2026-11-13, all of it, committed).
-13. **Next:** Stage H, text, stickers and voice.
+13. ~~Stage H, text, stickers and voice~~ (done 2026-11-13, all of it, committed).
+14. **Next:** Stage J, effects.
 
 ## CapCut list: stages G–L (to do, decided 2026-11-12)
 
@@ -301,8 +318,8 @@ The P0 list from `research/shorts-editor-research.md` §5. Each stage ends with 
 |---|---|---|
 | G | Captions, the CapCut way | **done** 2026-11-13, committed |
 | I | Rhythm: beats and speed curves | **done** 2026-11-13, committed |
-| H | Text, stickers and voice | **next** |
-| J | Effects | to do |
+| H | Text, stickers and voice | **done** 2026-11-13, committed |
+| J | Effects | **next** |
 | K | Cut-outs | to do |
 | L | Templates and finding moments | to do |
 
@@ -325,11 +342,11 @@ Why first: the user asked for it, and their real CapCut Short ("Studiare per la 
 - [x] Music that starts later or loops
 
 ### Stage H: text, stickers and voice
-- [ ] Title looks grid (~12 presets); exits and loop animations
-- [ ] 4–6 text templates: Hook, Subscribe, Part 2, Top 3 number, Question, "Link in description"
-- [ ] Stickers: emoji, arrows, shapes (SF Symbols), with the same animations
-- [ ] Titles and stickers **follow a subject** (Vision tracking)
-- [ ] **Text to speech** from a title or script line (system voices / Personal Voice), placed as a voice-over and captioned by G
+- [x] Title looks grid (~12 presets); exits and loop animations
+- [x] 4–6 text templates: Hook, Subscribe, Part 2, Top 3 number, Question, "Link in description"
+- [x] Stickers: emoji, arrows, shapes (SF Symbols), with the same animations
+- [x] Titles and stickers **follow a subject** (Vision tracking)
+- [x] **Text to speech** from a title or script line (system voices / Personal Voice), placed as a voice-over and captioned by G
 
 ### Stage J: effects
 - [ ] ~12 effects attached to a clip and following it: Shake, Flash, Zoom Pulse, Glitch, RGB Split, VHS, Film Grain, Light Leak, Blur In/Out, Vignette Pulse, Mirror, Black & White Pop; strength + length
@@ -360,6 +377,7 @@ Why first: the user asked for it, and their real CapCut Short ("Studiare per la 
 - Remove Pauses: the shortest pause cut is fixed at 0.3 s (not a slider). Detection is by loudness only, so steady background music or noise above the threshold isn't seen as a pause; lowering "What counts as a pause" is the fix. Clips whose file has no sound are left alone.
 - Playback times from AVPlayer are in nanoseconds; compare them with model times only after `snappedToFrame()` (a skip loop came from this).
 - The Highlight style's green box can blend into green backgrounds.
+- Stickers are titles underneath: they share the titles lane and the export check for covered titles. Following is 2-D only (no scale/rotation following) and stops where the subject is lost or the clip changes. Spoken voice-overs stay in Application Support (not cleaned up).
 - Titles: the text is saved when editing ends (Return or clicking away), so the viewer updates then, not while typing. No snapping when dragging on the timeline. Overlapping titles share one lane row and are drawn on top of each other. One font (the system font) for all styles; no colour picker.
 - SwiftUI text fields hand the old value back to their binding as focus leaves. Editing fields that save on end (caption lines, title text) only accept changes while focused; otherwise what was typed is lost.
 - Saving: one window, one Short at a time (no DocumentGroup: the single-window model, shared `EditorModel` and Finder media import made a custom store simpler). No versions browser and no "Revert". Media bookmarks are app-scoped, so a project copied to another Mac (or user) needs Find Missing Files… there. Writing tries an atomic write first and falls back to a plain one if the sandbox refuses the temporary file. In an Open panel a folder has to be *selected* (not just opened) for "Use" to work, as everywhere in macOS. `screencapture` of the app window misses separate windows (Open panel, alerts): capture their region (`System Events … get {position, size} of windows`).

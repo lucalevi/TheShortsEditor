@@ -35,6 +35,9 @@ struct ContentView: View {
         .sheet(isPresented: $model.choosesStoryboard) {
             StoryboardChooser(model: model)
         }
+        .sheet(item: $model.speechRequest) { request in
+            SpeechSheet(model: model, request: request)
+        }
         .alert(item: $model.alert) { alert in
             Alert(title: Text(alert.title), message: Text(alert.message))
         }
@@ -108,6 +111,14 @@ struct EditorView: View {
                 Button("Title", systemImage: "textformat") { model.addTitle() }
                     .help("Add text over the video at the playhead, like a hook (⌘T)")
                     .disabled(model.project.timeline.clips.isEmpty)
+            }
+            ToolbarItem {
+                Button("Stickers", systemImage: "face.smiling") { model.showsStickerPicker = true }
+                    .help("Add a sticker (emoji, arrow, shape) or a ready-made text at the playhead")
+                    .disabled(model.project.timeline.clips.isEmpty)
+                    .popover(isPresented: $model.showsStickerPicker, arrowEdge: .bottom) {
+                        StickerPicker(model: model)
+                    }
             }
             ToolbarItem {
                 Button("Music", systemImage: "music.note") {

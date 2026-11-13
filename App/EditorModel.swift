@@ -169,6 +169,14 @@ final class EditorModel {
     var analysingLook: Set<Clip.ID> = []
     /// Listening to the music for its beats.
     var findingBeats = false
+    /// A title or sticker learning to follow something in the video, with how far it has got.
+    var tracking: (id: TextOverlay.ID, progress: Double)?
+    /// The sticker and ready-made text picker is open.
+    var showsStickerPicker = false
+    /// The text-to-speech sheet, when open.
+    var speechRequest: SpeechRequest?
+    /// Making a voice from text.
+    var makingSpeech = false
     /// Smooth slow-motion copies being made, by clip, with how far they have got (0…1).
     var smoothing: [Clip.ID: Double] = [:]
     /// Copies that couldn't be made, so they aren't tried again after every rebuild.

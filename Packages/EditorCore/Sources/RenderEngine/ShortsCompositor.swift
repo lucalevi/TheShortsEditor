@@ -352,20 +352,25 @@ nonisolated final class ShortsCompositor: NSObject, AVVideoCompositing, Sendable
 
     private func titleImage(_ state: TitleTrack.State) -> CIImage? {
         let title = state.title, scale = state.scale
-        let key = "title|\(title.look.hashValue)|\(title.text)|\(state.visibleCharacters ?? -1)"
+        let key = title.sticker.map { "sticker|\($0.hashValue)" } ?? "title|\(title.look.hashValue)|\(title.text)|\(state.visibleCharacters ?? -1)"
         guard let placement = TitleRenderer.placement(of: title),
-              let cgImage = cachedImage(key, make: { TitleRenderer.image(text: title.text, look: title.look, visibleCharacters: state.visibleCharacters) })
+              let cgImage = cachedImage(key, make: { TitleRenderer.image(of: title, visibleCharacters: state.visibleCharacters) })
         else { return nil }
         let size = CGSize(width: cgImage.width, height: cgImage.height)
         var image = CIImage(cgImage: cgImage)
-        if scale != 1 {
+        if state.blur > 0.5 {
+            image = image.clampedToExtent().applyingGaussianBlur(sigma: state.blur / 2).cropped(to: image.extent.insetBy(dx: -state.blur, dy: -state.blur))
+        }
+        if scale != 1 || state.rotation != 0 {
+            // Around its middle; Core Image turns anticlockwise, so clockwise degrees are negated.
             image = image.transformed(by: CGAffineTransform(translationX: -size.width / 2, y: -size.height / 2)
                 .concatenating(CGAffineTransform(scaleX: scale, y: scale))
+                .concatenating(CGAffineTransform(rotationAngle: -state.rotation * .pi / 180))
                 .concatenating(CGAffineTransform(translationX: size.width / 2, y: size.height / 2)))
         }
         let canvas = Project.canvasSize
         return image.transformed(by: CGAffineTransform(
-            translationX: placement.image.minX,
+            translationX: placement.image.minX + state.xOffset,
             y: canvas.height - placement.image.maxY - state.yOffset
         ))
     }

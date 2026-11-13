@@ -118,13 +118,15 @@ extension EditorModel {
         let name = name.trimmingCharacters(in: .whitespaces)
         guard !name.isEmpty else { return }
         savedTextStyles.removeAll { $0.name == name }
-        savedTextStyles.append(SavedTextStyle(name: name, look: title.look, entrance: title.entrance))
+        savedTextStyles.append(SavedTextStyle(name: name, look: title.look, entrance: title.entrance, exit: title.exit, loop: title.loop))
     }
 
     func applySavedStyle(_ style: SavedTextStyle, to titleID: TextOverlay.ID) {
         editTitle(titleID, "Use Saved Style") { title in
             title.look = style.look
             title.entrance = style.entrance
+            title.exit = style.exit
+            title.loop = style.loop
         }
     }
 

@@ -10,7 +10,7 @@ struct InspectorView: View {
             PanelHeader(title: model.silenceSession != nil ? "Remove Pauses"
                         : model.timelineRange != nil ? "Range"
                         : model.timelineSelection.count > 1 ? "\(model.timelineSelection.count) Selected"
-                        : model.selectedTitle != nil ? "Title"
+                        : model.selectedTitle != nil ? (model.selectedTitle?.isSticker == true ? "Sticker" : "Title")
                         : model.selectedOverlay != nil ? "Over the Clips"
                         : model.selectedSound != nil ? (model.selectedSound!.isVoiceOver ? "Voice-Over" : model.selectedSound!.detachedFrom != nil ? "Clip Sound" : "Sound Effect")
                         : model.selection == .music && model.project.music != nil ? "Music"

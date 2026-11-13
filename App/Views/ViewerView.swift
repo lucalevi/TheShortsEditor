@@ -458,10 +458,11 @@ private struct TitleHandles: View {
         GeometryReader { geometry in
             let scale = geometry.size.width / Project.canvasSize.width
             ForEach(model.project.titlesOnScreen(at: model.currentTime)) { title in
-                if let frame = TitlePreview.frame(of: title) {
+                if let frame = TitlePreview.frame(of: title), let shown = TitlePreview.frame(of: title, at: model.currentTime) {
                     let isSelected = model.selectedTitleID == title.id
                     let offset = drag?.id == title.id ? drag!.offset : .zero
-                    let rect = clamped(frame.offsetBy(dx: offset.width / scale, dy: offset.height / scale))
+                    // Where it is now (following something, it has moved from where it was put).
+                    let rect = clamped(shown.offsetBy(dx: offset.width / scale, dy: offset.height / scale))
                     RoundedRectangle(cornerRadius: 4)
                         .strokeBorder(style: StrokeStyle(lineWidth: isSelected ? 2 : 1, dash: isSelected ? [] : [4, 3]))
                         .foregroundStyle(isSelected ? Color.yellow : Color.white.opacity(hovered == title.id || drag != nil ? 0.9 : 0))
@@ -472,7 +473,7 @@ private struct TitleHandles: View {
                         .pointerStyle(.grabIdle)
                         .onTapGesture(count: 2) {
                             model.selectedTitleID = title.id
-                            model.wantsTitleTextFocus = true
+                            if !title.isSticker { model.wantsTitleTextFocus = true }
                         }
                         .onTapGesture { model.selectedTitleID = title.id }
                         .gesture(DragGesture(minimumDistance: 2).onChanged { value in
@@ -490,7 +491,7 @@ private struct TitleHandles: View {
                             let moved = clamped(frame.offsetBy(dx: offset.width / scale, dy: offset.height / scale))
                             let vertical = Double(moved.midY / Project.canvasSize.height)
                             let across = Double(moved.midX / Project.canvasSize.width)
-                            model.editTitle(title.id, "Move Title") { title in
+                            model.editTitle(title.id, title.isSticker ? "Move Sticker" : "Move Title") { title in
                                 title.verticalPosition = min(max(vertical, 0), 1)
                                 title.horizontalPosition = abs(across - 0.5) < 0.005 ? 0.5 : min(max(across, 0), 1)
                             }

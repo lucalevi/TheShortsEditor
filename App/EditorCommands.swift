@@ -242,6 +242,34 @@ struct EditorCommands: Commands {
             Button("Add Title") { model.addTitle() }
                 .keyboardShortcut("t")
                 .disabled(model.project.timeline.clips.isEmpty)
+            Menu("Add Ready-Made Text") {
+                ForEach(TextTemplate.allCases) { template in
+                    Button(template.displayName) { model.addTextTemplate(template) }
+                }
+            }
+            .disabled(model.project.timeline.clips.isEmpty)
+            Menu("Add Sticker") {
+                Menu("Emoji") {
+                    ForEach(StickerCatalog.emoji, id: \.self) { emoji in
+                        Button(emoji) { model.addSticker(Sticker(.emoji(emoji))) }
+                    }
+                }
+                ForEach(StickerCatalog.groups) { group in
+                    Menu(group.name) {
+                        ForEach(group.symbols) { symbol in
+                            Button(symbol.displayName, systemImage: symbol.name) { model.addSticker(Sticker(.symbol(symbol.name))) }
+                        }
+                    }
+                }
+                Divider()
+                Button("Show All Stickers…") { model.showsStickerPicker = true }
+            }
+            .disabled(model.project.timeline.clips.isEmpty)
+            Button("Follow Something in the Video") { if let id = model.selectedTitleID { model.followInVideo(id) } }
+                .disabled(model.selectedTitleID == nil || model.tracking != nil)
+            Divider()
+            Button("Speak Text…") { model.beginSpeech(for: model.selectedTitleID) }
+                .disabled(model.project.timeline.clips.isEmpty || model.speechRequest != nil)
             Divider()
             Button("Make Captions") { model.makeCaptions() }
                 .disabled(model.project.timeline.clips.isEmpty || model.captionJob != nil)
