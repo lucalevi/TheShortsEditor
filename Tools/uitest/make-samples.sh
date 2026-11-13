@@ -18,4 +18,6 @@ ffmpeg -loglevel error -y -f lavfi -i "aevalsrc='0.25*(sin(2*PI*220*t)+sin(2*PI*
 ffmpeg -loglevel error -y -f lavfi -i "mandelbrot=size=1080x1920:rate=30" -t 4 -c:v h264_videotoolbox -b:v 6M $OUT/broll-sample.mp4
 ffmpeg -loglevel error -y -f lavfi -i "testsrc=size=1600x1200:rate=1" -frames:v 1 $OUT/photo-sample.jpg
 ffmpeg -loglevel error -y -f lavfi -i "rgbtestsrc=size=1080x1920:rate=1" -frames:v 1 $OUT/portrait-sample.png
+# A green screen with a moving patterned square in front, for Stage K (keying, Remove Background).
+ffmpeg -loglevel error -y -f lavfi -i "color=c=0x33BF4D:s=1080x1920:r=30:d=5" -f lavfi -i "testsrc2=size=500x700:rate=30:duration=5" -filter_complex "[0][1]overlay=x='200+150*sin(t*2)':y=600,format=yuv420p" -c:v h264_videotoolbox -allow_sw 1 -b:v 6M $OUT/greenscreen-sample.mp4
 echo $OUT

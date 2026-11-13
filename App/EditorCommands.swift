@@ -221,6 +221,18 @@ struct EditorCommands: Commands {
             Toggle("Steady Shaky Video", isOn: Binding(get: { !steadiable.isEmpty && steadiable.allSatisfy { $0.steadiness > 0 } },
                                                       set: { on in model.setSteadiness(on ? Clip.defaultSteadiness : 0, for: steadiable.map(\.id)) }))
                 .disabled(steadiable.isEmpty)
+            let cuttable = lookTargets.filter(model.canCutOut)
+            Menu("Remove Background") {
+                Button("Off") { model.setRemoveBackground(nil, for: cuttable.map(\.id)) }
+                Divider()
+                ForEach(CutoutSubject.allCases) { subject in
+                    Button("Keep \(subject.displayName)") { model.setRemoveBackground(subject, for: cuttable.map(\.id)) }
+                }
+            }
+            .disabled(cuttable.isEmpty)
+            Toggle("Green Screen", isOn: Binding(get: { cuttable.count == 1 && cuttable[0].cutout.key != nil },
+                                                 set: { on in if let clip = cuttable.first { model.setColorKey(on, for: clip.id) } }))
+                .disabled(cuttable.count != 1)
             Divider()
             Button("Follow the Subject") { if let clip = selectedClips.first { model.followSubject(clip.id) } }
                 .disabled(selectedClips.count != 1 || model.reframing != nil)

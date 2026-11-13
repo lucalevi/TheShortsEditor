@@ -7,9 +7,12 @@ import SwiftUI
 struct ColorPick: Equatable {
     var clipID: Clip.ID
     var target: ColorAdjustments.BalanceTarget
+    /// Picks the green screen's colour instead (Stage K).
+    var forKey = false
 
     var prompt: String {
-        switch target {
+        if forKey { return "Click the green or blue screen in the picture" }
+        return switch target {
         case .white: "Click something white or grey in the picture"
         case .skin: "Click someone's skin in the picture"
         }
@@ -207,6 +210,10 @@ extension EditorModel {
     func pickColor(at point: CGPoint) {
         guard let pick = colorPick else { return }
         colorPick = nil
+        if pick.forKey {
+            pickKeyColor(at: point, for: pick.clipID)
+            return
+        }
         var plain = project
         plain.updateLook(of: pick.clipID) { $0 = ClipLook() }
         plain.look = nil

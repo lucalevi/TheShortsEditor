@@ -12,6 +12,14 @@ struct PictureSection: View {
     @State private var dragging: (scale: Double?, rotation: Double?) = (nil, nil)
 
     private var placement: Placement { model.placementAtPlayhead(of: clip) }
+
+    private static func backgroundHint(_ background: ClipBackground) -> String {
+        switch background {
+        case .blur: "Where the picture doesn't reach, a blurred copy of it fills the screen."
+        case .black: "Where the picture doesn't reach (or is cut out), the screen is black."
+        case .color: "Where the picture doesn't reach (or is cut out), the screen is this colour."
+        }
+    }
     private var isOnScreen: Bool { model.adjustableClip?.id == clip.id }
 
     var body: some View {
@@ -34,9 +42,23 @@ struct PictureSection: View {
                     .labelsHidden()
                     .fixedSize()
                 }
-                Text(clip.background == .blur
-                     ? "Where the picture doesn't reach, a blurred copy of it fills the screen."
-                     : "Where the picture doesn't reach, the screen is black.")
+                if clip.background == .color {
+                    ColorRow(title: "Colour", selection: clip.backgroundColor) { color in
+                        if let color { model.setBackgroundColor(color, for: [clip.id]) }
+                    }
+                    HStack(spacing: 6) {
+                        Text("Other colour").font(.caption).foregroundStyle(.secondary)
+                        ColorPicker("Other colour", selection: Binding(get: { Color(clip.backgroundColor) }, set: { color in
+                            guard let c = NSColor(color).usingColorSpace(.sRGB) else { return }
+                            model.setBackgroundColor(RGBA(c.redComponent, c.greenComponent, c.blueComponent), for: [clip.id])
+                        }), supportsOpacity: false)
+                        .labelsHidden()
+                        .help("Any other colour")
+                    }
+                }
+                Text(clip.background == .blur && clip.cutout.isSeeThrough
+                     ? "A cut-out picture shows black behind it. Choose Colour for another colour."
+                     : Self.backgroundHint(clip.background))
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)

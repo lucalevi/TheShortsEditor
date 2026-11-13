@@ -134,6 +134,8 @@ public enum ClipBackground: String, Codable, CaseIterable, Identifiable, Sendabl
     /// A blurred, enlarged copy of the same picture: the usual look for horizontal footage in a Short.
     case blur
     case black
+    /// A plain colour (`Clip.backgroundColor`).
+    case color
 
     public var id: String { rawValue }
 
@@ -141,6 +143,7 @@ public enum ClipBackground: String, Codable, CaseIterable, Identifiable, Sendabl
         switch self {
         case .blur: "Blurred"
         case .black: "Black"
+        case .color: "Colour"
         }
     }
 }

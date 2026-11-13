@@ -181,6 +181,11 @@ private struct ClipInspector: View {
             EffectsSection(model: model, clip: clip)
                 .id(clip.id)
 
+            if model.canCutOut(clip) {
+                CutoutSection(model: model, clip: clip, isMain: true)
+                    .id(clip.id)
+            }
+
             if clip.isFrozen {
                 FreezeSection(model: model, clip: clip)
             } else if asset?.isImage != true {
@@ -309,6 +314,11 @@ private struct OverlayInspector: View {
 
             EffectsSection(model: model, clip: overlay.clip)
                 .id(overlay.clip.id)
+
+            if model.canCutOut(overlay.clip) {
+                CutoutSection(model: model, clip: overlay.clip, isMain: false)
+                    .id(overlay.clip.id)
+            }
 
             if asset?.isImage != true {
                 SpeedSection(model: model, clips: [overlay.clip])

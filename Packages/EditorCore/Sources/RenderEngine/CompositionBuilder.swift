@@ -354,6 +354,17 @@ private struct MediaSources {
         return asset
     }
 
+    /// The asset `clip`'s picture is read from: its see-through copy (Remove Background), once
+    /// made, else its own file.
+    mutating func pictureAsset(for clip: Clip, media: MediaAsset) -> AVURLAsset {
+        let url = CutoutCache.pictureURL(for: clip, media: media)
+        guard url != media.url else { return asset(media) }
+        let key = "cutout|\(url.path)"
+        let asset = cleanedAssets[key] ?? AVURLAsset(url: url)
+        cleanedAssets[key] = asset
+        return asset
+    }
+
     /// The sound `clip` plays: its file's, cleaned up (see `VoiceCleaner`) and/or through a voice
     /// effect or EQ (see `SoundProcessor`) when those have been made.
     mutating func audioTrack(for clip: Clip) async throws -> AVAssetTrack? {
@@ -384,7 +395,7 @@ private struct MediaSources {
         if let media, media.hasVideo, !media.isImage, clip.isFrozen {
             // A freeze frame: one picture of the video, read once.
             if isMain { try await CompositionBuilder.insertBlack(into: track, at: start, duration: clip.duration) }
-            if let still = await FrameStills.still(of: media.url, at: clip.sourceStart) {
+            if let still = await FrameStills.still(of: CutoutCache.pictureURL(for: clip, media: media), at: clip.sourceStart) {
                 return make(.frame(still), still.naturalSize, still.preferredTransform)
             }
             missing.insert(media.id)
@@ -392,21 +403,23 @@ private struct MediaSources {
         }
         if let media, media.isImage {
             if isMain { try await CompositionBuilder.insertBlack(into: track, at: start, duration: clip.duration) }
-            if let image = StillImages.image(at: media.url) {
-                return make(.image(media.url), CGSize(width: image.width, height: image.height))
+            let url = CutoutCache.pictureURL(for: clip, media: media)
+            if let image = StillImages.image(at: url) {
+                return make(.image(url), CGSize(width: image.width, height: image.height))
             }
             missing.insert(media.id)
             return make(.none, Project.canvasSize)
         }
         // Smooth slow motion plays a copy with pictures made up in between, once it has been made.
         var smooth: (track: AVAssetTrack, shift: CMTime)?
-        if let media, let copy = FrameInterpolator.existingCopy(for: clip, media: media) {
+        // (Not for a clip without its background: its own copy is played instead.)
+        if let media, clip.cutout.removeBackground == nil, let copy = FrameInterpolator.existingCopy(for: clip, media: media) {
             let key = "smooth|\(copy.url.path)"
             let copyAsset = cleanedAssets[key] ?? AVURLAsset(url: copy.url)
             cleanedAssets[key] = copyAsset
             if let track = try? await copyAsset.loadTracks(withMediaType: .video).first { smooth = (track, copy.range.start) }
         }
-        if let media, media.hasVideo, let original = try? await asset(media).loadTracks(withMediaType: .video).first {
+        if let media, media.hasVideo, let original = try? await pictureAsset(for: clip, media: media).loadTracks(withMediaType: .video).first {
             let video = smooth?.track ?? original
             let shift = smooth?.shift ?? .zero
             let available = try await video.load(.timeRange)
@@ -453,7 +466,7 @@ private struct MediaSources {
         }
         // Pictures, freeze frames and missing media look the same before and after.
         guard case .track = layer.source, let media = project.asset(id: clip.assetID),
-              let video = try? await asset(media).loadTracks(withMediaType: .video).first else { return layer }
+              let video = try? await pictureAsset(for: clip, media: media).loadTracks(withMediaType: .video).first else { return layer }
         let length = CMTimeMultiplyByFloat64(half, multiplier: clip.speed(atOffset: before ? .zero : clip.duration - .oneFrame))
         let source = before ? CMTimeRange(start: clip.sourceStart - length, duration: length) : CMTimeRange(start: clip.sourceRange.end, duration: length)
         let available = try await video.load(.timeRange)
@@ -463,7 +476,7 @@ private struct MediaSources {
             return make(.track(track.trackID), layer.naturalSize, layer.preferredTransform)
         }
         let held = before ? clip.sourceStart : clip.sourceTime(atOffset: clip.duration - .oneFrame)
-        if let still = await FrameStills.still(of: media.url, at: held) {
+        if let still = await FrameStills.still(of: CutoutCache.pictureURL(for: clip, media: media), at: held) {
             return make(.frame(still), still.naturalSize, still.preferredTransform)
         }
         return make(.none, Project.canvasSize, .identity)

@@ -16,7 +16,9 @@ Stages 1–7 are done, tested on screen, committed and pushed to https://github.
 | 6 | Audio: clip volume, music with ducking, loudness on export | 2026-11-09 |
 | 7 | Save/open projects, autosave, missing media | 2026-11-09 |
 
-**Pick up here (2026-11-13, latest):** Stage J (effects) is built, tested, checked on screen, committed and pushed. Next: Stage K (cut-outs). "My Short 17" now also has a Glitch effect on its first clip.
+**Pick up here (2026-11-13, latest):** Stage K (cut-outs) is built, tested, checked on screen, committed and pushed. Next: Stage L (templates and finding moments). "My Short 17" now also has `greenscreen-sample` as its last main clip (Main subject removed, heart shape, yellow behind) and as B-roll at 0:07.8 (green screen, Lighten). `Tools/uitest/.samples/greenscreen-sample.mp4` was added (also in `make-samples.sh`).
+
+**Before that (2026-11-13):** Stage J (effects) is built, tested, checked on screen, committed and pushed (2098287). "My Short 17" now also has a Glitch effect on its first clip.
 
 **Before that (2026-11-13):** Stage H (text, stickers and voice) is built, tested, checked on screen, committed and pushed (2609751). "My Short 17" now also has a Subscribe template (pill title + bell sticker following), and a spoken "Subscribe" voice-over.
 
@@ -26,7 +28,21 @@ Stages 1–7 are done, tested on screen, committed and pushed to https://github.
 
 **Before that (2026-11-12):** CapCut was researched (`research/capcut/README.md`); next is Stage G (captions), see "CapCut list: stages G–L" below. **Before that (2026-11-11):** Stage F of the iMovie list ("One-click Shorts", `research/imovie/imovie-reverse-engineering.md`) is built, tested, checked on screen and committed. With it, every stage of the iMovie list (A–F) is done. Stage E is committed (5e708e6); its Photos tab is still unchecked on screen. Next: ask the user (see "What's next"). Test footage and a closed scratch iMovie library are in `~/Movies/ShortsEditorResearch` (safe to delete). Test Shorts "My Short 5"–"My Short 12" are in the library (safe to delete); "My Short 12" has a look, Stabilize, two markers and a slid clip from the on-screen checks.
 
-### Stage J: effects (2026-11-13): done, committed
+### Stage K: cut-outs (2026-11-13): done, committed
+
+Model in `EditorCore/Cutouts.swift` (`CutoutSubject`, `ColorKey`, `ClipMask`, `BlendMode`, `ClipCutout` on `Clip.cutout`) plus `ClipBackground.color`/`Clip.backgroundColor`; settings kind `.cutout` ("Cut-out") for Copy/Paste/Reset Settings (`CutoutTests`: 9). `RenderEngine/CutoutRenderer.swift` (key, masks, blends) used in `ShortsCompositor`; `RenderEngine/CutoutMaker.swift` (`CutoutMaker`, `CutoutCache`) (`CutoutRenderTests`: 9). App: `App/EditorModel+Cutouts.swift`, `App/Views/CutoutViews.swift`, Picture section (Colour), Clip menu, timeline badges. New fields are optional in the file (no version bump).
+1. **Remove Background** (clip and B-roll inspector ▸ Cut-out; Clip ▸ Remove Background): Off / People (Vision person segmentation, accurate) / Main subject (Vision subject lifting). A see-through copy of the file is made once, in the background with a progress bar (≈0.1 s a frame: a 30 s clip takes about a minute), and kept in `Caches/Shorts Editor/Cut-outs` (HEVC with transparency, same frame times, at most 1920 px; a PNG for pictures). Until it is made the clip shows its whole picture. Edges are smoothed a little from frame to frame. A cut-out main clip shows black or its colour behind it; cut-out B-roll shows the clips under it.
+2. **Green screen** (Cut-out ▸ Green screen; Clip ▸ Green Screen): turning it on finds the screen's colour in the clip (the most common strong colour, else green); **Pick from Video** reads the colour where you click in the viewer (with the key off). Strength, Soft edge, Clean tint (takes the green glow off edges, keeps brightness). Drawn as a `CIColorCube` with alpha after the clip's colours.
+3. **Shapes (masks)**: None, Line (keeps the top), Band, Circle, Rectangle (round corners), Heart, Star, drawn on the clip's frame in the grid; Across, Up/down, Size, Stretch, Turn, Soft edge, Corners, "Hide the shape instead". The shape sits on the picture, so it moves and scales with it. Sliders show live while dragged (`LivePreview.setCutout`).
+4. **Blend modes for B-roll** ("Mix with the clips under it"): Normal, Darken (multiply), Lighten (screen), Overlay, Soft Light, Hard Light, Add, Difference, Darker Only, Lighter Only, Burn, Dodge.
+5. **Colour behind a picture**: Around it ▸ Colour, with the swatches and any other colour.
+6. Fixes found on screen: Add used `CIAdditionCompositing`, whose alpha went past 1 and took the clip below away again (now `CILinearDodgeBlendMode`); the inspector grew sideways (segmented picker with a two-line label, an unwrapped hint, the colour row plus well, a lazy grid) — all fixed.
+
+Tests: 409 model + 129 render + 3 transcription = 541, all pass.
+Verified on screen: green screen found automatically on a main clip and on B-roll, Pick from Video, the shape grid on the clip's frame, Heart (soft edge, badge), Main subject removal with progress, the copy used (backdrop gone), Colour behind (white, yellow), Lighten on B-roll, all kept after quitting and reopening.
+Not yet verified on screen: People on real footage with a person (no such sample; Vision ran on test patterns only), dragging the key and mask sliders (live preview), other shapes and blend modes on screen (all pixel-tested), the Clip menu items, export with cut-outs, a freeze frame of a cut-out clip.
+
+### Stage J: effects (2026-11-13): done, committed (2098287)
 
 Model in `EditorCore/Effects.swift` (`EffectKind`, `EffectPart`, `ClipEffect`, `Clip.effects`, `activeEffects`) (`EffectTests`: 5); `RenderEngine/EffectRenderer.swift` (Core Image), applied in `ShortsCompositor.draw` before the clip's animation; 12 new synthesized sounds in `SoundLibrary` (`EffectRenderTests`: 8); app in `App/EditorModel+Effects.swift`, `App/Views/EffectViews.swift`. `Clip.effects` is optional in the file (no version bump).
 1. **12 effects attached to a clip** (clip and B-roll inspector ▸ Effects; Clip ▸ Add Effect): Shake, Flash, Zoom Pulse, Glitch, Colour Split, Old Tape (VHS), Film Grain, Light Leak, Blur, Dark Edges (vignette pulse), Mirror, Colour Pop (black and white except strong colours). The grid is drawn on the clip's own frame (like the filters); click adds (the clip's part plays), click again takes it off (a tick and frame show which are on). Each added effect has **Plays**: Whole clip / At the start / At the end (start fades it out, end fades it in: Blur at the start = Blur In, at the end = Blur Out), **Strength**, **Length** (0.2–3 s), Play and Remove. One of each kind per clip. Effects follow their clip: a split keeps start effects on the first part and end effects on the second; they are copied/reset with the clip's Look (Copy/Paste/Reset Settings). Random-looking effects (shake, glitch, tape, grain) are worked out from the frame number, so preview and export match. The timeline shows a wand badge with the count.
@@ -320,7 +336,8 @@ The P0 list from `research/shorts-editor-research.md` §5. Each stage ends with 
 12. ~~Stage I, rhythm~~ (done 2026-11-13, all of it, committed).
 13. ~~Stage H, text, stickers and voice~~ (done 2026-11-13, all of it, committed).
 14. ~~Stage J, effects~~ (done 2026-11-13, all of it, committed).
-15. **Next:** Stage K, cut-outs.
+15. ~~Stage K, cut-outs~~ (done 2026-11-13, all of it, committed).
+16. **Next:** Stage L, templates and finding moments.
 
 ## CapCut list: stages G–L (to do, decided 2026-11-12)
 
@@ -334,8 +351,8 @@ The P0 list from `research/shorts-editor-research.md` §5. Each stage ends with 
 | I | Rhythm: beats and speed curves | **done** 2026-11-13, committed |
 | H | Text, stickers and voice | **done** 2026-11-13, committed |
 | J | Effects | **done** 2026-11-13, committed |
-| K | Cut-outs | **next** |
-| L | Templates and finding moments | to do |
+| K | Cut-outs | **done** 2026-11-13, committed |
+| L | Templates and finding moments | **next** |
 
 ### Stage G: captions, the CapCut way
 Why first: the user asked for it, and their real CapCut Short ("Studiare per la vita", 14 s) is a voice-over with 14 captions typed by hand (CapCut's auto captions are Pro). We already have free on-device captions; G adds what's missing.
@@ -367,9 +384,9 @@ Why first: the user asked for it, and their real CapCut Short ("Studiare per la 
 - [x] ~12 more sound effects
 
 ### Stage K: cut-outs
-- [ ] Remove background (Vision person/foreground mask, offline per file, cached like Stabilize)
-- [ ] Chroma key (picker, strength, edge softness, spill)
-- [ ] Masks: line, circle, rectangle (feather, invert); canvas colour; blend modes for overlays
+- [x] Remove background (Vision person/foreground mask, offline per file, cached like Stabilize)
+- [x] Chroma key (picker, strength, edge softness, spill)
+- [x] Masks: line, circle, rectangle (feather, invert); canvas colour; blend modes for overlays (plus band, heart, star)
 
 ### Stage L: templates and finding moments
 - [ ] Templates = storyboards with fixed timings, text and transitions, cut on the beat ("Fill a template")

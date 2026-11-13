@@ -60,6 +60,10 @@ public struct Clip: Identifiable, Codable, Equatable, Sendable {
     public var animationOut: ClipAnimation? = nil
     /// Effects on the picture (shake, flash, glitch…), see `Effects.swift`.
     public var effects: [ClipEffect] = []
+    /// Remove Background, green screen, mask and blend mode (see `Cutouts.swift`).
+    public var cutout = ClipCutout()
+    /// The colour behind the picture when `background` is `.color`.
+    public var backgroundColor: RGBA = .white
 
     public static let maxVolume = 2.0
     /// No clip is shorter than this, so it can still be seen and grabbed on the timeline.
@@ -237,7 +241,7 @@ extension Clip {
         case fadeIn, fadeOut, volumeKeys, voiceEffect, equalizer, soundDetached
         case transitionOut, isFrozen, pictureFadeIn, pictureFadeOut, smoothSpeed
         case look, steadiness, styledMotion
-        case speedCurve, smoothSlowMotion, animationIn, animationOut, effects
+        case speedCurve, smoothSlowMotion, animationIn, animationOut, effects, cutout, backgroundColor
     }
 
     public init(from decoder: any Decoder) throws {
@@ -274,6 +278,8 @@ extension Clip {
         animationIn = try? c.decodeIfPresent(ClipAnimation.self, forKey: .animationIn)
         animationOut = try? c.decodeIfPresent(ClipAnimation.self, forKey: .animationOut)
         effects = (try? c.decodeIfPresent([ClipEffect].self, forKey: .effects)) ?? []
+        cutout = (try? c.decodeIfPresent(ClipCutout.self, forKey: .cutout)) ?? ClipCutout()
+        backgroundColor = (try? c.decodeIfPresent(RGBA.self, forKey: .backgroundColor)) ?? .white
     }
 
     public func encode(to encoder: any Encoder) throws {
@@ -309,5 +315,7 @@ extension Clip {
         try c.encodeIfPresent(animationIn, forKey: .animationIn)
         try c.encodeIfPresent(animationOut, forKey: .animationOut)
         if !effects.isEmpty { try c.encode(effects, forKey: .effects) }
+        if !cutout.isEmpty { try c.encode(cutout, forKey: .cutout) }
+        if backgroundColor != .white { try c.encode(backgroundColor, forKey: .backgroundColor) }
     }
 }

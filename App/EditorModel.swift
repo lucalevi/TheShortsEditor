@@ -165,6 +165,10 @@ final class EditorModel {
     var steadying: [MediaAsset.ID: Double] = [:]
     /// Files whose shake couldn't be measured, so it isn't tried again after every rebuild.
     @ObservationIgnored var unsteadiable: Set<MediaAsset.ID> = []
+    /// See-through copies being made for Remove Background (by file and subject), with how far they have got.
+    var cuttingOut: [String: Double] = [:]
+    /// Copies that couldn't be made, so they aren't tried again after every rebuild.
+    @ObservationIgnored var uncuttable: Set<String> = []
     /// Clips being looked at for Enhance or Match Color.
     var analysingLook: Set<Clip.ID> = []
     /// Listening to the music for its beats.
@@ -1215,6 +1219,7 @@ final class EditorModel {
                 seek(to: time)
                 prepareMissingProcessedSounds()
                 prepareMissingSteadiness()
+                prepareMissingCutouts()
                 prepareMissingSmoothSlowMotion()
                 remakeMissingStyleMusic()
             } catch {

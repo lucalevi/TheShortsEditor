@@ -1673,6 +1673,14 @@ private struct ClipBlock: View, Equatable {
                         if clip.steadiness > 0 {
                             Image(systemName: "hand.raised.slash").help("Steadied")
                         }
+                        if clip.cutout.removeBackground != nil {
+                            Image(systemName: "person.and.background.dotted").help("Background removed")
+                        } else if clip.cutout.key != nil {
+                            Image(systemName: "person.crop.square.filled.and.at.rectangle").help("Green screen taken away")
+                        }
+                        if let mask = clip.cutout.mask {
+                            Image(systemName: mask.shape.systemImage).help("Shape: \(mask.shape.displayName)")
+                        }
                         if clip.hasMotion {
                             Image(systemName: "move.3d").help("The picture moves")
                         } else if clip.placement.scale != 1 {

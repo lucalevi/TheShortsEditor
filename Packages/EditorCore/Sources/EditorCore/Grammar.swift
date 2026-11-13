@@ -389,6 +389,8 @@ public enum SettingsKind: String, CaseIterable, Identifiable, Sendable {
     case sound
     /// Colour, filter and Stabilize.
     case look
+    /// Remove Background, green screen, mask and blend mode.
+    case cutout
 
     public var id: String { rawValue }
 
@@ -399,6 +401,7 @@ public enum SettingsKind: String, CaseIterable, Identifiable, Sendable {
         case .speed: "Speed"
         case .sound: "Sound"
         case .look: "Look"
+        case .cutout: "Cut-out"
         }
     }
 }
@@ -417,6 +420,7 @@ public extension Project {
                 clip.framing = source.framing
                 clip.placement = source.placement
                 clip.background = source.background
+                clip.backgroundColor = source.backgroundColor
                 clip.pictureFadeIn = source.pictureFadeIn
                 clip.pictureFadeOut = source.pictureFadeOut
                 if !kinds.contains(.motion) { clip.keyframes = [] }
@@ -446,6 +450,7 @@ public extension Project {
                 clip.steadiness = source.steadiness
                 clip.effects = source.effects.map { var effect = $0; effect.id = UUID(); return effect }
             }
+            if kinds.contains(.cutout) { clip.cutout = source.cutout }
         }
     }
 
@@ -476,6 +481,7 @@ public extension Project {
                 clip.steadiness = 0
                 clip.effects = []
             }
+            if kinds.contains(.cutout) { clip.cutout = ClipCutout() }
         }
     }
 
@@ -491,6 +497,7 @@ public extension Project {
         if clip.speed != 1 { kinds.insert(.speed) }
         if clip.volume != 1 || clip.cleansVoice || clip.hasSoundShaping || (isMain && clip.isMuted) { kinds.insert(.sound) }
         if !clip.look.isNeutral || clip.steadiness > 0 || !clip.effects.isEmpty { kinds.insert(.look) }
+        if !clip.cutout.isEmpty { kinds.insert(.cutout) }
         return kinds
     }
 

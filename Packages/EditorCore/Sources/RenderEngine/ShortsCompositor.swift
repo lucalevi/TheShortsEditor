@@ -95,6 +95,18 @@ public nonisolated enum LivePreview {
         placements.withLock { $0.removeAll() }
         looks.withLock { $0.removeAll() }
         shortLook.withLock { $0 = nil }
+        cutouts.withLock { $0.removeAll() }
+    }
+
+    // Cut-out sliders being dragged (green screen, mask, blend).
+    private static let cutouts = Mutex<[Clip.ID: ClipCutout]>([:])
+
+    public static func setCutout(_ cutout: ClipCutout?, for clipID: Clip.ID) {
+        cutouts.withLock { $0[clipID] = cutout }
+    }
+
+    static func cutout(for clipID: Clip.ID) -> ClipCutout? {
+        cutouts.withLock { $0[clipID] }
     }
 
     static func placement(for clipID: Clip.ID) -> Placement? {
@@ -218,7 +230,7 @@ nonisolated final class ShortsCompositor: NSObject, AVVideoCompositing, Sendable
             let base = layer.isMain ? CIImage(color: .black).cropped(to: ciRegion) : CIImage(color: .clear).cropped(to: ciRegion)
             picture = EffectRenderer.apply(effects, to: picture, in: ciRegion).composited(over: base)
         }
-        guard let state = animation else { return picture.composited(over: image) }
+        guard let state = animation else { return Self.composite(picture, of: layer, over: image) }
         if state.blur > 0.5 {
             picture = picture.clampedToExtent().applyingGaussianBlur(sigma: state.blur / 2).cropped(to: picture.extent)
         }
@@ -233,7 +245,13 @@ nonisolated final class ShortsCompositor: NSObject, AVVideoCompositing, Sendable
         if state.opacity < 1 {
             picture = picture.applyingFilter("CIColorMatrix", parameters: ["inputAVector": CIVector(x: 0, y: 0, z: 0, w: state.opacity)])
         }
-        return picture.composited(over: image)
+        return Self.composite(picture, of: layer, over: image)
+    }
+
+    /// A layer's picture over what is under it: covering it, or mixed in by its blend mode (B-roll).
+    private static func composite(_ picture: CIImage, of layer: CompositorLayer, over image: CIImage) -> CIImage {
+        let blend = layer.isMain ? .normal : (LivePreview.cutout(for: layer.clip.id) ?? layer.clip.cutout).blend
+        return CutoutRenderer.blend(picture, over: image, mode: blend)
     }
 
     /// Draws one layer over `image`: its picture framed and placed in its region (over a blurred
@@ -249,6 +267,10 @@ nonisolated final class ShortsCompositor: NSObject, AVVideoCompositing, Sendable
         if !LivePreview.showsOriginal {
             source = LookRenderer.apply(LivePreview.look(for: layer.clip.id) ?? layer.clip.look, to: source)
         }
+        // Green screen: keyed on the picture as it looks (after its colours), so a picked colour matches.
+        let cutout = LivePreview.cutout(for: layer.clip.id) ?? layer.clip.cutout
+        let unkeyed = source
+        if let key = cutout.key { source = CutoutRenderer.keyed(source, by: key) }
         var image = image
         let offset = time - layer.timelineStart
         let sourceTime = layer.clip.sourceTime(atOffset: offset)
@@ -262,19 +284,29 @@ nonisolated final class ShortsCompositor: NSObject, AVVideoCompositing, Sendable
         let height = source.extent.height
         if layer.isMain {
             let covers = layer.clip.framing.placedFrame(of: Self.displaySize(layer), placement: placement, region: region).covers(region)
-            let behind = layer.clip.background == .blur && !covers
-                ? Self.blurredBackground(source, layer: layer, sourceHeight: height)
-                : CIImage(color: .black)
+            // A see-through picture shows the colour or black behind it, not a blurred copy of itself.
+            let behind: CIImage = switch layer.clip.background {
+            case .color: CIImage(color: CIColor(red: layer.clip.backgroundColor.red, green: layer.clip.backgroundColor.green, blue: layer.clip.backgroundColor.blue))
+            case .blur where !covers && !cutout.isSeeThrough: Self.blurredBackground(unkeyed, layer: layer, sourceHeight: height)
+            default: CIImage(color: .black)
+            }
             image = behind.cropped(to: ciRegion).composited(over: image)
         }
         // Cut to the region (the canvas, or half of it) so a big picture doesn't spill over.
         var placed = source.transformed(by: Self.flipped(transform, sourceHeight: height)).cropped(to: ciRegion)
+        if let mask = cutout.mask {
+            // On the upright picture, placed like it, so it moves with it.
+            let display = Self.displaySize(layer)
+            let toCanvas = layer.clip.framing.transform(naturalSize: display, preferredTransform: .identity, canvas: region.size)
+                .concatenating(placement.transform(in: region))
+            placed = CutoutRenderer.masked(placed, by: CutoutRenderer.maskImage(mask, pictureSize: display, pictureToCanvas: toCanvas, in: ciRegion))
+        }
         let opacity = placement.opacity * (layer.isMain ? 1 : layer.clip.pictureFade(atOffset: offset))
         if opacity <= 0 { return image }
         if opacity < 1 {
             placed = placed.applyingFilter("CIColorMatrix", parameters: ["inputAVector": CIVector(x: 0, y: 0, z: 0, w: opacity)])
         }
-        return placed.composited(over: image)
+        return Self.composite(placed, of: layer, over: image)
     }
 
     private func sourceImage(for layer: CompositorLayer, request: AVAsynchronousVideoCompositionRequest) -> CIImage? {
