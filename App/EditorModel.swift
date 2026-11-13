@@ -5,6 +5,7 @@ import Observation
 import RenderEngine
 import SwiftUI
 import Transcription
+@preconcurrency import Translation
 
 /// The state of the open Short and everything the views can do to it.
 ///
@@ -186,12 +187,37 @@ final class EditorModel {
     @ObservationIgnored var recorder: AVAudioRecorder?
     @ObservationIgnored var voiceOverURL: URL?
     var captionLanguage = CaptionLanguage.preferred()
+    /// The spoken language is found by listening, rather than chosen.
+    var findsCaptionLanguage = true
+    /// What the language picker shows.
+    var captionLanguageChoice: CaptionLanguageChoice {
+        get { findsCaptionLanguage ? .automatic : .language(captionLanguage) }
+        set {
+            switch newValue {
+            case .automatic: findsCaptionLanguage = true
+            case .language(let language):
+                findsCaptionLanguage = false
+                captionLanguage = language
+            }
+        }
+    }
     /// What the caption maker is doing, while it works.
     private(set) var captionJob: CaptionJob?
     /// The captions as they appear on the timeline. Updated with every edit.
     private(set) var captionPages: [CaptionPage] = []
     /// The caption the user last clicked on the timeline, so the Captions list can show it.
     var focusedCaptionID: CaptionPage.ID?
+    /// A caption whose words should start being edited (after splitting one in two).
+    var captionToEdit: CaptionPage.ID?
+    /// Where the cursor goes in that caption, in characters.
+    var captionEditCursor = 0
+    /// What Apple Intelligence is reading the script for, while it works.
+    var wordModelJob: WordModel.Task?
+    /// Real words used as fillers ("like", "tipo"), found by Apple Intelligence in the Script panel.
+    var modelFillers: Set<Word.ID> = []
+    /// Set to start translating the captions (run by the editor's `translationTask`).
+    var translationRequest: TranslationSession.Configuration?
+    var isTranslating = false
     /// Set while the Export sheet is open.
     var exportPhase: ExportPhase?
     /// Set while the user is choosing which pauses to remove.
@@ -258,6 +284,8 @@ final class EditorModel {
     }
 
     enum CaptionJob: Equatable {
+        /// Listening to the start of the sound to find the language spoken.
+        case detecting
         /// Downloading the language's speech model, the first time it is used.
         case downloading(Double)
         /// Listening to file `index` of `count`.
@@ -584,25 +612,34 @@ final class EditorModel {
 
     // MARK: Captions
 
-    /// Transcribes the clips on the timeline that don't have captions in the chosen language yet,
-    /// then shows the captions. The result is one undoable step.
-    func makeCaptions() {
-        guard captionJob == nil else { return }
-        let language = captionLanguage
-        let assets = project.assetsNeedingTranscription(in: language)
-        guard !project.timeline.clips.isEmpty else { return }
-        sidebar = .captions
-        guard !assets.isEmpty else {
-            apply("Show Captions") { $0.captions.isVisible = true }
+    /// Transcribes what is heard in the Short (clips, B-roll with sound, voice-overs) that doesn't
+    /// have captions in the chosen language yet, then shows the captions. The result is one
+    /// undoable step. With "Find automatically", the language is the one the Short's captions are
+    /// already in, or found by listening. `quietly` keeps the panel and doesn't complain when
+    /// nothing is heard (used after recording a voice-over).
+    func makeCaptions(quietly: Bool = false) {
+        guard captionJob == nil, !project.timeline.clips.isEmpty else { return }
+        if !quietly { sidebar = .captions }
+        if findsCaptionLanguage, let inUse = project.captionLanguageInUse { captionLanguage = inUse }
+        let detects = findsCaptionLanguage && project.captionLanguageInUse == nil
+        guard detects || !project.assetsNeedingTranscription(in: captionLanguage).isEmpty else {
+            if !quietly { apply("Show Captions") { $0.captions.isVisible = true } }
             return
         }
-        captionJob = .downloading(0)
+        captionJob = detects ? .detecting : .downloading(0)
         captionTask = Task {
             defer { captionJob = nil }
             do {
+                var language = captionLanguage
+                if detects, let first = project.assetsHeard().first {
+                    language = try await Transcriber.detectLanguage(of: first.url, name: first.name, fallback: captionLanguage)
+                    captionLanguage = language
+                }
+                captionJob = .downloading(0)
                 try await Transcriber.prepare(language) { fraction in
                     if case .downloading = self.captionJob { self.captionJob = .downloading(fraction) }
                 }
+                let assets = project.assetsNeedingTranscription(in: language)
                 var transcripts: [MediaAsset.ID: Transcript] = [:]
                 for (index, asset) in assets.enumerated() {
                     try Task.checkCancellation()
@@ -610,20 +647,20 @@ final class EditorModel {
                     transcripts[asset.id] = try await Transcriber.transcribe(asset.url, name: asset.name, language: language)
                 }
                 try Task.checkCancellation()
-                apply("Make Captions") { project in
+                apply(quietly ? "Make Voice-Over Captions" : "Make Captions") { project in
                     project.transcripts.merge(transcripts) { $1 }
                     project.captions.isVisible = true
                 }
-                if !project.hasCaptions {
+                if !project.hasCaptions, !quietly {
                     alert = AlertMessage(
                         title: "No speech found",
-                        message: "No words in \(language.displayName) were heard in your clips. Check the language, or that the clips have someone talking."
+                        message: "No words in \(language.displayName) were heard in your Short. Check the language, or that the clips or voice-overs have someone talking."
                     )
                 }
             } catch is CancellationError {
                 // The user stopped it; nothing changes.
             } catch {
-                alert = AlertMessage(title: "Captions couldn't be made", message: error.localizedDescription)
+                if !quietly { alert = AlertMessage(title: "Captions couldn't be made", message: error.localizedDescription) }
             }
         }
     }

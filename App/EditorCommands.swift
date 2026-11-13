@@ -50,6 +50,11 @@ struct EditorCommands: Commands {
                 .keyboardShortcut("e")
                 .disabled(model.project.timeline.clips.isEmpty || model.exportPhase != nil)
             Button("Save Frame as Picture…") { model.saveFrame() }
+            Divider()
+            Button("Import Subtitle File (.srt)…") { model.importCaptionsFile() }
+                .disabled(model.project.timeline.clips.isEmpty)
+            Button("Export Subtitle File (.srt)…") { model.exportCaptionsFile() }
+                .disabled(!model.project.hasCaptions)
                 .keyboardShortcut("e", modifiers: [.command, .shift])
                 .disabled(model.project.timeline.clips.isEmpty || model.screen == .home)
         }
@@ -213,7 +218,7 @@ struct EditorCommands: Commands {
                 set: { model.setCaptionsVisible($0) }
             ))
             .disabled(!model.project.hasCaptions)
-            Picker("Caption Style", selection: Binding(get: { model.project.captions.style }, set: { model.setCaptionStyle($0) })) {
+            Picker("Caption Look", selection: Binding(get: { model.project.captions.style }, set: { model.setCaptionStyle($0) })) {
                 ForEach(CaptionStyle.allCases) { Text($0.displayName).tag($0) }
             }
             .disabled(!model.project.hasCaptions)

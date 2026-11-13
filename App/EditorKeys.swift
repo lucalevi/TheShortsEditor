@@ -10,12 +10,18 @@ import AppKit
 final class EditorKeys {
     private var monitor: Any?
     private var upMonitor: Any?
+    private var clickMonitor: Any?
 
     func install(for model: EditorModel) {
         guard monitor == nil else { return }
         monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak model] event in
             guard let model, Self.handle(event, model) else { return event }
             return nil
+        }
+        // A click anywhere else ends editing a caption, so the change is saved.
+        clickMonitor = NSEvent.addLocalMonitorForEvents(matching: .leftMouseDown) { event in
+            CaptionTextField.endEditingOnClickOutside(event)
+            return event
         }
         // R is held while dragging a range: notice when it is let go.
         upMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyUp) { [weak model] event in
@@ -27,6 +33,7 @@ final class EditorKeys {
     private static func handle(_ event: NSEvent, _ model: EditorModel) -> Bool {
         // The home window has no timeline: its keys go to its own views.
         guard model.screen == .editor else { return false }
+        if CaptionTextField.handleCommandReturn(event) { return true }
         // ⌘A outside a text field selects everything on the timeline (Edit ▸ Select All).
         if event.modifierFlags.intersection([.command, .control, .option, .shift]) == .command,
            event.charactersIgnoringModifiers == "a",

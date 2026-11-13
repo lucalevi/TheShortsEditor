@@ -27,6 +27,8 @@ struct TimelineView: View {
     @State private var rangeAnchor: CMTime?
     /// Where files are being dragged over the clips, for the landing marker.
     @State private var dropX: CGFloat?
+    /// A caption edge being dragged in the captions lane, and where it is now.
+    @State private var captionEdgeDrag: (pageID: CaptionPage.ID, edge: CaptionEdge, time: CMTime)?
 
     struct BlockDrag {
         enum Kind { case move, start, end }
@@ -1168,32 +1170,81 @@ struct TimelineView: View {
 
     // MARK: Captions, music, pauses
 
-    /// The captions, under the clips they belong to. Click one to go there and fix its words.
+    /// The captions, under the clips they belong to. Click one to go there and fix its words; drag
+    /// its left or right edge to change when it comes and goes.
     private var captionLane: some View {
         ZStack(alignment: .topLeading) {
             ForEach(model.captionPages) { page in
                 let isCurrent = model.currentCaption?.id == page.id
-                Text(page.text)
+                let range = shownRange(of: page)
+                Text(page.plainText)
                     .font(.caption2.weight(.medium))
                     .lineLimit(1)
-                    .padding(.horizontal, 4)
-                    .frame(width: max(width(of: page.range.duration) - 2, 3), height: captionLaneHeight, alignment: .leading)
+                    .padding(.horizontal, 5)
+                    .frame(width: max(width(of: range.duration) - 2, 3), height: captionLaneHeight, alignment: .leading)
                     .background(
                         Color.orange.opacity(isCurrent ? 0.55 : 0.3),
                         in: RoundedRectangle(cornerRadius: 4)
                     )
+                    .overlay(alignment: .leading) {
+                        if page.source == .sound {
+                            // Heard in a voice-over: a small mark so it reads apart from the clip's own.
+                            Rectangle().fill(.primary.opacity(0.5)).frame(width: 2).padding(.vertical, 4)
+                        }
+                    }
                     .clipped()
-                    .offset(x: x(for: page.range.start) + 1)
+                    .overlay { captionEdges(page) }
+                    .offset(x: x(for: range.start) + 1)
                     .onTapGesture {
                         model.pause()
                         model.seek(to: page.firstFrame)
                         model.sidebar = .captions
                         model.focusedCaptionID = page.id
                     }
-                    .help(page.text)
+                    .help(page.text + "\nDrag an edge to change when it shows")
             }
         }
         .opacity(model.project.captions.isVisible ? 1 : 0.4)
+    }
+
+    /// Where a caption is drawn: where it is, or where its edge is being dragged to.
+    private func shownRange(of page: CaptionPage) -> CMTimeRange {
+        guard let drag = captionEdgeDrag, drag.pageID == page.id else { return page.range }
+        switch drag.edge {
+        case .start: return CMTimeRange(start: min(drag.time, page.range.end - .oneFrame), end: page.range.end)
+        case .end: return CMTimeRange(start: page.range.start, end: max(drag.time, page.range.start + .oneFrame))
+        }
+    }
+
+    private func captionEdges(_ page: CaptionPage) -> some View {
+        HStack(spacing: 0) {
+            captionEdgeHandle(page, .start)
+            Spacer(minLength: 0)
+            captionEdgeHandle(page, .end)
+        }
+    }
+
+    private func captionEdgeHandle(_ page: CaptionPage, _ edge: CaptionEdge) -> some View {
+        Rectangle()
+            .fill(Color.primary.opacity(captionEdgeDrag?.pageID == page.id && captionEdgeDrag?.edge == edge ? 0.6 : 0.001))
+            .frame(width: 6)
+            .contentShape(Rectangle())
+            .pointerStyle(.frameResize(position: edge == .start ? .leading : .trailing))
+            .gesture(
+                DragGesture(minimumDistance: 2, coordinateSpace: .global)
+                    .onChanged { value in
+                        let base = edge == .start ? page.range.start : page.range.end
+                        let time = max(base + seconds(value.translation.width), .zero).snappedToFrame()
+                        captionEdgeDrag = (page.id, edge, time)
+                        model.pause()
+                        model.seek(to: time)
+                    }
+                    .onEnded { _ in
+                        if let drag = captionEdgeDrag { model.moveCaptionEdge(page, drag.edge, to: drag.time) }
+                        captionEdgeDrag = nil
+                    }
+            )
+            .help(edge == .start ? "Drag to change when this caption starts" : "Drag to change when this caption ends")
     }
 
     /// The song, under everything else, with a line showing its volume (it dips where people talk).

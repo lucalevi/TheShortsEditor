@@ -152,30 +152,11 @@ extension EditorModel {
         apply(actionName) { change(&$0.captions) }
     }
 
-    /// Picks key words in all the captions (numbers, names, long meaningful words).
-    func pickKeywords() {
-        var count = 0
-        apply("Highlight Key Words") { project in
-            count = project.pickKeywords()
-            project.captions.showsKeywords = true
-        }
-        if count == 0 { alert = AlertMessage(title: "No key words found", message: "Click a word in the Script panel to highlight it yourself.") }
-    }
-
     func clearKeywords() {
         apply("Clear Key Words") { project in
             let ids = Set(project.transcripts.values.flatMap(\.words).map(\.id))
             project.updateWords(ids) { $0.isKeyword = false }
         }
-    }
-
-    func suggestEmoji() {
-        var count = 0
-        apply("Add Emoji") { project in
-            count = project.suggestEmoji()
-            project.captions.showsEmoji = true
-        }
-        if count == 0 { alert = AlertMessage(title: "No emoji found", message: "None of the words call for one. Add one to a word in the Script panel.") }
     }
 
     func clearEmoji() {
@@ -210,8 +191,8 @@ extension EditorModel {
         scriptSelection = []
     }
 
-    /// The filler sounds and repeated words in the Short.
-    var fillerWords: [WordRef] { project.fillerAndRepeatedWords() }
+    /// The filler sounds and repeated words in the Short, and the fillers Apple Intelligence found.
+    var fillerWords: [WordRef] { project.fillerAndRepeatedWords(also: modelFillers) }
 
     func removeFillerWords() {
         let words = Set(fillerWords)
@@ -346,6 +327,8 @@ extension EditorModel {
             }
             if let id { selection = .sound(id) }
             loadPreviewsIfNeeded(media)
+            // Record, and the captions appear: a Short that has captions gets the voice-over's too.
+            if !project.transcripts.isEmpty { makeCaptions(quietly: true) }
         }
     }
 

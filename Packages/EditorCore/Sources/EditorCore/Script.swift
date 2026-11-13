@@ -43,15 +43,16 @@ public extension Project {
     /// Every word on the timeline, in order (the script).
     var script: [TimedWord] { CaptionLayout.timelineWords(in: self) }
 
-    /// The filler sounds ("um", "eh"…) on the timeline, and words said twice in a row ("I I
-    /// think", "so so"), keeping the second time.
-    func fillerAndRepeatedWords() -> [WordRef] {
-        let words = script
+    /// The filler sounds ("um", "eh"…) on the timeline, words said twice in a row ("I I
+    /// think", "so so"), keeping the second time, and the words in `fillers` (real words used as
+    /// fillers, found by the language model). Only words of the main clips, which can be cut.
+    func fillerAndRepeatedWords(also fillers: Set<Word.ID> = []) -> [WordRef] {
+        let words = script.filter { $0.source == .clip }
         var found: [WordRef] = []
         var index = 0
         while index < words.count {
             let word = words[index]
-            if FillerWords.isFiller(word.text) {
+            if FillerWords.isFiller(word.text) || fillers.contains(word.wordID) {
                 found.append(word.ref)
                 index += 1
                 continue
@@ -268,15 +269,15 @@ public enum EmojiSuggestions {
 
 public extension Project {
     /// Gives words that call for one an emoji, at most one in each caption, replacing earlier
-    /// suggestions. Returns how many.
+    /// suggestions. `choose` gives a word's emoji (the built-in table unless given). Returns how many.
     @discardableResult
-    mutating func suggestEmoji() -> Int {
+    mutating func suggestEmoji(_ choose: (TimedWord) -> String? = { EmojiSuggestions.emoji(for: $0.text) }) -> Int {
         let pages = CaptionLayout.pages(in: self)
         var chosen: Set<Word.ID> = []
         var emojis: [Word.ID: String] = [:]
         for page in pages {
             for word in page.words {
-                if let emoji = EmojiSuggestions.emoji(for: word.text) {
+                if let emoji = choose(word) {
                     chosen.insert(word.wordID)
                     emojis[word.wordID] = emoji
                     break

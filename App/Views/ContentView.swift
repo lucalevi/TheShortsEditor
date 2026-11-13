@@ -1,4 +1,5 @@
 import SwiftUI
+@preconcurrency import Translation
 
 /// The app's one window: the home window with every Short, or the editor with one of them.
 struct ContentView: View {
@@ -59,6 +60,10 @@ struct EditorView: View {
             // A single storyline needs little height; the viewer gets the rest.
             TimelineView(model: model)
                 .frame(minHeight: 230, idealHeight: 255, maxHeight: 330)
+        }
+        // Captions in a second language, translated on this Mac (it asks to download languages once).
+        .translationTask(model.translationRequest) { session in
+            await model.runTranslation(session)
         }
         .toolbar {
             ToolbarItem(placement: .navigation) {

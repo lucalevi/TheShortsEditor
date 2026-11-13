@@ -40,10 +40,21 @@ struct ScriptView: View {
         let selected = model.scriptSelection
         let selectedWords = words.filter { selected.contains($0.ref) }
         return VStack(alignment: .leading, spacing: 8) {
-            Button(fillers.isEmpty ? "No Filler Words" : "Remove \(fillers.count) Filler Word\(fillers.count == 1 ? "" : "s")",
-                   systemImage: "wand.and.stars") { model.removeFillerWords() }
-                .disabled(fillers.isEmpty)
-                .help("Cuts “um”, “eh” and words said twice in a row. Underlined with dots below.")
+            HStack(spacing: 6) {
+                Button(fillers.isEmpty ? "No Filler Words" : "Remove \(fillers.count) Filler Word\(fillers.count == 1 ? "" : "s")",
+                       systemImage: "wand.and.stars") { model.removeFillerWords() }
+                    .disabled(fillers.isEmpty)
+                    .help("Cuts “um”, “eh”, words said twice in a row, and fillers Apple Intelligence found. Underlined with dots below.")
+                if model.canUseWordModel, words.contains(where: { $0.source == .clip }) {
+                    if model.wordModelJob == .fillers {
+                        ProgressView().controlSize(.small)
+                    } else {
+                        Button("Find More", systemImage: "apple.intelligence") { model.findMoreFillers() }
+                            .disabled(model.wordModelJob != nil)
+                            .help("Apple Intelligence looks for words like “like”, “tipo” or “allora” said only as fillers, on this Mac")
+                    }
+                }
+            }
             if selectedWords.isEmpty {
                 Text("Click a word to go there. ⇧-click to select several, then cut them (⌫) and the video is cut too.")
                     .font(.caption)
@@ -51,8 +62,12 @@ struct ScriptView: View {
                     .fixedSize(horizontal: false, vertical: true)
             } else {
                 HStack(spacing: 6) {
-                    Button("Cut \(selectedWords.count)", systemImage: "scissors") { model.cutWords(selected) }
-                        .help("Cut these words (and the pause after each) out of the video (⌫)")
+                    let cuttable = selectedWords.filter { $0.source == .clip }.count
+                    Button("Cut \(cuttable)", systemImage: "scissors") { model.cutWords(selected) }
+                        .disabled(cuttable == 0)
+                        .help(cuttable == 0
+                              ? "Words in voice-overs and B-roll can't be cut here: trim the sound on the timeline instead"
+                              : "Cut these words (and the pause after each) out of the video (⌫)")
                     let allKey = selectedWords.allSatisfy(\.isKeyword)
                     Button(allKey ? "Unhighlight" : "Highlight", systemImage: "highlighter") {
                         model.setKeyword(!allKey, words: Set(selectedWords.map(\.wordID)))
@@ -81,19 +96,30 @@ struct ScriptView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    /// The words, one paragraph per clip.
+    /// The words, one paragraph per clip, voice-over or B-roll clip, in the order they are heard.
     private func paragraphs(_ words: [TimedWord]) -> some View {
         let groups = Dictionary(grouping: words.enumerated(), by: \.element.clipID)
-        let order = model.project.timeline.clips.map(\.id).filter { groups[$0] != nil }
+        var order: [Clip.ID] = []
+        for word in words where !order.contains(word.clipID) { order.append(word.clipID) }
         let fillers = Set(model.fillerWords)
         let current = words.last { $0.range.start <= model.currentTime && model.currentTime < $0.range.end + CMTime(value: 1, timescale: 5) }?.ref
         return VStack(alignment: .leading, spacing: 14) {
             ForEach(order, id: \.self) { clipID in
-                FlowLayout(spacing: 3, lineSpacing: 4) {
-                    ForEach(groups[clipID] ?? [], id: \.element.ref) { index, word in
-                        WordChip(word: word, isSelected: model.scriptSelection.contains(word.ref),
-                                 isCurrent: current == word.ref, isFiller: fillers.contains(word.ref))
-                            .onTapGesture { click(word, index: index, in: words) }
+                VStack(alignment: .leading, spacing: 4) {
+                    switch groups[clipID]?.first?.element.source {
+                    case .sound?:
+                        Label("Voice-over or sound", systemImage: "mic").font(.caption).foregroundStyle(.secondary)
+                    case .broll?:
+                        Label("B-roll", systemImage: "rectangle.on.rectangle").font(.caption).foregroundStyle(.secondary)
+                    default:
+                        EmptyView()
+                    }
+                    FlowLayout(spacing: 3, lineSpacing: 4) {
+                        ForEach(groups[clipID] ?? [], id: \.element.ref) { index, word in
+                            WordChip(word: word, isSelected: model.scriptSelection.contains(word.ref),
+                                     isCurrent: current == word.ref, isFiller: fillers.contains(word.ref))
+                                .onTapGesture { click(word, index: index, in: words) }
+                        }
                     }
                 }
             }

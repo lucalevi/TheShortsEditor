@@ -1,6 +1,6 @@
 # Project status
 
-_Last updated: 2026-11-12 (CapCut research, stages G–L planned). Read this first when picking the project back up, then update it at the end of each session._
+_Last updated: 2026-11-13 (Stage G, captions the CapCut way: done and committed). Read this first when picking the project back up, then update it at the end of each session._
 
 ## Where we are
 
@@ -16,7 +16,24 @@ Stages 1–7 are done, tested on screen, committed and pushed to https://github.
 | 6 | Audio: clip volume, music with ducking, loudness on export | 2026-11-09 |
 | 7 | Save/open projects, autosave, missing media | 2026-11-09 |
 
-**Pick up here (2026-11-12, latest):** CapCut was researched (`research/capcut/README.md`); next is Stage G (captions), see "CapCut list: stages G–L" below. **Before that (2026-11-11):** Stage F of the iMovie list ("One-click Shorts", `research/imovie/imovie-reverse-engineering.md`) is built, tested, checked on screen and committed. With it, every stage of the iMovie list (A–F) is done. Stage E is committed (5e708e6); its Photos tab is still unchecked on screen. Next: ask the user (see "What's next"). Test footage and a closed scratch iMovie library are in `~/Movies/ShortsEditorResearch` (safe to delete). Test Shorts "My Short 5"–"My Short 12" are in the library (safe to delete); "My Short 12" has a look, Stabilize, two markers and a slid clip from the on-screen checks.
+**Pick up here (2026-11-13, latest):** Stage G (captions the CapCut way) is built, tested, checked on screen, committed and pushed. Next: Stage I (rhythm). Test Short "My Short 16" (Italian voice-over captions, a German second line, an imported SRT) is in the library (safe to delete); spoken test files `voiceover-sample.m4a` (English) and `italiano-sample.m4a` were made with `say` into `Tools/uitest/.samples`, with `My Short 16.srt` exported there.
+
+**Before that (2026-11-12):** CapCut was researched (`research/capcut/README.md`); next is Stage G (captions), see "CapCut list: stages G–L" below. **Before that (2026-11-11):** Stage F of the iMovie list ("One-click Shorts", `research/imovie/imovie-reverse-engineering.md`) is built, tested, checked on screen and committed. With it, every stage of the iMovie list (A–F) is done. Stage E is committed (5e708e6); its Photos tab is still unchecked on screen. Next: ask the user (see "What's next"). Test footage and a closed scratch iMovie library are in `~/Movies/ShortsEditorResearch` (safe to delete). Test Shorts "My Short 5"–"My Short 12" are in the library (safe to delete); "My Short 12" has a look, Stabilize, two markers and a slid clip from the on-screen checks.
+
+### Stage G: captions the CapCut way (2026-11-13): done, committed
+
+Model in `EditorCore/Captions.swift` (word fields, sources, looks, page rules) and `EditorCore/CaptionEditing.swift` (split/merge, edges, SRT, translations, smart-word picks, `LanguageGuess`) (`CaptionEditingTests`: 33 tests); `RenderEngine/CaptionRenderer.swift` rewritten around `CaptionDrawing` (`CaptionLookTests`: 18 incl. one per look); `Transcription/WordModel.swift` (Foundation Models) and language detection in `Transcriber`; app in `App/EditorModel+Captions.swift`, `App/Views/CaptionTextField.swift` (AppKit field), `CaptionsView`, the captions lane in `TimelineView`, Script panel. New `Word` fields (`captionBreak`, `lineBreakAfter`, `endsExactly`, `translation`), `Transcript.isTyped`, `CaptionSettings.translationLanguage`: all optional in the file, so old projects open unchanged (no file version bump needed).
+1. **Captions from every voice**: voice-overs, other sound items and B-roll with its sound on are transcribed and captioned (`CaptionLayout.timelineWords`). Where two talk at once: voice-over > other sounds > main clips > B-roll. **Muted clips no longer have captions** (captions are what you hear), unless their captions were typed/imported. Detached sound carries its clip's captions. Built-in sound effects are never transcribed. Recording a voice-over in a Short that has captions transcribes it right away (`makeCaptions(quietly:)`). Words of voice-overs and B-roll show in the Script panel under their own heading and can be highlighted, but only main-clip words can be cut.
+2. **Looks** (was "Style"; Text ▸ Caption Look): Bold Pop, Box, One Word, **Phrase** (2–4 words, big, normal case), **Karaoke** (fills as spoken, 8 steps per word), **Glow**, **Bounce** (spoken word jumps for 0.3 s), **Typewriter** (words appear as spoken; the box grows), **Outline** (hollow; spoken word filled), Subtitles, Simple. The grid draws each look over a frame of this Short (without its captions/titles), caught mid-word. Emoji typed in a caption are drawn in colour (also under outlines); animations hide/move words by clipping, never by recolouring, so emoji behave.
+3. **Edit like text** (AppKit `CaptionTextField`): ↩ splits at the cursor (inside a word splits the word) and starts editing the new caption; ⌘↩ (or ⌥↩) adds a line break (caught in `EditorKeys`, because the List never passes key equivalents to the field); ⌫ at the very start joins it to the caption before (same clip only), cursor at the join; Escape undoes the typing; a click anywhere else ends editing and saves. Splits and joins pin the caption's start and the next caption's start (`CaptionBreak`), so hand-made captions keep their shape in every look. Captions ⋯ ▸ "Undo My Splits and Joins" lets them flow again. **Timing**: drag a caption's left/right edge on the captions lane (moves its first word's start / last word's end, clamped to the neighbouring words; a moved end ends exactly there, no 0.5 s linger).
+4. **Smarter words with Apple Intelligence** (`WordModel`, guided generation, chunks of 120 numbered words, answers validated in `SmartWords.picks`): Pick Key Words, Suggest Emoji (Captions ▸ Design) and Script ▸ "Find More" (fillers like "like", "tipo", "allora", only when the Short has main-clip words). Falls back to the old rules when the model isn't available or answers nothing. Buttons show the Apple Intelligence symbol when it's used.
+5. **SRT**: File ▸ Import/Export Subtitle File (.srt)… (also in the Captions ⋯ menu and on the empty Captions panel). Export writes the captions as shown (line breaks kept, translation not included). Import replaces the captions: each cue becomes one caption, its words spread by length and stored on what is heard at that moment (voice-over first, else the main clip), marked typed. macOS has no registered type for .srt, so panels use the extension's dynamic type.
+6. **Second language**: Captions ▸ Second language (17 languages): Apple's Translation framework on device (`translationTask` on `EditorView`; it asks to download a language once), shown smaller under each caption. A translation is kept per caption with the text it was made from, so edited captions hide theirs; "Translate N Captions" redoes them.
+7. **Languages**: Spanish and Portuguese added (on-device speech models exist for both). The language picker's default is **Find automatically**: the Short's existing caption language, else it listens to the first 15 s of the first heard file in each likely language (the Mac's languages, installed speech models; up to 4) and keeps the one the speech model is surest of (`LanguageGuess`).
+
+Tests: 355 model + 99 render + 3 transcription = 457, all pass.
+Verified on screen: Italian found automatically from a voice-over sound; voice-over captions on the lane (mic mark) and in the list (mic icon); look grid over the Short's frame; split with ↩ (focus moves to the new caption), join with ⌫, ⌘↩ line break shown on two lines in the viewer, saving by clicking away; dragging a caption's end on the lane; Karaoke filling word by word; German second line in the list and the viewer; Apple Intelligence key words and emoji (👋 Ciao, 💅 trucco); Script panel listing voice-over words; SRT export (with line breaks) and import onto the voice-over.
+Not yet verified on screen: recording a real voice-over and its captions appearing by themselves (needs the microphone), Find More fillers on a talking main clip, B-roll with sound on, Glow/Bounce/Typewriter/Outline/Phrase in the viewer while playing (they are pixel-tested), the translation download prompt for a language not yet on the Mac, export with the new looks.
 
 ### Stage F: one-click Shorts (2026-11-11): done, committed
 
@@ -253,7 +270,8 @@ The P0 list from `research/shorts-editor-research.md` §5. Each stage ends with 
 8. **Roadmap features 6–12 done** (2026-11-09): speed, text design, captions that pop, edit by text, sound layer, auto reframe, layouts.
 9. **iMovie list stages A–F done** (2026-11-09 … 11-11, `research/imovie/imovie-reverse-engineering.md`). This covered most of the roadmap's "next 20%" (markers, filters, transitions, copy/paste settings, templates as storyboards and styles, long video → Short as Magic Short).
 10. **CapCut research done (2026-11-12, `research/capcut/`)**: the user wants **iMovie's look and feel with CapCut's features**. Stages G–L with checklists: **"CapCut list: stages G–L"** below (details in `research/capcut/capcut-reverse-engineering.md` §7).
-11. **Next:** Stage G, captions the CapCut way (the user asked for "auto captions" on 2026-11-12; we already have them, so G is what's missing: captions from voice-overs and B-roll, a Phrase style, split/merge lines, caption looks with word animations, smarter words with Foundation Models, SRT). Confirm the scope with the user before building.
+11. ~~Stage G, captions the CapCut way~~ (done 2026-11-13, all of it, committed).
+12. **Next:** Stage I, rhythm (beats, Cut to the Beat, speed curve presets).
 
 ## CapCut list: stages G–L (to do, decided 2026-11-12)
 
@@ -263,8 +281,8 @@ The P0 list from `research/shorts-editor-research.md` §5. Each stage ends with 
 
 | Stage | What | State |
 |---|---|---|
-| G | Captions, the CapCut way | **next**: confirm scope with the user first (all of G, or voice-over captions alone) |
-| I | Rhythm: beats and speed curves | to do |
+| G | Captions, the CapCut way | **done** 2026-11-13, committed |
+| I | Rhythm: beats and speed curves | **next** |
 | H | Text, stickers and voice | to do |
 | J | Effects | to do |
 | K | Cut-outs | to do |
@@ -272,13 +290,13 @@ The P0 list from `research/shorts-editor-research.md` §5. Each stage ends with 
 
 ### Stage G: captions, the CapCut way
 Why first: the user asked for it, and their real CapCut Short ("Studiare per la vita", 14 s) is a voice-over with 14 captions typed by hand (CapCut's auto captions are Pro). We already have free on-device captions; G adds what's missing.
-- [ ] Captions from **voice-overs** and **B-roll** sound (transcripts stored per file, like now)
-- [ ] **Phrase** style: 2–4 words a page, big, centred, the caption font; emoji typed in a caption drawn in colour
-- [ ] Edit like text: ↩ splits a caption at the cursor, ⌘↩ new line, ⌫ at the start merges with the one before; nudge timing by dragging its edges on the captions lane
-- [ ] **Caption looks** grid (8–12, word animations: pop, karaoke fill, glow, bounce, typewriter, box, outline, subtitles), drawn live from the Short's frame
-- [ ] Smarter key words, emoji and real filler words ("like", "tipo", "allora") with Apple **Foundation Models**, falling back to today's rules
-- [ ] **SRT** import/export (File menu)
-- [ ] Later in G: translated second line (Translation framework), more languages with auto-detect
+- [x] Captions from **voice-overs** and **B-roll** sound (transcripts stored per file, like now)
+- [x] **Phrase** style: 2–4 words a page, big, centred, the caption font; emoji typed in a caption drawn in colour
+- [x] Edit like text: ↩ splits a caption at the cursor, ⌘↩ new line, ⌫ at the start merges with the one before; nudge timing by dragging its edges on the captions lane
+- [x] **Caption looks** grid (8–12, word animations: pop, karaoke fill, glow, bounce, typewriter, box, outline, subtitles), drawn live from the Short's frame
+- [x] Smarter key words, emoji and real filler words ("like", "tipo", "allora") with Apple **Foundation Models**, falling back to today's rules
+- [x] **SRT** import/export (File menu)
+- [x] Later in G: translated second line (Translation framework), more languages with auto-detect
 
 ### Stage I: rhythm
 - [ ] Beat markers on the music (the app's own music knows its beats; files by onset detection)
@@ -313,14 +331,12 @@ Why first: the user asked for it, and their real CapCut Short ("Studiare per la 
 
 ## Open questions for the user
 
-- Stage G scope: build all of it, or voice-over captions alone first? (Asked 2026-11-12.)
-
 - Should the editor link exported Shorts to `channel_lab` plans (`~/Documents/Programming/YouTube`)? Recommended: not now; maybe later.
 
 ## Known limitations / tech debt
 
 - Undo was silently broken before 2026-11-08: opening files from Finder briefly creates a second window, and the model had attached to its undo manager. Now the model asks its window (re-set each time the window becomes active) for the undo manager at every edit.
-- Captions: a whole source file is transcribed even if only part of it is used (fine for Short-length clips, slow for long ones). Lines are grouped by length/pauses/sentence ends; there's no manual "split this caption here" yet. No caption dragging in the viewer (Top/Middle/Bottom only). The test sample is a synthetic voice, so accuracy on real, noisy recordings is untested.
+- Captions: a whole source file is transcribed even if only part of it is used (fine for Short-length clips, slow for long ones). Lines are grouped by length/pauses/sentence ends, plus the user's splits and joins. Captions move only up/down as a whole (no per-caption position). The test sample is a synthetic voice, so accuracy on real, noisy recordings is untested.
 - Export: the MP4 has edit lists (from B-frames and AAC priming, standard for AVFoundation and iPhone files). YouTube's encoding page says "no edit lists"; untested whether it matters. If an upload ever misbehaves, try `AVVideoAllowFrameReorderingKey: false`. "Closed GOP" isn't verified either (VideoToolbox key frames are normally IDR).
 - Test fixtures with sound must mark the audio input finished as soon as the last chunk is in; otherwise `AVAssetWriter` stalls the video waiting for more audio.
 - Remove Pauses: the shortest pause cut is fixed at 0.3 s (not a slider). Detection is by loudness only, so steady background music or noise above the threshold isn't seen as a pause; lowering "What counts as a pause" is the fix. Clips whose file has no sound are left alone.
@@ -330,8 +346,9 @@ Why first: the user asked for it, and their real CapCut Short ("Studiare per la 
 - SwiftUI text fields hand the old value back to their binding as focus leaves. Editing fields that save on end (caption lines, title text) only accept changes while focused; otherwise what was typed is lost.
 - Saving: one window, one Short at a time (no DocumentGroup: the single-window model, shared `EditorModel` and Finder media import made a custom store simpler). No versions browser and no "Revert". Media bookmarks are app-scoped, so a project copied to another Mac (or user) needs Find Missing Files… there. Writing tries an atomic write first and falls back to a plain one if the sandbox refuses the temporary file. In an Open panel a folder has to be *selected* (not just opened) for "Use" to work, as everywhere in macOS. `screencapture` of the app window misses separate windows (Open panel, alerts): capture their region (`System Events … get {position, size} of windows`).
 - Sound files can only be the music, not clips. Animated GIFs show their first frame only.
-- B-roll sound isn't counted as speech for ducking, and B-roll isn't transcribed for captions. Voice-overs count as speech for their whole length (not by loudness) and aren't transcribed either.
-- Key words and emoji are picked by simple rules (no language model); "welcome"/"showing" can be picked. Emoji dictionary is small. Filler words are sounds only ("um", "eh"…), not real words used as fillers ("like", "allora").
+- B-roll sound isn't counted as speech for ducking. Voice-overs count as speech for their whole length (not by loudness).
+- Without Apple Intelligence, key words and emoji are picked by simple rules ("welcome"/"showing" can be picked; small emoji dictionary) and fillers are sounds only. With it, the model may pick more key words than one in seven, and its emoji can be literal (💅 for "trucco", Italian for both "trick" and "make-up").
+- Stage G: captions are translated one at a time, so a short caption is translated without the sentence around it ("tipo il trucco più" → "wie der beste Make-up-Look"). Language detection listens to the first heard file only and tries at most 4 languages; a language whose speech model isn't on the Mac is only tried when it is the Mac's own. Words in voice-overs and B-roll can't be cut from the Script panel. Splitting a caption doesn't split the clip; joins work only within one clip or sound. Caption edges don't snap. A muted clip's spoken captions are hidden (they come back when it is unmuted).
 - Voice clean-up copies are kept in Caches and remade if missing; a project opened on another Mac re-cleans when the toggle is switched off and on.
 - Speed has no ramps/curves and no smooth slow motion (frame blending). Reversed clips don't exist.
 - Split screen is top/bottom halves only, and only the topmost split B-roll at a time decides it. Overlays are timeline-timed (like titles), not attached to the clip under them, so moving a main clip doesn't move its B-roll.
@@ -375,3 +392,5 @@ Menu items can be clicked by name, e.g. `osascript -e 'tell application "System 
 To check undo: `osascript -e 'tell application "System Events" to tell process "Shorts Editor" to get enabled of menu item 1 of menu "Edit" of menu bar 1'`. To see `NSLog` output, run the binary in `Contents/MacOS` directly (the unified log didn't show it).
 
 Notes: System Events' `click at` doesn't trigger SwiftUI taps, which is why `ui.sh` posts real mouse events. Screenshots are 2× on the Retina display and 1× on the external one. Give the window a second or two after `activate` when it's on another Space.
+
+While a pop-up menu or a modal panel is open, `ui.sh` hangs (its osascript calls wait). Send keys with `Tools/uitest/.bin/mouse key CODE` directly, start menu-item clicks that open a panel in the background (`(osascript … &)`), and capture the Open/Save panel by its own window number (`CGWindowListCopyWindowInfo`, owner "Shorts Editor", the smaller window; `screencapture -l <number>`). Click in it with `.bin/mouse click` at the panel's screen position plus the point.

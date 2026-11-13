@@ -286,12 +286,11 @@ nonisolated final class ShortsCompositor: NSObject, AVVideoCompositing, Sendable
 
     private func captionImage(for track: CaptionTrack, at time: CMTime) -> CIImage? {
         guard let state = track.state(at: time) else { return nil }
-        let keywords = Set(state.page.words.indices.filter { state.page.words[$0].isKeyword })
-        let key = "\(track.settings.hashValue)|\(state.page.id)|\(state.page.text)|\(state.word)|\(keywords.sorted())|\(state.page.emoji ?? "")"
-        let cgImage = cachedImage(key) {
-            CaptionRenderer.image(words: state.page.words.map(\.text), keywords: keywords, currentWord: state.word,
-                                  emoji: state.page.emoji, settings: track.settings)
-        }
+        var hasher = Hasher()
+        hasher.combine(track.settings)
+        hasher.combine(state.drawing)
+        let key = "caption|\(hasher.finalize())"
+        let cgImage = cachedImage(key) { CaptionRenderer.image(state.drawing, settings: track.settings) }
         guard let cgImage else { return nil }
 
         let size = CGSize(width: cgImage.width, height: cgImage.height)

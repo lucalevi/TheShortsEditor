@@ -36,7 +36,7 @@ private struct MakeCaptions: View {
         } description: {
             Text(model.project.timeline.clips.isEmpty
                  ? "Put some clips on the timeline first. Captions are made from what is said in them."
-                 : "Captions are written for you from what is said in your clips. It all happens on this Mac.")
+                 : "Captions are written for you from what is said in your clips and voice-overs. It all happens on this Mac.")
         } actions: {
             VStack(spacing: 10) {
                 LanguagePicker(model: model)
@@ -44,6 +44,10 @@ private struct MakeCaptions: View {
                     .buttonStyle(.borderedProminent)
                     .controlSize(.large)
                     .disabled(model.project.timeline.clips.isEmpty)
+                Button("Import Subtitle File…") { model.importCaptionsFile() }
+                    .buttonStyle(.link)
+                    .disabled(model.project.timeline.clips.isEmpty)
+                    .help("Use captions you already have, from an .srt file")
             }
         }
     }
@@ -53,8 +57,10 @@ private struct LanguagePicker: View {
     @Bindable var model: EditorModel
 
     var body: some View {
-        Picker("Spoken language", selection: $model.captionLanguage) {
-            ForEach(CaptionLanguage.allCases) { Text($0.displayName).tag($0) }
+        Picker("Spoken language", selection: $model.captionLanguageChoice) {
+            Text(CaptionLanguageChoice.automatic.displayName).tag(CaptionLanguageChoice.automatic)
+            Divider()
+            ForEach(CaptionLanguage.allCases) { Text($0.displayName).tag(CaptionLanguageChoice.language($0)) }
         }
         .fixedSize()
         .help("The language people speak in your clips")
@@ -68,13 +74,16 @@ private struct CaptionProgress: View {
     var body: some View {
         VStack(spacing: 12) {
             switch job {
+            case .detecting:
+                ProgressView()
+                Text("Listening for the language…")
             case .downloading(let fraction):
                 ProgressView(value: fraction)
                 Text("Getting the speech model ready…")
                 Text("This happens once per language.").font(.caption).foregroundStyle(.secondary)
             case .listening(let index, let count):
                 ProgressView()
-                Text(count == 1 ? "Listening to your clip…" : "Listening to clip \(index) of \(count)…")
+                Text(count == 1 ? "Listening to your Short…" : "Listening to part \(index) of \(count)…")
             }
             Button("Cancel", action: cancel)
         }
@@ -96,16 +105,7 @@ private struct CaptionSettingsForm: View {
                 .toggleStyle(.switch)
                 .controlSize(.small)
 
-            VStack(alignment: .leading, spacing: 6) {
-                Text("Style").font(.subheadline.weight(.semibold))
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 96), spacing: 6)], spacing: 6) {
-                    ForEach(CaptionStyle.allCases) { style in
-                        StyleChip(name: style.displayName, isSelected: settings.style == style, makeImage: { CaptionPreview.image(for: style) }) {
-                            model.setCaptionStyle(style)
-                        }
-                    }
-                }
-            }
+            CaptionLookGrid(model: model, settings: settings)
 
             VStack(alignment: .leading, spacing: 6) {
                 Text("Position").font(.subheadline.weight(.semibold))
@@ -122,17 +122,20 @@ private struct CaptionSettingsForm: View {
                     .foregroundStyle(.secondary)
             }
 
+            SecondLanguage(model: model, settings: settings)
+
             CaptionDesign(model: model, settings: settings)
 
-            let missing = model.project.assetsNeedingTranscription(in: model.captionLanguage)
+            let missing = model.project.assetsNeedingTranscription(in: model.captionLanguageForNewCaptions)
             HStack {
                 LanguagePicker(model: model).labelsHidden().controlSize(.small)
                 Spacer()
                 if !missing.isEmpty {
                     Button("Update Captions") { model.makeCaptions() }
                         .controlSize(.small)
-                        .help("Make captions for clips that don't have them in this language yet")
+                        .help("Make captions for clips and voice-overs that don't have them in this language yet")
                 }
+                CaptionsMoreMenu(model: model)
             }
         }
         .padding(12)
@@ -198,7 +201,7 @@ private struct CaptionList: View {
                 if let id { withAnimation { proxy.scrollTo(id, anchor: .center) } }
             }
             .safeAreaInset(edge: .bottom) {
-                Text("Click a caption's words to fix them. Press Return when done.")
+                Text("Click a caption to fix it. ↩ splits it at the cursor, ⌘↩ starts a new line, ⌫ at the start joins it to the one before.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .padding(8)
@@ -213,43 +216,216 @@ private struct CaptionRow: View {
     let model: EditorModel
     let page: CaptionPage
     let isCurrent: Bool
-
-    /// What the user is typing. Outside editing the row always shows the project's words.
-    @State private var draft = ""
-    @FocusState private var isEditing: Bool
+    @State private var typing: String?
 
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
-            Button(TimeFormat.string(page.range.start)) {
-                model.pause()
-                model.seek(to: page.firstFrame)
+            VStack(alignment: .leading, spacing: 2) {
+                Button(TimeFormat.string(page.range.start)) {
+                    model.pause()
+                    model.seek(to: page.firstFrame)
+                }
+                .buttonStyle(.plain)
+                .font(.caption.monospacedDigit())
+                .foregroundStyle(isCurrent ? Color.accentColor : .secondary)
+                .help("Go to this caption")
+                switch page.source {
+                case .sound:
+                    Image(systemName: "mic").font(.caption2).foregroundStyle(.secondary).help("Heard in a voice-over or sound")
+                case .broll:
+                    Image(systemName: "rectangle.on.rectangle").font(.caption2).foregroundStyle(.secondary).help("Heard in a B-roll clip")
+                case .clip:
+                    EmptyView()
+                }
             }
-            .buttonStyle(.plain)
-            .font(.caption.monospacedDigit())
-            .foregroundStyle(isCurrent ? Color.accentColor : .secondary)
-            .help("Go to this caption")
 
-            TextField("Caption", text: Binding(get: { isEditing ? draft : page.text }, set: { if isEditing { draft = $0 } }), axis: .vertical)
-                .textFieldStyle(.plain)
-                .focused($isEditing)
-                // Return ends editing; the change is saved once, when editing ends.
-                .onSubmit { isEditing = false }
-                .onChange(of: isEditing) { _, editing in
-                    if editing {
-                        draft = page.text
+            VStack(alignment: .leading, spacing: 2) {
+                CaptionTextField(
+                    text: page.text,
+                    startsEditing: model.captionToEdit == page.id,
+                    onBeginEditing: {
                         model.pause()
                         model.seek(to: page.firstFrame)
-                    } else {
-                        let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
+                    },
+                    onCommit: { typed in
+                        let text = typed.trimmingCharacters(in: .whitespacesAndNewlines)
                         if text != page.text { model.editCaption(page, text: text) }
-                    }
+                    },
+                    onSplit: { text, offset in model.splitCaption(page, text: text, at: offset) },
+                    onMerge: { text in model.mergeCaptionWithPrevious(page, text: text) },
+                    cursor: model.captionEditCursor,
+                    onStartedEditing: { if model.captionToEdit == page.id { model.captionToEdit = nil } },
+                    onTextChange: { typing = $0 },
+                    editingText: typing
+                )
+                if let translation = page.translation, model.project.captions.translationLanguage != nil {
+                    Text(translation).font(.caption).foregroundStyle(.secondary)
                 }
+            }
         }
         .padding(.vertical, 3)
         .listRowBackground(
             (isCurrent || model.focusedCaptionID == page.id ? Color.accentColor.opacity(0.15) : Color.clear)
                 .clipShape(RoundedRectangle(cornerRadius: 6))
         )
+    }
+}
+
+/// The caption looks, each drawn over a picture of this Short, with its word animation caught
+/// mid-word.
+private struct CaptionLookGrid: View {
+    let model: EditorModel
+    let settings: CaptionSettings
+    /// A frame of the Short without its captions, as the chips' background.
+    @State private var frame: CGImage?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Look").font(.subheadline.weight(.semibold))
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 74), spacing: 6)], spacing: 6) {
+                ForEach(CaptionStyle.allCases) { style in
+                    LookChip(style: style, settings: settings, frame: frame, isSelected: settings.style == style) {
+                        model.setCaptionStyle(style)
+                    }
+                }
+            }
+        }
+        // A new picture when the playhead stops somewhere else.
+        .task(id: model.isPlaying ? -1 : Int(model.currentTime.seconds)) {
+            guard !model.isPlaying, !model.project.timeline.clips.isEmpty else { return }
+            var project = model.project
+            project.captions.isVisible = false
+            project.titles = []
+            let time = model.currentTime
+            frame = try? await ProjectPoster.frame(of: project, at: time, maxSize: CGSize(width: 240, height: 426))
+        }
+    }
+}
+
+private struct LookChip: View {
+    let style: CaptionStyle
+    let settings: CaptionSettings
+    let frame: CGImage?
+    let isSelected: Bool
+    let action: () -> Void
+    @State private var image: CGImage?
+
+    var body: some View {
+        Button(action: action) {
+            VStack(spacing: 3) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 6).fill(Color(white: 0.22))
+                    if let image {
+                        Image(decorative: image, scale: 2).resizable().scaledToFill()
+                    }
+                }
+                .frame(height: 46)
+                .clipShape(RoundedRectangle(cornerRadius: 6))
+                Text(style.displayName).font(.caption).lineLimit(1)
+            }
+            .padding(3)
+            .background(isSelected ? Color.accentColor.opacity(0.25) : .clear, in: RoundedRectangle(cornerRadius: 8))
+            .overlay {
+                RoundedRectangle(cornerRadius: 8).strokeBorder(isSelected ? Color.accentColor : .clear, lineWidth: 2)
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(style.displayName)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+        .help(Self.help(style))
+        .task(id: Key(settings: settings, hasFrame: frame != nil, frameID: frame.map { ObjectIdentifier($0) })) {
+            image = CaptionPreview.image(for: style, settings: settings, over: frame, size: CGSize(width: 160, height: 92))
+        }
+    }
+
+    private struct Key: Hashable {
+        var settings: CaptionSettings
+        var hasFrame: Bool
+        var frameID: ObjectIdentifier?
+    }
+
+    static func help(_ style: CaptionStyle) -> String {
+        switch style {
+        case .bold: "Big capitals; the spoken word turns yellow and grows"
+        case .highlight: "The spoken word sits on a coloured box"
+        case .oneWord: "One big word at a time"
+        case .phrase: "Two to four words at a time, big and centred"
+        case .karaoke: "Words fill with colour as they are spoken"
+        case .glow: "Soft light around the letters; the spoken word shines"
+        case .bounce: "The spoken word jumps up"
+        case .typewriter: "Words appear one by one as they are spoken"
+        case .outline: "Hollow letters; the spoken word fills in"
+        case .classic: "White text on a dark box, like TV subtitles"
+        case .minimal: "Plain white text with a soft shadow"
+        }
+    }
+}
+
+/// A translated second line under each caption.
+private struct SecondLanguage: View {
+    let model: EditorModel
+    let settings: CaptionSettings
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text("Second language").font(.subheadline.weight(.semibold))
+                Spacer()
+                Picker("Second language", selection: Binding(
+                    get: { settings.translationLanguage },
+                    set: { model.setTranslationLanguage($0) }
+                )) {
+                    Text("None").tag(String?.none)
+                    Divider()
+                    ForEach(EditorModel.translationLanguages.filter { $0 != model.project.captionLanguageInUse?.rawValue }, id: \.self) { code in
+                        Text(EditorModel.languageName(code)).tag(Optional(code))
+                    }
+                }
+                .labelsHidden()
+                .fixedSize()
+                .controlSize(.small)
+            }
+            if settings.translationLanguage != nil {
+                if model.isTranslating || model.translationRequest != nil {
+                    HStack(spacing: 6) {
+                        ProgressView().controlSize(.small)
+                        Text("Translating on this Mac…").font(.caption).foregroundStyle(.secondary)
+                    }
+                } else {
+                    let missing = model.project.captionsNeedingTranslation().count
+                    if missing > 0 {
+                        Button(missing == 1 ? "Translate 1 Caption" : "Translate \(missing) Captions") { model.translateCaptions() }
+                            .controlSize(.small)
+                            .help("Captions you changed need translating again")
+                    } else {
+                        Text("Shown smaller, under each caption. Translated on this Mac.").font(.caption).foregroundStyle(.secondary)
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// Subtitle files, caption breaks and starting over.
+private struct CaptionsMoreMenu: View {
+    let model: EditorModel
+
+    var body: some View {
+        Menu {
+            Button("Import Subtitle File (.srt)…") { model.importCaptionsFile() }
+            Button("Export Subtitle File (.srt)…") { model.exportCaptionsFile() }
+            Divider()
+            Button("Undo My Splits and Joins") { model.resetCaptionBreaks() }
+                .help("Let the captions flow again on their own")
+            Button("Delete All Captions") { model.removeAllCaptions() }
+        } label: {
+            Image(systemName: "ellipsis.circle")
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .help("Subtitle files, caption breaks, delete captions")
     }
 }
 
@@ -303,8 +479,11 @@ private struct CaptionDesign: View {
                     model.editCaptionLook(on ? "Show Key Words" : "Hide Key Words") { $0.showsKeywords = on }
                 }))
                 HStack {
-                    Button("Pick Key Words") { model.pickKeywords() }
-                        .help("Highlight numbers, names and strong words automatically, about one in seven words")
+                    Button("Pick Key Words", systemImage: model.canUseWordModel ? "apple.intelligence" : "highlighter") { model.pickKeywords() }
+                        .help(model.canUseWordModel
+                              ? "Apple Intelligence reads your captions and highlights the words that matter, on this Mac"
+                              : "Highlight numbers, names and strong words automatically, about one in seven words")
+                        .disabled(model.wordModelJob != nil)
                     Button("Clear") { model.clearKeywords() }
                 }
                 .controlSize(.small)
@@ -312,8 +491,12 @@ private struct CaptionDesign: View {
                     model.editCaptionLook(on ? "Show Emoji" : "Hide Emoji") { $0.showsEmoji = on }
                 }))
                 HStack {
-                    Button("Suggest Emoji") { model.suggestEmoji() }
-                        .help("Add an emoji above captions with words like money, love, fire, idea… (at most one per caption)")
+                    Button("Suggest Emoji", systemImage: model.canUseWordModel ? "apple.intelligence" : "face.smiling") { model.suggestEmoji() }
+                        .help(model.canUseWordModel
+                              ? "Apple Intelligence picks emoji that match what is said (at most one per caption), on this Mac"
+                              : "Add an emoji above captions with words like money, love, fire, idea… (at most one per caption)")
+                        .disabled(model.wordModelJob != nil)
+                    if model.wordModelJob != nil { ProgressView().controlSize(.small) }
                     Button("Clear") { model.clearEmoji() }
                 }
                 .controlSize(.small)
