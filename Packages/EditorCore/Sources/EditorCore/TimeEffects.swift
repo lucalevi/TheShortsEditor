@@ -100,6 +100,11 @@ public struct SpeedSegment: Equatable, Sendable {
     public let source: CMTimeRange
     public let duration: CMTime
 
+    public init(source: CMTimeRange, duration: CMTime) {
+        self.source = source
+        self.duration = duration
+    }
+
     public var speed: Double { duration > .zero ? source.duration.seconds / duration.seconds : 1 }
 }
 
@@ -117,7 +122,7 @@ public extension Timeline {
     func speedRampFrames(afterClipAt index: Int) -> Int64 {
         guard index >= 0, index + 1 < clips.count else { return 0 }
         let a = clips[index], b = clips[index + 1]
-        guard a.smoothSpeed, b.smoothSpeed, a.speed != b.speed, !a.isFrozen, !b.isFrozen, a.transitionOut == nil,
+        guard a.smoothSpeed, b.smoothSpeed, a.speed != b.speed, a.speedCurve == nil, b.speedCurve == nil, !a.isFrozen, !b.isFrozen, a.transitionOut == nil,
               a.assetID == b.assetID, abs((a.sourceRange.end - b.sourceStart).seconds) < 0.5 / Double(Project.frameRate)
         else { return 0 }
         func half(_ clip: Clip) -> Int64 { clip.duration.convertScale(Project.frameRate, method: .roundTowardNegativeInfinity).value / 2 }
@@ -138,6 +143,7 @@ public extension Timeline {
     func speedSegments(forClipAt index: Int) -> [SpeedSegment] {
         let clip = clips[index]
         guard !clip.isFrozen else { return [] }
+        if clip.speedCurve != nil { return clip.curveSegments }
         let framesIn = speedRampFrames(afterClipAt: index - 1), framesOut = speedRampFrames(afterClipAt: index)
         guard framesIn > 0 || framesOut > 0 else { return [SpeedSegment(source: clip.sourceRange, duration: clip.duration)] }
 

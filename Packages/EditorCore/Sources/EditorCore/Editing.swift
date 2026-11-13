@@ -262,7 +262,7 @@ public extension Project {
         let source = clip.sourceDuration
         updateAnyClip(id) { clip in
             clip.speed = speed
-            clip.duration = max(CMTimeMultiplyByFloat64(source, multiplier: 1 / speed).snappedToFrame(), Clip.minimumDuration)
+            clip.duration = clip.duration(showing: source)
         }
     }
 }
@@ -289,6 +289,8 @@ public enum Snapping {
         for overlay in project.overlays where !excluding.contains(.overlay(overlay.id)) { times += [overlay.start, overlay.end] }
         for sound in project.sounds where !excluding.contains(.sound(sound.id)) { times += [sound.start, sound.end] }
         for marker in project.markers where marker.id != excludingMarker && marker.time <= project.duration { times.append(marker.time) }
+        // The music's beats, while they are shown.
+        if project.music?.showsBeats == true { times += project.timelineBeats.map(\.time) }
         if let playhead { times.append(playhead) }
         return times
     }

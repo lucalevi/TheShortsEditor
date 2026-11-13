@@ -46,6 +46,7 @@ struct SpeedSection: View {
             Text(speed > 1 ? "Faster and shorter. Voices keep their pitch." : speed < 1 ? "Slow motion: longer. Voices keep their pitch." : "As recorded.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
+            RhythmSpeedExtras(model: model, clips: clips)
             TimeExtras(model: model, clips: clips)
         }
     }

@@ -139,6 +139,38 @@ struct EditorCommands: Commands {
                 }
             }
             .disabled(selectedClips.isEmpty && model.timelineRange == nil)
+            let curvable = selectedClips.filter { model.project.timeline.index(of: $0.id) != nil && !model.project.isStill($0) }
+            Menu("Speed Curve") {
+                Button("None") { model.setSpeedCurve(nil, for: curvable.map(\.id)) }
+                Divider()
+                ForEach(SpeedCurveShape.allCases) { shape in
+                    Button(shape.displayName) { model.setSpeedCurve(shape, for: curvable.map(\.id)) }
+                }
+            }
+            .disabled(curvable.isEmpty)
+            let animatable = selectedClips.map(\.id)
+            Menu("Comes In") {
+                Button("None") { model.setAnimation(nil, entering: true, for: animatable) }
+                Divider()
+                ForEach(MotionAnimation.allCases) { kind in
+                    Button(kind.displayName) { model.setAnimation(kind, entering: true, for: animatable) }
+                }
+            }
+            .disabled(animatable.isEmpty)
+            Menu("Goes Out") {
+                Button("None") { model.setAnimation(nil, entering: false, for: animatable) }
+                Divider()
+                ForEach(MotionAnimation.allCases) { kind in
+                    Button(kind.displayName) { model.setAnimation(kind, entering: false, for: animatable) }
+                }
+            }
+            .disabled(animatable.isEmpty)
+            Menu("Cut to the Beat") {
+                ForEach(BeatSpacing.allCases) { spacing in
+                    Button(spacing.displayName) { model.cutToBeat(spacing) }
+                }
+            }
+            .disabled(model.project.music == nil || model.project.timeline.clips.isEmpty || model.findingBeats)
             Button("Add Freeze Frame") { model.addFreezeFrame() }
                 .keyboardShortcut("f", modifiers: .option)
                 .disabled(model.project.timeline.clips.isEmpty)
@@ -250,6 +282,16 @@ struct EditorCommands: Commands {
                 set: { on in model.editMusic(on ? "Lower Music Under Speech" : "Keep Music Level") { $0.lowersUnderSpeech = on } }
             ))
             .disabled(model.project.music == nil)
+            Toggle("Loop Music", isOn: Binding(get: { model.project.music?.loops ?? false }, set: { model.setMusicLoops($0) }))
+                .disabled(model.project.music == nil || model.project.music?.mood != nil)
+            Button("Start Music at Playhead") { model.setMusicTimelineStart(model.currentTime) }
+                .disabled(model.project.music == nil || model.currentTime >= model.duration)
+            Toggle("Show Beats", isOn: Binding(get: { model.project.music?.showsBeats == true && model.project.hasBeats }, set: { model.setShowsBeats($0) }))
+                .disabled(model.project.music == nil || model.findingBeats)
+            Button("Add Beat at Playhead") { model.addBeatAtPlayhead() }
+                .disabled(model.project.musicRange.map { !$0.containsTime(model.currentTime) } ?? true)
+            Button("Remove Beat at Playhead") { model.removeBeatAtPlayhead() }
+                .disabled(!model.beatNearPlayhead)
             Divider()
             if let clip = model.selectedClip {
                 Toggle("Mute Clip", isOn: Binding(get: { clip.isMuted }, set: { model.setClipMuted(clip.id, $0) }))

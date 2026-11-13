@@ -51,6 +51,13 @@ public struct Clip: Identifiable, Codable, Equatable, Sendable {
     public var steadiness: Double
     /// The placement and motion came from the Short's style, so another style may replace them.
     public var styledMotion: Bool = false
+    /// Speeds up and slows down by itself in a named shape, on top of `speed` (see `SpeedCurves.swift`).
+    public var speedCurve: SpeedCurve? = nil
+    /// Slow motion made smooth: pictures in between are made up (see `FrameInterpolator`).
+    public var smoothSlowMotion: Bool = false
+    /// How the picture comes in at its start and goes at its end (see `ClipAnimation.swift`).
+    public var animationIn: ClipAnimation? = nil
+    public var animationOut: ClipAnimation? = nil
 
     public static let maxVolume = 2.0
     /// No clip is shorter than this, so it can still be seen and grabbed on the timeline.
@@ -98,6 +105,7 @@ public struct Clip: Identifiable, Codable, Equatable, Sendable {
     /// How much of the source the clip shows (nothing but one picture for a freeze frame).
     public var sourceDuration: CMTime {
         if isFrozen { return .zero }
+        if speedCurve != nil { return CMTime(seconds: curveSource(atOffset: duration.seconds), preferredTimescale: 90000) }
         return speed == 1 ? duration : CMTimeMultiplyByFloat64(duration, multiplier: speed).convertScale(600, method: .roundHalfAwayFromZero)
     }
 
@@ -106,18 +114,25 @@ public struct Clip: Identifiable, Codable, Equatable, Sendable {
     /// The source time playing `offset` into the clip.
     public func sourceTime(atOffset offset: CMTime) -> CMTime {
         if isFrozen { return sourceStart }
+        if speedCurve != nil { return sourceStart + CMTime(seconds: curveSource(atOffset: offset.seconds), preferredTimescale: 90000) }
         return speed == 1 ? sourceStart + offset : sourceStart + CMTimeMultiplyByFloat64(offset, multiplier: speed)
     }
 
     /// How far into the clip a source time plays (it may be outside the clip).
     public func timelineOffset(ofSourceTime time: CMTime) -> CMTime {
         if isFrozen { return .zero }
+        if speedCurve != nil { return CMTime(seconds: curveOffset(ofSource: (time - sourceStart).seconds), preferredTimescale: 90000) }
         return speed == 1 ? time - sourceStart : CMTimeMultiplyByFloat64(time - sourceStart, multiplier: 1 / speed)
     }
 
     /// A stretch of the source as it lasts on the timeline.
     public func timelineDuration(ofSource duration: CMTime) -> CMTime {
-        speed == 1 ? duration : CMTimeMultiplyByFloat64(duration, multiplier: 1 / speed)
+        if speedCurve != nil, !isFrozen {
+            let source = sourceDuration.seconds
+            let average = source > 0 ? source / self.duration.seconds : speed
+            return CMTimeMultiplyByFloat64(duration, multiplier: 1 / average)
+        }
+        return speed == 1 ? duration : CMTimeMultiplyByFloat64(duration, multiplier: 1 / speed)
     }
 
     /// The volume actually played (before the volume line and fades).
@@ -195,6 +210,12 @@ public struct Timeline: Codable, Equatable, Sendable {
         var first = clips[index]
         guard offset < first.duration else { return nil }
         var second = first.piece(sourceStart: first.sourceTime(atOffset: offset), duration: first.duration - offset)
+        if let curve = first.speedCurve {
+            // Each half plays its own part of the shape.
+            let middle = curve.from + (curve.to - curve.from) * offset.seconds / first.duration.seconds
+            first.speedCurve?.to = middle
+            second.speedCurve?.from = middle
+        }
         first.duration = offset
         first.keepFades(isFirst: true, isLast: false)
         second.keepFades(isFirst: false, isLast: true)
@@ -210,6 +231,7 @@ extension Clip {
         case fadeIn, fadeOut, volumeKeys, voiceEffect, equalizer, soundDetached
         case transitionOut, isFrozen, pictureFadeIn, pictureFadeOut, smoothSpeed
         case look, steadiness, styledMotion
+        case speedCurve, smoothSlowMotion, animationIn, animationOut
     }
 
     public init(from decoder: any Decoder) throws {
@@ -241,6 +263,10 @@ extension Clip {
         look = (try? c.decodeIfPresent(ClipLook.self, forKey: .look)) ?? ClipLook()
         steadiness = try c.decodeIfPresent(Double.self, forKey: .steadiness) ?? 0
         styledMotion = try c.decodeIfPresent(Bool.self, forKey: .styledMotion) ?? false
+        speedCurve = try? c.decodeIfPresent(SpeedCurve.self, forKey: .speedCurve)
+        smoothSlowMotion = try c.decodeIfPresent(Bool.self, forKey: .smoothSlowMotion) ?? false
+        animationIn = try? c.decodeIfPresent(ClipAnimation.self, forKey: .animationIn)
+        animationOut = try? c.decodeIfPresent(ClipAnimation.self, forKey: .animationOut)
     }
 
     public func encode(to encoder: any Encoder) throws {
@@ -271,5 +297,9 @@ extension Clip {
         if look != ClipLook() { try c.encode(look, forKey: .look) }
         if steadiness > 0 { try c.encode(steadiness, forKey: .steadiness) }
         if styledMotion { try c.encode(styledMotion, forKey: .styledMotion) }
+        try c.encodeIfPresent(speedCurve, forKey: .speedCurve)
+        if smoothSlowMotion { try c.encode(smoothSlowMotion, forKey: .smoothSlowMotion) }
+        try c.encodeIfPresent(animationIn, forKey: .animationIn)
+        try c.encodeIfPresent(animationOut, forKey: .animationOut)
     }
 }

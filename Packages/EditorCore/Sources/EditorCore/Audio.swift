@@ -1,9 +1,19 @@
 import CoreMedia
 import Foundation
 
-/// The background song. It starts with the Short and plays until the Short (or the song) ends.
+/// The background song. It starts with the Short (or at `start`) and plays until the Short (or
+/// the song, unless it loops) ends.
 public struct BackgroundMusic: Codable, Equatable, Sendable {
     public var assetID: MediaAsset.ID
+    /// Where on the timeline the song begins.
+    public var start: CMTime = .zero
+    /// Plays again from its beginning when it ends before the Short does.
+    public var loops: Bool = false
+    /// The song's beats in its own time, found by listening or set by hand (nil: none yet, or
+    /// the app's own music, whose beats are known). See `Rhythm.swift`.
+    public var beats: [Beat]? = nil
+    /// Beats are shown on the music and cuts snap to them.
+    public var showsBeats: Bool = false
     /// Where in the song to begin, so the best part can play under the Short.
     public var sourceStart: CMTime
     /// How loud the song plays when nobody is talking, from 0 to 1.
@@ -64,10 +74,14 @@ public extension Project {
     }
 
     /// Where the song plays on the timeline, or nil without music (or with nothing to play under).
-    var musicRange: CMTimeRange? {
-        guard let track = music, let song = asset(id: track.assetID) else { return nil }
-        let length = min(duration, song.duration - track.sourceStart)
-        return length > .zero ? CMTimeRange(start: .zero, duration: length) : nil
+    var musicRange: CMTimeRange? { musicRange(through: duration) }
+
+    /// Where the song would play if the Short lasted until `end`.
+    func musicRange(through end: CMTime) -> CMTimeRange? {
+        guard let track = music, let song = asset(id: track.assetID), track.start < end else { return nil }
+        let room = end - track.start
+        let length = track.loops && song.duration > .zero ? room : min(room, song.duration - track.sourceStart)
+        return length > .zero ? CMTimeRange(start: track.start, duration: length) : nil
     }
 
     /// Whether the song stops before the Short does.
@@ -111,7 +125,9 @@ public enum AudioMix {
             let threshold = max(audio.suggestedThreshold, quietestSpeech)
             let sourceFirst = clip.sourceStart.convertScale(Project.frameRate, method: .roundHalfAwayFromZero).value
             for offset in 0..<clipFrames {
-                let index = Int(sourceFirst + Int64((Double(offset) * clip.speed).rounded(.down)))
+                let index = clip.speedCurve == nil
+                    ? Int(sourceFirst + Int64((Double(offset) * clip.speed).rounded(.down)))
+                    : Int((clip.sourceTime(atOffset: CMTime(value: offset, timescale: Project.frameRate)).seconds * Double(Project.frameRate)).rounded(.down))
                 if index >= 0, index < audio.decibels.count, audio.decibels[index] >= threshold {
                     frames.append(clipStart + offset)
                 }
@@ -172,12 +188,12 @@ public enum AudioMix {
         }
         func faded(at t: CMTime) -> Double {
             var f = 1.0
-            if fadeIn > .zero, t < fadeIn { f = min(f, t.seconds / fadeIn.seconds) }
+            if fadeIn > .zero, t < range.start + fadeIn { f = min(f, (t - range.start).seconds / fadeIn.seconds) }
             if fadeOut > .zero, t > range.end - fadeOut { f = min(f, (range.end - t).seconds / fadeOut.seconds) }
             return max(f, 0)
         }
 
-        var times: [CMTime] = [range.start, range.end, fadeIn, range.end - fadeOut]
+        var times: [CMTime] = [range.start, range.end, range.start + fadeIn, range.end - fadeOut]
         for r in speech {
             times += [r.start - down, r.start, r.end, r.end + up]
         }
@@ -300,6 +316,7 @@ public struct LoudnessMeter: Sendable {
 extension BackgroundMusic {
     private enum CodingKeys: String, CodingKey {
         case assetID, sourceStart, volume, lowersUnderSpeech, fadesIn, fadesOut, mood
+        case start, loops, beats, showsBeats
     }
 
     public init(from decoder: any Decoder) throws {
@@ -311,6 +328,10 @@ extension BackgroundMusic {
         fadesIn = try c.decode(Bool.self, forKey: .fadesIn)
         fadesOut = try c.decode(Bool.self, forKey: .fadesOut)
         mood = try? c.decodeIfPresent(MusicMood.self, forKey: .mood)
+        start = c.contains(.start) ? try c.decodeTime(forKey: .start) : .zero
+        loops = try c.decodeIfPresent(Bool.self, forKey: .loops) ?? false
+        beats = try? c.decodeIfPresent([Beat].self, forKey: .beats)
+        showsBeats = try c.decodeIfPresent(Bool.self, forKey: .showsBeats) ?? false
     }
 
     public func encode(to encoder: any Encoder) throws {
@@ -322,5 +343,9 @@ extension BackgroundMusic {
         try c.encode(fadesIn, forKey: .fadesIn)
         try c.encode(fadesOut, forKey: .fadesOut)
         try c.encodeIfPresent(mood, forKey: .mood)
+        if start > .zero { try c.encode(time: start, forKey: .start) }
+        if loops { try c.encode(loops, forKey: .loops) }
+        try c.encodeIfPresent(beats, forKey: .beats)
+        if showsBeats { try c.encode(showsBeats, forKey: .showsBeats) }
     }
 }

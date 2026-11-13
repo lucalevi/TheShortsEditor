@@ -167,6 +167,12 @@ final class EditorModel {
     @ObservationIgnored var unsteadiable: Set<MediaAsset.ID> = []
     /// Clips being looked at for Enhance or Match Color.
     var analysingLook: Set<Clip.ID> = []
+    /// Listening to the music for its beats.
+    var findingBeats = false
+    /// Smooth slow-motion copies being made, by clip, with how far they have got (0…1).
+    var smoothing: [Clip.ID: Double] = [:]
+    /// Copies that couldn't be made, so they aren't tried again after every rebuild.
+    @ObservationIgnored var unsmoothable: Set<URL> = []
     /// The marker whose name is being typed (its pop-up on the ruler is open).
     var markerBeingRenamed: Marker.ID?
     /// The clip shown in the clip trimmer (⌘\), if it is open.
@@ -1201,6 +1207,7 @@ final class EditorModel {
                 seek(to: time)
                 prepareMissingProcessedSounds()
                 prepareMissingSteadiness()
+                prepareMissingSmoothSlowMotion()
                 remakeMissingStyleMusic()
             } catch {
                 guard !Task.isCancelled else { return }

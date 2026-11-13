@@ -1,6 +1,6 @@
 # Project status
 
-_Last updated: 2026-11-13 (Stage G, captions the CapCut way: done and committed). Read this first when picking the project back up, then update it at the end of each session._
+_Last updated: 2026-11-13 (Stage I, rhythm: done and committed). Read this first when picking the project back up, then update it at the end of each session._
 
 ## Where we are
 
@@ -16,9 +16,26 @@ Stages 1–7 are done, tested on screen, committed and pushed to https://github.
 | 6 | Audio: clip volume, music with ducking, loudness on export | 2026-11-09 |
 | 7 | Save/open projects, autosave, missing media | 2026-11-09 |
 
-**Pick up here (2026-11-13, latest):** Stage G (captions the CapCut way) is built, tested, checked on screen, committed and pushed. Next: Stage I (rhythm). Test Short "My Short 16" (Italian voice-over captions, a German second line, an imported SRT) is in the library (safe to delete); spoken test files `voiceover-sample.m4a` (English) and `italiano-sample.m4a` were made with `say` into `Tools/uitest/.samples`, with `My Short 16.srt` exported there.
+**Pick up here (2026-11-13, latest):** Stage I (rhythm) is built, tested, checked on screen, committed and pushed. Next after it: Stage H (text, stickers and voice). Test Short "My Short 17" (Hero and Bullet curves, a Spin entrance, music moved to 0:02 with beats shown, cut to the bar) is in the library (safe to delete).
+
+**Before that (2026-11-13):** Stage G (captions the CapCut way) is built, tested, checked on screen, committed and pushed. Test Short "My Short 16" (Italian voice-over captions, a German second line, an imported SRT) is in the library (safe to delete); spoken test files `voiceover-sample.m4a` (English) and `italiano-sample.m4a` were made with `say` into `Tools/uitest/.samples`, with `My Short 16.srt` exported there.
 
 **Before that (2026-11-12):** CapCut was researched (`research/capcut/README.md`); next is Stage G (captions), see "CapCut list: stages G–L" below. **Before that (2026-11-11):** Stage F of the iMovie list ("One-click Shorts", `research/imovie/imovie-reverse-engineering.md`) is built, tested, checked on screen and committed. With it, every stage of the iMovie list (A–F) is done. Stage E is committed (5e708e6); its Photos tab is still unchecked on screen. Next: ask the user (see "What's next"). Test footage and a closed scratch iMovie library are in `~/Movies/ShortsEditorResearch` (safe to delete). Test Shorts "My Short 5"–"My Short 12" are in the library (safe to delete); "My Short 12" has a look, Stabilize, two markers and a slid clip from the on-screen checks.
+
+### Stage I: rhythm (2026-11-13): done, committed
+
+Model in `EditorCore/Rhythm.swift` (beats, `BeatFinder`, music placement and passes, Cut to the Beat), `SpeedCurves.swift`, `ClipAnimation.swift` (`RhythmTests`: 26 tests); `RenderEngine/BeatDetector.swift`, `FrameInterpolator.swift`, curves/looping in `CompositionBuilder`, animations in `ShortsCompositor.draw` (`RhythmRenderTests`: 6); app in `App/EditorModel+Rhythm.swift`, `App/Views/RhythmViews.swift`, the music lane in `TimelineView`. Project files are now **version 8** (`Clip.speedCurve`, `smoothSlowMotion`, `animationIn/Out`; `BackgroundMusic.start`, `loops`, `beats`, `showsBeats`).
+1. **Beats** (Music inspector ▸ Beats, Sound ▸ Show Beats): the app's own music knows its beats (tempo, 4 a bar, from 0); any other song is listened to on device (`BeatDetector`: spectral flux with Accelerate, `BeatFinder`: tempo by autocorrelation 70–180 bpm preferring ~120, grid fitted to the onsets by a straight line, bars where the low notes are strongest; a fixed 35 ms latency corrected, checked with a click track). Shown as ticks on the music lane (taller on bars); while shown, every dragged edge snaps to them. Add Beat / Remove Beat at the playhead, Find Again. Beats are stored in the song's time, so they follow its start, a later start and loops.
+2. **Cut to the Beat** (Clip menu, Music inspector): Every Beat / Every Other Beat / Every Bar. Each cut (and the end of the Short) moves to the nearest chosen beat within one beat gap, as far as the clip's footage allows, never under the shortest clip; finds the beats first if needed.
+3. **Speed curves** (Speed ▸ Speed curve, Clip ▸ Speed Curve): Montage, Hero, Bullet, Jump Cut, Flash In, Flash Out, drawn as tiles. Main clips only. The shape multiplies the clip's speed and plays as 3-frame steps; the clip keeps its footage, so its length changes. All source ↔ timeline mapping goes through the steps (captions, keyframes, waveform at the average speed); a split gives each half its part of the shape. Gradual speed between clips is off next to a curve. Sound follows in stretches of at least 0.2 s.
+4. **Smooth slow motion** (checkbox under Speed when a clip plays slower than its file has pictures for): a copy with made-up pictures in between (`VTFrameProcessor` frame-rate conversion, optical flow on this Mac; blends where unsupported), 2–8× as many pictures, whole file up to 60 s else the clip ± 2 s, kept in Caches, made in the background with progress, then used by the composition. No sound in the copy (the clip's sound comes from the original).
+5. **Clip animations** ("Comes in and goes out" in the clip and B-roll inspectors; Clip ▸ Comes In / Goes Out): Fade, Pop, Zoom, Slide Up/Down/Left/Right, Spin, Blur, 0.2–2 s each (shared out on a short clip); choosing one plays it. The layer (with its blurred background) is drawn alone, then moved/turned/blurred/faded as one picture. `MotionAnimation` is meant to be reused by titles and stickers in Stage H.
+6. **Music later or looped**: "Starts on the timeline at" slider, Start at Playhead, or drag the music on the timeline (snaps); fades and ducking follow. "Loop the song" (files only, not the app's music) plays it again from its start until the Short ends. App music that starts later still ends on a bar.
+7. Fix found on screen: curved sound made AVPlayer show no pictures at all (offline rendering was fine). Causes: nanosecond slivers/gaps between scaled sound pieces and sound ending a hair after the picture. Steps are now joined to ≥ 0.2 s, placed on the previous piece's end, end exactly on their frame, and the clips' sound is trimmed to the picture (`curvedSoundHasNoSliversAndNeverOutlastsThePicture`).
+
+Tests: 381 model + 105 render + 3 transcription = 489, all pass.
+Verified on screen: beats found on music-sample and drawn on the lane; Cut to the Beat ▸ Every Bar (cuts on the bar ticks); Hero and Bullet tiles (clip lengths change, labels on the clips, playback through both); Spin entrance drawn mid-turn; music dragged to 0:02 (fade and ticks moved); smooth slow motion made a 150 fps copy (~40 s for a 5 s 1080p file) and played it; reopening the Short.
+Not yet verified on screen: beats of a real song by ear, Loop the song with a short song, Add/Remove Beat by hand, animations on B-roll, exporting a Short with curves/animations/looped music, a curve on a talking clip (how the stepped sound sounds).
 
 ### Stage G: captions the CapCut way (2026-11-13): done, committed
 
@@ -271,7 +288,8 @@ The P0 list from `research/shorts-editor-research.md` §5. Each stage ends with 
 9. **iMovie list stages A–F done** (2026-11-09 … 11-11, `research/imovie/imovie-reverse-engineering.md`). This covered most of the roadmap's "next 20%" (markers, filters, transitions, copy/paste settings, templates as storyboards and styles, long video → Short as Magic Short).
 10. **CapCut research done (2026-11-12, `research/capcut/`)**: the user wants **iMovie's look and feel with CapCut's features**. Stages G–L with checklists: **"CapCut list: stages G–L"** below (details in `research/capcut/capcut-reverse-engineering.md` §7).
 11. ~~Stage G, captions the CapCut way~~ (done 2026-11-13, all of it, committed).
-12. **Next:** Stage I, rhythm (beats, Cut to the Beat, speed curve presets).
+12. ~~Stage I, rhythm~~ (done 2026-11-13, all of it, committed).
+13. **Next:** Stage H, text, stickers and voice.
 
 ## CapCut list: stages G–L (to do, decided 2026-11-12)
 
@@ -282,8 +300,8 @@ The P0 list from `research/shorts-editor-research.md` §5. Each stage ends with 
 | Stage | What | State |
 |---|---|---|
 | G | Captions, the CapCut way | **done** 2026-11-13, committed |
-| I | Rhythm: beats and speed curves | **next** |
-| H | Text, stickers and voice | to do |
+| I | Rhythm: beats and speed curves | **done** 2026-11-13, committed |
+| H | Text, stickers and voice | **next** |
 | J | Effects | to do |
 | K | Cut-outs | to do |
 | L | Templates and finding moments | to do |
@@ -299,12 +317,12 @@ Why first: the user asked for it, and their real CapCut Short ("Studiare per la 
 - [x] Later in G: translated second line (Translation framework), more languages with auto-detect
 
 ### Stage I: rhythm
-- [ ] Beat markers on the music (the app's own music knows its beats; files by onset detection)
-- [ ] Snap to beats; **Cut to the Beat** (clips trimmed so cuts land on beats)
-- [ ] **Speed curve presets**: Montage, Hero, Bullet, Jump Cut, Flash In, Flash Out (named shapes of our gradual speed)
-- [ ] Smooth slow motion (frame interpolation, `VTFrameProcessor`)
-- [ ] Clip In/Out animations (shared with text)
-- [ ] Music that starts later or loops
+- [x] Beat markers on the music (the app's own music knows its beats; files by onset detection)
+- [x] Snap to beats; **Cut to the Beat** (clips trimmed so cuts land on beats)
+- [x] **Speed curve presets**: Montage, Hero, Bullet, Jump Cut, Flash In, Flash Out (named shapes of our gradual speed)
+- [x] Smooth slow motion (frame interpolation, `VTFrameProcessor`)
+- [x] Clip In/Out animations (shared with text)
+- [x] Music that starts later or loops
 
 ### Stage H: text, stickers and voice
 - [ ] Title looks grid (~12 presets); exits and loop animations
@@ -350,13 +368,13 @@ Why first: the user asked for it, and their real CapCut Short ("Studiare per la 
 - Without Apple Intelligence, key words and emoji are picked by simple rules ("welcome"/"showing" can be picked; small emoji dictionary) and fillers are sounds only. With it, the model may pick more key words than one in seven, and its emoji can be literal (💅 for "trucco", Italian for both "trick" and "make-up").
 - Stage G: captions are translated one at a time, so a short caption is translated without the sentence around it ("tipo il trucco più" → "wie der beste Make-up-Look"). Language detection listens to the first heard file only and tries at most 4 languages; a language whose speech model isn't on the Mac is only tried when it is the Mac's own. Words in voice-overs and B-roll can't be cut from the Script panel. Splitting a caption doesn't split the clip; joins work only within one clip or sound. Caption edges don't snap. A muted clip's spoken captions are hidden (they come back when it is unmuted).
 - Voice clean-up copies are kept in Caches and remade if missing; a project opened on another Mac re-cleans when the toggle is switched off and on.
-- Speed has no ramps/curves and no smooth slow motion (frame blending). Reversed clips don't exist.
+- Speed curves are six fixed shapes (no custom curve); they play in 3-frame steps and their sound in ≥ 0.2 s stretches (slightly out of step inside a stretch). The filmstrip of a curved clip is drawn at its average speed. Smooth slow-motion copies stay in Caches (not cleaned up) and are remade when the clip's slowest speed changes the factor.
 - Split screen is top/bottom halves only, and only the topmost split B-roll at a time decides it. Overlays are timeline-timed (like titles), not attached to the clip under them, so moving a main clip doesn't move its B-roll.
 - Live preview while dragging a picture redraws the frame by seeking to the same time; during playback it isn't shown (dragging pauses).
 - Keyframes animate placement only (not opacity or volume). The handles' corner squares are kept inside the viewer, so on a picture bigger than the screen they sit at the edge, not at the true corner.
 - Filmstrip and waveform are drawn per clip with Canvas; very long clips at high zoom draw many stills (no tiling yet).
 - Synthetic clicks (`ui.sh`) can leave a SwiftUI pop-up menu open, which blocks Apple events to the app (osascript times out after 2 minutes). Press Escape (`ui.sh code 53`) after using a pop-up.
-- Audio: one song only; it always starts with the Short (no placing it later, no looping a short song).
+- Audio: one song only. Beat finding assumes one steady tempo (songs that speed up or swing drift off the grid; Add/Remove Beat fixes single beats). Cut to the Beat only shortens/lengthens clips, it doesn't split long ones into beat-length pieces.
 - Volume line: points move up/down only (not sideways). B-roll has fades and effects in the inspector but no line on its timeline block. "Too loud" uses per-frame RMS (−6 dBFS), not true peaks, so it's a hint. Voice effects are synthesized by me and were never judged by ear; Robot is ring modulation + a short comb, not a vocoder. Processed copies are stereo, play from file time 0 (a video whose sound starts later than its picture would drift slightly, same as voice clean-up), and the echo/reverb tail is cut at the end of the file. Speech for ducking is found by loudness, so a clip with constant loud sound (e.g. its own music) counts as speech throughout. Volume sliders apply when released (no live preview while dragging). AVFoundation's audio mix does boost above 100% (checked: linear in float).
 - Photos: only the newest 600 items of a kind are listed (no albums, no search, no scrolling further). Copies of library items stay in `Application Support/Shorts Editor/From Photos` (not cleaned up). Live Photos are used as stills. No dragging from the Photos grid.
 - Clip trimmer: no sound waveform, and sound items can't be opened in it. Markers can't be added to a clip in Media (only on the timeline).

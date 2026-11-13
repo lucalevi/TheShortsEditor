@@ -199,9 +199,37 @@ nonisolated final class ShortsCompositor: NSObject, AVVideoCompositing, Sendable
         request.finish(withComposedVideoFrame: output)
     }
 
+    /// Draws one layer over `image`. While the clip comes in or goes out with an animation, the
+    /// layer (with its background, for a main clip) is drawn on its own first, then moved, sized,
+    /// turned, blurred and faded as one picture.
+    private func draw(_ layer: CompositorLayer, at time: CMTime, request: AVAsynchronousVideoCompositionRequest, over image: CIImage) -> CIImage {
+        guard let state = layer.clip.animationState(atOffset: time - layer.timelineStart), !state.isIdentity else {
+            return drawPlain(layer, at: time, request: request, over: image)
+        }
+        let canvas = CGRect(origin: .zero, size: Project.canvasSize)
+        let region = layer.region
+        let ciRegion = CGRect(x: region.minX, y: canvas.height - region.maxY, width: region.width, height: region.height)
+        var picture = drawPlain(layer, at: time, request: request, over: CIImage(color: .clear).cropped(to: ciRegion))
+        if state.blur > 0.5 {
+            picture = picture.clampedToExtent().applyingGaussianBlur(sigma: state.blur / 2).cropped(to: picture.extent)
+        }
+        // Around the middle of its region; Core Image's y goes up, so a move down is negative.
+        let middle = CGPoint(x: ciRegion.midX, y: ciRegion.midY)
+        let transform = CGAffineTransform(translationX: -middle.x, y: -middle.y)
+            .concatenating(CGAffineTransform(scaleX: state.scale, y: state.scale))
+            .concatenating(CGAffineTransform(rotationAngle: -state.rotation * .pi / 180))
+            .concatenating(CGAffineTransform(translationX: middle.x + state.offsetX * region.width, y: middle.y - state.offsetY * region.height))
+        picture = picture.transformed(by: transform).cropped(to: ciRegion)
+        if state.opacity <= 0 { return image }
+        if state.opacity < 1 {
+            picture = picture.applyingFilter("CIColorMatrix", parameters: ["inputAVector": CIVector(x: 0, y: 0, z: 0, w: state.opacity)])
+        }
+        return picture.composited(over: image)
+    }
+
     /// Draws one layer over `image`: its picture framed and placed in its region (over a blurred
     /// copy of itself or black for a main clip), see-through as far as its opacity and fades say.
-    private func draw(_ layer: CompositorLayer, at time: CMTime, request: AVAsynchronousVideoCompositionRequest, over image: CIImage) -> CIImage {
+    private func drawPlain(_ layer: CompositorLayer, at time: CMTime, request: AVAsynchronousVideoCompositionRequest, over image: CIImage) -> CIImage {
         let canvas = CGRect(origin: .zero, size: Project.canvasSize)
         let region = layer.region
         // Core Image's origin is at the bottom left.

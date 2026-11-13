@@ -13,7 +13,8 @@ public struct ProjectFile: Codable, Equatable, Sendable {
     /// 5: colour, filters (per clip and for the whole Short), Stabilize.
     /// 6: markers.
     /// 7: styles, app-made music, storyboards.
-    public static let currentVersion = 7
+    /// 8: speed curves, clip animations, smooth slow motion, beats, music placed later or looped.
+    public static let currentVersion = 8
     public static let fileExtension = "shortsproject"
 
     public var version: Int

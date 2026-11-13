@@ -72,7 +72,9 @@ public extension Project {
     mutating func fitMoodMusic() {
         guard var music, let mood = music.mood, duration > .zero else { return }
         let bar = mood.barLength.seconds
-        let remainder = duration.seconds.truncatingRemainder(dividingBy: bar)
+        let length = (duration - music.start).seconds
+        guard length > 0 else { return }
+        let remainder = length.truncatingRemainder(dividingBy: bar)
         let start = remainder < 0.001 ? 0 : bar - remainder
         music.sourceStart = CMTime(seconds: start, preferredTimescale: 48_000)
         music.fadesIn = false

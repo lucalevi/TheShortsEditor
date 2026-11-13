@@ -65,15 +65,36 @@ public enum CompositionBuilder {
         for (index, clip) in project.timeline.clips.enumerated() {
             // Where the speed changes gradually into a neighbour's, the picture goes in as a few
             // short stretches at speeds in between (the sound keeps its plain step).
-            let segments = project.timeline.hasSpeedRamp(atClip: index) ? project.timeline.speedSegments(forClipAt: index) : nil
+            // A speed curve plays as short steps, picture and sound alike.
+            let segments = project.timeline.hasSpeedRamp(atClip: index) || clip.speedCurve != nil ? project.timeline.speedSegments(forClipAt: index) : nil
             let layer = try await media.layer(for: clip, at: cursor, in: videoTrack, isMain: true, segments: segments)
-            if case .track = layer.source, !clip.soundDetached, let sourceAudio = try await media.audioTrack(for: clip) {
+            if case .track = layer.source, !clip.soundDetached, clip.speedCurve != nil, let sourceAudio = try await media.audioTrack(for: clip) {
+                let available = try await sourceAudio.load(.timeRange)
+                var at = cursor
+                for segment in SpeedSegment.joined(clip.curveSegments) {
+                    let range = segment.source.intersection(available)
+                    // Slivers left by rounding (a file's sound ending a hair early) are skipped.
+                    if range.duration.seconds > 0.001 {
+                        // Where part of a step has no sound, the rest keeps its place.
+                        let ratio = segment.duration.seconds / max(segment.source.duration.seconds, 0.000_001)
+                        let lead = CMTimeMultiplyByFloat64(range.start - segment.source.start, multiplier: ratio)
+                        let length = CMTimeMultiplyByFloat64(range.duration, multiplier: ratio)
+                        let insertAt = insertionTime(audioTrack, at + lead)
+                        padToTime(audioTrack, insertAt)
+                        try audioTrack.insertTimeRange(range, of: sourceAudio, at: insertAt)
+                        // A step's sound ends exactly where its picture does (on a frame), not a hair after.
+                        let end = range.end >= segment.source.end ? at + segment.duration : insertAt + length
+                        audioTrack.scaleTimeRange(CMTimeRange(start: insertAt, duration: range.duration), toDuration: end - insertAt)
+                    }
+                    at = at + segment.duration
+                }
+            } else if case .track = layer.source, !clip.soundDetached, let sourceAudio = try await media.audioTrack(for: clip) {
                 // Audio may be a little shorter than the video; insert only what exists and pad
                 // so the next clip's sound still starts exactly with its picture.
                 let available = try await sourceAudio.load(.timeRange)
                 let range = clip.sourceRange.intersection(available)
                 if range.duration > .zero {
-                    let insertAt = cursor + clip.timelineOffset(ofSourceTime: range.start)
+                    let insertAt = insertionTime(audioTrack, cursor + clip.timelineOffset(ofSourceTime: range.start))
                     padToTime(audioTrack, insertAt)
                     try audioTrack.insertTimeRange(range, of: sourceAudio, at: insertAt)
                     if clip.speed != 1 { audioTrack.scaleTimeRange(CMTimeRange(start: insertAt, duration: range.duration), toDuration: clip.timelineDuration(ofSource: range.duration)) }
@@ -81,6 +102,12 @@ public enum CompositionBuilder {
             }
             layers.append((CMTimeRange(start: cursor, duration: clip.duration), layer))
             cursor = cursor + clip.duration
+        }
+
+        // Sound never runs past the picture (a sound longer than the Short, even by a nanosecond,
+        // stalls the player).
+        if !audioTrack.segments.isEmpty, audioTrack.timeRange.end > cursor {
+            audioTrack.removeTimeRange(CMTimeRange(start: cursor, end: audioTrack.timeRange.end))
         }
 
         // Transitions: around each cut both clips are on screen. In the half before the cut the
@@ -192,12 +219,18 @@ public enum CompositionBuilder {
             songAudio = try? await media.asset(song).loadTracks(withMediaType: .audio).first
             if songAudio == nil { missing.insert(song.id) }
         }
-        if let track = project.music, let range = project.musicRange, let songAudio,
+        if let track = project.music, project.musicRange != nil, let songAudio,
            let musicTrack = composition.addMutableTrack(withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid) {
             let available = try await songAudio.load(.timeRange)
-            let source = CMTimeRange(start: track.sourceStart, duration: range.duration).intersection(available)
-            if source.duration > .zero {
-                try musicTrack.insertTimeRange(source, of: songAudio, at: source.start - track.sourceStart)
+            // Once, or over and over when it loops; it may start later than the Short.
+            var inserted = false
+            for pass in project.musicPasses {
+                let source = pass.source.intersection(available)
+                guard source.duration > .zero else { continue }
+                try musicTrack.insertTimeRange(source, of: songAudio, at: pass.start + (source.start - pass.source.start))
+                inserted = true
+            }
+            if inserted {
                 envelope = AudioMix.musicEnvelope(for: project, speech: track.lowersUnderSpeech ? await speech(in: project) : [])
                 let parameters = AVMutableAudioMixInputParameters(track: musicTrack)
                 for (a, b) in zip(envelope, envelope.dropFirst()) where b.time > a.time {
@@ -252,11 +285,52 @@ public enum CompositionBuilder {
         return span > 0 ? min(max((time - a.time).seconds / span, 0), 1) : 0
     }
 
+    /// Where to put sound meant for `time`: the end of what the track already has when that is
+    /// within a millisecond (scaled stretches end a hair off), so no gap or overlap of a few
+    /// nanoseconds is made. Such slivers stall the player.
+    private static func insertionTime(_ track: AVMutableCompositionTrack, _ time: CMTime) -> CMTime {
+        guard !track.segments.isEmpty else { return time }
+        let end = track.timeRange.end
+        return abs((end - time).seconds) < 0.001 ? end : time
+    }
+
     private static func padToTime(_ track: AVMutableCompositionTrack, _ time: CMTime) {
         let end = track.segments.isEmpty ? .zero : track.timeRange.end
         if end < time {
             track.insertEmptyTimeRange(CMTimeRange(start: end, end: time))
         }
+    }
+}
+
+extension SpeedSegment {
+    /// The shortest stretch of sound a speed curve plays at one speed: steps of a slow curve hold
+    /// only a few hundredths of a second of sound (less than one AAC packet), which stalls the player.
+    static let shortestSound = CMTime(value: 1, timescale: 5)
+
+    /// Neighbouring steps joined until each lasts at least `shortestSound` in the file and on the
+    /// timeline. They start and end where the steps do, so picture and sound meet at every join.
+    static func joined(_ segments: [SpeedSegment]) -> [SpeedSegment] {
+        var result: [SpeedSegment] = []
+        var current: SpeedSegment?
+        for segment in segments {
+            if let open = current {
+                current = SpeedSegment(source: CMTimeRange(start: open.source.start, end: segment.source.end), duration: open.duration + segment.duration)
+            } else {
+                current = segment
+            }
+            if let open = current, open.source.duration >= shortestSound, open.duration >= shortestSound {
+                result.append(open)
+                current = nil
+            }
+        }
+        if let open = current {
+            if let last = result.popLast() {
+                result.append(SpeedSegment(source: CMTimeRange(start: last.source.start, end: open.source.end), duration: last.duration + open.duration))
+            } else {
+                result.append(open)
+            }
+        }
+        return result
     }
 }
 
@@ -324,17 +398,34 @@ private struct MediaSources {
             missing.insert(media.id)
             return make(.none, Project.canvasSize)
         }
-        if let media, media.hasVideo, let video = try? await asset(media).loadTracks(withMediaType: .video).first {
+        // Smooth slow motion plays a copy with pictures made up in between, once it has been made.
+        var smooth: (track: AVAssetTrack, shift: CMTime)?
+        if let media, let copy = FrameInterpolator.existingCopy(for: clip, media: media) {
+            let key = "smooth|\(copy.url.path)"
+            let copyAsset = cleanedAssets[key] ?? AVURLAsset(url: copy.url)
+            cleanedAssets[key] = copyAsset
+            if let track = try? await copyAsset.loadTracks(withMediaType: .video).first { smooth = (track, copy.range.start) }
+        }
+        if let media, media.hasVideo, let original = try? await asset(media).loadTracks(withMediaType: .video).first {
+            let video = smooth?.track ?? original
+            let shift = smooth?.shift ?? .zero
+            let available = try await video.load(.timeRange)
+            func inFile(_ range: CMTimeRange) -> CMTimeRange {
+                let moved = CMTimeRange(start: range.start - shift, duration: range.duration)
+                // The copy can be a picture shorter than the original.
+                return smooth == nil ? moved : CMTimeRange(start: moved.start, end: min(moved.end, available.end))
+            }
             if let segments, !segments.isEmpty {
                 var at = start
                 for segment in segments {
-                    try track.insertTimeRange(segment.source, of: video, at: at)
-                    track.scaleTimeRange(CMTimeRange(start: at, duration: segment.source.duration), toDuration: segment.duration)
+                    try track.insertTimeRange(inFile(segment.source), of: video, at: at)
+                    track.scaleTimeRange(CMTimeRange(start: at, duration: inFile(segment.source).duration), toDuration: segment.duration)
                     at = at + segment.duration
                 }
             } else {
-                try track.insertTimeRange(clip.sourceRange, of: video, at: start)
-                if clip.speed != 1 { track.scaleTimeRange(CMTimeRange(start: start, duration: clip.sourceRange.duration), toDuration: clip.duration) }
+                let range = inFile(clip.sourceRange)
+                try track.insertTimeRange(range, of: video, at: start)
+                if clip.speed != 1 || range.duration != clip.duration { track.scaleTimeRange(CMTimeRange(start: start, duration: range.duration), toDuration: clip.duration) }
             }
             let (naturalSize, preferredTransform) = try await video.load(.naturalSize, .preferredTransform)
             var layer = make(.track(track.trackID), naturalSize, preferredTransform)
@@ -363,7 +454,7 @@ private struct MediaSources {
         // Pictures, freeze frames and missing media look the same before and after.
         guard case .track = layer.source, let media = project.asset(id: clip.assetID),
               let video = try? await asset(media).loadTracks(withMediaType: .video).first else { return layer }
-        let length = CMTimeMultiplyByFloat64(half, multiplier: clip.speed)
+        let length = CMTimeMultiplyByFloat64(half, multiplier: clip.speed(atOffset: before ? .zero : clip.duration - .oneFrame))
         let source = before ? CMTimeRange(start: clip.sourceStart - length, duration: length) : CMTimeRange(start: clip.sourceRange.end, duration: length)
         let available = try await video.load(.timeRange)
         if source.start >= available.start, source.end <= available.end {

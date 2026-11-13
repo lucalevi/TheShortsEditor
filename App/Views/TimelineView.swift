@@ -29,6 +29,8 @@ struct TimelineView: View {
     @State private var dropX: CGFloat?
     /// A caption edge being dragged in the captions lane, and where it is now.
     @State private var captionEdgeDrag: (pageID: CaptionPage.ID, edge: CaptionEdge, time: CMTime)?
+    /// While the music is dragged along the timeline: how far it has moved.
+    @State private var musicDrag: CMTime?
 
     struct BlockDrag {
         enum Kind { case move, start, end }
@@ -1093,7 +1095,7 @@ struct TimelineView: View {
             .overlay(alignment: .bottom) {
                 if let levels = model.audioLevels[sound.clip.assetID] {
                     WaveformView(levels: levels, sourceStart: sound.clip.sourceTime(atOffset: start - sound.start),
-                                 pointsPerSecond: pointsPerSecond / CGFloat(sound.clip.speed),
+                                 pointsPerSecond: pointsPerSecond / CGFloat(sound.clip.averageSpeed),
                                  tooLoud: model.tooLoudRanges(of: sound.clip).map { CMTimeRange(start: $0.start - (start - sound.start), duration: $0.duration) })
                         .frame(height: soundRowHeight - 14)
                         .opacity(sound.clip.isMuted ? 0.3 : 0.8)
@@ -1253,13 +1255,20 @@ struct TimelineView: View {
         if let range = model.project.musicRange, let song = model.musicAsset {
             let width = max(width(of: range.duration) - 2, 6)
             let isSelected = model.isSelected(.music)
+            let shift = musicDrag ?? .zero
             RoundedRectangle(cornerRadius: 4)
                 .fill(Color.green.opacity(isSelected ? 0.45 : 0.25))
                 .overlay {
-                    VolumeLine(points: model.musicEnvelope, fullVolume: model.project.music?.volume ?? 1, pointsPerSecond: pointsPerSecond)
+                    VolumeLine(points: model.musicEnvelope, origin: range.start, fullVolume: model.project.music?.volume ?? 1, pointsPerSecond: pointsPerSecond)
                         .stroke(Color.primary.opacity(0.75), lineWidth: 1.5)
                         .padding(.top, 14)
                         .padding(.bottom, 3)
+                }
+                .overlay {
+                    if model.project.music?.showsBeats == true {
+                        BeatMarks(beats: model.project.timelineBeats, origin: range.start, pointsPerSecond: pointsPerSecond)
+                            .allowsHitTesting(false)
+                    }
                 }
                 .overlay(alignment: .topLeading) {
                     Label(song.name, systemImage: "music.note")
@@ -1275,12 +1284,30 @@ struct TimelineView: View {
                 }
                 .frame(width: width, height: musicLaneHeight)
                 .contentShape(Rectangle())
-                .offset(x: leadingInset + 1)
+                .offset(x: x(for: range.start + shift) + 1)
                 .gesture(clickTap { _, modifiers in model.click(.music, modifiers: modifiers) })
+                .gesture(DragGesture(minimumDistance: 3)
+                    .onChanged { value in
+                        model.pause()
+                        if !model.isSelected(.music) { model.selection = .music }
+                        var start = max(.zero, range.start + seconds(value.translation.width))
+                        snapLine = nil
+                        if let stuck = model.snapped(start) {
+                            start = stuck
+                            snapLine = stuck
+                        }
+                        start = min(start, max(.zero, model.duration - CMTime(value: 1, timescale: 1)))
+                        musicDrag = (start - range.start).snappedToFrame()
+                    }
+                    .onEnded { _ in
+                        if let drag = musicDrag, drag != .zero { model.setMusicTimelineStart(range.start + drag) }
+                        musicDrag = nil
+                        snapLine = nil
+                    })
                 .contextMenu {
                     deleteButton(for: .music, single: "Remove Music")
                 }
-                .help("Music: \(song.name). The line shows its volume; it dips while people talk.")
+                .help("Music: \(song.name). The line shows its volume; it dips while people talk. Drag it to start the music later.")
                 .accessibilityElement(children: .combine)
                 .accessibilityLabel("Music: \(song.name)")
                 .accessibilityAddTraits(isSelected ? .isSelected : [])
@@ -1320,6 +1347,8 @@ struct TimelineView: View {
 /// under speech and the fades are easy to see.
 private nonisolated struct VolumeLine: Shape {
     let points: [VolumePoint]
+    /// The timeline time at the left edge of the shape.
+    var origin: CMTime = .zero
     let fullVolume: Double
     let pointsPerSecond: CGFloat
 
@@ -1327,12 +1356,39 @@ private nonisolated struct VolumeLine: Shape {
         Path { path in
             for (index, point) in points.enumerated() {
                 let location = CGPoint(
-                    x: rect.minX + CGFloat(point.time.seconds) * pointsPerSecond,
+                    x: rect.minX + CGFloat((point.time - origin).seconds) * pointsPerSecond,
                     y: rect.maxY - rect.height * CGFloat(fullVolume > 0 ? min(point.volume / fullVolume, 1) : 0)
                 )
                 if index == 0 { path.move(to: location) } else { path.addLine(to: location) }
             }
         }
+    }
+}
+
+/// The music's beats: a short tick on each, a taller one where a bar begins, along its bottom.
+private struct BeatMarks: View {
+    let beats: [TimelineBeat]
+    let origin: CMTime
+    let pointsPerSecond: CGFloat
+
+    var body: some View {
+        Canvas { context, size in
+            var small = Path(), tall = Path()
+            for beat in beats {
+                let x = CGFloat((beat.time - origin).seconds) * pointsPerSecond
+                guard x >= 0, x <= size.width else { continue }
+                if beat.isBarStart {
+                    tall.move(to: CGPoint(x: x, y: size.height * 0.35))
+                    tall.addLine(to: CGPoint(x: x, y: size.height))
+                } else {
+                    small.move(to: CGPoint(x: x, y: size.height * 0.7))
+                    small.addLine(to: CGPoint(x: x, y: size.height))
+                }
+            }
+            context.stroke(small, with: .color(.primary.opacity(0.55)), lineWidth: 1)
+            context.stroke(tall, with: .color(.primary.opacity(0.9)), lineWidth: 1.5)
+        }
+        .accessibilityHidden(true)
     }
 }
 
@@ -1469,7 +1525,7 @@ private struct OverlayBlock: View {
         RoundedRectangle(cornerRadius: 5)
             .fill(Color.teal.opacity(0.35))
             .overlay {
-                FilmstripView(filmstrip: filmstrip, sourceStart: sourceStart, pointsPerSecond: pointsPerSecond / CGFloat(overlay.clip.speed), aspect: aspect)
+                FilmstripView(filmstrip: filmstrip, sourceStart: sourceStart, pointsPerSecond: pointsPerSecond / CGFloat(overlay.clip.averageSpeed), aspect: aspect)
                     .opacity(0.75)
             }
             .overlay(alignment: .topLeading) {
@@ -1533,7 +1589,7 @@ private struct ClipBlock: View, Equatable {
             .fill(Color.accentColor.opacity(0.25))
             .overlay(alignment: .top) {
                 // A freeze frame shows its one picture all along.
-                FilmstripView(filmstrip: filmstrip, sourceStart: clip.sourceStart, pointsPerSecond: clip.isFrozen ? 1_000_000 : pointsPerSecond / CGFloat(clip.speed), aspect: aspect)
+                FilmstripView(filmstrip: filmstrip, sourceStart: clip.sourceStart, pointsPerSecond: clip.isFrozen ? 1_000_000 : pointsPerSecond / CGFloat(clip.averageSpeed), aspect: aspect)
                     .padding(.bottom, levels == nil ? 0 : waveHeight)
                     .opacity(0.85)
             }
@@ -1552,7 +1608,7 @@ private struct ClipBlock: View, Equatable {
                         .background(Color.black.opacity(0.35))
                         .opacity(levels.decibels.isEmpty ? 0 : 0.8)
                 } else if let levels {
-                    WaveformView(levels: levels, sourceStart: clip.sourceStart, pointsPerSecond: pointsPerSecond / CGFloat(clip.speed), tooLoud: tooLoud)
+                    WaveformView(levels: levels, sourceStart: clip.sourceStart, pointsPerSecond: pointsPerSecond / CGFloat(clip.averageSpeed), tooLoud: tooLoud)
                         .frame(height: waveHeight - 2)
                         .padding(.bottom, 1)
                         .background(Color.black.opacity(0.35))
@@ -1583,6 +1639,12 @@ private struct ClipBlock: View, Equatable {
                         }
                         if clip.speed != 1 {
                             Text("\(clip.speed.formatted(.number.precision(.fractionLength(0...2))))×").help("Speed")
+                        }
+                        if let curve = clip.speedCurve {
+                            Label(curve.shape.displayName, systemImage: "speedometer").help("Speed curve: \(curve.shape.displayName)")
+                        }
+                        if clip.animationIn != nil || clip.animationOut != nil {
+                            Image(systemName: "sparkles").help("Comes in or goes out with an animation")
                         }
                         if clip.isFrozen {
                             Image(systemName: "snowflake").help("Freeze frame")

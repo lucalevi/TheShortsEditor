@@ -69,11 +69,13 @@ struct MusicInspector: View {
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
                 if model.project.musicEndsEarly, let range = model.project.musicRange {
-                    Label("The song ends at \(TimeFormat.string(range.end)), before your Short does. Start it earlier, or pick a longer song.", systemImage: "info.circle")
+                    Label("The song ends at \(TimeFormat.string(range.end)), before your Short does. Start it earlier, loop it, or pick a longer song.", systemImage: "info.circle")
                         .font(.caption)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
+
+            MusicRhythmSection(model: model, music: music, song: song)
 
             if model.duration > CMTime(value: 60, timescale: 1) {
                 Label("Your Short is longer than 1:00. If the song's owner claims it, YouTube blocks the Short. Use music you have the rights to.", systemImage: "exclamationmark.triangle.fill")
