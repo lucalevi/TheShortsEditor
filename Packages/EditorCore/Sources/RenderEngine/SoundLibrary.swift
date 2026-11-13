@@ -27,10 +27,10 @@ public nonisolated enum SoundEffectGroup: String, CaseIterable, Identifiable, Se
 /// are needed (no recordings to license), and kept in its Application Support folder.
 public nonisolated enum SoundEffect: String, CaseIterable, Identifiable, Sendable {
     case whoosh, swipe, deepWhoosh, flyBy, zip
-    case boom, punch, thud, cinematicHit, clap
-    case riser, fall, tension, rewind
-    case pop, click, ding, notification, typing, shutter, correct, wrong, coin, tick
-    case boing, slideWhistle, bonk, laser, spring
+    case boom, punch, thud, cinematicHit, clap, subDrop, glitch
+    case riser, fall, tension, rewind, drumRoll, reverseCymbal, countdown
+    case pop, click, ding, notification, typing, shutter, correct, wrong, coin, tick, sparkle, kaching, vibrate, dingDong
+    case boing, slideWhistle, bonk, laser, spring, recordScratch, tada, bubble
     case rain, wind, ocean, roomTone, heartbeat
 
     public var id: String { rawValue }
@@ -38,10 +38,10 @@ public nonisolated enum SoundEffect: String, CaseIterable, Identifiable, Sendabl
     public var group: SoundEffectGroup {
         switch self {
         case .whoosh, .swipe, .deepWhoosh, .flyBy, .zip: .whooshes
-        case .boom, .punch, .thud, .cinematicHit, .clap: .hits
-        case .riser, .fall, .tension, .rewind: .risers
-        case .pop, .click, .ding, .notification, .typing, .shutter, .correct, .wrong, .coin, .tick: .interface
-        case .boing, .slideWhistle, .bonk, .laser, .spring: .cartoon
+        case .boom, .punch, .thud, .cinematicHit, .clap, .subDrop, .glitch: .hits
+        case .riser, .fall, .tension, .rewind, .drumRoll, .reverseCymbal, .countdown: .risers
+        case .pop, .click, .ding, .notification, .typing, .shutter, .correct, .wrong, .coin, .tick, .sparkle, .kaching, .vibrate, .dingDong: .interface
+        case .boing, .slideWhistle, .bonk, .laser, .spring, .recordScratch, .tada, .bubble: .cartoon
         case .rain, .wind, .ocean, .roomTone, .heartbeat: .ambience
         }
     }
@@ -82,6 +82,18 @@ public nonisolated enum SoundEffect: String, CaseIterable, Identifiable, Sendabl
         case .ocean: "Waves"
         case .roomTone: "Room Tone"
         case .heartbeat: "Heartbeat"
+        case .subDrop: "Bass Drop"
+        case .glitch: "Glitch"
+        case .drumRoll: "Drum Roll"
+        case .reverseCymbal: "Reverse Swell"
+        case .countdown: "Countdown"
+        case .sparkle: "Sparkle"
+        case .kaching: "Cash Register"
+        case .vibrate: "Phone Buzz"
+        case .dingDong: "Doorbell"
+        case .recordScratch: "Record Scratch"
+        case .tada: "Ta-da"
+        case .bubble: "Bubble"
         }
     }
 
@@ -122,6 +134,18 @@ public nonisolated enum SoundEffect: String, CaseIterable, Identifiable, Sendabl
         case .ocean: "The sea, relaxing"
         case .roomTone: "Fills silent gaps quietly"
         case .heartbeat: "Nerves, a tense moment"
+        case .subDrop: "The drop: a deep boom falling away"
+        case .glitch: "A digital glitch, with a glitch effect"
+        case .drumRoll: "Before the big reveal"
+        case .reverseCymbal: "Swelling into a cut"
+        case .countdown: "3, 2, 1, go"
+        case .sparkle: "Something new, magic, clean"
+        case .kaching: "A sale, money, a good deal"
+        case .vibrate: "A phone buzzing on the table"
+        case .dingDong: "Someone at the door, a surprise"
+        case .recordScratch: "Wait, what? Stopping the moment"
+        case .tada: "Done! The result"
+        case .bubble: "Something light popping up"
         }
     }
 
@@ -150,6 +174,18 @@ public nonisolated enum SoundEffect: String, CaseIterable, Identifiable, Sendabl
         case .rain, .ocean: "cloud.rain"
         case .roomTone: "house"
         case .heartbeat: "heart"
+        case .subDrop: "arrow.down.to.line"
+        case .glitch: "square.split.diagonal.2x2"
+        case .drumRoll: "music.note.list"
+        case .reverseCymbal: "waveform.path.ecg"
+        case .countdown: "timer"
+        case .sparkle: "sparkle"
+        case .kaching: "cart"
+        case .vibrate: "iphone.radiowaves.left.and.right"
+        case .dingDong: "bell.and.waves.left.and.right"
+        case .recordScratch: "opticaldisc"
+        case .tada: "party.popper"
+        case .bubble: "circle.circle"
         }
     }
 
@@ -186,6 +222,18 @@ public nonisolated enum SoundEffect: String, CaseIterable, Identifiable, Sendabl
         case .spring: 0.7
         case .rain, .wind, .ocean, .roomTone: 12
         case .heartbeat: 4.8
+        case .subDrop: 1.8
+        case .glitch: 0.5
+        case .drumRoll: 2.6
+        case .reverseCymbal: 2.0
+        case .countdown: 3.7
+        case .sparkle: 1.1
+        case .kaching: 1.0
+        case .vibrate: 1.1
+        case .dingDong: 1.7
+        case .recordScratch: 0.6
+        case .tada: 1.6
+        case .bubble: 0.35
         }
     }
 
@@ -348,6 +396,75 @@ public nonisolated enum SoundEffect: String, CaseIterable, Identifiable, Sendabl
             case .heartbeat:
                 let beat = t.truncatingRemainder(dividingBy: 0.8)
                 value = knock(beat, at: 0, frequency: 55, decay: 18) + 0.7 * knock(beat, at: 0.22, frequency: 50, decay: 20)
+            case .subDrop:
+                phase += 2 * .pi * (30 + 90 * exp(-p * 3)) / rate
+                value = sin(phase) * exp(-p * 2.2) * min(t * 400, 1)
+            case .glitch:
+                // Bursts of buzzing at a different pitch every 30 ms, some silent.
+                let slot = Int(t / 0.03)
+                let pitch = 200 + Double((slot * 7919) % 13) * 180
+                let on = (slot * 104_729) % 5 != 0
+                phase += 2 * .pi * pitch / rate
+                value = on ? (sin(phase) > 0 ? 0.6 : -0.6) + 0.3 * noise() : 0
+            case .drumRoll:
+                // Snare hits getting faster and louder, then a crash.
+                let roll = min(t, 2.1)
+                let speed = 12 + 10 * roll / 2.1
+                let since = (roll * speed).truncatingRemainder(dividingBy: 1) / speed
+                let snare = t < 2.1 ? lowPass(noise(), &low, 3500) * exp(-since * 60) * (0.35 + 0.65 * roll / 2.1) : 0
+                let crash = t >= 2.1 ? (noise() - lowPass(noise(), &low2, 3000)) * exp(-(t - 2.1) * 5) * 1.4 : 0
+                value = snare + crash
+            case .reverseCymbal:
+                // Bright noise swelling, cut off at its loudest.
+                let bright = noise() - lowPass(noise(), &low, 2500)
+                value = bright * pow(p, 3) * (p > 0.98 ? (1 - p) / 0.02 : 1)
+            case .countdown:
+                let second = Int(t)
+                let into = t - Double(second)
+                let isGo = second >= 3
+                let length = isGo ? 0.55 : 0.13
+                value = into < length ? tone(t, isGo ? 1760 : 880) * min(into * 300, 1) * min((length - into) * 60, 1) : 0
+            case .sparkle:
+                var ping = 0.0
+                for k in 0..<7 {
+                    let at = Double(k) * 0.12 + 0.03 * Double((k * 37) % 5)
+                    ping += knock(t, at: at, frequency: 2400 + 350 * Double(k), decay: 14) * 0.5
+                }
+                value = ping
+            case .kaching:
+                let rattle = t < 0.12 ? lowPass(noise(), &low, 5000) * 0.6 : 0
+                let bells = knock(t, at: 0.12, frequency: 2637, decay: 5) + 0.6 * knock(t, at: 0.12, frequency: 3951, decay: 6) + 0.5 * knock(t, at: 0.2, frequency: 3136, decay: 5)
+                value = rattle + bells
+            case .vibrate:
+                let on = t < 0.4 || (t > 0.55 && t < 0.95)
+                phase += 2 * .pi * 150 / rate
+                value = on ? (sin(phase) + 0.4 * sin(phase * 2.1)) * (0.7 + 0.3 * sin(2 * .pi * 25 * t)) : 0
+            case .dingDong:
+                let ding = knock(t, at: 0, frequency: 659, decay: 3) + 0.3 * knock(t, at: 0, frequency: 1318, decay: 4)
+                let dong = knock(t, at: 0.5, frequency: 523, decay: 2.5) + 0.3 * knock(t, at: 0.5, frequency: 1046, decay: 3.5)
+                value = ding + dong
+            case .recordScratch:
+                // The record dragged back and forth: pitch and brightness following the hand.
+                let hand = abs(sin(2 * .pi * 3.2 * t))
+                phase += 2 * .pi * (250 + 900 * hand) / rate
+                let scratch = lowPass(noise(), &low, 400 + 4000 * hand) + 0.4 * sin(phase)
+                value = scratch * (0.3 + 0.7 * hand) * min((seconds - t) * 15, 1)
+            case .tada:
+                // Two bright brass-like chords: short "ta", long "da".
+                func brass(_ notes: [Double]) -> Double {
+                    var sum = 0.0
+                    for f in notes { for h in 1...5 { sum += sin(2 * .pi * f * Double(h) * t) / Double(h) } }
+                    return sum
+                }
+                if t < 0.16 {
+                    value = brass([523, 659, 784]) * min(t * 60, 1) * min((0.16 - t) * 60, 1)
+                } else {
+                    let d = t - 0.18
+                    value = d > 0 ? brass([523, 659, 784, 1046]) * min(d * 30, 1) * exp(-d * 1.4) : 0
+                }
+            case .bubble:
+                phase += 2 * .pi * (400 + 1400 * p) / rate
+                value = sin(phase) * sin(.pi * p) * (t > 0.12 && t < 0.15 ? 0 : 1)
             }
             out[i] = value
         }

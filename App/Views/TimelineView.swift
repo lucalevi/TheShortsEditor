@@ -1646,6 +1646,10 @@ private struct ClipBlock: View, Equatable {
                         if clip.animationIn != nil || clip.animationOut != nil {
                             Image(systemName: "sparkles").help("Comes in or goes out with an animation")
                         }
+                        if !clip.effects.isEmpty {
+                            Label("\(clip.effects.count)", systemImage: "wand.and.stars")
+                                .help("Effects: " + clip.effects.map(\.kind.displayName).joined(separator: ", "))
+                        }
                         if clip.isFrozen {
                             Image(systemName: "snowflake").help("Freeze frame")
                         }

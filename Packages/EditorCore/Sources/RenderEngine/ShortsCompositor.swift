@@ -203,13 +203,22 @@ nonisolated final class ShortsCompositor: NSObject, AVVideoCompositing, Sendable
     /// layer (with its background, for a main clip) is drawn on its own first, then moved, sized,
     /// turned, blurred and faded as one picture.
     private func draw(_ layer: CompositorLayer, at time: CMTime, request: AVAsynchronousVideoCompositionRequest, over image: CIImage) -> CIImage {
-        guard let state = layer.clip.animationState(atOffset: time - layer.timelineStart), !state.isIdentity else {
+        let offset = time - layer.timelineStart
+        let effects = LivePreview.showsOriginal ? [] : layer.clip.activeEffects(atOffset: offset, clipStart: layer.timelineStart)
+        let animation = layer.clip.animationState(atOffset: offset).flatMap { $0.isIdentity ? nil : $0 }
+        guard !effects.isEmpty || animation != nil else {
             return drawPlain(layer, at: time, request: request, over: image)
         }
         let canvas = CGRect(origin: .zero, size: Project.canvasSize)
         let region = layer.region
         let ciRegion = CGRect(x: region.minX, y: canvas.height - region.maxY, width: region.width, height: region.height)
         var picture = drawPlain(layer, at: time, request: request, over: CIImage(color: .clear).cropped(to: ciRegion))
+        if !effects.isEmpty {
+            // Effects work on the picture as placed; a main clip's black shows where it moves away.
+            let base = layer.isMain ? CIImage(color: .black).cropped(to: ciRegion) : CIImage(color: .clear).cropped(to: ciRegion)
+            picture = EffectRenderer.apply(effects, to: picture, in: ciRegion).composited(over: base)
+        }
+        guard let state = animation else { return picture.composited(over: image) }
         if state.blur > 0.5 {
             picture = picture.clampedToExtent().applyingGaussianBlur(sigma: state.blur / 2).cropped(to: picture.extent)
         }

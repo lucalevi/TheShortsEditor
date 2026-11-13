@@ -58,6 +58,8 @@ public struct Clip: Identifiable, Codable, Equatable, Sendable {
     /// How the picture comes in at its start and goes at its end (see `ClipAnimation.swift`).
     public var animationIn: ClipAnimation? = nil
     public var animationOut: ClipAnimation? = nil
+    /// Effects on the picture (shake, flash, glitch…), see `Effects.swift`.
+    public var effects: [ClipEffect] = []
 
     public static let maxVolume = 2.0
     /// No clip is shorter than this, so it can still be seen and grabbed on the timeline.
@@ -217,6 +219,10 @@ public struct Timeline: Codable, Equatable, Sendable {
             second.speedCurve?.from = middle
         }
         first.duration = offset
+        // Effects at the start stay with the first part, those at the end with the second.
+        first.effects.removeAll { $0.part == .end }
+        second.effects.removeAll { $0.part == .start }
+        second.effects = second.effects.map { var effect = $0; effect.id = UUID(); return effect }
         first.keepFades(isFirst: true, isLast: false)
         second.keepFades(isFirst: false, isLast: true)
         clips[index] = first
@@ -231,7 +237,7 @@ extension Clip {
         case fadeIn, fadeOut, volumeKeys, voiceEffect, equalizer, soundDetached
         case transitionOut, isFrozen, pictureFadeIn, pictureFadeOut, smoothSpeed
         case look, steadiness, styledMotion
-        case speedCurve, smoothSlowMotion, animationIn, animationOut
+        case speedCurve, smoothSlowMotion, animationIn, animationOut, effects
     }
 
     public init(from decoder: any Decoder) throws {
@@ -267,6 +273,7 @@ extension Clip {
         smoothSlowMotion = try c.decodeIfPresent(Bool.self, forKey: .smoothSlowMotion) ?? false
         animationIn = try? c.decodeIfPresent(ClipAnimation.self, forKey: .animationIn)
         animationOut = try? c.decodeIfPresent(ClipAnimation.self, forKey: .animationOut)
+        effects = (try? c.decodeIfPresent([ClipEffect].self, forKey: .effects)) ?? []
     }
 
     public func encode(to encoder: any Encoder) throws {
@@ -301,5 +308,6 @@ extension Clip {
         if smoothSlowMotion { try c.encode(smoothSlowMotion, forKey: .smoothSlowMotion) }
         try c.encodeIfPresent(animationIn, forKey: .animationIn)
         try c.encodeIfPresent(animationOut, forKey: .animationOut)
+        if !effects.isEmpty { try c.encode(effects, forKey: .effects) }
     }
 }

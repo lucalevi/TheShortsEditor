@@ -178,6 +178,9 @@ private struct ClipInspector: View {
             ClipAnimationSection(model: model, clip: clip)
                 .id(clip.id)
 
+            EffectsSection(model: model, clip: clip)
+                .id(clip.id)
+
             if clip.isFrozen {
                 FreezeSection(model: model, clip: clip)
             } else if asset?.isImage != true {
@@ -302,6 +305,9 @@ private struct OverlayInspector: View {
             MotionSection(model: model, clip: overlay.clip)
 
             ClipAnimationSection(model: model, clip: overlay.clip)
+                .id(overlay.clip.id)
+
+            EffectsSection(model: model, clip: overlay.clip)
                 .id(overlay.clip.id)
 
             if asset?.isImage != true {

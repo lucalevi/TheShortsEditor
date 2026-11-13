@@ -444,6 +444,7 @@ public extension Project {
             if kinds.contains(.look) {
                 clip.look = source.look
                 clip.steadiness = source.steadiness
+                clip.effects = source.effects.map { var effect = $0; effect.id = UUID(); return effect }
             }
         }
     }
@@ -473,6 +474,7 @@ public extension Project {
             if kinds.contains(.look) {
                 clip.look = ClipLook()
                 clip.steadiness = 0
+                clip.effects = []
             }
         }
     }
@@ -488,7 +490,7 @@ public extension Project {
         if !clip.keyframes.isEmpty { kinds.insert(.motion) }
         if clip.speed != 1 { kinds.insert(.speed) }
         if clip.volume != 1 || clip.cleansVoice || clip.hasSoundShaping || (isMain && clip.isMuted) { kinds.insert(.sound) }
-        if !clip.look.isNeutral || clip.steadiness > 0 { kinds.insert(.look) }
+        if !clip.look.isNeutral || clip.steadiness > 0 || !clip.effects.isEmpty { kinds.insert(.look) }
         return kinds
     }
 

@@ -165,6 +165,12 @@ struct EditorCommands: Commands {
                 }
             }
             .disabled(animatable.isEmpty)
+            Menu("Add Effect") {
+                ForEach(EffectKind.allCases) { kind in
+                    Button(kind.displayName) { model.addEffect(kind, to: selectedClips.map(\.id)) }
+                }
+            }
+            .disabled(selectedClips.isEmpty)
             Menu("Cut to the Beat") {
                 ForEach(BeatSpacing.allCases) { spacing in
                     Button(spacing.displayName) { model.cutToBeat(spacing) }

@@ -1,6 +1,6 @@
 # Project status
 
-_Last updated: 2026-11-13 (Stage H, text, stickers and voice: done and committed). Read this first when picking the project back up, then update it at the end of each session._
+_Last updated: 2026-11-13 (Stage J, effects: done and committed). Read this first when picking the project back up, then update it at the end of each session._
 
 ## Where we are
 
@@ -16,7 +16,9 @@ Stages 1–7 are done, tested on screen, committed and pushed to https://github.
 | 6 | Audio: clip volume, music with ducking, loudness on export | 2026-11-09 |
 | 7 | Save/open projects, autosave, missing media | 2026-11-09 |
 
-**Pick up here (2026-11-13, latest):** Stage H (text, stickers and voice) is built, tested, checked on screen, committed and pushed. Next: Stage J (effects). "My Short 17" now also has a Subscribe template (pill title + bell sticker following), and a spoken "Subscribe" voice-over.
+**Pick up here (2026-11-13, latest):** Stage J (effects) is built, tested, checked on screen, committed and pushed. Next: Stage K (cut-outs). "My Short 17" now also has a Glitch effect on its first clip.
+
+**Before that (2026-11-13):** Stage H (text, stickers and voice) is built, tested, checked on screen, committed and pushed (2609751). "My Short 17" now also has a Subscribe template (pill title + bell sticker following), and a spoken "Subscribe" voice-over.
 
 **Before that (2026-11-13):** Stage I (rhythm) is built, tested, checked on screen, committed and pushed (bd5ef08). Test Short "My Short 17" (Hero and Bullet curves, a Spin entrance, music moved to 0:02 with beats shown, cut to the bar) is in the library (safe to delete).
 
@@ -24,7 +26,18 @@ Stages 1–7 are done, tested on screen, committed and pushed to https://github.
 
 **Before that (2026-11-12):** CapCut was researched (`research/capcut/README.md`); next is Stage G (captions), see "CapCut list: stages G–L" below. **Before that (2026-11-11):** Stage F of the iMovie list ("One-click Shorts", `research/imovie/imovie-reverse-engineering.md`) is built, tested, checked on screen and committed. With it, every stage of the iMovie list (A–F) is done. Stage E is committed (5e708e6); its Photos tab is still unchecked on screen. Next: ask the user (see "What's next"). Test footage and a closed scratch iMovie library are in `~/Movies/ShortsEditorResearch` (safe to delete). Test Shorts "My Short 5"–"My Short 12" are in the library (safe to delete); "My Short 12" has a look, Stabilize, two markers and a slid clip from the on-screen checks.
 
-### Stage H: text, stickers and voice (2026-11-13): done, committed
+### Stage J: effects (2026-11-13): done, committed
+
+Model in `EditorCore/Effects.swift` (`EffectKind`, `EffectPart`, `ClipEffect`, `Clip.effects`, `activeEffects`) (`EffectTests`: 5); `RenderEngine/EffectRenderer.swift` (Core Image), applied in `ShortsCompositor.draw` before the clip's animation; 12 new synthesized sounds in `SoundLibrary` (`EffectRenderTests`: 8); app in `App/EditorModel+Effects.swift`, `App/Views/EffectViews.swift`. `Clip.effects` is optional in the file (no version bump).
+1. **12 effects attached to a clip** (clip and B-roll inspector ▸ Effects; Clip ▸ Add Effect): Shake, Flash, Zoom Pulse, Glitch, Colour Split, Old Tape (VHS), Film Grain, Light Leak, Blur, Dark Edges (vignette pulse), Mirror, Colour Pop (black and white except strong colours). The grid is drawn on the clip's own frame (like the filters); click adds (the clip's part plays), click again takes it off (a tick and frame show which are on). Each added effect has **Plays**: Whole clip / At the start / At the end (start fades it out, end fades it in: Blur at the start = Blur In, at the end = Blur Out), **Strength**, **Length** (0.2–3 s), Play and Remove. One of each kind per clip. Effects follow their clip: a split keeps start effects on the first part and end effects on the second; they are copied/reset with the clip's Look (Copy/Paste/Reset Settings). Random-looking effects (shake, glitch, tape, grain) are worked out from the frame number, so preview and export match. The timeline shows a wand badge with the count.
+2. **12 more sound effects** (46 now): Bass Drop, Glitch (Hits); Drum Roll, Reverse Swell, Countdown (Risers); Sparkle, Cash Register, Phone Buzz, Doorbell (Taps and alerts); Record Scratch, Ta-da, Bubble (Cartoon). Synthesized like the others.
+3. Fix found on screen: the colour split (used by Glitch, Colour Split, Old Tape) added three solid layers, so their opacity added up and Glitch bands came out black; channels are now combined with "maximum" (`aColourSplitStaysAsSolidAsThePicture`).
+
+Tests: 400 model + 120 render + 3 transcription = 523, all pass.
+Verified on screen: the Effects grid on the clip's frame, adding Glitch (badge on the clip, bands jumping with their colours), the new sounds in the Sounds panel.
+Not yet verified on screen: every effect while playing (all pixel-tested), start/end timing and the sliders, effects on B-roll, listening to the new sounds by ear, export with effects.
+
+### Stage H: text, stickers and voice (2026-11-13): done, committed (2609751)
 
 Model in `EditorCore/Stickers.swift` (stickers, `TitleLoop`, exits, `TrackPoint`, `PatchTracker`, `TextTemplate`), new looks in `TextLook.swift`/`Titles.swift` (`StickerTests`: 14 tests); `RenderEngine/StickerRenderer.swift`, `SubjectTracker.swift`, `SpeechMaker.swift`, title motion in `TitleRenderer`/`ShortsCompositor.titleImage` (`StickerRenderTests`: 7); app in `App/EditorModel+Stickers.swift`, `App/Views/StickerViews.swift`, `TitleInspector` reorganised. New fields are optional in the file (`TextOverlay.exit/loop/rotation/sticker/track`, `TextLook.glowColor/popShadowColor/letterSpacing`, `SavedTextStyle.exit/loop`); file version stays 8.
 1. **Title looks grid**: 13 looks (Bold, Label, Marker, Dark Box, Simple + Neon (glow), Hollow (outline only), Pop Shadow (solid offset copy), Comic, Pill, Typewriter (American Typewriter on paper strips), Cinema (Futura, spaced capitals), Handwritten (Marker Felt)). The grid previews each look with the title's own first words.
@@ -306,7 +319,8 @@ The P0 list from `research/shorts-editor-research.md` §5. Each stage ends with 
 11. ~~Stage G, captions the CapCut way~~ (done 2026-11-13, all of it, committed).
 12. ~~Stage I, rhythm~~ (done 2026-11-13, all of it, committed).
 13. ~~Stage H, text, stickers and voice~~ (done 2026-11-13, all of it, committed).
-14. **Next:** Stage J, effects.
+14. ~~Stage J, effects~~ (done 2026-11-13, all of it, committed).
+15. **Next:** Stage K, cut-outs.
 
 ## CapCut list: stages G–L (to do, decided 2026-11-12)
 
@@ -319,8 +333,8 @@ The P0 list from `research/shorts-editor-research.md` §5. Each stage ends with 
 | G | Captions, the CapCut way | **done** 2026-11-13, committed |
 | I | Rhythm: beats and speed curves | **done** 2026-11-13, committed |
 | H | Text, stickers and voice | **done** 2026-11-13, committed |
-| J | Effects | **next** |
-| K | Cut-outs | to do |
+| J | Effects | **done** 2026-11-13, committed |
+| K | Cut-outs | **next** |
 | L | Templates and finding moments | to do |
 
 ### Stage G: captions, the CapCut way
@@ -349,8 +363,8 @@ Why first: the user asked for it, and their real CapCut Short ("Studiare per la 
 - [x] **Text to speech** from a title or script line (system voices / Personal Voice), placed as a voice-over and captioned by G
 
 ### Stage J: effects
-- [ ] ~12 effects attached to a clip and following it: Shake, Flash, Zoom Pulse, Glitch, RGB Split, VHS, Film Grain, Light Leak, Blur In/Out, Vignette Pulse, Mirror, Black & White Pop; strength + length
-- [ ] ~12 more sound effects
+- [x] ~12 effects attached to a clip and following it: Shake, Flash, Zoom Pulse, Glitch, RGB Split, VHS, Film Grain, Light Leak, Blur In/Out, Vignette Pulse, Mirror, Black & White Pop; strength + length
+- [x] ~12 more sound effects
 
 ### Stage K: cut-outs
 - [ ] Remove background (Vision person/foreground mask, offline per file, cached like Stabilize)
@@ -377,6 +391,7 @@ Why first: the user asked for it, and their real CapCut Short ("Studiare per la 
 - Remove Pauses: the shortest pause cut is fixed at 0.3 s (not a slider). Detection is by loudness only, so steady background music or noise above the threshold isn't seen as a pause; lowering "What counts as a pause" is the fix. Clips whose file has no sound are left alone.
 - Playback times from AVPlayer are in nanoseconds; compare them with model times only after `snappedToFrame()` (a skip loop came from this).
 - The Highlight style's green box can blend into green backgrounds.
+- Effects: one of each kind per clip; no keyframing of strength; Light Leak drifts on a fixed 4 s cycle; Mirror copies the left half only. The new sounds are synthesized and were only measured, not judged by ear.
 - Stickers are titles underneath: they share the titles lane and the export check for covered titles. Following is 2-D only (no scale/rotation following) and stops where the subject is lost or the clip changes. Spoken voice-overs stay in Application Support (not cleaned up).
 - Titles: the text is saved when editing ends (Return or clicking away), so the viewer updates then, not while typing. No snapping when dragging on the timeline. Overlapping titles share one lane row and are drawn on top of each other. One font (the system font) for all styles; no colour picker.
 - SwiftUI text fields hand the old value back to their binding as focus leaves. Editing fields that save on end (caption lines, title text) only accept changes while focused; otherwise what was typed is lost.
