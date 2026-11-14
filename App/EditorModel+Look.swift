@@ -220,8 +220,11 @@ extension EditorModel {
         let time = currentTime
         Task {
             guard let image = try? await ProjectPoster.frame(of: plain, at: time),
-                  let sample = LookRenderer.sample(image, at: CGPoint(x: point.x * CGFloat(image.width) / Project.canvasSize.width,
-                                                                       y: point.y * CGFloat(image.height) / Project.canvasSize.height))
+                let sample = LookRenderer.sample(
+                    image,
+                    at: CGPoint(
+                        x: point.x * CGFloat(image.width) / Project.canvasSize.width,
+                        y: point.y * CGFloat(image.height) / Project.canvasSize.height))
             else {
                 NSSound.beep()
                 return
@@ -229,8 +232,11 @@ extension EditorModel {
             guard let clip = project.anyClip(id: pick.clipID) else { return }
             let balanced = clip.look.color.balanced(sample, toward: pick.target)
             guard balanced != clip.look.color else {
-                alert = AlertMessage(title: "Pick another spot",
-                                     message: "That spot is too dark, too bright or one strong colour, so there is nothing to balance. Click something white, grey or light that is lit but not glaring.")
+                alert = AlertMessage(
+                    title: "Pick another spot",
+                    message:
+                        "That spot is too dark, too bright or one strong colour, so there is nothing to balance. Click something white, grey or light that is lit but not glaring."
+                )
                 return
             }
             apply(pick.target == .white ? "Pick White" : "Pick Skin Tone") { $0.updateLook(of: pick.clipID) { $0.color = balanced } }
@@ -260,7 +266,8 @@ extension EditorModel {
         var needed: [MediaAsset.ID: URL] = [:]
         for clip in clips where clip.steadiness > 0 && steadying[clip.assetID] == nil && !unsteadiable.contains(clip.assetID) {
             guard let media = project.asset(id: clip.assetID), canStabilize(clip), !missingAssets.contains(media.id),
-                  ShakeCache.path(for: media.url) == nil else { continue }
+                ShakeCache.path(for: media.url) == nil
+            else { continue }
             needed[media.id] = media.url
         }
         guard !needed.isEmpty else { return }

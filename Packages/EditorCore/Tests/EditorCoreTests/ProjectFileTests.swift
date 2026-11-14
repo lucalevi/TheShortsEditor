@@ -2,11 +2,13 @@ import CoreGraphics
 import CoreMedia
 import Foundation
 import Testing
+
 @testable import EditorCore
 
 private func asset(_ name: String, seconds: Int64 = 10, video: Bool = true) -> MediaAsset {
-    MediaAsset(url: URL(fileURLWithPath: "/Users/me/Movies/\(name)"), name: name, duration: CMTime(value: seconds, timescale: 1),
-               displaySize: video ? CGSize(width: 1080, height: 1920) : .zero, hasAudio: true, hasVideo: video)
+    MediaAsset(
+        url: URL(fileURLWithPath: "/Users/me/Movies/\(name)"), name: name, duration: CMTime(value: seconds, timescale: 1),
+        displaySize: video ? CGSize(width: 1080, height: 1920) : .zero, hasAudio: true, hasVideo: video)
 }
 
 /// A project using everything that gets saved.

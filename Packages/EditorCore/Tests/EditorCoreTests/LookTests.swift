@@ -2,6 +2,7 @@ import CoreGraphics
 import CoreMedia
 import Foundation
 import Testing
+
 @testable import EditorCore
 
 private func close(_ a: Double, _ b: Double, _ tolerance: Double = 0.01) -> Bool { abs(a - b) <= tolerance }
@@ -10,8 +11,9 @@ private func close(_ a: RGB, _ b: RGB, _ tolerance: Double = 0.01) -> Bool {
 }
 
 private func video(_ name: String) -> MediaAsset {
-    MediaAsset(url: URL(fileURLWithPath: "/tmp/\(name)"), name: name, duration: CMTime(value: 10, timescale: 1),
-               displaySize: CGSize(width: 1080, height: 1920), hasAudio: true)
+    MediaAsset(
+        url: URL(fileURLWithPath: "/tmp/\(name)"), name: name, duration: CMTime(value: 10, timescale: 1),
+        displaySize: CGSize(width: 1080, height: 1920), hasAudio: true)
 }
 
 /// A picture of `count` pixels: an even ramp from dark to bright, tinted by `cast`.
@@ -150,7 +152,7 @@ struct FrameStatsTests {
         let auto = ColorAdjustments.auto(for: stats)
         #expect(auto.exposure > 0)
         #expect(auto.contrast > 0)
-        #expect(auto.warmth > 0)  // takes some of the blue out
+        #expect(auto.warmth > 0) // takes some of the blue out
         let after = FrameStats(pixels: pixels.map(auto.apply))!
         #expect(after.median > stats.median)
         #expect(after.bright - after.dark > stats.bright - stats.dark)
@@ -166,7 +168,8 @@ struct FrameStatsTests {
         let match = ColorAdjustments.matching(target, to: wanted)
         let after = FrameStats(pixels: target.map(match.apply))!
         #expect(abs(after.median - wanted.median) < abs(before.median - wanted.median) / 2)
-        #expect(abs((after.mean.r / after.mean.b) - (wanted.mean.r / wanted.mean.b)) < abs((before.mean.r / before.mean.b) - (wanted.mean.r / wanted.mean.b)) / 2)
+        #expect(
+            abs((after.mean.r / after.mean.b) - (wanted.mean.r / wanted.mean.b)) < abs((before.mean.r / before.mean.b) - (wanted.mean.r / wanted.mean.b)) / 2)
         #expect(after.bright - after.dark > before.bright - before.dark)
     }
 
@@ -286,9 +289,11 @@ struct LookOnProjectTests {
 struct StabilizationTests {
     /// A path that shakes ±`amount` every other frame around a slow pan to the right.
     private func shaky(amount: Double = 0.02, frames: Int = 120) -> ShakePath {
-        ShakePath(interval: 1.0 / 30, positions: (0..<frames).map { i in
-            CGPoint(x: Double(i) * 0.001 + (i.isMultiple(of: 2) ? amount : -amount), y: i.isMultiple(of: 2) ? -amount : amount)
-        })
+        ShakePath(
+            interval: 1.0 / 30,
+            positions: (0..<frames).map { i in
+                CGPoint(x: Double(i) * 0.001 + (i.isMultiple(of: 2) ? amount : -amount), y: i.isMultiple(of: 2) ? -amount : amount)
+            })
     }
 
     @Test func correctionCancelsTheShakeButKeepsThePan() {

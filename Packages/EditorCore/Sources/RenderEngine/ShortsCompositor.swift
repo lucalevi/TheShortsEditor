@@ -1,9 +1,9 @@
 @preconcurrency import AVFoundation
-import os
 import CoreImage
 import EditorCore
 import ImageIO
 import Synchronization
+import os
 
 /// One picture drawn in a stretch of the timeline: the main clip, or an overlay on top of it.
 nonisolated struct CompositorLayer: Sendable {
@@ -35,8 +35,9 @@ nonisolated struct CompositorLayer: Sendable {
     var steadying: Steadying? = nil
 
     func with(region: CGRect) -> CompositorLayer {
-        CompositorLayer(source: source, clip: clip, timelineStart: timelineStart, naturalSize: naturalSize,
-                        preferredTransform: preferredTransform, isMain: isMain, region: region, steadying: steadying)
+        CompositorLayer(
+            source: source, clip: clip, timelineStart: timelineStart, naturalSize: naturalSize,
+            preferredTransform: preferredTransform, isMain: isMain, region: region, steadying: steadying)
     }
 }
 
@@ -68,8 +69,10 @@ nonisolated final class ShortsInstruction: NSObject, AVVideoCompositionInstructi
     /// The filter over the whole Short, drawn over the clips (not the titles and captions).
     let look: FilterChoice?
 
-    init(timeRange: CMTimeRange, layers: [CompositorLayer], captions: CaptionTrack, titles: TitleTrack, transition: TransitionDrawing? = nil,
-         look: FilterChoice? = nil) {
+    init(
+        timeRange: CMTimeRange, layers: [CompositorLayer], captions: CaptionTrack, titles: TitleTrack, transition: TransitionDrawing? = nil,
+        look: FilterChoice? = nil
+    ) {
         self.timeRange = timeRange
         self.layers = layers
         self.captions = captions
@@ -179,7 +182,7 @@ nonisolated final class ShortsCompositor: NSObject, AVVideoCompositing, Sendable
         let signpost = Signposts.render.beginInterval("Frame")
         defer { Signposts.render.endInterval("Frame", signpost) }
         guard let instruction = request.videoCompositionInstruction as? ShortsInstruction,
-              let output = request.renderContext.newPixelBuffer()
+            let output = request.renderContext.newPixelBuffer()
         else {
             request.finish(with: NSError(domain: "ShortsCompositor", code: 1))
             return
@@ -199,8 +202,9 @@ nonisolated final class ShortsCompositor: NSObject, AVVideoCompositing, Sendable
             // Counted from the middle of each frame, so the first and last frames are equally far in.
             let into = (time - transition.range.start).seconds + 0.5 / Double(Project.frameRate)
             let progress = min(max(into / max(transition.range.duration.seconds, 0.001), 0), 1)
-            let mixed = TransitionMixer.mix(transition.kind, from: transition.otherIsIncoming ? mainImage : otherImage,
-                                            to: transition.otherIsIncoming ? otherImage : mainImage, progress: progress, in: ciRegion)
+            let mixed = TransitionMixer.mix(
+                transition.kind, from: transition.otherIsIncoming ? mainImage : otherImage,
+                to: transition.otherIsIncoming ? otherImage : mainImage, progress: progress, in: ciRegion)
             image = mixed.cropped(to: ciRegion).composited(over: image)
             layers = layers.dropFirst()
         }
@@ -215,7 +219,8 @@ nonisolated final class ShortsCompositor: NSObject, AVVideoCompositing, Sendable
             guard state.opacity > 0, let title = titleImage(state) else { continue }
             let over = title.composited(over: image)
             // Fading: blend between the frame without and with the title.
-            image = state.opacity < 1
+            image =
+                state.opacity < 1
                 ? image.applyingFilter("CIDissolveTransition", parameters: ["inputTargetImage": over, "inputTime": state.opacity])
                 : over
         }
@@ -294,18 +299,21 @@ nonisolated final class ShortsCompositor: NSObject, AVVideoCompositing, Sendable
         // Steadied (moved against the shake and zoomed in a little), then framed to the region's
         // size, then moved, resized and turned around its middle, then put in place.
         let steady = layer.steadying?.transform(atSourceTime: sourceTime, naturalSize: layer.naturalSize) ?? .identity
-        let transform = steady
+        let transform =
+            steady
             .concatenating(layer.clip.framing.transform(naturalSize: layer.naturalSize, preferredTransform: layer.preferredTransform, canvas: region.size))
             .concatenating(placement.transform(in: region))
         let height = source.extent.height
         if layer.isMain {
             let covers = layer.clip.framing.placedFrame(of: Self.displaySize(layer), placement: placement, region: region).covers(region)
             // A see-through picture shows the colour or black behind it, not a blurred copy of itself.
-            let behind: CIImage = switch layer.clip.background {
-            case .color: CIImage(color: CIColor(red: layer.clip.backgroundColor.red, green: layer.clip.backgroundColor.green, blue: layer.clip.backgroundColor.blue))
-            case .blur where !covers && !cutout.isSeeThrough: Self.blurredBackground(unkeyed, layer: layer, sourceHeight: height)
-            default: CIImage(color: .black)
-            }
+            let behind: CIImage =
+                switch layer.clip.background {
+                case .color:
+                    CIImage(color: CIColor(red: layer.clip.backgroundColor.red, green: layer.clip.backgroundColor.green, blue: layer.clip.backgroundColor.blue))
+                case .blur where !covers && !cutout.isSeeThrough: Self.blurredBackground(unkeyed, layer: layer, sourceHeight: height)
+                default: CIImage(color: .black)
+                }
             image = behind.cropped(to: ciRegion).composited(over: image)
         }
         // Cut to the region (the canvas, or half of it) so a big picture doesn't spill over.
@@ -351,7 +359,8 @@ nonisolated final class ShortsCompositor: NSObject, AVVideoCompositing, Sendable
         let fill = Framing.fill.transform(naturalSize: layer.naturalSize, preferredTransform: layer.preferredTransform, canvas: layer.region.size)
             .concatenating(Placement(scale: 1.1).transform(in: layer.region))
         let small = CGAffineTransform(scaleX: 0.25, y: 0.25)
-        return source
+        return
+            source
             .transformed(by: flipped(fill, sourceHeight: sourceHeight).concatenating(small))
             .clampedToExtent()
             .applyingGaussianBlur(sigma: 14)
@@ -385,14 +394,16 @@ nonisolated final class ShortsCompositor: NSObject, AVVideoCompositing, Sendable
         if CaptionRenderer.animates(track.style), state.entrance < 1 {
             // A quick pop: grow from 80% to full size around the caption's centre.
             let scale = 0.8 + 0.2 * (1 - pow(1 - state.entrance, 3))
-            image = image.transformed(by: CGAffineTransform(translationX: -size.width / 2, y: -size.height / 2)
-                .concatenating(CGAffineTransform(scaleX: scale, y: scale))
-                .concatenating(CGAffineTransform(translationX: size.width / 2, y: size.height / 2)))
+            image = image.transformed(
+                by: CGAffineTransform(translationX: -size.width / 2, y: -size.height / 2)
+                    .concatenating(CGAffineTransform(scaleX: scale, y: scale))
+                    .concatenating(CGAffineTransform(translationX: size.width / 2, y: size.height / 2)))
         }
-        return image.transformed(by: CGAffineTransform(
-            translationX: (canvas.width - size.width) / 2,
-            y: canvas.height - top - size.height
-        ))
+        return image.transformed(
+            by: CGAffineTransform(
+                translationX: (canvas.width - size.width) / 2,
+                y: canvas.height - top - size.height
+            ))
     }
 
     private func cachedImage(_ key: String, make: () -> CGImage?) -> CGImage? {
@@ -413,7 +424,7 @@ nonisolated final class ShortsCompositor: NSObject, AVVideoCompositing, Sendable
         if let typed = LivePreview.titleText(for: title.id) { title.text = typed }
         let key = title.sticker.map { "sticker|\($0.hashValue)" } ?? "title|\(title.look.hashValue)|\(title.text)|\(state.visibleCharacters ?? -1)"
         guard let placement = TitleRenderer.placement(of: title),
-              let cgImage = cachedImage(key, make: { TitleRenderer.image(of: title, visibleCharacters: state.visibleCharacters) })
+            let cgImage = cachedImage(key, make: { TitleRenderer.image(of: title, visibleCharacters: state.visibleCharacters) })
         else { return nil }
         let size = CGSize(width: cgImage.width, height: cgImage.height)
         var image = CIImage(cgImage: cgImage)
@@ -422,16 +433,18 @@ nonisolated final class ShortsCompositor: NSObject, AVVideoCompositing, Sendable
         }
         if scale != 1 || state.rotation != 0 {
             // Around its middle; Core Image turns anticlockwise, so clockwise degrees are negated.
-            image = image.transformed(by: CGAffineTransform(translationX: -size.width / 2, y: -size.height / 2)
-                .concatenating(CGAffineTransform(scaleX: scale, y: scale))
-                .concatenating(CGAffineTransform(rotationAngle: -state.rotation * .pi / 180))
-                .concatenating(CGAffineTransform(translationX: size.width / 2, y: size.height / 2)))
+            image = image.transformed(
+                by: CGAffineTransform(translationX: -size.width / 2, y: -size.height / 2)
+                    .concatenating(CGAffineTransform(scaleX: scale, y: scale))
+                    .concatenating(CGAffineTransform(rotationAngle: -state.rotation * .pi / 180))
+                    .concatenating(CGAffineTransform(translationX: size.width / 2, y: size.height / 2)))
         }
         let canvas = Project.canvasSize
-        return image.transformed(by: CGAffineTransform(
-            translationX: placement.image.minX + state.xOffset,
-            y: canvas.height - placement.image.maxY - state.yOffset
-        ))
+        return image.transformed(
+            by: CGAffineTransform(
+                translationX: placement.image.minX + state.xOffset,
+                y: canvas.height - placement.image.maxY - state.yOffset
+            ))
     }
 
     func cancelAllPendingVideoCompositionRequests() {}
@@ -448,12 +461,14 @@ public nonisolated enum StillImages {
     public static func image(at url: URL) -> CGImage? {
         if let cached = cache.withLock({ $0[url] }) { return cached }
         guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
-              let image = CGImageSourceCreateThumbnailAtIndex(source, 0, [
-                  kCGImageSourceCreateThumbnailFromImageAlways: true,
-                  kCGImageSourceCreateThumbnailWithTransform: true,
-                  kCGImageSourceThumbnailMaxPixelSize: maxPixelSize,
-                  kCGImageSourceShouldCacheImmediately: true,
-              ] as CFDictionary)
+            let image = CGImageSourceCreateThumbnailAtIndex(
+                source, 0,
+                [
+                    kCGImageSourceCreateThumbnailFromImageAlways: true,
+                    kCGImageSourceCreateThumbnailWithTransform: true,
+                    kCGImageSourceThumbnailMaxPixelSize: maxPixelSize,
+                    kCGImageSourceShouldCacheImmediately: true,
+                ] as CFDictionary)
         else { return nil }
         cache.withLock { cache in
             if cache.count > 40 { cache.removeAll() }
@@ -465,11 +480,11 @@ public nonisolated enum StillImages {
     /// The upright size of the picture at `url`, in pixels, without decoding it.
     public static func size(at url: URL) -> CGSize? {
         guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
-              CGImageSourceGetCount(source) > 0,
-              let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
-              let width = properties[kCGImagePropertyPixelWidth] as? Int,
-              let height = properties[kCGImagePropertyPixelHeight] as? Int,
-              width > 0, height > 0
+            CGImageSourceGetCount(source) > 0,
+            let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
+            let width = properties[kCGImagePropertyPixelWidth] as? Int,
+            let height = properties[kCGImagePropertyPixelHeight] as? Int,
+            width > 0, height > 0
         else { return nil }
         // EXIF orientations 5–8 are turned a quarter, so width and height swap.
         let orientation = properties[kCGImagePropertyOrientation] as? Int ?? 1

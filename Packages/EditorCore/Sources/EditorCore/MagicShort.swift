@@ -172,8 +172,9 @@ public extension Project {
 
         if options.addsHookTitle, duration > .zero {
             let text = MagicShort.hookText(from: script)
-            var title = TextOverlay(text: text ?? MagicShort.placeholderHook, start: .zero,
-                                    duration: min(MagicShort.hookLength, duration).snappedToFrame())
+            var title = TextOverlay(
+                text: text ?? MagicShort.placeholderHook, start: .zero,
+                duration: min(MagicShort.hookLength, duration).snappedToFrame())
             title.takeLook(of: options.style)
             titles.insert(title, at: 0)
             report.hookTitleID = title.id
@@ -227,7 +228,8 @@ public extension Project {
         for index in timeline.clips.indices {
             let clip = timeline.clips[index]
             guard !speaking.contains(clip.assetID), !clip.isFrozen, asset(id: clip.assetID)?.isImage == false,
-                  clip.duration > MagicShort.quietClipLength + CMTime(value: 1, timescale: 1) else { continue }
+                clip.duration > MagicShort.quietClipLength + CMTime(value: 1, timescale: 1)
+            else { continue }
             timeline.clips[index] = clip.middle(MagicShort.quietClipLength)
         }
     }

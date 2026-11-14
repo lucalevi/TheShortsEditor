@@ -29,9 +29,11 @@ struct PhotosView: View {
         ContentUnavailableView {
             Label("Your Photos Library", systemImage: "photo.on.rectangle.angled")
         } description: {
-            Text(status == .denied || status == .restricted
-                 ? "Shorts Editor isn't allowed to see your photos. Turn it on in System Settings ▸ Privacy & Security ▸ Photos."
-                 : "Use videos and photos from your iPhone straight from Photos, without exporting them first. Items in iCloud are downloaded when you add them.")
+            Text(
+                status == .denied || status == .restricted
+                    ? "Shorts Editor isn't allowed to see your photos. Turn it on in System Settings ▸ Privacy & Security ▸ Photos."
+                    : "Use videos and photos from your iPhone straight from Photos, without exporting them first. Items in iCloud are downloaded when you add them."
+            )
         } actions: {
             if status == .denied || status == .restricted {
                 Button("Open Privacy Settings") {
@@ -68,9 +70,10 @@ struct PhotosView: View {
             }
             .overlay {
                 if items.isEmpty {
-                    ContentUnavailableView(kind == .photos ? "No Photos" : kind == .videos ? "No Videos" : "Nothing Here",
-                                           systemImage: "photo.on.rectangle",
-                                           description: Text(status == .limited ? "Only the items you allowed are shown." : "Your Photos library has none."))
+                    ContentUnavailableView(
+                        kind == .photos ? "No Photos" : kind == .videos ? "No Videos" : "Nothing Here",
+                        systemImage: "photo.on.rectangle",
+                        description: Text(status == .limited ? "Only the items you allowed are shown." : "Your Photos library has none."))
                 }
             }
 
@@ -102,7 +105,8 @@ struct PhotosView: View {
         if flags.contains(.command) {
             if selection.contains(id) { selection.remove(id) } else { selection.insert(id) }
         } else if flags.contains(.shift), let anchor = items.firstIndex(where: { selection.contains($0.localIdentifier) }),
-                  let index = items.firstIndex(where: { $0.localIdentifier == id }) {
+            let index = items.firstIndex(where: { $0.localIdentifier == id })
+        {
             selection = Set(items[min(anchor, index)...max(anchor, index)].map(\.localIdentifier))
         } else {
             selection = [id]
@@ -205,9 +209,11 @@ struct ClipTrimmerView: View {
                 Label("Clip Trimmer", systemImage: "film").font(.callout.weight(.semibold))
                 Text(media.name).lineLimit(1).foregroundStyle(.secondary)
                 Spacer()
-                Text("Shows \(TimeFormat.string(CMTime(seconds: start, preferredTimescale: 600)))–\(TimeFormat.string(CMTime(seconds: end, preferredTimescale: 600))) of \(TimeFormat.string(media.duration)) · on the timeline \(TimeFormat.string(clip.timelineDuration(ofSource: CMTime(seconds: end - start, preferredTimescale: 600))))")
-                    .monospacedDigit()
-                    .foregroundStyle(.secondary)
+                Text(
+                    "Shows \(TimeFormat.string(CMTime(seconds: start, preferredTimescale: 600)))–\(TimeFormat.string(CMTime(seconds: end, preferredTimescale: 600))) of \(TimeFormat.string(media.duration)) · on the timeline \(TimeFormat.string(clip.timelineDuration(ofSource: CMTime(seconds: end - start, preferredTimescale: 600))))"
+                )
+                .monospacedDigit()
+                .foregroundStyle(.secondary)
                 Button("Done") { model.trimmerClipID = nil }
                     .keyboardShortcut(.cancelAction)
                     .controlSize(.small)
@@ -374,13 +380,15 @@ struct TimelineMarkers: View {
             model.pause()
             model.seek(to: marker.time)
         }
-        .gesture(DragGesture(minimumDistance: 3).onChanged { value in
-            let moved = marker.time + CMTime(seconds: Double(value.translation.width / pointsPerSecond), preferredTimescale: 600)
-            dragging = (marker.id, model.markerDropTime(moved.clamped(.zero, model.duration), for: marker.id))
-        }.onEnded { _ in
-            if let dragging { model.moveMarker(dragging.id, to: dragging.time) }
-            dragging = nil
-        })
+        .gesture(
+            DragGesture(minimumDistance: 3).onChanged { value in
+                let moved = marker.time + CMTime(seconds: Double(value.translation.width / pointsPerSecond), preferredTimescale: 600)
+                dragging = (marker.id, model.markerDropTime(moved.clamped(.zero, model.duration), for: marker.id))
+            }.onEnded { _ in
+                if let dragging { model.moveMarker(dragging.id, to: dragging.time) }
+                dragging = nil
+            }
+        )
         .contextMenu {
             Button("Rename…") {
                 name = marker.name
@@ -390,8 +398,11 @@ struct TimelineMarkers: View {
             Divider()
             Button("Delete Marker", role: .destructive) { model.deleteMarker(marker.id) }
         }
-        .popover(isPresented: Binding(get: { model.markerBeingRenamed == marker.id },
-                                      set: { if !$0 { model.markerBeingRenamed = nil } })) {
+        .popover(
+            isPresented: Binding(
+                get: { model.markerBeingRenamed == marker.id },
+                set: { if !$0 { model.markerBeingRenamed = nil } })
+        ) {
             VStack(alignment: .leading, spacing: 8) {
                 Text("Marker at \(TimeFormat.string(marker.time))").font(.headline)
                 TextField("Name", text: $name)
@@ -450,10 +461,13 @@ struct SettingsView: View {
             Section {
                 LabeledContent("Transition length") {
                     HStack {
-                        Slider(value: Binding(get: { Double(transitionFrames) / Double(Project.frameRate) },
-                                              set: { transitionFrames = Int(ClipTransition.allowed(CMTime(seconds: $0, preferredTimescale: 600)).value) }),
-                               in: ClipTransition.minimumDuration.seconds...ClipTransition.maximumDuration.seconds)
-                            .frame(width: 180)
+                        Slider(
+                            value: Binding(
+                                get: { Double(transitionFrames) / Double(Project.frameRate) },
+                                set: { transitionFrames = Int(ClipTransition.allowed(CMTime(seconds: $0, preferredTimescale: 600)).value) }),
+                            in: ClipTransition.minimumDuration.seconds...ClipTransition.maximumDuration.seconds
+                        )
+                        .frame(width: 180)
                         Text("\((Double(transitionFrames) / Double(Project.frameRate)).formatted(.number.precision(.fractionLength(1)))) s")
                             .monospacedDigit()
                             .frame(width: 44, alignment: .trailing)

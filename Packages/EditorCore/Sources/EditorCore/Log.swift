@@ -32,7 +32,9 @@ public extension Logger {
     /// Logs a failure the user can carry on from: what was being done, and the error.
     func failure(_ action: String, _ error: any Error) {
         let ns = error as NSError
-        self.error("\(action, privacy: .public) failed (\(ns.domain, privacy: .public) \(ns.code, privacy: .public)): \(error.localizedDescription, privacy: .private)")
+        self.error(
+            "\(action, privacy: .public) failed (\(ns.domain, privacy: .public) \(ns.code, privacy: .public)): \(error.localizedDescription, privacy: .private)"
+        )
     }
 
     /// Runs `work`; when it throws, logs the failure and returns nil. For work whose failure

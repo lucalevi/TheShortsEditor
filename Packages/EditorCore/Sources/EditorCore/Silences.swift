@@ -32,8 +32,10 @@ public struct SilenceSettings: Equatable, Sendable {
     /// Quiet shorter than this is a natural pause and stays.
     public var minimumPause: CMTime
 
-    public init(threshold: Float = -40, padding: CMTime = CMTime(value: 4, timescale: 30),
-                minimumPause: CMTime = SilenceSettings.defaultMinimumPause) {
+    public init(
+        threshold: Float = -40, padding: CMTime = CMTime(value: 4, timescale: 30),
+        minimumPause: CMTime = SilenceSettings.defaultMinimumPause
+    ) {
         self.threshold = threshold
         self.padding = padding
         self.minimumPause = minimumPause
@@ -139,7 +141,8 @@ public extension Project {
             if clip.sourceRange.end > cursor { pieces.append(CMTimeRange(start: cursor, end: clip.sourceRange.end)) }
             let kept = pieces.filter { $0.duration >= .oneFrame }
             for (number, piece) in kept.enumerated() {
-                var part = clip.piece(id: number == 0 ? clip.id : UUID(), sourceStart: piece.start, duration: clip.timelineDuration(ofSource: piece.duration).snappedToFrame())
+                var part = clip.piece(
+                    id: number == 0 ? clip.id : UUID(), sourceStart: piece.start, duration: clip.timelineDuration(ofSource: piece.duration).snappedToFrame())
                 part.keepFades(isFirst: number == 0, isLast: number == kept.count - 1)
                 clips.append(part)
             }

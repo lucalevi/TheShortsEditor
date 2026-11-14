@@ -147,12 +147,13 @@ public extension Project {
         var claims: [SplitEdge: (id: Clip.ID, fraction: CGFloat)] = [:]
         for overlay in overlaysOnScreen(at: time).reversed() {
             guard let split = overlay.layout.split, claims[split.edge] == nil else { continue }
-            let opposite: SplitEdge = switch split.edge {
-            case .top: .bottom
-            case .bottom: .top
-            case .left: .right
-            case .right: .left
-            }
+            let opposite: SplitEdge =
+                switch split.edge {
+                case .top: .bottom
+                case .bottom: .top
+                case .left: .right
+                case .right: .left
+                }
             guard split.fraction + (claims[opposite]?.fraction ?? 0) <= 0.75 else { continue }
             claims[split.edge] = (overlay.id, split.fraction)
         }

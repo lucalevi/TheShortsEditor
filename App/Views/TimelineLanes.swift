@@ -53,28 +53,36 @@ extension TimelineView {
         .overlay(alignment: .leading) {
             EdgeHandle(edge: .leading, help: "Drag to trim the start") { dx in
                 updateBlockDrag(item, kind: .start, points: dx, start: overlay.start, duration: overlay.duration)
-            } onEnd: { endBlockDrag() }
+            } onEnd: {
+                endBlockDrag()
+            }
         }
         .overlay(alignment: .trailing) {
             EdgeHandle(edge: .trailing, help: "Drag to trim the end") { dx in
                 updateBlockDrag(item, kind: .end, points: dx, start: overlay.start, duration: overlay.duration)
-            } onEnd: { endBlockDrag() }
+            } onEnd: {
+                endBlockDrag()
+            }
         }
         .frame(width: max(width(of: length) - 2, 6), height: overlayRowHeight)
         .offset(x: x(for: start) + 1, y: CGFloat(row) * (overlayRowHeight + rowGap))
         .zIndex(blockDrag?.item == item ? 1 : 0)
-        .gesture(clickTap { _, modifiers in
-            if modifiers.isDisjoint(with: [.command, .shift]) {
-                model.selectOverlay(overlay.id)
-            } else {
-                model.click(item, modifiers: modifiers)
+        .gesture(
+            clickTap { _, modifiers in
+                if modifiers.isDisjoint(with: [.command, .shift]) {
+                    model.selectOverlay(overlay.id)
+                } else {
+                    model.click(item, modifiers: modifiers)
+                }
             }
-        })
-        .gesture(DragGesture(minimumDistance: 3)
-            .onChanged { value in
-                updateBlockDrag(item, kind: .move, points: value.translation.width, start: overlay.start, duration: overlay.duration)
-            }
-            .onEnded { _ in endBlockDrag() })
+        )
+        .gesture(
+            DragGesture(minimumDistance: 3)
+                .onChanged { value in
+                    updateBlockDrag(item, kind: .move, points: value.translation.width, start: overlay.start, duration: overlay.duration)
+                }
+                .onEnded { _ in endBlockDrag() }
+        )
         .contextMenu {
             Button("Split at Playhead") {
                 model.selection = item
@@ -116,19 +124,23 @@ extension TimelineView {
                 .frame(width: max(width(of: length) - 2, 6), height: titleRowHeight)
                 .offset(x: x(for: start) + 1, y: CGFloat(rows[title.id] ?? 0) * (titleRowHeight + 2))
                 .zIndex(blockDrag?.item == item ? 1 : 0)
-                .gesture(clickTap { _, modifiers in
-                    if modifiers.isDisjoint(with: [.command, .shift]) {
-                        model.selectTitle(title.id)
-                    } else {
-                        model.click(item, modifiers: modifiers)
+                .gesture(
+                    clickTap { _, modifiers in
+                        if modifiers.isDisjoint(with: [.command, .shift]) {
+                            model.selectTitle(title.id)
+                        } else {
+                            model.click(item, modifiers: modifiers)
+                        }
                     }
-                })
-                .gesture(DragGesture(minimumDistance: 3).onChanged { value in
-                    updateBlockDrag(item, kind: .move, points: value.translation.width, start: title.start, duration: title.duration)
-                }.onEnded { _ in
-                    endBlockDrag()
-                    if model.timelineSelection.count <= 1 { model.selectTitle(title.id) }
-                })
+                )
+                .gesture(
+                    DragGesture(minimumDistance: 3).onChanged { value in
+                        updateBlockDrag(item, kind: .move, points: value.translation.width, start: title.start, duration: title.duration)
+                    }.onEnded { _ in
+                        endBlockDrag()
+                        if model.timelineSelection.count <= 1 { model.selectTitle(title.id) }
+                    }
+                )
                 .contextMenu {
                     Button("Start at Playhead") { model.moveTitle(title.id, to: model.currentTime) }
                     Divider()
@@ -256,19 +268,23 @@ extension TimelineView {
             .fill((sound.isVoiceOver ? Color.pink : Color.indigo).opacity(isSelected ? 0.6 : 0.4))
             .overlay(alignment: .bottom) {
                 if let levels = model.audioLevels[sound.clip.assetID] {
-                    WaveformView(levels: levels, sourceStart: sound.clip.sourceTime(atOffset: start - sound.start),
-                                 pointsPerSecond: pointsPerSecond / CGFloat(sound.clip.averageSpeed),
-                                 tooLoud: model.tooLoudRanges(of: sound.clip).map { CMTimeRange(start: $0.start - (start - sound.start), duration: $0.duration) })
-                        .frame(height: soundRowHeight - 14)
-                        .opacity(sound.clip.isMuted ? 0.3 : 0.8)
+                    WaveformView(
+                        levels: levels, sourceStart: sound.clip.sourceTime(atOffset: start - sound.start),
+                        pointsPerSecond: pointsPerSecond / CGFloat(sound.clip.averageSpeed),
+                        tooLoud: model.tooLoudRanges(of: sound.clip).map { CMTimeRange(start: $0.start - (start - sound.start), duration: $0.duration) }
+                    )
+                    .frame(height: soundRowHeight - 14)
+                    .opacity(sound.clip.isMuted ? 0.3 : 0.8)
                 }
             }
             .overlay(alignment: .topLeading) {
-                Label(sound.detachedFrom != nil ? "Sound of \(name)" : name,
-                      systemImage: sound.isVoiceOver ? "mic.fill" : sound.detachedFrom != nil ? "waveform.path" : "waveform")
-                    .font(.caption2.weight(.medium))
-                    .lineLimit(1)
-                    .padding(.horizontal, 4)
+                Label(
+                    sound.detachedFrom != nil ? "Sound of \(name)" : name,
+                    systemImage: sound.isVoiceOver ? "mic.fill" : sound.detachedFrom != nil ? "waveform.path" : "waveform"
+                )
+                .font(.caption2.weight(.medium))
+                .lineLimit(1)
+                .padding(.horizontal, 4)
             }
             .clipShape(RoundedRectangle(cornerRadius: 4))
             .overlay {
@@ -285,23 +301,31 @@ extension TimelineView {
             .overlay(alignment: .leading) {
                 EdgeHandle(edge: .leading, help: "Drag to trim the start") { dx in
                     updateBlockDrag(item, kind: .start, points: dx, start: sound.start, duration: sound.duration)
-                } onEnd: { endBlockDrag() }
+                } onEnd: {
+                    endBlockDrag()
+                }
             }
             .overlay(alignment: .trailing) {
                 EdgeHandle(edge: .trailing, help: "Drag to trim the end") { dx in
                     updateBlockDrag(item, kind: .end, points: dx, start: sound.start, duration: sound.duration)
-                } onEnd: { endBlockDrag() }
+                } onEnd: {
+                    endBlockDrag()
+                }
             }
             .frame(width: max(width(of: length) - 2, 6), height: soundRowHeight)
             .contentShape(Rectangle())
             .offset(x: x(for: start) + 1, y: CGFloat(row) * (soundRowHeight + 2))
             .zIndex(blockDrag?.item == item ? 1 : 0)
-            .gesture(clickTap { _, modifiers in
-                if modifiers.isDisjoint(with: [.command, .shift]) { model.selectSound(sound.id) } else { model.click(item, modifiers: modifiers) }
-            })
-            .gesture(DragGesture(minimumDistance: 3)
-                .onChanged { value in updateBlockDrag(item, kind: .move, points: value.translation.width, start: sound.start, duration: sound.duration) }
-                .onEnded { _ in endBlockDrag() })
+            .gesture(
+                clickTap { _, modifiers in
+                    if modifiers.isDisjoint(with: [.command, .shift]) { model.selectSound(sound.id) } else { model.click(item, modifiers: modifiers) }
+                }
+            )
+            .gesture(
+                DragGesture(minimumDistance: 3)
+                    .onChanged { value in updateBlockDrag(item, kind: .move, points: value.translation.width, start: sound.start, duration: sound.duration) }
+                    .onEnded { _ in endBlockDrag() }
+            )
             .contextMenu {
                 Button("Split at Playhead") {
                     model.selection = item
@@ -448,24 +472,26 @@ extension TimelineView {
                 .contentShape(Rectangle())
                 .offset(x: x(for: range.start + shift) + 1)
                 .gesture(clickTap { _, modifiers in model.click(.music, modifiers: modifiers) })
-                .gesture(DragGesture(minimumDistance: 3)
-                    .onChanged { value in
-                        model.pause()
-                        if !model.isSelected(.music) { model.selection = .music }
-                        var start = max(.zero, range.start + seconds(value.translation.width))
-                        snapLine = nil
-                        if let stuck = model.snapped(start) {
-                            start = stuck
-                            snapLine = stuck
+                .gesture(
+                    DragGesture(minimumDistance: 3)
+                        .onChanged { value in
+                            model.pause()
+                            if !model.isSelected(.music) { model.selection = .music }
+                            var start = max(.zero, range.start + seconds(value.translation.width))
+                            snapLine = nil
+                            if let stuck = model.snapped(start) {
+                                start = stuck
+                                snapLine = stuck
+                            }
+                            start = min(start, max(.zero, model.duration - CMTime(value: 1, timescale: 1)))
+                            musicDrag = (start - range.start).snappedToFrame()
                         }
-                        start = min(start, max(.zero, model.duration - CMTime(value: 1, timescale: 1)))
-                        musicDrag = (start - range.start).snappedToFrame()
-                    }
-                    .onEnded { _ in
-                        if let drag = musicDrag, drag != .zero { model.setMusicTimelineStart(range.start + drag) }
-                        musicDrag = nil
-                        snapLine = nil
-                    })
+                        .onEnded { _ in
+                            if let drag = musicDrag, drag != .zero { model.setMusicTimelineStart(range.start + drag) }
+                            musicDrag = nil
+                            snapLine = nil
+                        }
+                )
                 .contextMenu {
                     deleteButton(for: .music, single: "Remove Music")
                 }
@@ -479,15 +505,15 @@ extension TimelineView {
             } label: {
                 Label("Add Music", systemImage: "music.note")
             }
-                .menuStyle(.button)
-                .buttonStyle(.borderless)
-                .menuIndicator(.hidden)
-                .controlSize(.small)
-                .fixedSize()
-                .foregroundStyle(.secondary)
-                .frame(height: musicLaneHeight)
-                .offset(x: leadingInset + 4)
-                .help("Add music to play under your Short: the app's own, or a song from a file. You can also drop a sound file here.")
+            .menuStyle(.button)
+            .buttonStyle(.borderless)
+            .menuIndicator(.hidden)
+            .controlSize(.small)
+            .fixedSize()
+            .foregroundStyle(.secondary)
+            .frame(height: musicLaneHeight)
+            .offset(x: leadingInset + 4)
+            .help("Add music to play under your Short: the app's own, or a song from a file. You can also drop a sound file here.")
         }
     }
 

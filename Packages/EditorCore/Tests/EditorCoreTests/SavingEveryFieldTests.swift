@@ -2,6 +2,7 @@ import CoreGraphics
 import CoreMedia
 import Foundation
 import Testing
+
 @testable import EditorCore
 
 /// Every field of every saved type comes back after saving, even when nothing is at its default.
@@ -15,9 +16,10 @@ struct SavingEveryFieldTests {
 
     /// Fails for each stored property of `value` that equals the same property of `blank`.
     private func expectEveryFieldSet<T>(_ value: T, differsFrom blank: T, _ name: String, sourceLocation: SourceLocation = #_sourceLocation) {
-        let blankFields = Dictionary(uniqueKeysWithValues: Mirror(reflecting: blank).children.compactMap { child in
-            child.label.map { ($0, String(describing: child.value)) }
-        })
+        let blankFields = Dictionary(
+            uniqueKeysWithValues: Mirror(reflecting: blank).children.compactMap { child in
+                child.label.map { ($0, String(describing: child.value)) }
+            })
         for child in Mirror(reflecting: value).children {
             guard let label = child.label else { continue }
             if blankFields[label] == String(describing: child.value) {
@@ -35,8 +37,9 @@ struct SavingEveryFieldTests {
 
     static let placement = Placement(offsetX: 0.1, offsetY: -0.2, scale: 1.4, rotation: 12, opacity: 0.7)
     static let keyframe = Keyframe(time: t(9), placement: placement, easing: .linear)
-    static let mask = ClipMask(shape: .heart, centerX: 0.4, centerY: 0.6, size: 0.33, stretch: 1.5, rotation: 20, feather: 0.2,
-                               roundness: 0.3, inverted: true)
+    static let mask = ClipMask(
+        shape: .heart, centerX: 0.4, centerY: 0.6, size: 0.33, stretch: 1.5, rotation: 20, feather: 0.2,
+        roundness: 0.3, inverted: true)
     static let key = ColorKey(color: ColorKey.blue, strength: 0.7, softness: 0.1, spill: 0.9)
     static let cutout = ClipCutout(removeBackground: .subject, key: key, mask: mask, blend: .screen)
 
@@ -65,19 +68,22 @@ struct SavingEveryFieldTests {
         reversedFrom: ReversedSource(assetID: UUID(), range: CMTimeRange(start: t(1), duration: t(2))))
 
     static let word: Word = {
-        var word = Word(text: "ciao", start: t(4), duration: t(5), isKeyword: true, emoji: "👋", captionBreak: .joined,
-                        lineBreakAfter: true, endsExactly: true)
+        var word = Word(
+            text: "ciao", start: t(4), duration: t(5), isKeyword: true, emoji: "👋", captionBreak: .joined,
+            lineBreakAfter: true, endsExactly: true)
         word.translation = CaptionTranslation(source: "ciao", text: "hello")
         return word
     }()
 
-    static let look = TextLook(fontFamily: "Avenir", weight: 0.9, size: 120, textColor: .yellow, outlineColor: .black, outlineWidth: 8,
-                               boxColor: .green, boxPerLine: true, shadow: true, uppercase: true, glowColor: .white,
-                               popShadowColor: .black, letterSpacing: 0.1)
+    static let look = TextLook(
+        fontFamily: "Avenir", weight: 0.9, size: 120, textColor: .yellow, outlineColor: .black, outlineWidth: 8,
+        boxColor: .green, boxPerLine: true, shadow: true, uppercase: true, glowColor: .white,
+        popShadowColor: .black, letterSpacing: 0.1)
 
     static var title: TextOverlay {
-        var title = TextOverlay(text: "Hi", style: .comic, look: look, entrance: .fade, start: t(10), duration: t(50),
-                                verticalPosition: 0.8, horizontalPosition: 0.3)
+        var title = TextOverlay(
+            text: "Hi", style: .comic, look: look, entrance: .fade, start: t(10), duration: t(50),
+            verticalPosition: 0.8, horizontalPosition: 0.3)
         title.followsClip = false
         title.exit = ClipAnimation(.zoom)
         title.loop = .wiggle
@@ -115,8 +121,9 @@ struct SavingEveryFieldTests {
         return captions
     }()
 
-    static let shot = Shot(name: "Hook", direction: "Say it", length: t(60), title: "Watch this", isTalking: true, transition: .zoom,
-                           entrance: .pop, fitsExactly: true)
+    static let shot = Shot(
+        name: "Hook", direction: "Say it", length: t(60), title: "Watch this", isTalking: true, transition: .zoom,
+        entrance: .pop, fitsExactly: true)
 
     static var storyboard: Storyboard {
         var storyboard = Storyboard(kind: .review)
@@ -153,8 +160,11 @@ struct SavingEveryFieldTests {
         expectEveryFieldSet(Self.mask, differsFrom: ClipMask(shape: .line), "ClipMask")
         expectEveryFieldSet(Self.key, differsFrom: ColorKey(), "ColorKey")
         expectEveryFieldSet(Self.cutout, differsFrom: ClipCutout(), "ClipCutout")
-        expectEveryFieldSet(Self.asset, differsFrom: MediaAsset(url: URL(fileURLWithPath: "/"), name: "", duration: .zero, displaySize: .zero,
-                                                                hasAudio: true, hasVideo: false), "MediaAsset")
+        expectEveryFieldSet(
+            Self.asset,
+            differsFrom: MediaAsset(
+                url: URL(fileURLWithPath: "/"), name: "", duration: .zero, displaySize: .zero,
+                hasAudio: true, hasVideo: false), "MediaAsset")
         expectEveryFieldSet(Self.word, differsFrom: Word(text: "", start: .zero, duration: .zero), "Word")
         expectEveryFieldSet(Self.look, differsFrom: TextLook(), "TextLook")
         expectEveryFieldSet(Self.title, differsFrom: TextOverlay(text: "", start: .zero, duration: .zero), "TextOverlay")

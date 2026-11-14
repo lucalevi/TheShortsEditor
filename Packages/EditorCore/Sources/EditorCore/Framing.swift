@@ -14,7 +14,8 @@ public extension Framing {
         let scale = self == .fill ? max(scaleX, scaleY) : min(scaleX, scaleY)
         let offsetX = (canvas.width - oriented.width * scale) / 2
         let offsetY = (canvas.height - oriented.height * scale) / 2
-        return preferredTransform
+        return
+            preferredTransform
             .concatenating(CGAffineTransform(translationX: -oriented.minX, y: -oriented.minY))
             .concatenating(CGAffineTransform(scaleX: scale, y: scale))
             .concatenating(CGAffineTransform(translationX: offsetX, y: offsetY))

@@ -2,14 +2,16 @@ import CoreGraphics
 import CoreMedia
 import Foundation
 import Testing
+
 @testable import EditorCore
 
 private func seconds(_ s: Double) -> CMTime { CMTime(seconds: s, preferredTimescale: 600) }
 
 private func project(seconds length: Int64) -> Project {
     var project = Project()
-    let asset = MediaAsset(url: URL(fileURLWithPath: "/tmp/a.mov"), name: "a", duration: CMTime(value: length, timescale: 1),
-                           displaySize: CGSize(width: 1080, height: 1920), hasAudio: true)
+    let asset = MediaAsset(
+        url: URL(fileURLWithPath: "/tmp/a.mov"), name: "a", duration: CMTime(value: length, timescale: 1),
+        displaySize: CGSize(width: 1080, height: 1920), hasAudio: true)
     project.addAsset(asset)
     project.appendClip(of: asset.id)
     return project
@@ -45,7 +47,7 @@ struct TitleTests {
         var p = project(seconds: 10)
         let id = p.addTitle(at: seconds(6), text: "Late")
         p.timeline.split(at: seconds(5))
-        p.timeline.remove(p.timeline.clips[1].id)  // Short is now 5 s.
+        p.timeline.remove(p.timeline.clips[1].id) // Short is now 5 s.
         #expect(p.title(id: id)?.start == CMTime(value: 6, timescale: 1))
         #expect(p.title(id: id)?.visibleRange(in: p) == nil)
         #expect(p.titlesOnScreen(at: seconds(4)).isEmpty)
@@ -96,7 +98,9 @@ struct TitleTests {
     @Test func survivesSavingAndLoading() throws {
         var p = project(seconds: 10)
         let id = p.addTitle(at: seconds(1), text: "Two\nlines")
-        p.updateTitle(id) { $0.style = .marker; $0.entrance = .fade; $0.verticalPosition = 0.4 }
+        p.updateTitle(id) {
+            $0.style = .marker; $0.entrance = .fade; $0.verticalPosition = 0.4
+        }
         let decoded = try JSONDecoder().decode(Project.self, from: JSONEncoder().encode(p))
         #expect(decoded == p)
     }

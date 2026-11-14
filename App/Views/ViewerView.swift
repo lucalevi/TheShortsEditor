@@ -44,7 +44,9 @@ struct ViewerView: View {
                     model.importFiles(urls, addToTimeline: true)
                 }
                 return true
-            } isTargeted: { isDropTargeted = $0 }
+            } isTargeted: {
+                isDropTargeted = $0
+            }
             TransportBar(model: model)
         }
     }
@@ -138,7 +140,10 @@ private struct TransportBar: View {
                 .frame(minWidth: 110, alignment: .leading)
             Toggle("Loop", systemImage: "repeat", isOn: $model.loopsPlayback)
                 .toggleStyle(.button)
-                .help(model.loopsPlayback ? "Loop is on: playing starts again at the end, as a Short does on YouTube (⌘L)" : "Play over and over, as a Short does on YouTube (⌘L)")
+                .help(
+                    model.loopsPlayback
+                        ? "Loop is on: playing starts again at the end, as a Short does on YouTube (⌘L)" : "Play over and over, as a Short does on YouTube (⌘L)"
+                )
             Button("Play Full Screen", systemImage: "arrow.up.left.and.arrow.down.right") { model.toggleFullScreenPreview() }
                 .help("Watch it full screen on a phone, with YouTube's buttons over it (⇧⌘F)")
         }
@@ -219,15 +224,19 @@ private struct PictureHandles: View {
             .frame(width: size.width, height: size.height)
             .rotationEffect(angle)
             .position(center)
-            .gesture(DragGesture(minimumDistance: 1, coordinateSpace: .named("viewer"))
-                .onChanged { value in move(clip, by: value.translation, scale: scale) }
-                .onEnded { _ in finish(clip, actionName: "Move Picture") })
-            .simultaneousGesture(MagnifyGesture()
-                .onChanged { value in pinch(clip, magnification: value.magnification) }
-                .onEnded { _ in
-                    pinchStart = nil
-                    finish(clip, actionName: "Resize Picture")
-                })
+            .gesture(
+                DragGesture(minimumDistance: 1, coordinateSpace: .named("viewer"))
+                    .onChanged { value in move(clip, by: value.translation, scale: scale) }
+                    .onEnded { _ in finish(clip, actionName: "Move Picture") }
+            )
+            .simultaneousGesture(
+                MagnifyGesture()
+                    .onChanged { value in pinch(clip, magnification: value.magnification) }
+                    .onEnded { _ in
+                        pinchStart = nil
+                        finish(clip, actionName: "Resize Picture")
+                    }
+            )
             .pointerStyle(.grabIdle)
             .help("Drag to move. Drag a corner or pinch to resize. Drag the round knob to turn it.")
         // Corners: kept inside the viewer, so they can be grabbed even when the picture is bigger.
@@ -238,9 +247,11 @@ private struct PictureHandles: View {
                 .frame(width: 10, height: 10)
                 .overlay(Rectangle().strokeBorder(Color.black.opacity(0.6), lineWidth: 1))
                 .position(point)
-                .gesture(DragGesture(minimumDistance: 1, coordinateSpace: .named("viewer"))
-                    .onChanged { value in resize(clip, center: center, from: value.startLocation, to: value.location) }
-                    .onEnded { _ in finish(clip, actionName: "Resize Picture") })
+                .gesture(
+                    DragGesture(minimumDistance: 1, coordinateSpace: .named("viewer"))
+                        .onChanged { value in resize(clip, center: center, from: value.startLocation, to: value.location) }
+                        .onEnded { _ in finish(clip, actionName: "Resize Picture") }
+                )
                 .pointerStyle(.frameResize(position: corner == 0 ? .topLeading : corner == 1 ? .topTrailing : corner == 2 ? .bottomTrailing : .bottomLeading))
         }
         // The knob for turning, above the top edge.
@@ -250,9 +261,11 @@ private struct PictureHandles: View {
             .frame(width: 12, height: 12)
             .overlay(Circle().strokeBorder(Color.black.opacity(0.6), lineWidth: 1))
             .position(knob)
-            .gesture(DragGesture(minimumDistance: 1, coordinateSpace: .named("viewer"))
-                .onChanged { value in rotate(clip, center: center, from: value.startLocation, to: value.location) }
-                .onEnded { _ in finish(clip, actionName: "Turn Picture") })
+            .gesture(
+                DragGesture(minimumDistance: 1, coordinateSpace: .named("viewer"))
+                    .onChanged { value in rotate(clip, center: center, from: value.startLocation, to: value.location) }
+                    .onEnded { _ in finish(clip, actionName: "Turn Picture") }
+            )
             .help("Drag to turn the picture. It sticks to straight angles.")
     }
 
@@ -387,7 +400,8 @@ private struct CaptionHandle: View {
         GeometryReader { geometry in
             let scale = geometry.size.width / Project.canvasSize.width
             if model.project.captions.isVisible, model.currentCaption != nil,
-               let frame = CaptionPreview.frame(in: model.project, at: model.currentTime) {
+                let frame = CaptionPreview.frame(in: model.project, at: model.currentTime)
+            {
                 let rect = frame.offsetBy(dx: 0, dy: (dy ?? 0) / scale)
                 RoundedRectangle(cornerRadius: 4)
                     .strokeBorder(style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
@@ -397,14 +411,16 @@ private struct CaptionHandle: View {
                     .offset(x: rect.minX * scale, y: rect.minY * scale)
                     .onHover { isHovered = $0 }
                     .pointerStyle(.frameResize(position: .top, directions: [.inward, .outward]))
-                    .gesture(DragGesture(minimumDistance: 2).onChanged { value in
-                        model.pause()
-                        dy = value.translation.height
-                    }.onEnded { value in
-                        dy = nil
-                        let middle = frame.midY + value.translation.height / scale
-                        model.setCaptionPositionByDragging(Double(middle / Project.canvasSize.height))
-                    })
+                    .gesture(
+                        DragGesture(minimumDistance: 2).onChanged { value in
+                            model.pause()
+                            dy = value.translation.height
+                        }.onEnded { value in
+                            dy = nil
+                            let middle = frame.midY + value.translation.height / scale
+                            model.setCaptionPositionByDragging(Double(middle / Project.canvasSize.height))
+                        }
+                    )
                     .help("Drag up or down to move the captions")
             }
         }
@@ -478,26 +494,28 @@ private struct TitleHandles: View {
                             if !title.isSticker { model.wantsTitleTextFocus = true }
                         }
                         .onTapGesture { model.selectedTitleID = title.id }
-                        .gesture(DragGesture(minimumDistance: 2).onChanged { value in
-                            model.pause()
-                            if model.selectedTitleID != title.id { model.selectedTitleID = title.id }
-                            var translation = value.translation
-                            // Sticks to the middle across.
-                            if abs(frame.midX + translation.width / scale - Project.canvasSize.width / 2) < 8 / scale {
-                                translation.width = (Project.canvasSize.width / 2 - frame.midX) * scale
+                        .gesture(
+                            DragGesture(minimumDistance: 2).onChanged { value in
+                                model.pause()
+                                if model.selectedTitleID != title.id { model.selectedTitleID = title.id }
+                                var translation = value.translation
+                                // Sticks to the middle across.
+                                if abs(frame.midX + translation.width / scale - Project.canvasSize.width / 2) < 8 / scale {
+                                    translation.width = (Project.canvasSize.width / 2 - frame.midX) * scale
+                                }
+                                drag = (title.id, translation)
+                            }.onEnded { _ in
+                                let offset = drag?.offset ?? .zero
+                                drag = nil
+                                let moved = clamped(frame.offsetBy(dx: offset.width / scale, dy: offset.height / scale))
+                                let vertical = Double(moved.midY / Project.canvasSize.height)
+                                let across = Double(moved.midX / Project.canvasSize.width)
+                                model.editTitle(title.id, title.isSticker ? "Move Sticker" : "Move Title") { title in
+                                    title.verticalPosition = min(max(vertical, 0), 1)
+                                    title.horizontalPosition = abs(across - 0.5) < 0.005 ? 0.5 : min(max(across, 0), 1)
+                                }
                             }
-                            drag = (title.id, translation)
-                        }.onEnded { _ in
-                            let offset = drag?.offset ?? .zero
-                            drag = nil
-                            let moved = clamped(frame.offsetBy(dx: offset.width / scale, dy: offset.height / scale))
-                            let vertical = Double(moved.midY / Project.canvasSize.height)
-                            let across = Double(moved.midX / Project.canvasSize.width)
-                            model.editTitle(title.id, title.isSticker ? "Move Sticker" : "Move Title") { title in
-                                title.verticalPosition = min(max(vertical, 0), 1)
-                                title.horizontalPosition = abs(across - 0.5) < 0.005 ? 0.5 : min(max(across, 0), 1)
-                            }
-                        })
+                        )
                         .help("Click to edit, drag to move. Double-click to change the words.")
                 }
             }

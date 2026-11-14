@@ -1,6 +1,7 @@
 @preconcurrency import AVFoundation
 import EditorCore
 import Testing
+
 @testable import RenderEngine
 
 private typealias Pixel = (r: UInt8, g: UInt8, b: UInt8)

@@ -2,6 +2,7 @@ import CoreGraphics
 import CoreMedia
 import Foundation
 import Testing
+
 @testable import EditorCore
 
 private func t(_ seconds: Double) -> CMTime { CMTime(seconds: seconds, preferredTimescale: 600) }
@@ -9,10 +10,12 @@ private func t(_ seconds: Double) -> CMTime { CMTime(seconds: seconds, preferred
 /// A 10 s clip of a talking file, plus a 30 s song.
 private func project(clipSeconds: Int64 = 10, songSeconds: Int64 = 30) -> Project {
     var project = Project()
-    let video = MediaAsset(url: URL(fileURLWithPath: "/tmp/talk.mov"), name: "talk", duration: CMTime(value: clipSeconds, timescale: 1),
-                           displaySize: CGSize(width: 1080, height: 1920), hasAudio: true)
-    let song = MediaAsset(url: URL(fileURLWithPath: "/tmp/song.m4a"), name: "song", duration: CMTime(value: songSeconds, timescale: 1),
-                          displaySize: .zero, hasAudio: true, hasVideo: false)
+    let video = MediaAsset(
+        url: URL(fileURLWithPath: "/tmp/talk.mov"), name: "talk", duration: CMTime(value: clipSeconds, timescale: 1),
+        displaySize: CGSize(width: 1080, height: 1920), hasAudio: true)
+    let song = MediaAsset(
+        url: URL(fileURLWithPath: "/tmp/song.m4a"), name: "song", duration: CMTime(value: songSeconds, timescale: 1),
+        displaySize: .zero, hasAudio: true, hasVideo: false)
     project.addAsset(video)
     project.addAsset(song)
     project.appendClip(of: video.id)
@@ -21,10 +24,11 @@ private func project(clipSeconds: Int64 = 10, songSeconds: Int64 = 30) -> Projec
 
 /// Loud (−20 dB) during `talking` seconds of the file, background noise (−60 dB) elsewhere.
 private func levels(seconds: Int, talking: [ClosedRange<Double>]) -> AudioLevels {
-    AudioLevels(decibels: (0..<(seconds * 30)).map { frame in
-        let time = Double(frame) / 30
-        return talking.contains { $0.contains(time) } ? -20 : -60
-    })
+    AudioLevels(
+        decibels: (0..<(seconds * 30)).map { frame in
+            let time = Double(frame) / 30
+            return talking.contains { $0.contains(time) } ? -20 : -60
+        })
 }
 
 struct ClipSoundTests {
@@ -101,7 +105,7 @@ struct MusicTests {
     @Test func speechFollowsTheClipsOnTheTimeline() {
         var p = project()
         p.timeline.split(at: t(5))
-        p.timeline.remove(p.timeline.clips[0].id)  // the 5…10 s part now starts at 0
+        p.timeline.remove(p.timeline.clips[0].id) // the 5…10 s part now starts at 0
         let speech = AudioMix.speechRanges(in: p, levels: [p.assets[0].id: levels(seconds: 10, talking: [7...8])])
         #expect(speech.count == 1)
         #expect(abs(speech[0].start.seconds - 2) < 0.05)
@@ -122,13 +126,13 @@ struct MusicTests {
         let curve = AudioMix.musicEnvelope(for: p, speech: speech)
         let v = BackgroundMusic.defaultVolume
         func at(_ s: Double) -> Double { AudioMix.volume(at: t(s), in: curve) }
-        #expect(at(0) == 0)                                     // fading in
+        #expect(at(0) == 0) // fading in
         #expect(abs(at(0.5) - v / 2) < 0.01)
-        #expect(abs(at(2) - v) < 0.001)                         // full between
+        #expect(abs(at(2) - v) < 0.001) // full between
         #expect(abs(at(5) - v * BackgroundMusic.loweredFraction) < 0.001) // under speech
         #expect(abs(at(3.9) - v * (1 - (1 - BackgroundMusic.loweredFraction) * 0.6)) < 0.001) // going down before speech
-        #expect(abs(at(7) - v) < 0.001)                         // back up
-        #expect(abs(at(9) - v / 2) < 0.01)                      // fading out
+        #expect(abs(at(7) - v) < 0.001) // back up
+        #expect(abs(at(9) - v / 2) < 0.01) // fading out
         #expect(at(10) == 0)
     }
 
@@ -146,14 +150,14 @@ struct MusicTests {
     @Test func aSongAddedAsASoundGoesDownUnderSpeech() {
         var p = project()
         let id = p.addSound(of: p.assets[1].id, at: t(2))!
-        #expect(p.sound(id: id)?.lowersUnderSpeech == true)    // a 30 s file is a song
+        #expect(p.sound(id: id)?.lowersUnderSpeech == true) // a 30 s file is a song
         let sound = p.sound(id: id)!
         let curve = AudioMix.lowered(sound.clip.soundEnvelope(), startingAt: sound.start, speech: [CMTimeRange(start: t(4), end: t(6))])
         func at(_ s: Double) -> Double { AudioMix.volume(at: t(s) - sound.start, in: curve) }
-        #expect(abs(at(3) - 1) < 0.001)                              // its own level before
+        #expect(abs(at(3) - 1) < 0.001) // its own level before
         #expect(abs(at(5) - BackgroundMusic.loweredFraction) < 0.001) // under speech
         #expect(abs(at(3.9) - (1 - (1 - BackgroundMusic.loweredFraction) * 0.6)) < 0.001)
-        #expect(abs(at(7) - 1) < 0.001)                              // back up
+        #expect(abs(at(7) - 1) < 0.001) // back up
         #expect(curve.first?.time == .zero && curve.last?.time == sound.duration)
     }
 
@@ -247,7 +251,7 @@ struct LoudnessTests {
     @Test func peaksStopTheBoost() {
         var meter = LoudnessMeter()
         var samples = sine(frequency: 1000, dBFS: -30, seconds: 5)
-        samples[1000] = 0.5  // one click at −6 dBFS
+        samples[1000] = 0.5 // one click at −6 dBFS
         meter.add(interleaved: samples)
         #expect(abs(20 * log10(meter.normalizingGain()) - 5) < 0.05)
     }

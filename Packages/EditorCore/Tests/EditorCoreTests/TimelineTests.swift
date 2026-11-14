@@ -1,6 +1,7 @@
 import CoreMedia
 import Foundation
 import Testing
+
 @testable import EditorCore
 
 private func seconds(_ s: Double) -> CMTime { CMTime(seconds: s, preferredTimescale: 600) }
@@ -73,7 +74,8 @@ struct TimelineTests {
 
     @Test func projectRoundTripsThroughJSON() throws {
         var project = Project()
-        let asset = MediaAsset(url: URL(filePath: "/tmp/a.mov"), name: "a", duration: seconds(4), displaySize: CGSize(width: 1080, height: 1920), hasAudio: true)
+        let asset = MediaAsset(
+            url: URL(filePath: "/tmp/a.mov"), name: "a", duration: seconds(4), displaySize: CGSize(width: 1080, height: 1920), hasAudio: true)
         project.appendClip(of: project.addAsset(asset))
         let decoded = try JSONDecoder().decode(Project.self, from: JSONEncoder().encode(project))
         #expect(decoded == project)

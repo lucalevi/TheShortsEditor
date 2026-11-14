@@ -60,8 +60,10 @@ public enum Transcriber {
     /// The language spoken in the file at `url`, found by listening to its first seconds in each
     /// likely language (the Mac's languages, and those whose speech model is already here) and
     /// keeping the one the speech model is surest of. `fallback` when nothing is heard.
-    public static func detectLanguage(of url: URL, name: String, fallback: CaptionLanguage,
-                                      progress: @escaping @MainActor (Double) -> Void = { _ in }) async throws -> CaptionLanguage {
+    public static func detectLanguage(
+        of url: URL, name: String, fallback: CaptionLanguage,
+        progress: @escaping @MainActor (Double) -> Void = { _ in }
+    ) async throws -> CaptionLanguage {
         let candidates = await likelyLanguages(fallback: fallback)
         guard candidates.count > 1 else { return fallback }
         var best: (language: CaptionLanguage, score: Double)?
@@ -146,15 +148,17 @@ public enum Transcriber {
         let pcm = AVAudioFormat(commonFormat: format.commonFormat, sampleRate: format.sampleRate, channels: format.channelCount, interleaved: true)!
         let isFloat = format.commonFormat == .pcmFormatFloat32 || format.commonFormat == .pcmFormatFloat64
         let bits = pcm.streamDescription.pointee.mBitsPerChannel
-        let output = AVAssetReaderTrackOutput(track: track, outputSettings: [
-            AVFormatIDKey: kAudioFormatLinearPCM,
-            AVSampleRateKey: format.sampleRate,
-            AVNumberOfChannelsKey: format.channelCount,
-            AVLinearPCMBitDepthKey: bits,
-            AVLinearPCMIsFloatKey: isFloat,
-            AVLinearPCMIsNonInterleaved: false,
-            AVLinearPCMIsBigEndianKey: false,
-        ])
+        let output = AVAssetReaderTrackOutput(
+            track: track,
+            outputSettings: [
+                AVFormatIDKey: kAudioFormatLinearPCM,
+                AVSampleRateKey: format.sampleRate,
+                AVNumberOfChannelsKey: format.channelCount,
+                AVLinearPCMBitDepthKey: bits,
+                AVLinearPCMIsFloatKey: isFloat,
+                AVLinearPCMIsNonInterleaved: false,
+                AVLinearPCMIsBigEndianKey: false,
+            ])
         let reader = try AVAssetReader(asset: asset)
         if let limit { reader.timeRange = CMTimeRange(start: .zero, duration: limit) }
         reader.add(output)

@@ -1,6 +1,7 @@
 @preconcurrency import AVFoundation
 import EditorCore
 import Testing
+
 @testable import RenderEngine
 
 private let red: (UInt8, UInt8, UInt8, UInt8) = (0, 0, 255, 255)
@@ -96,10 +97,12 @@ struct CompositionBuilderTests {
     private func captioned(_ url: URL, visible: Bool = true, style: CaptionStyle = .bold) async throws -> Project {
         var project = try await project(with: url, framing: .fill)
         let assetID = project.assets[0].id
-        project.transcripts[assetID] = Transcript(language: .english, words: [
-            Word(text: "Hello", start: CMTime(value: 1, timescale: 10), duration: CMTime(value: 3, timescale: 10)),
-            Word(text: "there", start: CMTime(value: 4, timescale: 10), duration: CMTime(value: 3, timescale: 10)),
-        ])
+        project.transcripts[assetID] = Transcript(
+            language: .english,
+            words: [
+                Word(text: "Hello", start: CMTime(value: 1, timescale: 10), duration: CMTime(value: 3, timescale: 10)),
+                Word(text: "there", start: CMTime(value: 4, timescale: 10), duration: CMTime(value: 3, timescale: 10)),
+            ])
         project.captions.isVisible = visible
         project.captions.style = style
         return project
@@ -139,7 +142,9 @@ struct CompositionBuilderTests {
         #expect(CaptionTrack(project: settings).top(forHeight: 200) >= SafeZone.top)
     }
 
-    private func titled(_ url: URL, style: TitleStyle = .bold, entrance: TitleEntrance = .none, position: Double = TitlePlacement.top.verticalPosition) async throws -> Project {
+    private func titled(
+        _ url: URL, style: TitleStyle = .bold, entrance: TitleEntrance = .none, position: Double = TitlePlacement.top.verticalPosition
+    ) async throws -> Project {
         var project = try await project(with: url, framing: .fill)
         let id = project.addTitle(at: CMTime(value: 3, timescale: 10), text: "Watch this")
         project.updateTitle(id) { title in

@@ -2,18 +2,21 @@ import CoreGraphics
 import CoreMedia
 import Foundation
 import Testing
+
 @testable import EditorCore
 
 private func t(_ s: Double) -> CMTime { CMTime(seconds: s, preferredTimescale: 600).snappedToFrame() }
 
 private func video(_ name: String, seconds: Double = 10) -> MediaAsset {
-    MediaAsset(url: URL(fileURLWithPath: "/tmp/\(name)"), name: name, duration: CMTime(seconds: seconds, preferredTimescale: 600),
-               displaySize: CGSize(width: 1080, height: 1920), hasAudio: true)
+    MediaAsset(
+        url: URL(fileURLWithPath: "/tmp/\(name)"), name: name, duration: CMTime(seconds: seconds, preferredTimescale: 600),
+        displaySize: CGSize(width: 1080, height: 1920), hasAudio: true)
 }
 
 private func picture(_ name: String) -> MediaAsset {
-    MediaAsset(url: URL(fileURLWithPath: "/tmp/\(name)"), name: name, duration: CMTime(value: 4, timescale: 1),
-               displaySize: CGSize(width: 1080, height: 1920), hasAudio: false, isImage: true)
+    MediaAsset(
+        url: URL(fileURLWithPath: "/tmp/\(name)"), name: name, duration: CMTime(value: 4, timescale: 1),
+        displaySize: CGSize(width: 1080, height: 1920), hasAudio: false, isImage: true)
 }
 
 /// Sentences said one after another: each word half a second, a pause of `gap` between sentences.

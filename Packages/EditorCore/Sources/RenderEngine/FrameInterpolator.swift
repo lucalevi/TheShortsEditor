@@ -51,7 +51,8 @@ public nonisolated enum FrameInterpolator {
         let factor = min(Int((needed / fileRate - 0.05).rounded(.up)), maxFactor)
         guard factor >= 2 else { return nil }
         let whole = CMTimeRange(start: .zero, duration: media.duration)
-        let range = media.duration <= wholeFileLimit
+        let range =
+            media.duration <= wholeFileLimit
             ? whole
             : CMTimeRange(start: clip.sourceStart - margin, end: clip.sourceRange.end + margin).intersection(whole)
         return Recipe(range: range, factor: factor)
@@ -60,7 +61,8 @@ public nonisolated enum FrameInterpolator {
     /// Where the copy of `source` for `recipe` is kept.
     public static func copyURL(for source: URL, recipe: Recipe) -> URL {
         let values = try? source.resourceValues(forKeys: [.fileSizeKey, .contentModificationDateKey])
-        let key = "\(source.path)|\(values?.fileSize ?? 0)|\(values?.contentModificationDate?.timeIntervalSince1970 ?? 0)|"
+        let key =
+            "\(source.path)|\(values?.fileSize ?? 0)|\(values?.contentModificationDate?.timeIntervalSince1970 ?? 0)|"
             + "\(recipe.range.start.seconds)|\(recipe.range.duration.seconds)|\(recipe.factor)|v1"
         let digest = SHA256.hash(data: Data(key.utf8)).prefix(12).map { String(format: "%02x", $0) }.joined()
         return folder.appending(path: "\(digest).mov")
@@ -97,20 +99,24 @@ public nonisolated enum FrameInterpolator {
         let writer = try AVAssetWriter(outputURL: temporary, fileType: .mov)
         let outputRate = min(fileRate * Double(recipe.factor), 480)
         let bitRate = min(60_000_000, max(4_000_000, Int(Double(width * height) * min(outputRate, 120) * 0.15)))
-        let input = AVAssetWriterInput(mediaType: .video, outputSettings: [
-            AVVideoCodecKey: AVVideoCodecType.h264, AVVideoWidthKey: width, AVVideoHeightKey: height,
-            AVVideoCompressionPropertiesKey: [
-                AVVideoAverageBitRateKey: bitRate, AVVideoMaxKeyFrameIntervalDurationKey: 1,
-                AVVideoProfileLevelKey: AVVideoProfileLevelH264HighAutoLevel,
-            ] as [String: Any],
-        ])
+        let input = AVAssetWriterInput(
+            mediaType: .video,
+            outputSettings: [
+                AVVideoCodecKey: AVVideoCodecType.h264, AVVideoWidthKey: width, AVVideoHeightKey: height,
+                AVVideoCompressionPropertiesKey: [
+                    AVVideoAverageBitRateKey: bitRate, AVVideoMaxKeyFrameIntervalDurationKey: 1,
+                    AVVideoProfileLevelKey: AVVideoProfileLevelH264HighAutoLevel,
+                ] as [String: Any],
+            ])
         input.expectsMediaDataInRealTime = false
         input.transform = transform
-        let adaptor = AVAssetWriterInputPixelBufferAdaptor(assetWriterInput: input, sourcePixelBufferAttributes: [
-            kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA,
-            kCVPixelBufferWidthKey as String: width, kCVPixelBufferHeightKey as String: height,
-            kCVPixelBufferIOSurfacePropertiesKey as String: [String: Any](),
-        ])
+        let adaptor = AVAssetWriterInputPixelBufferAdaptor(
+            assetWriterInput: input,
+            sourcePixelBufferAttributes: [
+                kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA,
+                kCVPixelBufferWidthKey as String: width, kCVPixelBufferHeightKey as String: height,
+                kCVPixelBufferIOSurfacePropertiesKey as String: [String: Any](),
+            ])
         guard writer.canAdd(input) else { throw InterpolationError.failed }
         writer.add(input)
         guard writer.startWriting() else { throw writer.error ?? InterpolationError.failed }
@@ -120,11 +126,13 @@ public nonisolated enum FrameInterpolator {
         let flow = usesOpticalFlow ? OpticalFlow(width: width, height: height) : nil
         let reader = try AVAssetReader(asset: asset)
         reader.timeRange = range
-        let output = AVAssetReaderTrackOutput(track: video, outputSettings: [
-            kCVPixelBufferPixelFormatTypeKey as String: flow != nil ? kCVPixelFormatType_64RGBAHalf : kCVPixelFormatType_32BGRA,
-            kCVPixelBufferWidthKey as String: width, kCVPixelBufferHeightKey as String: height,
-            kCVPixelBufferIOSurfacePropertiesKey as String: [String: Any](),
-        ])
+        let output = AVAssetReaderTrackOutput(
+            track: video,
+            outputSettings: [
+                kCVPixelBufferPixelFormatTypeKey as String: flow != nil ? kCVPixelFormatType_64RGBAHalf : kCVPixelFormatType_32BGRA,
+                kCVPixelBufferWidthKey as String: width, kCVPixelBufferHeightKey as String: height,
+                kCVPixelBufferIOSurfacePropertiesKey as String: [String: Any](),
+            ])
         output.alwaysCopiesSampleData = false
         guard reader.canAdd(output) else { throw InterpolationError.unreadable }
         reader.add(output)
@@ -188,12 +196,15 @@ public nonisolated enum FrameInterpolator {
 
     /// A picture `phase` of the way from `a` to `b`, by blending (when optical flow isn't available).
     private static func blend(_ a: CVPixelBuffer, _ b: CVPixelBuffer, _ phase: Float, context: CIContext) -> CVPixelBuffer? {
-        let mixed = CIImage(cvPixelBuffer: a).applyingFilter("CIDissolveTransition", parameters: [
-            "inputTargetImage": CIImage(cvPixelBuffer: b), "inputTime": phase,
-        ])
+        let mixed = CIImage(cvPixelBuffer: a).applyingFilter(
+            "CIDissolveTransition",
+            parameters: [
+                "inputTargetImage": CIImage(cvPixelBuffer: b), "inputTime": phase,
+            ])
         var target: CVPixelBuffer?
-        CVPixelBufferCreate(nil, CVPixelBufferGetWidth(a), CVPixelBufferGetHeight(a), kCVPixelFormatType_32BGRA,
-                            [kCVPixelBufferIOSurfacePropertiesKey: [String: Any]()] as CFDictionary, &target)
+        CVPixelBufferCreate(
+            nil, CVPixelBufferGetWidth(a), CVPixelBufferGetHeight(a), kCVPixelFormatType_32BGRA,
+            [kCVPixelBufferIOSurfacePropertiesKey: [String: Any]()] as CFDictionary, &target)
         guard let target else { return nil }
         context.render(mixed, to: target)
         return target
@@ -206,9 +217,10 @@ public nonisolated enum FrameInterpolator {
         var submittedBefore = false
 
         init?(width: Int, height: Int) {
-            guard let configuration = VTFrameRateConversionConfiguration(
-                frameWidth: width, frameHeight: height, usePrecomputedFlow: false,
-                qualityPrioritization: .normal, revision: VTFrameRateConversionConfiguration.defaultRevision)
+            guard
+                let configuration = VTFrameRateConversionConfiguration(
+                    frameWidth: width, frameHeight: height, usePrecomputedFlow: false,
+                    qualityPrioritization: .normal, revision: VTFrameRateConversionConfiguration.defaultRevision)
             else { return nil }
             var pool: CVPixelBufferPool?
             CVPixelBufferPoolCreate(nil, nil, configuration.destinationPixelBufferAttributes as CFDictionary, &pool)
@@ -218,7 +230,8 @@ public nonisolated enum FrameInterpolator {
 
         func frames(between a: CVPixelBuffer, _ timeA: CMTime, and b: CVPixelBuffer, _ timeB: CMTime, phases: [Float]) async throws -> [CVPixelBuffer]? {
             guard let source = VTFrameProcessorFrame(buffer: a, presentationTimeStamp: timeA),
-                  let next = VTFrameProcessorFrame(buffer: b, presentationTimeStamp: timeB) else { return nil }
+                let next = VTFrameProcessorFrame(buffer: b, presentationTimeStamp: timeB)
+            else { return nil }
             var destinations: [VTFrameProcessorFrame] = []
             for phase in phases {
                 var buffer: CVPixelBuffer?
@@ -227,9 +240,10 @@ public nonisolated enum FrameInterpolator {
                 guard let buffer, let frame = VTFrameProcessorFrame(buffer: buffer, presentationTimeStamp: at) else { return nil }
                 destinations.append(frame)
             }
-            guard let parameters = VTFrameRateConversionParameters(
-                sourceFrame: source, nextFrame: next, opticalFlow: nil, interpolationPhase: phases,
-                submissionMode: submittedBefore ? .sequential : .random, destinationFrames: destinations)
+            guard
+                let parameters = VTFrameRateConversionParameters(
+                    sourceFrame: source, nextFrame: next, opticalFlow: nil, interpolationPhase: phases,
+                    submissionMode: submittedBefore ? .sequential : .random, destinationFrames: destinations)
             else { return nil }
             submittedBefore = true
             try await processor.process(parameters: parameters)

@@ -35,8 +35,10 @@ struct TransitionPicker: View {
                 let seconds = draggingLength ?? transition.duration.seconds
                 HStack {
                     Text("Length")
-                    Slider(value: Binding(get: { seconds }, set: { draggingLength = $0 }),
-                           in: ClipTransition.minimumDuration.seconds...ClipTransition.maximumDuration.seconds) { editing in
+                    Slider(
+                        value: Binding(get: { seconds }, set: { draggingLength = $0 }),
+                        in: ClipTransition.minimumDuration.seconds...ClipTransition.maximumDuration.seconds
+                    ) { editing in
                         if !editing, let value = draggingLength {
                             draggingLength = nil
                             model.setTransitionLength(CMTime(seconds: value, preferredTimescale: 600), after: clipID)
@@ -46,10 +48,13 @@ struct TransitionPicker: View {
                     Text("\(seconds.formatted(.number.precision(.fractionLength(1)))) s").monospacedDigit().frame(width: 40, alignment: .trailing)
                 }
                 if let span, span.range.duration < transition.duration {
-                    Label("Plays for \(span.range.duration.seconds.formatted(.number.precision(.fractionLength(1)))) s: a clip beside it is too short for more.", systemImage: "info.circle")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
+                    Label(
+                        "Plays for \(span.range.duration.seconds.formatted(.number.precision(.fractionLength(1)))) s: a clip beside it is too short for more.",
+                        systemImage: "info.circle"
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
                 } else if span == nil {
                     Label("Not shown: a clip beside it is too short.", systemImage: "info.circle")
                         .font(.caption)
@@ -133,8 +138,11 @@ struct CutBadge: View {
         .buttonStyle(.plain)
         .help("Transition: \(kind.displayName). Click to change it.")
         .accessibilityLabel("Transition: \(kind.displayName)")
-        .popover(isPresented: Binding(get: { model.transitionPickerCut == clipID }, set: { if !$0, model.transitionPickerCut == clipID { model.transitionPickerCut = nil } }),
-                 arrowEdge: .top) {
+        .popover(
+            isPresented: Binding(
+                get: { model.transitionPickerCut == clipID }, set: { if !$0, model.transitionPickerCut == clipID { model.transitionPickerCut = nil } }),
+            arrowEdge: .top
+        ) {
             VStack(alignment: .leading, spacing: 8) {
                 Text("Transition").font(.headline)
                 TransitionPicker(model: model, clipID: clipID)
@@ -188,9 +196,13 @@ struct TimeExtras: View {
         VStack(alignment: .leading, spacing: 6) {
             if !turnable.isEmpty {
                 let progress = turnable.compactMap { model.reversing[$0.id] }.first
-                Toggle("Play backwards", isOn: Binding(get: { turnable.allSatisfy { model.project.isReversed($0) } },
-                                                       set: { _ in model.toggleBackwards(for: turnable.map(\.id)) }))
-                    .disabled(progress != nil)
+                Toggle(
+                    "Play backwards",
+                    isOn: Binding(
+                        get: { turnable.allSatisfy { model.project.isReversed($0) } },
+                        set: { _ in model.toggleBackwards(for: turnable.map(\.id)) })
+                )
+                .disabled(progress != nil)
                 if let progress {
                     ProgressView(value: progress) { Text("Turning the clip round…").font(.caption) }
                         .controlSize(.small)
@@ -205,18 +217,23 @@ struct TimeExtras: View {
                 let ramp = model.speedRampState(of: clip.id)
                 if ramp.applies {
                     Toggle("Change speed gradually", isOn: Binding(get: { ramp.isOn }, set: { model.setSmoothSpeed($0, for: [clip.id]) }))
-                    Text(ramp.isOn ? "The picture eases into this speed from the part before, and out of it after, instead of jumping."
-                         : "The speed changes in one jump at the cut.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
+                    Text(
+                        ramp.isOn
+                            ? "The picture eases into this speed from the part before, and out of it after, instead of jumping."
+                            : "The speed changes in one jump at the cut."
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
                 }
                 if let media = model.project.asset(id: clip.assetID), let slowest = media.smoothestSlowSpeed, let rate = media.frameRate {
-                    Label("Filmed at \(Int(rate.rounded())) pictures a second: slow motion stays smooth down to \(slowest.formatted(.number.precision(.fractionLength(0...2))))×.",
-                          systemImage: "tortoise")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
+                    Label(
+                        "Filmed at \(Int(rate.rounded())) pictures a second: slow motion stays smooth down to \(slowest.formatted(.number.precision(.fractionLength(0...2))))×.",
+                        systemImage: "tortoise"
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
                 }
             }
         }
@@ -243,20 +260,26 @@ struct SeeThroughSection: View {
                 if let value = dragging.opacity { model.editPlacement(of: clip, "See-Through") { $0.opacity = (value * 20).rounded() / 20 } }
                 dragging.opacity = nil
             }
-            row("Fade in", value: dragging.fadeIn ?? clip.pictureFadeIn.seconds, range: 0...2, label: seconds) { dragging.fadeIn = $0 } onEnd: {
+            row("Fade in", value: dragging.fadeIn ?? clip.pictureFadeIn.seconds, range: 0...2, label: seconds) {
+                dragging.fadeIn = $0
+            } onEnd: {
                 if let value = dragging.fadeIn { model.setPictureFade(.start, to: CMTime(seconds: value, preferredTimescale: 600), for: clip.id) }
                 dragging.fadeIn = nil
             }
-            row("Fade out", value: dragging.fadeOut ?? clip.pictureFadeOut.seconds, range: 0...2, label: seconds) { dragging.fadeOut = $0 } onEnd: {
+            row("Fade out", value: dragging.fadeOut ?? clip.pictureFadeOut.seconds, range: 0...2, label: seconds) {
+                dragging.fadeOut = $0
+            } onEnd: {
                 if let value = dragging.fadeOut { model.setPictureFade(.end, to: CMTime(seconds: value, preferredTimescale: 600), for: clip.id) }
                 dragging.fadeOut = nil
             }
-            Text(clip.hasMotion
-                 ? "100% hides what is under it. This picture moves, so how solid it is gets saved at the playhead as a keyframe: it can appear or go over time."
-                 : "100% hides what is under it. Lower it to let the clip below show through. Fades make it appear and go gently.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
+            Text(
+                clip.hasMotion
+                    ? "100% hides what is under it. This picture moves, so how solid it is gets saved at the playhead as a keyframe: it can appear or go over time."
+                    : "100% hides what is under it. Lower it to let the clip below show through. Fades make it appear and go gently."
+            )
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
         }
     }
 
@@ -264,8 +287,10 @@ struct SeeThroughSection: View {
         value < 0.02 ? "Off" : "\(value.formatted(.number.precision(.fractionLength(1)))) s"
     }
 
-    private func row(_ title: String, value: Double, range: ClosedRange<Double>, label: @escaping (Double) -> String,
-                     onChange: @escaping @MainActor (Double) -> Void, onEnd: @escaping () -> Void) -> some View {
+    private func row(
+        _ title: String, value: Double, range: ClosedRange<Double>, label: @escaping (Double) -> String,
+        onChange: @escaping @MainActor (Double) -> Void, onEnd: @escaping () -> Void
+    ) -> some View {
         HStack {
             Text(title).frame(width: 56, alignment: .leading)
             Slider(value: Binding(get: { min(max(value, range.lowerBound), range.upperBound) }, set: onChange), in: range) { editing in

@@ -96,8 +96,10 @@ public struct MediaAsset: Identifiable, Codable, Equatable, Sendable {
     /// How long a picture stays when it is added.
     public static let imageClipDuration = CMTime(value: 3, timescale: 1)
 
-    public init(id: UUID = UUID(), url: URL, name: String, duration: CMTime, displaySize: CGSize, hasAudio: Bool, hasVideo: Bool = true, isImage: Bool = false,
-                frameRate: Double? = nil, reversedFrom: ReversedSource? = nil) {
+    public init(
+        id: UUID = UUID(), url: URL, name: String, duration: CMTime, displaySize: CGSize, hasAudio: Bool, hasVideo: Bool = true, isImage: Bool = false,
+        frameRate: Double? = nil, reversedFrom: ReversedSource? = nil
+    ) {
         self.frameRate = frameRate
         self.reversedFrom = reversedFrom
         self.id = id

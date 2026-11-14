@@ -16,7 +16,8 @@ extension EditorModel {
         panel.allowsMultipleSelection = true
         panel.canChooseDirectories = false
         panel.prompt = "Fill \(template.displayName)"
-        panel.message = "Choose up to \(template.shots.count) clips or pictures. They play in the order they were filmed; swap any shot afterwards. Fewer is fine: they are used again."
+        panel.message =
+            "Choose up to \(template.shots.count) clips or pictures. They play in the order they were filmed; swap any shot afterwards. Fewer is fine: they are used again."
         guard panel.runModal() == .OK, !panel.urls.isEmpty else { return }
         choosesTemplate = false
         let urls = Array(Self.inFilmingOrder(panel.urls).prefix(template.shots.count))
@@ -56,8 +57,10 @@ extension EditorModel {
 
     /// For Magic Short cut to a length: picks the sentences to keep, with Apple's on-device
     /// model when it can, else by the rules. Nil when there is nothing to choose.
-    func bestMoments(in trial: Project, options: MagicOptions, levels: [MediaAsset.ID: AudioLevels],
-                     language: CaptionLanguage) async -> (kept: Set<Word.ID>, byModel: Bool)? {
+    func bestMoments(
+        in trial: Project, options: MagicOptions, levels: [MediaAsset.ID: AudioLevels],
+        language: CaptionLanguage
+    ) async -> (kept: Set<Word.ID>, byModel: Bool)? {
         let sentences = trial.magicSentences(options, levels: levels)
         guard !sentences.isEmpty else { return nil }
         // A little room for the pauses left between sentences and the ending.

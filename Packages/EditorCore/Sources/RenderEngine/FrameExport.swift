@@ -1,7 +1,7 @@
 import CoreGraphics
 import CoreMedia
-import Foundation
 import EditorCore
+import Foundation
 import ImageIO
 import UniformTypeIdentifiers
 

@@ -2,14 +2,16 @@ import CoreGraphics
 import CoreMedia
 import Foundation
 import Testing
+
 @testable import EditorCore
 
 private func t(_ s: Double) -> CMTime { CMTime(seconds: s, preferredTimescale: 600).snappedToFrame() }
 
 private func tenSeconds() -> Project {
     var p = Project()
-    let asset = MediaAsset(url: URL(fileURLWithPath: "/tmp/a.mov"), name: "a.mov", duration: CMTime(value: 10, timescale: 1),
-                           displaySize: CGSize(width: 1080, height: 1920), hasAudio: true)
+    let asset = MediaAsset(
+        url: URL(fileURLWithPath: "/tmp/a.mov"), name: "a.mov", duration: CMTime(value: 10, timescale: 1),
+        displaySize: CGSize(width: 1080, height: 1920), hasAudio: true)
     p.appendClip(of: p.addAsset(asset))
     return p
 }
@@ -22,7 +24,8 @@ struct TitleLookPresetTests {
 
     @Test func oldLooksStillOpen() throws {
         // A look saved before glow, pop shadow and letter spacing existed.
-        let json = #"{"weight":0.6,"size":90,"textColor":{"red":1,"green":1,"blue":1,"alpha":1},"outlineWidth":20,"boxPerLine":false,"shadow":false,"uppercase":false}"#
+        let json =
+            #"{"weight":0.6,"size":90,"textColor":{"red":1,"green":1,"blue":1,"alpha":1},"outlineWidth":20,"boxPerLine":false,"shadow":false,"uppercase":false}"#
         let look = try JSONDecoder().decode(TextLook.self, from: Data(json.utf8))
         #expect(look.glowColor == nil && look.popShadowColor == nil && look.letterSpacing == 0)
         let neon = TitleStyle.neon.look

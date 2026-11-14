@@ -1,5 +1,5 @@
-import Accelerate
 @preconcurrency import AVFoundation
+import Accelerate
 import EditorCore
 import Foundation
 
@@ -36,17 +36,19 @@ public nonisolated enum MusicLibrary {
     static func write(_ music: (left: [Float], right: [Float]), to url: URL) throws {
         let count = music.left.count
         guard let format = AVAudioFormat(standardFormatWithSampleRate: sampleRate, channels: 2),
-              let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(count))
+            let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(count))
         else { throw CocoaError(.fileWriteUnknown) }
         buffer.frameLength = AVAudioFrameCount(count)
         music.left.withUnsafeBufferPointer { buffer.floatChannelData![0].update(from: $0.baseAddress!, count: count) }
         music.right.withUnsafeBufferPointer { buffer.floatChannelData![1].update(from: $0.baseAddress!, count: count) }
         let temporary = url.deletingLastPathComponent().appending(path: UUID().uuidString + ".m4a")
         do {
-            let file = try AVAudioFile(forWriting: temporary, settings: [
-                AVFormatIDKey: kAudioFormatMPEG4AAC, AVSampleRateKey: sampleRate, AVNumberOfChannelsKey: 2,
-                AVEncoderBitRateKey: 192_000,
-            ])
+            let file = try AVAudioFile(
+                forWriting: temporary,
+                settings: [
+                    AVFormatIDKey: kAudioFormatMPEG4AAC, AVSampleRateKey: sampleRate, AVNumberOfChannelsKey: 2,
+                    AVEncoderBitRateKey: 192_000,
+                ])
             try file.write(from: buffer)
             file.close()
         }
@@ -136,22 +138,24 @@ public nonisolated enum MusicLibrary {
 
         /// One note of the instrument at `frequency` Hz, `seconds` long (plus its tail).
         func note(_ frequency: Double, seconds: Double, rate: Double, noise: inout Noise) -> [Float] {
-            let tail: Double = switch self {
-            case .pad, .strings: 0.6
-            case .keys, .bell: 1.2
-            case .pluck, .square: 0.25
-            case .bass, .subBass: 0.08
-            default: 0
-            }
+            let tail: Double =
+                switch self {
+                case .pad, .strings: 0.6
+                case .keys, .bell: 1.2
+                case .pluck, .square: 0.25
+                case .bass, .subBass: 0.08
+                default: 0
+                }
             // Drums ring for their own length, whatever the step.
-            let ring: Double = switch self {
-            case .kick: 0.45
-            case .boom: 2.2
-            case .snare, .clap: 0.3
-            case .hat: 0.08
-            case .shaker: 0.1
-            default: 0
-            }
+            let ring: Double =
+                switch self {
+                case .kick: 0.45
+                case .boom: 2.2
+                case .snare, .clap: 0.3
+                case .hat: 0.08
+                case .shaker: 0.1
+                default: 0
+                }
             let count = Int((max(seconds, ring) + tail) * rate)
             var out = [Float](repeating: 0, count: count)
             var low = 0.0
@@ -173,7 +177,8 @@ public nonisolated enum MusicLibrary {
                     let bright = exp(-t * 7)
                     value = Wave.sine(frequency * t + 0.25 * bright * Wave.sine(frequency * t)) * exp(-t * 1.8) * min(t * 300, 1) * release
                 case .pluck:
-                    value = (h(1) + 0.5 * exp(-t * 18) * h(2) + 0.3 * exp(-t * 30) * h(3) + 0.15 * exp(-t * 40) * h(4)) * exp(-t * 9) * min(t * 800, 1) * release
+                    value =
+                        (h(1) + 0.5 * exp(-t * 18) * h(2) + 0.3 * exp(-t * 30) * h(3) + 0.15 * exp(-t * 40) * h(4)) * exp(-t * 9) * min(t * 800, 1) * release
                 case .square:
                     value = (h(1) + h(3) / 3 + h(5) / 5 + h(7) / 7) * exp(-t * 7) * min(t * 800, 1) * release * 0.7
                 case .bell:

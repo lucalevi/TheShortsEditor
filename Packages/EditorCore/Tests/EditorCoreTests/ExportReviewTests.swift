@@ -1,12 +1,14 @@
 import CoreMedia
 import Foundation
 import Testing
+
 @testable import EditorCore
 
 private func project(seconds: Int64, hasAudio: Bool = true) -> Project {
     var project = Project()
-    let asset = MediaAsset(url: URL(fileURLWithPath: "/tmp/a.mov"), name: "a", duration: CMTime(value: seconds, timescale: 1),
-                           displaySize: CGSize(width: 1080, height: 1920), hasAudio: hasAudio)
+    let asset = MediaAsset(
+        url: URL(fileURLWithPath: "/tmp/a.mov"), name: "a", duration: CMTime(value: seconds, timescale: 1),
+        displaySize: CGSize(width: 1080, height: 1920), hasAudio: hasAudio)
     project.addAsset(asset)
     project.appendClip(of: asset.id)
     return project

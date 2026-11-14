@@ -25,8 +25,10 @@ public struct BackgroundMusic: Codable, Equatable, Sendable {
     /// Set when the app made this music for a style (see `ShortStyles.swift`).
     public var mood: MusicMood?
 
-    public init(assetID: MediaAsset.ID, sourceStart: CMTime = .zero, volume: Double = BackgroundMusic.defaultVolume,
-                lowersUnderSpeech: Bool = true, fadesIn: Bool = true, fadesOut: Bool = true, mood: MusicMood? = nil) {
+    public init(
+        assetID: MediaAsset.ID, sourceStart: CMTime = .zero, volume: Double = BackgroundMusic.defaultVolume,
+        lowersUnderSpeech: Bool = true, fadesIn: Bool = true, fadesOut: Bool = true, mood: MusicMood? = nil
+    ) {
         self.mood = mood
         self.assetID = assetID
         self.sourceStart = sourceStart
@@ -103,7 +105,7 @@ public enum AudioMix {
     /// Where on the timeline the clips have someone talking (or other clear sound), from the
     /// loudness of their files. A muted clip has none. Ranges are in order and don't overlap.
     public static func speechRanges(in project: Project, levels: [MediaAsset.ID: AudioLevels]) -> [CMTimeRange] {
-        var frames: [Int64] = []  // timeline frame numbers with sound
+        var frames: [Int64] = [] // timeline frame numbers with sound
         // The main clips, and the sound detached from them (it is still the clips' own sound).
         var placed: [(clip: Clip, start: CMTime)] = []
         var cursor = CMTime.zero
@@ -125,7 +127,8 @@ public enum AudioMix {
             let threshold = max(audio.suggestedThreshold, quietestSpeech)
             let sourceFirst = clip.sourceStart.convertScale(Project.frameRate, method: .roundHalfAwayFromZero).value
             for offset in 0..<clipFrames {
-                let index = clip.speedCurve == nil
+                let index =
+                    clip.speedCurve == nil
                     ? Int(sourceFirst + Int64((Double(offset) * clip.speed).rounded(.down)))
                     : Int((clip.sourceTime(atOffset: CMTime(value: offset, timescale: Project.frameRate)).seconds * Double(Project.frameRate)).rounded(.down))
                 if index >= 0, index < audio.decibels.count, audio.decibels[index] >= threshold {

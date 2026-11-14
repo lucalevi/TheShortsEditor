@@ -186,10 +186,12 @@ nonisolated enum TitleRenderer {
     static func image(text: String, look: TextLook, visibleCharacters: Int? = nil) -> CGImage? {
         guard let layout = layout(text: text, look: look, visible: visibleCharacters) else { return nil }
         let size = CGFloat(look.size)
-        guard let context = CGContext(
-            data: nil, width: Int(layout.size.width), height: Int(layout.size.height), bitsPerComponent: 8, bytesPerRow: 0,
-            space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
-        ) else { return nil }
+        guard
+            let context = CGContext(
+                data: nil, width: Int(layout.size.width), height: Int(layout.size.height), bitsPerComponent: 8, bytesPerRow: 0,
+                space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+            )
+        else { return nil }
         context.setLineJoin(.round)
 
         let path = CGPath(rect: layout.textRect, transform: nil)
@@ -210,7 +212,8 @@ nonisolated enum TitleRenderer {
             context.fillPath()
         }
         if look.outlineColor != nil, look.outlineWidth > 0,
-           let stroke = Self.layout(text: text, look: look, stroke: true, visible: visibleCharacters) {
+            let stroke = Self.layout(text: text, look: look, stroke: true, visible: visibleCharacters)
+        {
             CTFrameDraw(CTFramesetterCreateFrame(stroke.framesetter, CFRange(location: 0, length: 0), path, nil), context)
         }
         if let pop = look.popShadowColor, let solid = Self.layout(text: text, look: recoloured(look, pop), visible: visibleCharacters) {

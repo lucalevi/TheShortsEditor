@@ -125,10 +125,11 @@ public extension Clip {
         var from = sourceStart.seconds
         for step in curveSteps {
             let to = from + Double(step.frames) / Double(Project.frameRate) * step.speed
-            segments.append(SpeedSegment(
-                source: CMTimeRange(start: CMTime(seconds: from, preferredTimescale: 90000), end: CMTime(seconds: to, preferredTimescale: 90000)),
-                duration: CMTime(value: step.frames, timescale: Project.frameRate)
-            ))
+            segments.append(
+                SpeedSegment(
+                    source: CMTimeRange(start: CMTime(seconds: from, preferredTimescale: 90000), end: CMTime(seconds: to, preferredTimescale: 90000)),
+                    duration: CMTime(value: step.frames, timescale: Project.frameRate)
+                ))
             from = to
         }
         return segments
@@ -196,7 +197,8 @@ public extension Project {
     /// file, so its length changes. Pictures and freeze frames have no speed.
     mutating func setSpeedCurve(_ shape: SpeedCurveShape?, for id: Clip.ID) {
         guard let index = timeline.index(of: id), !isStill(timeline.clips[index]),
-              let media = asset(id: timeline.clips[index].assetID) else { return }
+            let media = asset(id: timeline.clips[index].assetID)
+        else { return }
         var clip = timeline.clips[index]
         let source = clip.sourceDuration
         clip.speedCurve = shape.map { SpeedCurve($0) }

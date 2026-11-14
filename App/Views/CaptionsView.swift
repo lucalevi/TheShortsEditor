@@ -34,9 +34,10 @@ private struct MakeCaptions: View {
         ContentUnavailableView {
             Label("Add Captions", systemImage: "captions.bubble")
         } description: {
-            Text(model.project.timeline.clips.isEmpty
-                 ? "Put some clips on the timeline first. Captions are made from what is said in them."
-                 : "Captions are written for you from what is said in your clips and voice-overs. It all happens on this Mac.")
+            Text(
+                model.project.timeline.clips.isEmpty
+                    ? "Put some clips on the timeline first. Captions are made from what is said in them."
+                    : "Captions are written for you from what is said in your clips and voice-overs. It all happens on this Mac.")
         } actions: {
             VStack(spacing: 10) {
                 LanguagePicker(model: model)
@@ -109,10 +110,13 @@ private struct CaptionSettingsForm: View {
 
             VStack(alignment: .leading, spacing: 6) {
                 Text("Position").font(.subheadline.weight(.semibold))
-                Picker("Position", selection: Binding(
-                    get: { CaptionPlacement(settings.verticalPosition) },
-                    set: { model.setCaptionPosition($0.verticalPosition) }
-                )) {
+                Picker(
+                    "Position",
+                    selection: Binding(
+                        get: { CaptionPlacement(settings.verticalPosition) },
+                        set: { model.setCaptionPosition($0.verticalPosition) }
+                    )
+                ) {
                     ForEach(CaptionPlacement.allCases) { Text($0.displayName).tag($0) }
                 }
                 .pickerStyle(.segmented)
@@ -373,10 +377,13 @@ private struct SecondLanguage: View {
             HStack {
                 Text("Second language").font(.subheadline.weight(.semibold))
                 Spacer()
-                Picker("Second language", selection: Binding(
-                    get: { settings.translationLanguage },
-                    set: { model.setTranslationLanguage($0) }
-                )) {
+                Picker(
+                    "Second language",
+                    selection: Binding(
+                        get: { settings.translationLanguage },
+                        set: { model.setTranslationLanguage($0) }
+                    )
+                ) {
                     Text("None").tag(String?.none)
                     Divider()
                     ForEach(EditorModel.translationLanguages.filter { $0 != model.project.captionLanguageInUse?.rawValue }, id: \.self) { code in
@@ -477,26 +484,38 @@ private struct CaptionDesign: View {
                 Text("“None” keeps the style's own colour.").font(.caption).foregroundStyle(.secondary)
 
                 Divider()
-                Toggle("Highlight key words", isOn: Binding(get: { settings.showsKeywords }, set: { on in
-                    model.editCaptionLook(on ? "Show Key Words" : "Hide Key Words") { $0.showsKeywords = on }
-                }))
+                Toggle(
+                    "Highlight key words",
+                    isOn: Binding(
+                        get: { settings.showsKeywords },
+                        set: { on in
+                            model.editCaptionLook(on ? "Show Key Words" : "Hide Key Words") { $0.showsKeywords = on }
+                        }))
                 HStack {
                     Button("Pick Key Words", systemImage: model.canUseWordModel ? "apple.intelligence" : "highlighter") { model.pickKeywords() }
-                        .help(model.canUseWordModel
-                              ? "Apple Intelligence reads your captions and highlights the words that matter, on this Mac"
-                              : "Highlight numbers, names and strong words automatically, about one in seven words")
+                        .help(
+                            model.canUseWordModel
+                                ? "Apple Intelligence reads your captions and highlights the words that matter, on this Mac"
+                                : "Highlight numbers, names and strong words automatically, about one in seven words"
+                        )
                         .disabled(model.wordModelJob != nil)
                     Button("Clear") { model.clearKeywords() }
                 }
                 .controlSize(.small)
-                Toggle("Show emoji", isOn: Binding(get: { settings.showsEmoji }, set: { on in
-                    model.editCaptionLook(on ? "Show Emoji" : "Hide Emoji") { $0.showsEmoji = on }
-                }))
+                Toggle(
+                    "Show emoji",
+                    isOn: Binding(
+                        get: { settings.showsEmoji },
+                        set: { on in
+                            model.editCaptionLook(on ? "Show Emoji" : "Hide Emoji") { $0.showsEmoji = on }
+                        }))
                 HStack {
                     Button("Suggest Emoji", systemImage: model.canUseWordModel ? "apple.intelligence" : "face.smiling") { model.suggestEmoji() }
-                        .help(model.canUseWordModel
-                              ? "Apple Intelligence picks emoji that match what is said (at most one per caption), on this Mac"
-                              : "Add an emoji above captions with words like money, love, fire, idea… (at most one per caption)")
+                        .help(
+                            model.canUseWordModel
+                                ? "Apple Intelligence picks emoji that match what is said (at most one per caption), on this Mac"
+                                : "Add an emoji above captions with words like money, love, fire, idea… (at most one per caption)"
+                        )
                         .disabled(model.wordModelJob != nil)
                     if model.wordModelJob != nil { ProgressView().controlSize(.small) }
                     Button("Clear") { model.clearEmoji() }

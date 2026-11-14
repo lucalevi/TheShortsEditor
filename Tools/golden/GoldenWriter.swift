@@ -6,6 +6,7 @@ import CoreGraphics
 import CoreMedia
 import Foundation
 import Testing
+
 @testable import EditorCore
 
 @Test func writeGoldenProject() throws {
@@ -13,8 +14,9 @@ import Testing
     func seconds(_ s: Int64) -> CMTime { CMTime(value: s, timescale: 1) }
     func frames(_ f: Int64) -> CMTime { CMTime(value: f, timescale: 30) }
     func asset(_ name: String, _ length: Int64, video: Bool = true) -> MediaAsset {
-        MediaAsset(url: URL(fileURLWithPath: "/golden/\(name)"), name: name, duration: seconds(length),
-                   displaySize: video ? CGSize(width: 1080, height: 1920) : .zero, hasAudio: true, hasVideo: video)
+        MediaAsset(
+            url: URL(fileURLWithPath: "/golden/\(name)"), name: name, duration: seconds(length),
+            displaySize: video ? CGSize(width: 1080, height: 1920) : .zero, hasAudio: true, hasVideo: video)
     }
 
     // Version 1: clips, framing, volume, captions, a title, music.
@@ -26,11 +28,13 @@ import Testing
     p.timeline.split(at: seconds(4))
     p.timeline.clips[1].volume = 1.4
     p.timeline.clips[0].framing = .fit
-    p.transcripts[talk] = Transcript(language: .italian, words: [
-        Word(text: "Ciao", start: .zero, duration: frames(15)),
-        Word(text: "a", start: frames(15), duration: frames(6)),
-        Word(text: "tutti", start: frames(21), duration: frames(12)),
-    ])
+    p.transcripts[talk] = Transcript(
+        language: .italian,
+        words: [
+            Word(text: "Ciao", start: .zero, duration: frames(15)),
+            Word(text: "a", start: frames(15), duration: frames(6)),
+            Word(text: "tutti", start: frames(21), duration: frames(12)),
+        ])
     p.captions.style = .highlight
     p.addTitle(at: .zero, text: "Hook\nline two")
     p.setMusic(song)
@@ -38,8 +42,10 @@ import Testing
 
     #if GOLDEN_V2
     // Version 2: B-roll, pictures, placement and motion.
-    let photo = p.addAsset(MediaAsset(url: URL(fileURLWithPath: "/golden/photo.jpg"), name: "photo.jpg", duration: .zero,
-                                      displaySize: CGSize(width: 3000, height: 4000), hasAudio: false, isImage: true))
+    let photo = p.addAsset(
+        MediaAsset(
+            url: URL(fileURLWithPath: "/golden/photo.jpg"), name: "photo.jpg", duration: .zero,
+            displaySize: CGSize(width: 3000, height: 4000), hasAudio: false, isImage: true))
     let broll = p.addAsset(asset("broll.mov", 8))
     _ = p.addOverlay(of: broll, at: seconds(1))
     p.appendClip(of: photo)
@@ -74,8 +80,9 @@ import Testing
 
     #if GOLDEN_V5
     // Version 5: colour, filters (per clip and for the whole Short), Stabilize.
-    p.timeline.clips[0].look = ClipLook(color: ColorAdjustments(exposure: 0.2, contrast: 0.1, warmth: -0.3),
-                                        filter: FilterChoice(.film, strength: 0.7))
+    p.timeline.clips[0].look = ClipLook(
+        color: ColorAdjustments(exposure: 0.2, contrast: 0.1, warmth: -0.3),
+        filter: FilterChoice(.film, strength: 0.7))
     p.look = FilterChoice(.vivid, strength: 0.5)
     p.timeline.clips[1].steadiness = 0.8
     #endif

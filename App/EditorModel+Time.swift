@@ -12,7 +12,8 @@ extension EditorModel {
     var preferredTransition: ClipTransition {
         let kind = UserDefaults.standard.string(forKey: "transitionKind").flatMap(TransitionKind.init(rawValue:)) ?? .dissolve
         let frames = UserDefaults.standard.integer(forKey: "transitionFrames")
-        return ClipTransition(kind: kind, duration: frames > 0 ? CMTime(value: CMTimeValue(frames), timescale: Project.frameRate) : ClipTransition.defaultDuration)
+        return ClipTransition(
+            kind: kind, duration: frames > 0 ? CMTime(value: CMTimeValue(frames), timescale: Project.frameRate) : ClipTransition.defaultDuration)
     }
 
     private func remember(_ transition: ClipTransition) {
@@ -24,7 +25,8 @@ extension EditorModel {
     /// and a clip follows it, otherwise the cut nearest the playhead.
     var transitionCut: Clip.ID? {
         if let id = selectedClipID, let index = project.timeline.index(of: id), index + 1 < project.timeline.clips.count,
-           project.timeline.clips.count == 2 || timelineSelection.count == 1 {
+            project.timeline.clips.count == 2 || timelineSelection.count == 1
+        {
             // With one clip selected, the nearer of its two cuts to the playhead.
             let range = project.timeline.range(of: id)
             if let range, index > 0, abs((currentTime - range.start).seconds) < abs((currentTime - range.end).seconds) {
@@ -57,7 +59,8 @@ extension EditorModel {
     /// ⌥T: the last transition used (a dissolve to begin with) on the cut nearest the playhead.
     func addTransition(_ kind: TransitionKind? = nil) {
         guard let cut = transitionCut else {
-            alert = AlertMessage(title: "A transition needs two clips", message: "Transitions go between two clips. Add another clip, or split this one (B), then try again.")
+            alert = AlertMessage(
+                title: "A transition needs two clips", message: "Transitions go between two clips. Add another clip, or split this one (B), then try again.")
             return
         }
         setTransition(kind ?? project.style?.transition?.kind ?? preferredTransition.kind, after: cut)

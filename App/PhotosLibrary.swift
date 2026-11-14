@@ -39,15 +39,17 @@ enum PhotosLibrary {
         let options = PHFetchOptions()
         options.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]
         options.fetchLimit = limit
-        let result: PHFetchResult<PHAsset> = switch kind {
-        case .videos: PHAsset.fetchAssets(with: .video, options: options)
-        case .photos: PHAsset.fetchAssets(with: .image, options: options)
-        case .all:
-            {
-                options.predicate = NSPredicate(format: "mediaType == %d || mediaType == %d", PHAssetMediaType.video.rawValue, PHAssetMediaType.image.rawValue)
-                return PHAsset.fetchAssets(with: options)
-            }()
-        }
+        let result: PHFetchResult<PHAsset> =
+            switch kind {
+            case .videos: PHAsset.fetchAssets(with: .video, options: options)
+            case .photos: PHAsset.fetchAssets(with: .image, options: options)
+            case .all:
+                {
+                    options.predicate = NSPredicate(
+                        format: "mediaType == %d || mediaType == %d", PHAssetMediaType.video.rawValue, PHAssetMediaType.image.rawValue)
+                    return PHAsset.fetchAssets(with: options)
+                }()
+            }
         var items: [PHAsset] = []
         items.reserveCapacity(result.count)
         result.enumerateObjects { asset, _, _ in items.append(asset) }
@@ -141,8 +143,9 @@ extension EditorModel {
             }
             if !urls.isEmpty { importFiles(urls, to: destination) }
             if !failed.isEmpty {
-                alert = AlertMessage(title: failed.count == 1 ? "An item couldn't be added" : "\(failed.count) items couldn't be added",
-                                     message: (Array(Set(failed)).joined(separator: "\n")) + "\n\nIf it is in iCloud, check that this Mac is online.")
+                alert = AlertMessage(
+                    title: failed.count == 1 ? "An item couldn't be added" : "\(failed.count) items couldn't be added",
+                    message: (Array(Set(failed)).joined(separator: "\n")) + "\n\nIf it is in iCloud, check that this Mac is online.")
             }
         }
     }

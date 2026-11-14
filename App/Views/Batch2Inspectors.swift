@@ -33,8 +33,10 @@ struct SpeedSection: View {
             .controlSize(.small)
             HStack {
                 // A logarithmic slider: as far from 1× to 2× as from 0.5× to 1×.
-                Slider(value: Binding(get: { log2(dragging ?? speed) }, set: { dragging = pow(2, $0) }),
-                       in: log2(Clip.speedRange.lowerBound)...log2(Clip.speedRange.upperBound)) { editing in
+                Slider(
+                    value: Binding(get: { log2(dragging ?? speed) }, set: { dragging = pow(2, $0) }),
+                    in: log2(Clip.speedRange.lowerBound)...log2(Clip.speedRange.upperBound)
+                ) { editing in
                     if !editing, let value = dragging {
                         dragging = nil
                         model.setSpeed((value * 20).rounded() / 20, for: clips.map(\.id))
@@ -108,24 +110,34 @@ struct LayoutSection: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text("Layout").font(.subheadline.weight(.semibold))
-            Picker("Layout", selection: Binding(get: { overlay.layout.isSplit }, set: { split in
-                model.setLayout(split ? .top : .free, for: overlay.id)
-            })) {
+            Picker(
+                "Layout",
+                selection: Binding(
+                    get: { overlay.layout.isSplit },
+                    set: { split in
+                        model.setLayout(split ? .top : .free, for: overlay.id)
+                    })
+            ) {
                 Text("Over").tag(false)
                 Text("Split Screen").tag(true)
             }
             .pickerStyle(.segmented)
             .labelsHidden()
-            Text(overlay.layout == .free ? "Over the clip below it. Or put it small in a corner:"
-                 : "This clip fills the part chosen below, the clip under it the rest. Two split clips at once can share the screen in three, like a top and a bottom third.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
+            Text(
+                overlay.layout == .free
+                    ? "Over the clip below it. Or put it small in a corner:"
+                    : "This clip fills the part chosen below, the clip under it the rest. Two split clips at once can share the screen in three, like a top and a bottom third."
+            )
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
             if overlay.layout.isSplit {
                 LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 4) {
                     ForEach(OverlayLayout.splits) { layout in
                         let isChosen = overlay.layout == layout
-                        Button { model.setLayout(layout, for: overlay.id) } label: {
+                        Button {
+                            model.setLayout(layout, for: overlay.id)
+                        } label: {
                             Label(layout.displayName, systemImage: isChosen ? "checkmark" : layout.symbolName)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                         }
@@ -157,36 +169,48 @@ struct SoundInspector: View {
         let asset = model.project.asset(id: sound.clip.assetID)
         VStack(alignment: .leading, spacing: 16) {
             VStack(alignment: .leading, spacing: 4) {
-                Label(sound.detachedFrom != nil ? "Sound of \(asset?.name ?? "a clip")" : asset?.name ?? "Missing sound",
-                      systemImage: sound.isVoiceOver ? "mic.fill" : sound.detachedFrom != nil ? "waveform.path" : "waveform")
-                    .font(.headline)
-                    .lineLimit(2)
+                Label(
+                    sound.detachedFrom != nil ? "Sound of \(asset?.name ?? "a clip")" : asset?.name ?? "Missing sound",
+                    systemImage: sound.isVoiceOver ? "mic.fill" : sound.detachedFrom != nil ? "waveform.path" : "waveform"
+                )
+                .font(.headline)
+                .lineLimit(2)
                 Text("From \(TimeFormat.string(sound.start)) for \(TimeFormat.string(sound.duration))")
                     .monospacedDigit()
                     .foregroundStyle(.secondary)
             }
             ClipSoundPublic(model: model, clip: sound.clip)
             if sound.detachedFrom != nil {
-                Text("Detached from its clip. Drag its start earlier to hear it before the picture changes, or its end later to let it carry on over the next clip.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+                Text(
+                    "Detached from its clip. Drag its start earlier to hear it before the picture changes, or its end later to let it carry on over the next clip."
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
             }
             SoundShapingSection(model: model, clip: sound.clip)
                 .id(sound.id)
             if sound.detachedFrom == nil {
-                Toggle("It's a voice-over", isOn: Binding(get: { sound.isVoiceOver }, set: { on in
-                    model.apply(on ? "Mark as Voice-Over" : "Mark as Sound Effect") { $0.updateSound(sound.id) { $0.isVoiceOver = on } }
-                }))
+                Toggle(
+                    "It's a voice-over",
+                    isOn: Binding(
+                        get: { sound.isVoiceOver },
+                        set: { on in
+                            model.apply(on ? "Mark as Voice-Over" : "Mark as Sound Effect") { $0.updateSound(sound.id) { $0.isVoiceOver = on } }
+                        }))
                 Text("The music is lowered under voice-overs, as under people talking in your clips.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
             if sound.canLowerUnderSpeech {
-                Toggle("Lower while people talk", isOn: Binding(get: { sound.lowersUnderSpeech }, set: { on in
-                    model.apply(on ? "Lower Sound Under Speech" : "Keep Sound Level") { $0.updateSound(sound.id) { $0.lowersUnderSpeech = on } }
-                }))
+                Toggle(
+                    "Lower while people talk",
+                    isOn: Binding(
+                        get: { sound.lowersUnderSpeech },
+                        set: { on in
+                            model.apply(on ? "Lower Sound Under Speech" : "Keep Sound Level") { $0.updateSound(sound.id) { $0.lowersUnderSpeech = on } }
+                        }))
                 Text("For a second song or background sound: it goes quieter whenever someone speaks, like the music.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -309,12 +333,14 @@ struct FollowClipToggle: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             Toggle("Move with the clip under it", isOn: Binding(get: { model.project.followsClip(item) }, set: { model.setFollowsClip($0, for: item) }))
-            Text(model.project.followsClip(item)
-                 ? "Pinned to the clip below its start (the thin line on the timeline): moving, trimming or speeding up that clip carries it along."
-                 : "Stays at its time on the timeline whatever happens to the clips, e.g. to land on a beat of the music.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
+            Text(
+                model.project.followsClip(item)
+                    ? "Pinned to the clip below its start (the thin line on the timeline): moving, trimming or speeding up that clip carries it along."
+                    : "Stays at its time on the timeline whatever happens to the clips, e.g. to land on a beat of the music."
+            )
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
         }
     }
 }

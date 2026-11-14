@@ -2,6 +2,7 @@
 import CoreImage
 import EditorCore
 import Testing
+
 @testable import RenderEngine
 
 private let red: (UInt8, UInt8, UInt8, UInt8) = (0, 0, 255, 255)
@@ -123,11 +124,13 @@ struct CutoutRenderTests {
         let url = try await Fixture.video(width: 180, height: 320, seconds: 2, bgra: red)
         // Instead of Vision: keep the left half of every frame.
         let copy = CutoutCache.copyURL(for: url, subject: .people, isImage: false)
-        try await CutoutMaker.makeVideo(from: url, to: copy, subject: .people, matte: { image in
-            let e = image.extent
-            return CIImage(color: .white).cropped(to: CGRect(x: e.minX, y: e.minY, width: e.width / 2, height: e.height))
-                .composited(over: CIImage(color: .black).cropped(to: e))
-        })
+        try await CutoutMaker.makeVideo(
+            from: url, to: copy, subject: .people,
+            matte: { image in
+                let e = image.extent
+                return CIImage(color: .white).cropped(to: CGRect(x: e.minX, y: e.minY, width: e.width / 2, height: e.height))
+                    .composited(over: CIImage(color: .black).cropped(to: e))
+            })
         defer { try? FileManager.default.removeItem(at: copy) }
         let track = try #require(try await AVURLAsset(url: copy).loadTracks(withMediaType: .video).first)
         let range = try await track.load(.timeRange)
@@ -144,16 +147,19 @@ struct CutoutRenderTests {
 
     @Test func aTurnedVideoKeepsItsCutOutTheRightWayUp() async throws {
         // Stored landscape, top red and bottom blue, turned a quarter: on screen red is on the right.
-        let url = try await Fixture.video(width: 320, height: 180, seconds: 1, bgra: red, bottomBGRA: red,
-                                          transform: CGAffineTransform(a: 0, b: 1, c: -1, d: 0, tx: 180, ty: 0))
+        let url = try await Fixture.video(
+            width: 320, height: 180, seconds: 1, bgra: red, bottomBGRA: red,
+            transform: CGAffineTransform(a: 0, b: 1, c: -1, d: 0, tx: 180, ty: 0))
         let copy = CutoutCache.copyURL(for: url, subject: .subject, isImage: false)
         // Keep the top half of the upright picture.
-        try await CutoutMaker.makeVideo(from: url, to: copy, subject: .subject, matte: { image in
-            let e = image.extent
-            #expect(e.height > e.width)
-            return CIImage(color: .white).cropped(to: CGRect(x: e.minX, y: e.midY, width: e.width, height: e.height / 2))
-                .composited(over: CIImage(color: .black).cropped(to: e))
-        })
+        try await CutoutMaker.makeVideo(
+            from: url, to: copy, subject: .subject,
+            matte: { image in
+                let e = image.extent
+                #expect(e.height > e.width)
+                return CIImage(color: .white).cropped(to: CGRect(x: e.minX, y: e.midY, width: e.width, height: e.height / 2))
+                    .composited(over: CIImage(color: .black).cropped(to: e))
+            })
         defer { try? FileManager.default.removeItem(at: copy) }
         let project = try await blueUnder(url) { $0.cutout.removeBackground = .subject }
         let image = try await frame(of: try await CompositionBuilder.build(project), at: 0.5)
@@ -164,11 +170,13 @@ struct CutoutRenderTests {
     @Test func aPictureCopyIsAPNGWithoutItsBackground() async throws {
         let url = try Fixture.picture(width: 400, height: 600, top: (255, 0, 0), bottom: (255, 0, 0))
         let copy = CutoutCache.copyURL(for: url, subject: .people, isImage: true)
-        try await CutoutMaker.makePicture(from: url, to: copy, subject: .people, matte: { image in
-            let e = image.extent
-            return CIImage(color: .white).cropped(to: CGRect(x: e.minX, y: e.minY, width: e.width / 2, height: e.height))
-                .composited(over: CIImage(color: .black).cropped(to: e))
-        })
+        try await CutoutMaker.makePicture(
+            from: url, to: copy, subject: .people,
+            matte: { image in
+                let e = image.extent
+                return CIImage(color: .white).cropped(to: CGRect(x: e.minX, y: e.minY, width: e.width / 2, height: e.height))
+                    .composited(over: CIImage(color: .black).cropped(to: e))
+            })
         defer { try? FileManager.default.removeItem(at: copy) }
         let project = try await blueUnder(url) { $0.cutout.removeBackground = .people }
         let image = try await frame(of: try await CompositionBuilder.build(project), at: 0.5)

@@ -8,7 +8,8 @@ extension EditorModel {
         apply("Add \(kind.displayName)") { $0.addEffect(kind, to: clipIDs) }
         // Show it: play the part of the clip it is on.
         guard let id = clipIDs.first, let clip = project.anyClip(id: id), let start = project.timelineStart(ofClip: id),
-              let effect = clip.effects.first(where: { $0.kind == kind }) else { return }
+            let effect = clip.effects.first(where: { $0.kind == kind })
+        else { return }
         playEffect(effect, of: clip, at: start)
     }
 
@@ -23,11 +24,12 @@ extension EditorModel {
     /// Plays the part of `clip` (starting at `start` on the timeline) that `effect` is on.
     func playEffect(_ effect: ClipEffect, of clip: Clip, at start: CMTime) {
         let length = min(effect.length, clip.duration)
-        let range: CMTimeRange = switch effect.part {
-        case .wholeClip: CMTimeRange(start: start, duration: min(clip.duration, CMTime(value: 3, timescale: 1)))
-        case .start: CMTimeRange(start: start, duration: min(clip.duration, length + CMTime(value: 1, timescale: 2)))
-        case .end: CMTimeRange(start: max(start, start + clip.duration - length - CMTime(value: 1, timescale: 2)), end: start + clip.duration)
-        }
+        let range: CMTimeRange =
+            switch effect.part {
+            case .wholeClip: CMTimeRange(start: start, duration: min(clip.duration, CMTime(value: 3, timescale: 1)))
+            case .start: CMTimeRange(start: start, duration: min(clip.duration, length + CMTime(value: 1, timescale: 2)))
+            case .end: CMTimeRange(start: max(start, start + clip.duration - length - CMTime(value: 1, timescale: 2)), end: start + clip.duration)
+            }
         play(range)
     }
 }

@@ -96,10 +96,13 @@ struct EditorCommands: Commands {
             Button("Trim End to Playhead") { model.trimToPlayhead(removing: .end) }
                 .keyboardShortcut("w", modifiers: [])
                 .disabled(model.project.timeline.clips.isEmpty)
-            Button(model.timelineSelection.count > 1 ? "Delete \(model.timelineSelection.count) Items"
-                   : model.selection == .music ? "Remove Music" : model.selectedTitleID != nil ? "Delete Title" : "Delete Clip") { model.deleteSelection() }
-                .keyboardShortcut(.delete, modifiers: [])
-                .disabled(model.timelineSelection.isEmpty)
+            Button(
+                model.timelineSelection.count > 1
+                    ? "Delete \(model.timelineSelection.count) Items"
+                    : model.selection == .music ? "Remove Music" : model.selectedTitleID != nil ? "Delete Title" : "Delete Clip"
+            ) { model.deleteSelection() }
+            .keyboardShortcut(.delete, modifiers: [])
+            .disabled(model.timelineSelection.isEmpty)
             Divider()
             Button("Select Clip Range") { model.selectClipRange() }
                 .keyboardShortcut("x", modifiers: [])
@@ -186,9 +189,13 @@ struct EditorCommands: Commands {
             Button("Instant Replay") { model.addInstantReplay() }
                 .disabled(model.replayRange == nil)
             let turnable = selectedClips.filter { model.project.canReverse($0) }
-            Toggle("Play Backwards", isOn: Binding(get: { !turnable.isEmpty && turnable.allSatisfy { model.project.isReversed($0) } },
-                                                    set: { _ in model.toggleBackwards(for: turnable.map(\.id)) }))
-                .disabled(turnable.isEmpty || !model.reversing.isEmpty)
+            Toggle(
+                "Play Backwards",
+                isOn: Binding(
+                    get: { !turnable.isEmpty && turnable.allSatisfy { model.project.isReversed($0) } },
+                    set: { _ in model.toggleBackwards(for: turnable.map(\.id)) })
+            )
+            .disabled(turnable.isEmpty || !model.reversing.isEmpty)
             Menu("Transition") {
                 Button("Add \(model.preferredTransition.kind.displayName) at Nearest Cut") { model.addTransition() }
                     .keyboardShortcut("t", modifiers: .option)
@@ -199,7 +206,9 @@ struct EditorCommands: Commands {
                 Divider()
                 Button("Remove at Nearest Cut") { model.removeTransitionAtPlayhead() }
                     .disabled(model.transitionCut.flatMap { model.project.transition(after: $0) } == nil)
-                Button("Same on Every Cut") { model.setTransitionOnEveryCut(model.transitionCut.flatMap { model.project.transition(after: $0) } ?? model.preferredTransition) }
+                Button("Same on Every Cut") {
+                    model.setTransitionOnEveryCut(model.transitionCut.flatMap { model.project.transition(after: $0) } ?? model.preferredTransition)
+                }
                 Button("Remove All Transitions") { model.setTransitionOnEveryCut(nil) }
                     .disabled(model.project.transitionCount == 0)
             }
@@ -221,9 +230,13 @@ struct EditorCommands: Commands {
                 .keyboardShortcut("c", modifiers: .option)
                 .disabled(model.project.timeline.clips.isEmpty)
             let steadiable = lookTargets.filter(model.canStabilize)
-            Toggle("Steady Shaky Video", isOn: Binding(get: { !steadiable.isEmpty && steadiable.allSatisfy { $0.steadiness > 0 } },
-                                                      set: { on in model.setSteadiness(on ? Clip.defaultSteadiness : 0, for: steadiable.map(\.id)) }))
-                .disabled(steadiable.isEmpty)
+            Toggle(
+                "Steady Shaky Video",
+                isOn: Binding(
+                    get: { !steadiable.isEmpty && steadiable.allSatisfy { $0.steadiness > 0 } },
+                    set: { on in model.setSteadiness(on ? Clip.defaultSteadiness : 0, for: steadiable.map(\.id)) })
+            )
+            .disabled(steadiable.isEmpty)
             let cuttable = lookTargets.filter(model.canCutOut)
             Menu("Remove Background") {
                 Button("Off") { model.setRemoveBackground(nil, for: cuttable.map(\.id)) }
@@ -233,9 +246,13 @@ struct EditorCommands: Commands {
                 }
             }
             .disabled(cuttable.isEmpty)
-            Toggle("Green Screen", isOn: Binding(get: { cuttable.count == 1 && cuttable[0].cutout.key != nil },
-                                                 set: { on in if let clip = cuttable.first { model.setColorKey(on, for: clip.id) } }))
-                .disabled(cuttable.count != 1)
+            Toggle(
+                "Green Screen",
+                isOn: Binding(
+                    get: { cuttable.count == 1 && cuttable[0].cutout.key != nil },
+                    set: { on in if let clip = cuttable.first { model.setColorKey(on, for: clip.id) } })
+            )
+            .disabled(cuttable.count != 1)
             Divider()
             Button("Follow the Subject") { if let clip = selectedClips.first { model.followSubject(clip.id) } }
                 .disabled(selectedClips.count != 1 || model.reframing != nil)
@@ -294,10 +311,13 @@ struct EditorCommands: Commands {
             Divider()
             Button("Make Captions") { model.makeCaptions() }
                 .disabled(model.project.timeline.clips.isEmpty || model.captionJob != nil)
-            Toggle("Show Captions", isOn: Binding(
-                get: { model.project.captions.isVisible },
-                set: { model.setCaptionsVisible($0) }
-            ))
+            Toggle(
+                "Show Captions",
+                isOn: Binding(
+                    get: { model.project.captions.isVisible },
+                    set: { model.setCaptionsVisible($0) }
+                )
+            )
             .disabled(!model.project.hasCaptions)
             Picker("Caption Look", selection: Binding(get: { model.project.captions.style }, set: { model.setCaptionStyle($0) })) {
                 ForEach(CaptionStyle.allCases) { Text($0.displayName).tag($0) }
@@ -326,10 +346,13 @@ struct EditorCommands: Commands {
                 .disabled(model.project.timeline.clips.isEmpty)
             Button("Remove Music") { model.removeMusic() }
                 .disabled(model.project.music == nil)
-            Toggle("Lower Music While People Talk", isOn: Binding(
-                get: { model.project.music?.lowersUnderSpeech ?? false },
-                set: { on in model.editMusic(on ? "Lower Music Under Speech" : "Keep Music Level") { $0.lowersUnderSpeech = on } }
-            ))
+            Toggle(
+                "Lower Music While People Talk",
+                isOn: Binding(
+                    get: { model.project.music?.lowersUnderSpeech ?? false },
+                    set: { on in model.editMusic(on ? "Lower Music Under Speech" : "Keep Music Level") { $0.lowersUnderSpeech = on } }
+                )
+            )
             .disabled(model.project.music == nil)
             Toggle("Loop Music", isOn: Binding(get: { model.project.music?.loops ?? false }, set: { model.setMusicLoops($0) }))
                 .disabled(model.project.music == nil || model.project.music?.mood != nil)

@@ -103,12 +103,14 @@ public nonisolated enum SoundProcessor {
         let latency = AVAudioFramePosition((chain.reduce(0) { $0 + $1.auAudioUnit.latency } * format.sampleRate).rounded())
         let total = input.length
         let temporary = destination.deletingLastPathComponent().appending(path: UUID().uuidString + ".m4a")
-        let output = try AVAudioFile(forWriting: temporary, settings: [
-            AVFormatIDKey: kAudioFormatAppleLossless,
-            AVSampleRateKey: format.sampleRate,
-            AVNumberOfChannelsKey: format.channelCount,
-            AVEncoderBitDepthHintKey: 24,
-        ], commonFormat: .pcmFormatFloat32, interleaved: false)
+        let output = try AVAudioFile(
+            forWriting: temporary,
+            settings: [
+                AVFormatIDKey: kAudioFormatAppleLossless,
+                AVSampleRateKey: format.sampleRate,
+                AVNumberOfChannelsKey: format.channelCount,
+                AVEncoderBitDepthHintKey: 24,
+            ], commonFormat: .pcmFormatFloat32, interleaved: false)
         guard let buffer = AVAudioPCMBuffer(pcmFormat: engine.manualRenderingFormat, frameCapacity: engine.manualRenderingMaximumFrameCount) else {
             throw ProcessError.failed
         }

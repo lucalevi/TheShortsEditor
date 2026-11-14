@@ -67,8 +67,9 @@ extension EditorModel {
         guard !project.timeline.clips.isEmpty else { return }
         Task {
             guard let asset = await styleMusic(mood) else {
-                alert = AlertMessage(title: "The music couldn't be made",
-                                     message: "Try again, or add a song from a file (Sound ▸ Add Music ▸ From a File…).")
+                alert = AlertMessage(
+                    title: "The music couldn't be made",
+                    message: "Try again, or add a song from a file (Sound ▸ Add Music ▸ From a File…).")
                 return
             }
             apply("Add \(mood.displayName) Music") { $0.setMoodMusic(asset, mood: mood) }
@@ -153,8 +154,9 @@ extension EditorModel {
                     try await Transcriber.prepare(language) { fraction in show("Getting ready to listen…", fraction) }
                     for (index, asset) in assets.enumerated() {
                         try Task.checkCancellation()
-                        show(assets.count == 1 ? "Listening to your clip…" : "Listening to clip \(index + 1) of \(assets.count)…",
-                             Double(index) / Double(assets.count))
+                        show(
+                            assets.count == 1 ? "Listening to your clip…" : "Listening to clip \(index + 1) of \(assets.count)…",
+                            Double(index) / Double(assets.count))
                         transcripts[asset.id] = await Log.captions.attempt("Listening to a clip for Magic Short") {
                             try await Transcriber.transcribe(asset.url, name: asset.name, language: language)
                         }

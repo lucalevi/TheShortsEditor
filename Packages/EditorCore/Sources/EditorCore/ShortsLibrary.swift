@@ -44,7 +44,7 @@ public enum ShortsLibrary {
 
         public static func < (a: Section, b: Section) -> Bool {
             switch (a, b) {
-            case let (.month(x), .month(y)): x > y   // newer months first
+            case let (.month(x), .month(y)): x > y // newer months first
             default: a.order < b.order
             }
         }

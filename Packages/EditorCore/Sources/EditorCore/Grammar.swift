@@ -104,7 +104,9 @@ public extension Project {
                 let available = part ?? CMTimeRange(start: .zero, duration: asset.duration)
                 let length = min(old.duration, available.duration).snappedToFrame()
                 clip.duration = max(length, Clip.minimumDuration)
-                clip.sourceStart = mode == .replaceFromStart ? available.start.snappedToFrame()
+                clip.sourceStart =
+                    mode == .replaceFromStart
+                    ? available.start.snappedToFrame()
                     : max(.zero, available.end - clip.duration).snappedToFrame()
             }
         default:
@@ -448,7 +450,9 @@ public extension Project {
             if kinds.contains(.look) {
                 clip.look = source.look
                 clip.steadiness = source.steadiness
-                clip.effects = source.effects.map { var effect = $0; effect.id = UUID(); return effect }
+                clip.effects = source.effects.map {
+                    var effect = $0; effect.id = UUID(); return effect
+                }
             }
             if kinds.contains(.cutout) { clip.cutout = source.cutout }
         }
@@ -490,7 +494,8 @@ public extension Project {
         guard let clip = anyClip(id: id), let media = asset(id: clip.assetID) else { return [] }
         let isMain = timeline.index(of: id) != nil
         var kinds: Set<SettingsKind> = []
-        if !clip.placement.isIdentity || clip.framing != (isMain ? media.defaultFraming : .fill) || (isMain && clip.background != .blur) || clip.hasPictureFades {
+        if !clip.placement.isIdentity || clip.framing != (isMain ? media.defaultFraming : .fill) || (isMain && clip.background != .blur) || clip.hasPictureFades
+        {
             kinds.insert(.picture)
         }
         if !clip.keyframes.isEmpty { kinds.insert(.motion) }

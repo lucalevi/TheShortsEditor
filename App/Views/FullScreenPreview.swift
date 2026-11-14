@@ -38,10 +38,13 @@ struct FullScreenPreview: View {
                         .controlSize(.large)
                 }
                 Spacer()
-                Text(model.loopsPlayback ? "Click the video or press Space to play or pause. Loop is on (⌘L). Escape leaves."
-                     : "Click the video or press Space to play or pause. Escape leaves.")
-                    .font(.callout)
-                    .foregroundStyle(.white.opacity(0.7))
+                Text(
+                    model.loopsPlayback
+                        ? "Click the video or press Space to play or pause. Loop is on (⌘L). Escape leaves."
+                        : "Click the video or press Space to play or pause. Escape leaves."
+                )
+                .font(.callout)
+                .foregroundStyle(.white.opacity(0.7))
             }
             .padding(20)
         }

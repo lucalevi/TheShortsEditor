@@ -77,10 +77,10 @@ public enum WordModel {
             }.joined(separator: "\n")
             let session = LanguageModelSession(instructions: instructions(language: language, unit: "sentences"))
             let prompt = """
-            Pick the sentences that make the best Short of at most \(Int(share)) seconds in total: \
-            an opening that makes people stay, the most interesting, surprising, funny or useful part, \
-            and a clear ending. Leave out greetings, small talk and repeats. Keep the story making sense.
-            """ + "\n\n" + listed
+                Pick the sentences that make the best Short of at most \(Int(share)) seconds in total: \
+                an opening that makes people stay, the most interesting, surprising, funny or useful part, \
+                and a clear ending. Leave out greetings, small talk and repeats. Keep the story making sense.
+                """ + "\n\n" + listed
             let answer = try await session.respond(to: prompt, generating: MomentAnswer.self, options: GenerationOptions(temperature: 0.2)).content
             picks += answer.sentences.map { start + $0 - 1 }
             start = end
@@ -90,12 +90,13 @@ public enum WordModel {
 
     private static func instructions(language: CaptionLanguage?, unit: String = "words") -> String {
         if unit == "sentences" {
-            let spoken = language.map { " The speaker talks in \(Locale(identifier: "en").localizedString(forLanguageCode: $0.rawValue) ?? $0.rawValue)." } ?? ""
+            let spoken =
+                language.map { " The speaker talks in \(Locale(identifier: "en").localizedString(forLanguageCode: $0.rawValue) ?? $0.rawValue)." } ?? ""
             return """
-            You help cut a long video into a short vertical video (a YouTube Short).\(spoken) \
-            You get what is said as numbered sentences with how long each takes, like "[1] (4 s) Hello everyone." \
-            Answer only with sentence numbers from the list.
-            """
+                You help cut a long video into a short vertical video (a YouTube Short).\(spoken) \
+                You get what is said as numbered sentences with how long each takes, like "[1] (4 s) Hello everyone." \
+                Answer only with sentence numbers from the list.
+                """
         }
         return instructionsForWords(language: language)
     }
@@ -103,10 +104,10 @@ public enum WordModel {
     private static func instructionsForWords(language: CaptionLanguage?) -> String {
         let spoken = language.map { " The speaker talks in \(Locale(identifier: "en").localizedString(forLanguageCode: $0.rawValue) ?? $0.rawValue)." } ?? ""
         return """
-        You help make captions for a short vertical video (a YouTube Short).\(spoken) \
-        You get the transcript as numbered words, like "[1] Hello [2] everyone". \
-        Answer only with word numbers from the transcript.
-        """
+            You help make captions for a short vertical video (a YouTube Short).\(spoken) \
+            You get the transcript as numbered words, like "[1] Hello [2] everyone". \
+            Answer only with word numbers from the transcript.
+            """
     }
 
     private static func prompt(for task: Task) -> String {

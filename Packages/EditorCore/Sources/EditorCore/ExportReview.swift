@@ -31,78 +31,92 @@ public enum ExportReview {
     /// no sound at all. `titleFrames` is where each title is drawn, in canvas pixels with the
     /// origin at the top left (measured by the renderer, which knows how big the text is).
     /// `missing` are the assets whose files can't be found.
-    public static func issues(for project: Project, openingPeak: Float?, titleFrames: [TextOverlay.ID: CGRect] = [:],
-                              missing: Set<MediaAsset.ID> = []) -> [ExportIssue] {
+    public static func issues(
+        for project: Project, openingPeak: Float?, titleFrames: [TextOverlay.ID: CGRect] = [:],
+        missing: Set<MediaAsset.ID> = []
+    ) -> [ExportIssue] {
         var issues: [ExportIssue] = []
         let missingUsed = project.usedAssets.filter { missing.contains($0.id) }
         if !missingUsed.isEmpty {
-            issues.append(ExportIssue(
-                kind: .missingMedia, severity: .warning,
-                title: missingUsed.count == 1 ? "A file can't be found" : "\(missingUsed.count) files can't be found",
-                detail: "\(missingUsed.map(\.name).joined(separator: ", ")): those parts would be black and silent. Use Find Missing Files… in Media to point at where they are now."
-            ))
+            issues.append(
+                ExportIssue(
+                    kind: .missingMedia, severity: .warning,
+                    title: missingUsed.count == 1 ? "A file can't be found" : "\(missingUsed.count) files can't be found",
+                    detail:
+                        "\(missingUsed.map(\.name).joined(separator: ", ")): those parts would be black and silent. Use Find Missing Files… in Media to point at where they are now."
+                ))
         }
         if project.isOverMaxDuration {
-            issues.append(ExportIssue(
-                kind: .tooLong, severity: .warning,
-                title: "Longer than 3:00",
-                detail: "YouTube will post it as a regular video, not a Short. Trim it to 3:00 or less."
-            ))
+            issues.append(
+                ExportIssue(
+                    kind: .tooLong, severity: .warning,
+                    title: "Longer than 3:00",
+                    detail: "YouTube will post it as a regular video, not a Short. Trim it to 3:00 or less."
+                ))
         }
         if project.musicRange != nil, project.duration > CMTime(value: 60, timescale: 1) {
-            issues.append(ExportIssue(
-                kind: .musicOverOneMinute, severity: .warning,
-                title: "Music on a Short over 1:00",
-                detail: "If the song's owner claims it (Content ID), YouTube blocks Shorts longer than a minute. Use music you made or have the rights to, or keep the Short to 1:00."
-            ))
+            issues.append(
+                ExportIssue(
+                    kind: .musicOverOneMinute, severity: .warning,
+                    title: "Music on a Short over 1:00",
+                    detail:
+                        "If the song's owner claims it (Content ID), YouTube blocks Shorts longer than a minute. Use music you made or have the rights to, or keep the Short to 1:00."
+                ))
         }
         let covered = project.titles.filter { title in
             guard title.visibleRange(in: project) != nil, let frame = titleFrames[title.id] else { return false }
             return SafeZone.covers(frame)
         }
         if let first = covered.first {
-            issues.append(ExportIssue(
-                kind: .titleCovered, severity: .warning,
-                title: covered.count == 1 ? "A title is partly hidden on YouTube" : "\(covered.count) titles are partly hidden on YouTube",
-                detail: "“\(first.text.replacingOccurrences(of: "\n", with: " "))” is partly where YouTube shows its buttons and the video's description. Drag it towards the middle, or pick Top, Middle or Bottom."
-            ))
+            issues.append(
+                ExportIssue(
+                    kind: .titleCovered, severity: .warning,
+                    title: covered.count == 1 ? "A title is partly hidden on YouTube" : "\(covered.count) titles are partly hidden on YouTube",
+                    detail:
+                        "“\(first.text.replacingOccurrences(of: "\n", with: " "))” is partly where YouTube shows its buttons and the video's description. Drag it towards the middle, or pick Top, Middle or Bottom."
+                ))
         }
         if let openingPeak {
             if openingPeak < silenceThreshold {
-                issues.append(ExportIssue(
-                    kind: .quietStart, severity: .warning,
-                    title: "The first second is silent",
-                    detail: "Viewers decide in a moment. Start with someone talking or with sound, and cut any quiet intro."
-                ))
+                issues.append(
+                    ExportIssue(
+                        kind: .quietStart, severity: .warning,
+                        title: "The first second is silent",
+                        detail: "Viewers decide in a moment. Start with someone talking or with sound, and cut any quiet intro."
+                    ))
             }
         } else {
-            issues.append(ExportIssue(
-                kind: .noSound, severity: .tip,
-                title: "No sound",
-                detail: "Your Short has no sound. That's fine if it's meant to be watched in silence."
-            ))
+            issues.append(
+                ExportIssue(
+                    kind: .noSound, severity: .tip,
+                    title: "No sound",
+                    detail: "Your Short has no sound. That's fine if it's meant to be watched in silence."
+                ))
         }
         let hasSpeechSource = project.timeline.clips.contains { project.asset(id: $0.assetID)?.hasAudio == true }
         if !project.hasCaptions, hasSpeechSource {
-            issues.append(ExportIssue(
-                kind: .noCaptions, severity: .tip,
-                title: "No captions",
-                detail: "Many people watch Shorts with the sound off. Captions keep them watching."
-            ))
+            issues.append(
+                ExportIssue(
+                    kind: .noCaptions, severity: .tip,
+                    title: "No captions",
+                    detail: "Many people watch Shorts with the sound off. Captions keep them watching."
+                ))
         } else if project.hasCaptions, !project.captions.isVisible {
-            issues.append(ExportIssue(
-                kind: .captionsHidden, severity: .tip,
-                title: "Captions are hidden",
-                detail: "Your captions won't be in the video. Turn on “Show captions” to include them."
-            ))
+            issues.append(
+                ExportIssue(
+                    kind: .captionsHidden, severity: .tip,
+                    title: "Captions are hidden",
+                    detail: "Your captions won't be in the video. Turn on “Show captions” to include them."
+                ))
         }
         let afterEnd = project.titles.filter { $0.visibleRange(in: project) == nil }
         if !afterEnd.isEmpty {
-            issues.append(ExportIssue(
-                kind: .titleAfterEnd, severity: .tip,
-                title: afterEnd.count == 1 ? "A title is after the end" : "\(afterEnd.count) titles are after the end",
-                detail: "The Short got shorter, so it won't be seen. Move it earlier on the timeline, or delete it."
-            ))
+            issues.append(
+                ExportIssue(
+                    kind: .titleAfterEnd, severity: .tip,
+                    title: afterEnd.count == 1 ? "A title is after the end" : "\(afterEnd.count) titles are after the end",
+                    detail: "The Short got shorter, so it won't be seen. Move it earlier on the timeline, or delete it."
+                ))
         }
         return issues.sorted { $0.severity == .warning && $1.severity == .tip }
     }

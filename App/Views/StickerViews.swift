@@ -129,29 +129,44 @@ struct TitleMotionSection: View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Animation").font(.subheadline.weight(.semibold))
             row("Comes in") {
-                Picker("Comes in", selection: Binding(get: { title.entrance }, set: { entrance in
-                    model.editTitle(title.id, "Change Animation") { $0.entrance = entrance }
-                })) {
+                Picker(
+                    "Comes in",
+                    selection: Binding(
+                        get: { title.entrance },
+                        set: { entrance in
+                            model.editTitle(title.id, "Change Animation") { $0.entrance = entrance }
+                        })
+                ) {
                     ForEach(TitleEntrance.allCases.filter { !title.isSticker || $0 != .typewriter }) { Text($0.displayName).tag($0) }
                 }
             }
             row("While on") {
-                Picker("While on", selection: Binding(get: { title.loop }, set: { loop in
-                    model.editTitle(title.id, loop == nil ? "Hold Still" : "Loop Animation") { $0.loop = loop }
-                    if loop != nil { model.playTitle(title.id) }
-                })) {
+                Picker(
+                    "While on",
+                    selection: Binding(
+                        get: { title.loop },
+                        set: { loop in
+                            model.editTitle(title.id, loop == nil ? "Hold Still" : "Loop Animation") { $0.loop = loop }
+                            if loop != nil { model.playTitle(title.id) }
+                        })
+                ) {
                     Text("Still").tag(TitleLoop?.none)
                     Divider()
                     ForEach(TitleLoop.allCases) { Text($0.displayName).tag(TitleLoop?.some($0)) }
                 }
             }
             row("Goes out") {
-                Picker("Goes out", selection: Binding(get: { title.exit?.kind }, set: { kind in
-                    model.editTitle(title.id, kind == nil ? "No Animation Out" : "Animation Out") {
-                        $0.exit = kind.map { ClipAnimation($0, duration: TextOverlay.exitDuration) }
-                    }
-                    if kind != nil { model.playTitle(title.id, end: true) }
-                })) {
+                Picker(
+                    "Goes out",
+                    selection: Binding(
+                        get: { title.exit?.kind },
+                        set: { kind in
+                            model.editTitle(title.id, kind == nil ? "No Animation Out" : "Animation Out") {
+                                $0.exit = kind.map { ClipAnimation($0, duration: TextOverlay.exitDuration) }
+                            }
+                            if kind != nil { model.playTitle(title.id, end: true) }
+                        })
+                ) {
                     Text("Just goes").tag(MotionAnimation?.none)
                     Divider()
                     ForEach(MotionAnimation.allCases) { Label($0.displayName, systemImage: $0.systemImage).tag(MotionAnimation?.some($0)) }
@@ -207,10 +222,12 @@ struct FollowSubjectSection: View {
             } else {
                 Button("Follow", systemImage: "scope") { model.followInVideo(title.id) }
                     .disabled(model.tracking != nil || title.visibleRange(in: model.project) == nil)
-                Text("Put it on a face or an object at its first moment, then click Follow: it moves with that for as long as it is on screen. Done on this Mac.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+                Text(
+                    "Put it on a face or an object at its first moment, then click Follow: it moves with that for as long as it is on screen. Done on this Mac."
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
             }
         }
     }
@@ -254,8 +271,12 @@ struct SpeechSheet: View {
                 }
                 Picker("Voice", selection: $voiceID) {
                     ForEach(voices) { voice in
-                        Text(voice.isPersonal ? "\(voice.name) (your Personal Voice)" : voice.isBetter && !voice.name.contains("(") ? "\(voice.name) (better quality)" : voice.name)
-                            .tag(Optional(voice.id))
+                        Text(
+                            voice.isPersonal
+                                ? "\(voice.name) (your Personal Voice)"
+                                : voice.isBetter && !voice.name.contains("(") ? "\(voice.name) (better quality)" : voice.name
+                        )
+                        .tag(Optional(voice.id))
                     }
                 }
                 LabeledContent("Speed") {

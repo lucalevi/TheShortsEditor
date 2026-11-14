@@ -36,8 +36,9 @@ final class EditorKeys {
         if CaptionTextField.handleCommandReturn(event) { return true }
         // ⌘A outside a text field selects everything on the timeline (Edit ▸ Select All).
         if event.modifierFlags.intersection([.command, .control, .option, .shift]) == .command,
-           event.charactersIgnoringModifiers == "a",
-           !(event.window?.firstResponder is NSText) {
+            event.charactersIgnoringModifiers == "a",
+            !(event.window?.firstResponder is NSText)
+        {
             model.selectAllOnTimeline()
             return true
         }
@@ -55,7 +56,7 @@ final class EditorKeys {
             }
         }
         guard event.modifierFlags.intersection([.command, .control, .option]).isEmpty,
-              !(event.window?.firstResponder is NSText)
+            !(event.window?.firstResponder is NSText)
         else { return false }
 
         // Full-screen preview: Escape leaves it, Space plays and pauses.
@@ -121,23 +122,23 @@ final class EditorKeys {
             return true
         }
         switch event.keyCode {
-        case 49: model.togglePlayback()            // Space
-        case 38: model.shuttle(forward: false)     // J
-        case 40: model.pause()                     // K
-        case 37: model.shuttle(forward: true)      // L
-        case 11: model.splitAtPlayhead()           // B
-        case 12: model.trimToPlayhead(removing: .start)  // Q
-        case 13: model.trimToPlayhead(removing: .end)    // W
-        case 1: model.snapsToEdges.toggle()        // S
-        case 15: model.isRangeKeyDown = true       // R (held while dragging a range)
-        case 7: model.selectClipRange()            // X
-        case 46: model.addMarker()                 // M
-        case 14: break                             // E without a file selected
-        case 123: model.step(frames: -1)           // ←
-        case 124: model.step(frames: 1)            // →
-        case 51, 117: model.deleteSelection()      // ⌫, ⌦
-        case 115: model.seek(to: .zero)            // Home
-        case 119: model.seek(to: model.duration)   // End
+        case 49: model.togglePlayback() // Space
+        case 38: model.shuttle(forward: false) // J
+        case 40: model.pause() // K
+        case 37: model.shuttle(forward: true) // L
+        case 11: model.splitAtPlayhead() // B
+        case 12: model.trimToPlayhead(removing: .start) // Q
+        case 13: model.trimToPlayhead(removing: .end) // W
+        case 1: model.snapsToEdges.toggle() // S
+        case 15: model.isRangeKeyDown = true // R (held while dragging a range)
+        case 7: model.selectClipRange() // X
+        case 46: model.addMarker() // M
+        case 14: break // E without a file selected
+        case 123: model.step(frames: -1) // ←
+        case 124: model.step(frames: 1) // →
+        case 51, 117: model.deleteSelection() // ⌫, ⌦
+        case 115: model.seek(to: .zero) // Home
+        case 119: model.seek(to: model.duration) // End
         default: return false
         }
         return true

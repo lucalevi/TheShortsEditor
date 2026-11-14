@@ -1,6 +1,7 @@
 @preconcurrency import AVFoundation
 import EditorCore
 import Testing
+
 @testable import RenderEngine
 
 private let red: (UInt8, UInt8, UInt8, UInt8) = (0, 0, 255, 255)
@@ -74,7 +75,9 @@ struct ExporterTests {
         let broll = project.addAsset(try await MediaProbe.probe(try await Fixture.video(width: 180, height: 320, seconds: 2, bgra: red, toneFrom: 0)))
         let added = project.addOverlay(of: broll, at: .zero)
         let id = try #require(added)
-        project.updateOverlay(id) { $0.clip.isMuted = false; $0.clip.placement = Placement(scale: 0.5) }
+        project.updateOverlay(id) {
+            $0.clip.isMuted = false; $0.clip.placement = Placement(scale: 0.5)
+        }
 
         let url = outputURL()
         try await Exporter.export(project, to: url) { _ in }
@@ -160,11 +163,13 @@ struct ExporterTests {
     func captionsAreInTheExportedFile() async throws {
         let source = try await Fixture.video(width: 180, height: 320, bgra: red)
         var project = try await project(source)
-        project.transcripts[project.assets[0].id] = Transcript(language: .english, words: [
-            // At 0.5 s "file" is the current (yellow) word, so "Exported" is white.
-            Word(text: "Exported", start: .zero, duration: CMTime(value: 2, timescale: 5)),
-            Word(text: "file", start: CMTime(value: 2, timescale: 5), duration: CMTime(value: 3, timescale: 5)),
-        ])
+        project.transcripts[project.assets[0].id] = Transcript(
+            language: .english,
+            words: [
+                // At 0.5 s "file" is the current (yellow) word, so "Exported" is white.
+                Word(text: "Exported", start: .zero, duration: CMTime(value: 2, timescale: 5)),
+                Word(text: "file", start: CMTime(value: 2, timescale: 5), duration: CMTime(value: 3, timescale: 5)),
+            ])
         let url = outputURL()
         try await Exporter.export(project, to: url)
         #expect(try await AVURLAsset(url: url).loadTracks(withMediaType: .audio).isEmpty)

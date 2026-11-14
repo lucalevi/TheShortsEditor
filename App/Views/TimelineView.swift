@@ -119,8 +119,10 @@ struct TimelineView: View {
                     .toggleStyle(.button)
                     .labelStyle(.iconOnly)
                     .controlSize(.small)
-                    .help(model.snapsToEdges ? "Snapping is on: dragged edges stick to cuts, other items and the playhead (S)"
-                          : "Snapping is off (S)")
+                    .help(
+                        model.snapsToEdges
+                            ? "Snapping is on: dragged edges stick to cuts, other items and the playhead (S)"
+                            : "Snapping is off (S)")
                     Divider().frame(height: 14)
                     Image(systemName: "minus.magnifyingglass").foregroundStyle(.secondary)
                     Slider(value: $model.timelineZoom, in: EditorModel.zoomRange)
@@ -136,8 +138,9 @@ struct TimelineView: View {
                     ZStack(alignment: .topLeading) {
                         marqueeArea
                         ruler
-                        TimelineMarkers(model: model, leadingInset: leadingInset, pointsPerSecond: pointsPerSecond,
-                                        rulerHeight: rulerHeight, height: contentHeight)
+                        TimelineMarkers(
+                            model: model, leadingInset: leadingInset, pointsPerSecond: pointsPerSecond,
+                            rulerHeight: rulerHeight, height: contentHeight)
                         titleLane.offset(y: titlesY)
                         overlayLane.offset(y: overlaysY)
                         pinLines
@@ -170,7 +173,9 @@ struct TimelineView: View {
                     .frame(width: max(geometry.size.width, contentWidth), height: max(geometry.size.height, contentHeight), alignment: .topLeading)
                 }
                 .scrollPosition($scrollPosition)
-                .onScrollGeometryChange(for: CGRect.self) { $0.visibleRect } action: { _, newValue in
+                .onScrollGeometryChange(for: CGRect.self) {
+                    $0.visibleRect
+                } action: { _, newValue in
                     visibleRect = newValue
                 }
             }
@@ -195,7 +200,9 @@ struct TimelineView: View {
             .dropDestination(for: URL.self) { urls, _ in
                 model.importFiles(urls, addToTimeline: true)
                 return true
-            } isTargeted: { isDropTargeted = $0 }
+            } isTargeted: {
+                isDropTargeted = $0
+            }
         }
         .onChange(of: model.project.timeline.clips.isEmpty, initial: true) {
             if !model.project.timeline.clips.isEmpty { model.showTip(.skimming) }
@@ -255,42 +262,43 @@ struct TimelineView: View {
     /// Click: deselect and move the playhead. Drag: select with a rectangle.
     var emptySpaceGesture: some Gesture {
         DragGesture(minimumDistance: 0, coordinateSpace: .named(Self.contentSpace))
-                .onChanged { value in
-                    if rangeAnchor != nil || (marquee == nil && model.isRangeKeyDown && abs(value.translation.width) > 3) {
-                        if rangeAnchor == nil {
-                            model.pause()
-                            rangeAnchor = time(at: value.startLocation.x)
-                        }
-                        model.setTimelineRange(from: rangeAnchor!, to: time(at: value.location.x))
-                        return
+            .onChanged { value in
+                if rangeAnchor != nil || (marquee == nil && model.isRangeKeyDown && abs(value.translation.width) > 3) {
+                    if rangeAnchor == nil {
+                        model.pause()
+                        rangeAnchor = time(at: value.startLocation.x)
                     }
-                    let rect = CGRect(x: min(value.startLocation.x, value.location.x),
-                                      y: min(value.startLocation.y, value.location.y),
-                                      width: abs(value.location.x - value.startLocation.x),
-                                      height: abs(value.location.y - value.startLocation.y))
-                    guard rect.width > 3 || rect.height > 3 || marquee != nil else { return }
-                    if marqueeBase == nil { marqueeBase = model.timelineSelection }
-                    marquee = rect
-                    var selection = marqueeBase ?? TimelineSelection()
-                    let adding = !NSEvent.modifierFlags.isDisjoint(with: [.command, .shift])
-                    selection.select(items(in: rect), adding: adding)
-                    model.timelineSelection = selection
+                    model.setTimelineRange(from: rangeAnchor!, to: time(at: value.location.x))
+                    return
                 }
-                .onEnded { value in
-                    if rangeAnchor != nil {
-                        rangeAnchor = nil
-                        return
-                    }
-                    if marquee == nil, NSEvent.modifierFlags.isDisjoint(with: [.command, .shift]) {
-                        model.selection = nil   // a plain click on empty space
-                        model.selectedAssetID = nil
-                        model.timelineRange = nil
-                        model.pause()           // ...also moves the playhead there
-                        model.seek(to: time(at: value.location.x))
-                    }
-                    marquee = nil
-                    marqueeBase = nil
+                let rect = CGRect(
+                    x: min(value.startLocation.x, value.location.x),
+                    y: min(value.startLocation.y, value.location.y),
+                    width: abs(value.location.x - value.startLocation.x),
+                    height: abs(value.location.y - value.startLocation.y))
+                guard rect.width > 3 || rect.height > 3 || marquee != nil else { return }
+                if marqueeBase == nil { marqueeBase = model.timelineSelection }
+                marquee = rect
+                var selection = marqueeBase ?? TimelineSelection()
+                let adding = !NSEvent.modifierFlags.isDisjoint(with: [.command, .shift])
+                selection.select(items(in: rect), adding: adding)
+                model.timelineSelection = selection
+            }
+            .onEnded { value in
+                if rangeAnchor != nil {
+                    rangeAnchor = nil
+                    return
                 }
+                if marquee == nil, NSEvent.modifierFlags.isDisjoint(with: [.command, .shift]) {
+                    model.selection = nil // a plain click on empty space
+                    model.selectedAssetID = nil
+                    model.timelineRange = nil
+                    model.pause() // ...also moves the playhead there
+                    model.seek(to: time(at: value.location.x))
+                }
+                marquee = nil
+                marqueeBase = nil
+            }
     }
 
     @ViewBuilder
@@ -338,10 +346,12 @@ struct TimelineView: View {
         }
         .frame(height: rulerHeight)
         .contentShape(Rectangle())
-        .gesture(DragGesture(minimumDistance: 0).onChanged { value in
-            model.pause()
-            model.seek(to: time(at: value.location.x))
-        })
+        .gesture(
+            DragGesture(minimumDistance: 0).onChanged { value in
+                model.pause()
+                model.seek(to: time(at: value.location.x))
+            }
+        )
         .help("Click or drag to move the playhead")
     }
 
@@ -649,7 +659,10 @@ struct TimelineView: View {
                     // Transitions: a band over the time each plays, and a marker on its cut.
                     ForEach(model.project.timeline.transitionSpans, id: \.from) { span in
                         RoundedRectangle(cornerRadius: 2)
-                            .fill(LinearGradient(colors: [.white.opacity(0.05), .white.opacity(0.55), .white.opacity(0.05)], startPoint: .leading, endPoint: .trailing))
+                            .fill(
+                                LinearGradient(
+                                    colors: [.white.opacity(0.05), .white.opacity(0.55), .white.opacity(0.05)], startPoint: .leading, endPoint: .trailing)
+                            )
                             .frame(width: max(width(of: span.range.duration), 4), height: trackHeight - ClipBlock.waveHeight - 6)
                             .offset(x: width(of: span.range.start), y: 3)
                             .allowsHitTesting(false)
@@ -703,12 +716,16 @@ struct TimelineView: View {
         .overlay(alignment: .leading) {
             EdgeHandle(edge: .leading, help: "Drag to trim the start of the clip") { dx in
                 updateClipTrim(clip, edge: .start, points: dx)
-            } onEnd: { endClipTrim() }
+            } onEnd: {
+                endClipTrim()
+            }
         }
         .overlay(alignment: .trailing) {
             EdgeHandle(edge: .trailing, help: "Drag to trim the end of the clip") { dx in
                 updateClipTrim(clip, edge: .end, points: dx)
-            } onEnd: { endClipTrim() }
+            } onEnd: {
+                endClipTrim()
+            }
         }
         .frame(width: max(shown, 4), height: trackHeight)
         .offset(x: trim?.edge == .start ? delta : 0)
@@ -726,32 +743,34 @@ struct TimelineView: View {
             model.pause()
             model.seek(to: start + seconds(location.x))
         }
-        .gesture(DragGesture(minimumDistance: 4, coordinateSpace: .named(Self.contentSpace))
-            .onChanged { value in
-                // With R held, dragging picks a range instead of moving the clip.
-                if rangeAnchor != nil || (reorder == nil && model.isRangeKeyDown) {
-                    if rangeAnchor == nil {
-                        model.pause()
-                        rangeAnchor = time(at: value.startLocation.x)
+        .gesture(
+            DragGesture(minimumDistance: 4, coordinateSpace: .named(Self.contentSpace))
+                .onChanged { value in
+                    // With R held, dragging picks a range instead of moving the clip.
+                    if rangeAnchor != nil || (reorder == nil && model.isRangeKeyDown) {
+                        if rangeAnchor == nil {
+                            model.pause()
+                            rangeAnchor = time(at: value.startLocation.x)
+                        }
+                        model.setTimelineRange(from: rangeAnchor!, to: time(at: value.location.x))
+                        return
                     }
-                    model.setTimelineRange(from: rangeAnchor!, to: time(at: value.location.x))
-                    return
+                    if reorder == nil {
+                        model.pause()
+                        if !model.isSelected(.clip(clip.id)) { model.selectedClipID = clip.id }
+                    }
+                    reorder = Reorder(id: clip.id, dx: value.translation.width, destination: destination(for: clip, index: index, dx: value.translation.width))
                 }
-                if reorder == nil {
-                    model.pause()
-                    if !model.isSelected(.clip(clip.id)) { model.selectedClipID = clip.id }
+                .onEnded { value in
+                    if rangeAnchor != nil {
+                        rangeAnchor = nil
+                        return
+                    }
+                    let target = destination(for: clip, index: index, dx: value.translation.width)
+                    reorder = nil
+                    if target != index { model.moveClip(clip.id, to: target) }
                 }
-                reorder = Reorder(id: clip.id, dx: value.translation.width, destination: destination(for: clip, index: index, dx: value.translation.width))
-            }
-            .onEnded { value in
-                if rangeAnchor != nil {
-                    rangeAnchor = nil
-                    return
-                }
-                let target = destination(for: clip, index: index, dx: value.translation.width)
-                reorder = nil
-                if target != index { model.moveClip(clip.id, to: target) }
-            })
+        )
         .contextMenu {
             Button("Split at Playhead") { model.splitAtPlayhead() }
             Button("Trim Start to Playhead") { model.trimToPlayhead(removing: .start) }
@@ -819,7 +838,8 @@ struct TimelineView: View {
         model.pause()
         if !model.isSelected(.clip(clip.id)) { model.selectedClipID = clip.id }
         guard let range = model.project.timeline.range(of: clip.id),
-              let limits = model.project.trimLimits(for: clip, edge: edge) else { return }
+            let limits = model.project.trimLimits(for: clip, edge: edge)
+        else { return }
         let edgeTime = edge == .start ? range.start : range.end
         var delta = seconds(points)
         snapLine = nil

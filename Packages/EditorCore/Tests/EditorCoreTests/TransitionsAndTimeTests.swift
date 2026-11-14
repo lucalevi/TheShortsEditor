@@ -2,13 +2,15 @@ import CoreGraphics
 import CoreMedia
 import Foundation
 import Testing
+
 @testable import EditorCore
 
 private func t(_ s: Double) -> CMTime { CMTime(seconds: s, preferredTimescale: 600).snappedToFrame() }
 
 private func video(_ name: String, seconds: Int64 = 10, frameRate: Double? = nil) -> MediaAsset {
-    MediaAsset(url: URL(fileURLWithPath: "/tmp/\(name)"), name: name, duration: CMTime(value: seconds, timescale: 1),
-               displaySize: CGSize(width: 1080, height: 1920), hasAudio: true, frameRate: frameRate)
+    MediaAsset(
+        url: URL(fileURLWithPath: "/tmp/\(name)"), name: name, duration: CMTime(value: seconds, timescale: 1),
+        displaySize: CGSize(width: 1080, height: 1920), hasAudio: true, frameRate: frameRate)
 }
 
 /// Clips A (10 s) and B (10 s), back to back.
@@ -123,8 +125,10 @@ struct PictureFadeTests {
 
     @Test func opacityMovesBetweenKeyframes() {
         var clip = Clip(assetID: UUID(), sourceStart: .zero, duration: t(4))
-        clip.keyframes = [Keyframe(time: .zero, placement: Placement(opacity: 0), easing: .linear),
-                          Keyframe(time: t(2), placement: Placement(opacity: 1), easing: .linear)]
+        clip.keyframes = [
+            Keyframe(time: .zero, placement: Placement(opacity: 0), easing: .linear),
+            Keyframe(time: t(2), placement: Placement(opacity: 1), easing: .linear),
+        ]
         #expect(abs(clip.placement(atSourceTime: t(1)).opacity - 0.5) < 0.001)
     }
 
@@ -145,7 +149,9 @@ struct PictureFadeTests {
     @Test func splitKeepsTheFadeInFirstAndTheFadeOutLast() {
         var (p, a, _) = twoFiles()
         let id = p.addOverlay(of: a, at: t(2))!
-        p.updateOverlay(id) { $0.clip.pictureFadeIn = t(0.5); $0.clip.pictureFadeOut = t(0.5) }
+        p.updateOverlay(id) {
+            $0.clip.pictureFadeIn = t(0.5); $0.clip.pictureFadeOut = t(0.5)
+        }
         let second = p.splitOverlay(id, at: t(4))!
         #expect(p.overlay(id: id)?.clip.pictureFadeIn == t(0.5) && p.overlay(id: id)?.clip.pictureFadeOut == .zero)
         #expect(p.overlay(id: second)?.clip.pictureFadeIn == .zero && p.overlay(id: second)?.clip.pictureFadeOut == t(0.5))
@@ -198,8 +204,10 @@ struct FreezeFrameTests {
 
     @Test func theMotionStopsWithThePicture() {
         var (p, _, _) = twoFiles()
-        p.timeline.clips[0].keyframes = [Keyframe(time: .zero, placement: Placement(scale: 1), easing: .linear),
-                                         Keyframe(time: t(10), placement: Placement(scale: 2), easing: .linear)]
+        p.timeline.clips[0].keyframes = [
+            Keyframe(time: .zero, placement: Placement(scale: 1), easing: .linear),
+            Keyframe(time: t(10), placement: Placement(scale: 2), easing: .linear),
+        ]
         p.addFreezeFrame(at: t(5))
         let frozen = p.timeline.clips[1]
         #expect(frozen.keyframes.isEmpty)

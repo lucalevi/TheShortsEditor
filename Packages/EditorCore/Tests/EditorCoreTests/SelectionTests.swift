@@ -2,6 +2,7 @@ import CoreGraphics
 import CoreMedia
 import Foundation
 import Testing
+
 @testable import EditorCore
 
 private func seconds(_ s: Double) -> CMTime { CMTime(seconds: s, preferredTimescale: 600) }
@@ -9,10 +10,12 @@ private func seconds(_ s: Double) -> CMTime { CMTime(seconds: s, preferredTimesc
 /// Four 5-second clips, a title from 2 to 5 s, and a 60-second song as music.
 private func project() -> Project {
     var project = Project()
-    let video = MediaAsset(url: URL(fileURLWithPath: "/tmp/v.mov"), name: "v", duration: CMTime(value: 5, timescale: 1),
-                           displaySize: CGSize(width: 1080, height: 1920), hasAudio: true)
-    let song = MediaAsset(url: URL(fileURLWithPath: "/tmp/s.m4a"), name: "s", duration: CMTime(value: 60, timescale: 1),
-                          displaySize: .zero, hasAudio: true, hasVideo: false)
+    let video = MediaAsset(
+        url: URL(fileURLWithPath: "/tmp/v.mov"), name: "v", duration: CMTime(value: 5, timescale: 1),
+        displaySize: CGSize(width: 1080, height: 1920), hasAudio: true)
+    let song = MediaAsset(
+        url: URL(fileURLWithPath: "/tmp/s.m4a"), name: "s", duration: CMTime(value: 60, timescale: 1),
+        displaySize: .zero, hasAudio: true, hasVideo: false)
     project.addAsset(video)
     project.addAsset(song)
     for _ in 0..<4 { project.appendClip(of: video.id) }

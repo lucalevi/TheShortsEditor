@@ -65,9 +65,13 @@ enum ProjectStore {
         for asset in project.assets {
             guard let data = file.bookmarks[asset.id] else { continue }
             var stale = false
-            guard let resolved = Log.file.attempt("Finding a Short's media file", {
-                try URL(resolvingBookmarkData: data, options: .withSecurityScope, relativeTo: nil, bookmarkDataIsStale: &stale)
-            }) else {
+            guard
+                let resolved = Log.file.attempt(
+                    "Finding a Short's media file",
+                    {
+                        try URL(resolvingBookmarkData: data, options: .withSecurityScope, relativeTo: nil, bookmarkDataIsStale: &stale)
+                    })
+            else {
                 bookmarks[asset.url] = data
                 continue
             }
@@ -84,9 +88,13 @@ enum ProjectStore {
 
     private static func bookmark(for url: URL) -> Data? {
         if let known = bookmarks[url] { return known }
-        guard let data = Log.file.attempt("Making a bookmark for a media file", {
-            try url.bookmarkData(options: .withSecurityScope, includingResourceValuesForKeys: nil, relativeTo: nil)
-        }) else { return nil }
+        guard
+            let data = Log.file.attempt(
+                "Making a bookmark for a media file",
+                {
+                    try url.bookmarkData(options: .withSecurityScope, includingResourceValuesForKeys: nil, relativeTo: nil)
+                })
+        else { return nil }
         bookmarks[url] = data
         return data
     }
@@ -113,13 +121,14 @@ enum ProjectStore {
         let files = (try? FileManager.default.contentsOfDirectory(at: libraryFolder, includingPropertiesForKeys: [.contentModificationDateKey])) ?? []
         return files.compactMap { url -> ShortEntry? in
             guard url.pathExtension == ProjectFile.fileExtension,
-                  let id = UUID(uuidString: url.deletingPathExtension().lastPathComponent),
-                  let file = Log.file.attempt("Reading a Short for the home window", { try ProjectFile.decode(Data(contentsOf: url)) })
+                let id = UUID(uuidString: url.deletingPathExtension().lastPathComponent),
+                let file = Log.file.attempt("Reading a Short for the home window", { try ProjectFile.decode(Data(contentsOf: url)) })
             else { return nil }
             let modified = (try? url.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .now
-            return ShortEntry(id: id, name: file.name ?? ShortsLibrary.defaultName, created: file.created ?? modified,
-                              modified: modified, duration: file.project.duration,
-                              clipCount: file.project.timeline.clips.count)
+            return ShortEntry(
+                id: id, name: file.name ?? ShortsLibrary.defaultName, created: file.created ?? modified,
+                modified: modified, duration: file.project.duration,
+                clipCount: file.project.timeline.clips.count)
         }
         .sorted { $0.modified > $1.modified }
     }
@@ -128,7 +137,8 @@ enum ProjectStore {
     static func freshPoster(for entry: ShortEntry) -> URL? {
         let url = posterURL(for: entry.id)
         guard let date = try? url.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate,
-              date >= entry.modified else { return nil }
+            date >= entry.modified
+        else { return nil }
         return url
     }
 
@@ -197,7 +207,8 @@ enum ProjectStore {
             }
         }
         if FileManager.default.fileExists(atPath: legacyUntitledURL.path),
-           (try? importProject(at: legacyUntitledURL, existingNames: names)) != nil {
+            (try? importProject(at: legacyUntitledURL, existingNames: names)) != nil
+        {
             try? FileManager.default.removeItem(at: legacyUntitledURL)
         }
         defaults.removeObject(forKey: "RecentProjects")

@@ -55,20 +55,27 @@ struct PictureSection: View {
                     }
                     HStack(spacing: 6) {
                         Text("Other colour").font(.caption).foregroundStyle(.secondary)
-                        ColorPicker("Other colour", selection: Binding(get: { Color(clip.backgroundColor) }, set: { color in
-                            guard let c = NSColor(color).usingColorSpace(.sRGB) else { return }
-                            model.setBackgroundColor(RGBA(c.redComponent, c.greenComponent, c.blueComponent), for: [clip.id])
-                        }), supportsOpacity: false)
+                        ColorPicker(
+                            "Other colour",
+                            selection: Binding(
+                                get: { Color(clip.backgroundColor) },
+                                set: { color in
+                                    guard let c = NSColor(color).usingColorSpace(.sRGB) else { return }
+                                    model.setBackgroundColor(RGBA(c.redComponent, c.greenComponent, c.blueComponent), for: [clip.id])
+                                }), supportsOpacity: false
+                        )
                         .labelsHidden()
                         .help("Any other colour")
                     }
                 }
-                Text(clip.cutout.isSeeThrough && shownBackground == .black
-                     ? "A cut-out picture shows black behind it. Choose Colour for another colour."
-                     : Self.backgroundHint(shownBackground))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+                Text(
+                    clip.cutout.isSeeThrough && shownBackground == .black
+                        ? "A cut-out picture shows black behind it. Choose Colour for another colour."
+                        : Self.backgroundHint(shownBackground)
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
             }
 
             slider("Size", value: dragging.scale ?? placement.scale, range: 0.25...3, format: { "\(Int(($0 * 100).rounded()))%" }) { value in
@@ -108,12 +115,14 @@ struct PictureSection: View {
                 FollowSubjectButton(model: model, clip: clip)
             }
 
-            Text(isOnScreen
-                 ? "Drag the picture in the viewer to move it; drag a corner or pinch to resize it."
-                 : "Move the playhead onto this clip to drag its picture in the viewer.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
+            Text(
+                isOnScreen
+                    ? "Drag the picture in the viewer to move it; drag a corner or pinch to resize it."
+                    : "Move the playhead onto this clip to drag its picture in the viewer."
+            )
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
             if clip.hasMotion {
                 Label("This picture moves, so changes are saved at the playhead as a keyframe.", systemImage: "diamond.fill")
                     .font(.caption)

@@ -44,8 +44,11 @@ extension EditorModel {
             findingBeats = false
             guard project.music?.assetID == music.assetID else { return }
             guard !beats.isEmpty else {
-                alert = AlertMessage(title: "No steady beat found",
-                                     message: "“\(song.name)” has no beat that can be followed. You can still add beats by hand: put the playhead on a beat and choose Sound ▸ Add Beat at Playhead.")
+                alert = AlertMessage(
+                    title: "No steady beat found",
+                    message:
+                        "“\(song.name)” has no beat that can be followed. You can still add beats by hand: put the playhead on a beat and choose Sound ▸ Add Beat at Playhead."
+                )
                 return
             }
             apply("Find Beats") { $0.music?.beats = beats }
@@ -83,8 +86,9 @@ extension EditorModel {
                 project.music?.showsBeats = true
             }
             if moved == 0 {
-                self.alert = AlertMessage(title: "The cuts are already on the beat",
-                                          message: "No cut could move to a beat: they are on one already, or the clips have no more footage to reach the nearest.")
+                self.alert = AlertMessage(
+                    title: "The cuts are already on the beat",
+                    message: "No cut could move to a beat: they are on one already, or the clips have no more footage to reach the nearest.")
             }
         }
     }
@@ -130,8 +134,9 @@ extension EditorModel {
         var needed: [(clip: Clip.ID, url: URL, recipe: FrameInterpolator.Recipe)] = []
         for clip in clips where clip.smoothSlowMotion && smoothing[clip.id] == nil {
             guard let media = project.asset(id: clip.assetID), !missingAssets.contains(media.id),
-                  let recipe = FrameInterpolator.recipe(for: clip, media: media),
-                  FrameInterpolator.existingCopy(for: clip, media: media) == nil else { continue }
+                let recipe = FrameInterpolator.recipe(for: clip, media: media),
+                FrameInterpolator.existingCopy(for: clip, media: media) == nil
+            else { continue }
             let copy = FrameInterpolator.copyURL(for: media.url, recipe: recipe)
             guard !unsmoothable.contains(copy), !needed.contains(where: { FrameInterpolator.copyURL(for: $0.url, recipe: $0.recipe) == copy }) else { continue }
             needed.append((clip.id, media.url, recipe))
@@ -167,9 +172,10 @@ extension EditorModel {
         // Show it: play the clip's start or end.
         if kind != nil, let id = clipIDs.first, let start = project.timelineStart(ofClip: id), let clip = project.anyClip(id: id) {
             let length = CMTime(value: 3, timescale: 2)
-            play(entering
-                ? CMTimeRange(start: start, duration: min(length, clip.duration))
-                : CMTimeRange(start: max(start, start + clip.duration - length), end: start + clip.duration))
+            play(
+                entering
+                    ? CMTimeRange(start: start, duration: min(length, clip.duration))
+                    : CMTimeRange(start: max(start, start + clip.duration - length), end: start + clip.duration))
         }
     }
 

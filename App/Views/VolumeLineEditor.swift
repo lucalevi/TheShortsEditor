@@ -198,17 +198,19 @@ struct VolumeLineEditor: View {
             .contentShape(Rectangle())
             .position(x: min(max(position, edgeInset), size.width - edgeInset), y: handleSize / 2)
             .pointerStyle(.frameResize(position: edge == .start ? .trailing : .leading))
-            .gesture(DragGesture(minimumDistance: 1)
-                .onChanged { value in
-                    let dx = edge == .start ? value.translation.width : -value.translation.width
-                    let seconds = max(current.seconds + Double(dx / pointsPerSecond), 0)
-                    let limit = min(Clip.maxFade, clip.duration)
-                    drag = .fade(edge: edge, length: CMTime(seconds: (seconds * 10).rounded() / 10, preferredTimescale: 600).clamped(.zero, limit))
-                }
-                .onEnded { _ in
-                    if case .fade(let edge, let length) = drag { onFade(edge, length) }
-                    drag = nil
-                })
+            .gesture(
+                DragGesture(minimumDistance: 1)
+                    .onChanged { value in
+                        let dx = edge == .start ? value.translation.width : -value.translation.width
+                        let seconds = max(current.seconds + Double(dx / pointsPerSecond), 0)
+                        let limit = min(Clip.maxFade, clip.duration)
+                        drag = .fade(edge: edge, length: CMTime(seconds: (seconds * 10).rounded() / 10, preferredTimescale: 600).clamped(.zero, limit))
+                    }
+                    .onEnded { _ in
+                        if case .fade(let edge, let length) = drag { onFade(edge, length) }
+                        drag = nil
+                    }
+            )
             .help(edge == .start ? "Drag right to fade the sound in" : "Drag left to fade the sound out")
             .accessibilityLabel(edge == .start ? "Fade in handle" : "Fade out handle")
     }

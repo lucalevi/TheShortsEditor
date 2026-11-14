@@ -24,18 +24,20 @@ public nonisolated enum FrameStills {
         if let cached = cache.withLock({ $0[key] }) { return cached }
         let asset = AVURLAsset(url: url)
         guard let track = try? await asset.loadTracks(withMediaType: .video).first,
-              let (size, transform, range) = try? await track.load(.naturalSize, .preferredTransform, .timeRange),
-              let reader = try? AVAssetReader(asset: asset)
+            let (size, transform, range) = try? await track.load(.naturalSize, .preferredTransform, .timeRange),
+            let reader = try? AVAssetReader(asset: asset)
         else { return nil }
         // Start a little early and keep the last picture that begins at or before the time: that
         // is the one on screen then.
         let wanted = time.clamped(range.start, range.end)
         let start = max(range.start, wanted - CMTime(value: 1, timescale: 2))
         reader.timeRange = CMTimeRange(start: start, end: range.end)
-        let output = AVAssetReaderTrackOutput(track: track, outputSettings: [
-            kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA,
-            kCVPixelBufferIOSurfacePropertiesKey as String: [String: Any](),
-        ])
+        let output = AVAssetReaderTrackOutput(
+            track: track,
+            outputSettings: [
+                kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA,
+                kCVPixelBufferIOSurfacePropertiesKey as String: [String: Any](),
+            ])
         output.alwaysCopiesSampleData = false
         guard reader.canAdd(output) else { return nil }
         reader.add(output)

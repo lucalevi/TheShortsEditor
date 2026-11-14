@@ -26,8 +26,10 @@ public nonisolated enum Reverser {
     /// Writes `range` of the video at `url`, backwards, to `destination` (a .mov), reporting
     /// progress 0…1. The first picture of the copy is the last one of the range.
     @concurrent
-    public static func reverse(_ url: URL, range: CMTimeRange, to destination: URL,
-                               progress: @escaping @Sendable (Double) -> Void = { _ in }) async throws {
+    public static func reverse(
+        _ url: URL, range: CMTimeRange, to destination: URL,
+        progress: @escaping @Sendable (Double) -> Void = { _ in }
+    ) async throws {
         let asset = AVURLAsset(url: url)
         guard let video = try await asset.loadTracks(withMediaType: .video).first else { throw ReverseError.unreadable }
         let (naturalSize, transform, rate, trackRange) = try await video.load(.naturalSize, .preferredTransform, .nominalFrameRate, .timeRange)
@@ -43,16 +45,18 @@ public nonisolated enum Reverser {
         let scale = min(1, maxSide / max(naturalSize.width, naturalSize.height))
         let width = max(2, Int((naturalSize.width * scale / 2).rounded()) * 2), height = max(2, Int((naturalSize.height * scale / 2).rounded()) * 2)
         let bitRate = min(40_000_000, max(2_000_000, Int(Double(width * height) * min(frameRate, 60) * 0.22)))
-        let videoInput = AVAssetWriterInput(mediaType: .video, outputSettings: [
-            AVVideoCodecKey: AVVideoCodecType.h264,
-            AVVideoWidthKey: width,
-            AVVideoHeightKey: height,
-            AVVideoCompressionPropertiesKey: [
-                AVVideoAverageBitRateKey: bitRate,
-                AVVideoMaxKeyFrameIntervalDurationKey: 1,
-                AVVideoProfileLevelKey: AVVideoProfileLevelH264HighAutoLevel,
-            ] as [String: Any],
-        ])
+        let videoInput = AVAssetWriterInput(
+            mediaType: .video,
+            outputSettings: [
+                AVVideoCodecKey: AVVideoCodecType.h264,
+                AVVideoWidthKey: width,
+                AVVideoHeightKey: height,
+                AVVideoCompressionPropertiesKey: [
+                    AVVideoAverageBitRateKey: bitRate,
+                    AVVideoMaxKeyFrameIntervalDurationKey: 1,
+                    AVVideoProfileLevelKey: AVVideoProfileLevelH264HighAutoLevel,
+                ] as [String: Any],
+            ])
         videoInput.expectsMediaDataInRealTime = false
         videoInput.transform = transform
         guard writer.canAdd(videoInput) else { throw ReverseError.failed }
@@ -62,9 +66,11 @@ public nonisolated enum Reverser {
         var sound = try await reversedSound(of: asset, range: range)
         var audioInput: AVAssetWriterInput?
         if sound != nil {
-            let input = AVAssetWriterInput(mediaType: .audio, outputSettings: [
-                AVFormatIDKey: kAudioFormatMPEG4AAC, AVSampleRateKey: soundRate, AVNumberOfChannelsKey: 2, AVEncoderBitRateKey: 192_000,
-            ])
+            let input = AVAssetWriterInput(
+                mediaType: .audio,
+                outputSettings: [
+                    AVFormatIDKey: kAudioFormatMPEG4AAC, AVSampleRateKey: soundRate, AVNumberOfChannelsKey: 2, AVEncoderBitRateKey: 192_000,
+                ])
             input.expectsMediaDataInRealTime = false
             if writer.canAdd(input) {
                 writer.add(input)
@@ -140,9 +146,11 @@ public nonisolated enum Reverser {
     private static func frames(of track: AVAssetTrack, in asset: AVAsset, from: CMTime, to: CMTime) throws -> [(time: CMTime, buffer: CVPixelBuffer)] {
         let reader = try AVAssetReader(asset: asset)
         reader.timeRange = CMTimeRange(start: from, end: to)
-        let output = AVAssetReaderTrackOutput(track: track, outputSettings: [
-            kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange,
-        ])
+        let output = AVAssetReaderTrackOutput(
+            track: track,
+            outputSettings: [
+                kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange
+            ])
         output.alwaysCopiesSampleData = false
         guard reader.canAdd(output) else { throw ReverseError.unreadable }
         reader.add(output)
@@ -164,7 +172,8 @@ public nonisolated enum Reverser {
         guard let format else { return nil }
         var timing = CMSampleTimingInfo(duration: .invalid, presentationTimeStamp: time, decodeTimeStamp: .invalid)
         var sample: CMSampleBuffer?
-        CMSampleBufferCreateReadyWithImageBuffer(allocator: nil, imageBuffer: buffer, formatDescription: format, sampleTiming: &timing, sampleBufferOut: &sample)
+        CMSampleBufferCreateReadyWithImageBuffer(
+            allocator: nil, imageBuffer: buffer, formatDescription: format, sampleTiming: &timing, sampleBufferOut: &sample)
         return sample
     }
 
@@ -177,10 +186,12 @@ public nonisolated enum Reverser {
         guard let track = try await asset.loadTracks(withMediaType: .audio).first else { return nil }
         let reader = try AVAssetReader(asset: asset)
         reader.timeRange = range
-        let output = AVAssetReaderTrackOutput(track: track, outputSettings: [
-            AVFormatIDKey: kAudioFormatLinearPCM, AVSampleRateKey: soundRate, AVNumberOfChannelsKey: 2,
-            AVLinearPCMBitDepthKey: 16, AVLinearPCMIsFloatKey: false, AVLinearPCMIsBigEndianKey: false, AVLinearPCMIsNonInterleaved: false,
-        ])
+        let output = AVAssetReaderTrackOutput(
+            track: track,
+            outputSettings: [
+                AVFormatIDKey: kAudioFormatLinearPCM, AVSampleRateKey: soundRate, AVNumberOfChannelsKey: 2,
+                AVLinearPCMBitDepthKey: 16, AVLinearPCMIsFloatKey: false, AVLinearPCMIsBigEndianKey: false, AVLinearPCMIsNonInterleaved: false,
+            ])
         guard reader.canAdd(output) else { return nil }
         reader.add(output)
         guard reader.startReading() else { return nil }
@@ -212,16 +223,23 @@ public nonisolated enum Reverser {
             mBytesPerPacket: 4, mFramesPerPacket: 1, mBytesPerFrame: 4, mChannelsPerFrame: 2, mBitsPerChannel: 16, mReserved: 0
         )
         var format: CMAudioFormatDescription?
-        CMAudioFormatDescriptionCreate(allocator: nil, asbd: &description, layoutSize: 0, layout: nil, magicCookieSize: 0, magicCookie: nil, extensions: nil, formatDescriptionOut: &format)
+        CMAudioFormatDescriptionCreate(
+            allocator: nil, asbd: &description, layoutSize: 0, layout: nil, magicCookieSize: 0, magicCookie: nil, extensions: nil, formatDescriptionOut: &format
+        )
         var block: CMBlockBuffer?
-        CMBlockBufferCreateWithMemoryBlock(allocator: nil, memoryBlock: nil, blockLength: count, blockAllocator: nil, customBlockSource: nil, offsetToData: 0, dataLength: count, flags: kCMBlockBufferAssureMemoryNowFlag, blockBufferOut: &block)
+        CMBlockBufferCreateWithMemoryBlock(
+            allocator: nil, memoryBlock: nil, blockLength: count, blockAllocator: nil, customBlockSource: nil, offsetToData: 0, dataLength: count,
+            flags: kCMBlockBufferAssureMemoryNowFlag, blockBufferOut: &block)
         guard let format, let block else { return nil }
-        let status = data.withUnsafeBytes { CMBlockBufferReplaceDataBytes(with: $0.baseAddress! + offset, blockBuffer: block, offsetIntoDestination: 0, dataLength: count) }
+        let status = data.withUnsafeBytes {
+            CMBlockBufferReplaceDataBytes(with: $0.baseAddress! + offset, blockBuffer: block, offsetIntoDestination: 0, dataLength: count)
+        }
         guard status == kCMBlockBufferNoErr else { return nil }
         var sample: CMSampleBuffer?
-        CMAudioSampleBufferCreateReadyWithPacketDescriptions(allocator: nil, dataBuffer: block, formatDescription: format, sampleCount: count / 4,
-                                                             presentationTimeStamp: CMTime(value: CMTimeValue(offset / 4), timescale: CMTimeScale(soundRate)),
-                                                             packetDescriptions: nil, sampleBufferOut: &sample)
+        CMAudioSampleBufferCreateReadyWithPacketDescriptions(
+            allocator: nil, dataBuffer: block, formatDescription: format, sampleCount: count / 4,
+            presentationTimeStamp: CMTime(value: CMTimeValue(offset / 4), timescale: CMTimeScale(soundRate)),
+            packetDescriptions: nil, sampleBufferOut: &sample)
         return sample
     }
 }

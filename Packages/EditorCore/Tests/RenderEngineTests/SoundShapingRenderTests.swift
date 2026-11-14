@@ -1,6 +1,7 @@
 @preconcurrency import AVFoundation
 import EditorCore
 import Testing
+
 @testable import RenderEngine
 
 @MainActor
@@ -100,8 +101,9 @@ struct SoundShapingRenderTests {
         p.timeline.clips[0].voiceEffect = .megaphone
         let media = try #require(p.asset(id: p.timeline.clips[0].assetID))
         // Not made yet: it plays as it was.
-        #expect(SoundProcessor.playedURL(for: p.timeline.clips[0], media: media) == media.url
-            || FileManager.default.fileExists(atPath: SoundProcessor.playedURL(for: p.timeline.clips[0], media: media).path))
+        #expect(
+            SoundProcessor.playedURL(for: p.timeline.clips[0], media: media) == media.url
+                || FileManager.default.fileExists(atPath: SoundProcessor.playedURL(for: p.timeline.clips[0], media: media).path))
         let made = try await SoundProcessor.process(SoundProcessor.baseURL(for: p.timeline.clips[0], media: media), recipe: .init(p.timeline.clips[0]))
         #expect(SoundProcessor.playedURL(for: p.timeline.clips[0], media: media) == made)
         let shaped = try #require(try await AudioProbe.peak(of: p, in: seconds(0.3, 1.7)))

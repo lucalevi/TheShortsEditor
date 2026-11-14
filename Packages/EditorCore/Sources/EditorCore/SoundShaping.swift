@@ -237,7 +237,8 @@ public extension AudioMix {
         for clip in clips {
             var envelope = clip.soundEnvelope().map { VolumePoint(time: start + $0.time, volume: $0.volume) }
             if let previous, let last = points.last, clip.continues(previous), clip.heardFades.in == .zero,
-               previous.heardFades.out == .zero, last.volume != envelope.first?.volume {
+                previous.heardFades.out == .zero, last.volume != envelope.first?.volume
+            {
                 // Start from where the previous clip ended, and reach this clip's line a moment later.
                 let fadeEnd = start + min(Clip.continuityFade, clip.duration)
                 envelope.removeAll { $0.time < fadeEnd }
@@ -337,21 +338,26 @@ public extension Project {
         let clips = timeline.clips
         return timeline.transitionSpans.compactMap { span in
             guard let out = clips.first(where: { $0.id == span.from }), let into = clips.first(where: { $0.id == span.to }),
-                  let outgoing = borrowedSound(of: out, afterEnd: true, half: span.half),
-                  let incoming = borrowedSound(of: into, afterEnd: false, half: span.half) else { return nil }
-            return SoundCrossfade(span: span, incomingSource: incoming, outgoingSource: outgoing,
-                                  incomingLevel: into.soundLevel(atOffset: .zero), outgoingLevel: out.soundLevel(atOffset: out.duration))
+                let outgoing = borrowedSound(of: out, afterEnd: true, half: span.half),
+                let incoming = borrowedSound(of: into, afterEnd: false, half: span.half)
+            else { return nil }
+            return SoundCrossfade(
+                span: span, incomingSource: incoming, outgoingSource: outgoing,
+                incomingLevel: into.soundLevel(atOffset: .zero), outgoingLevel: out.soundLevel(atOffset: out.duration))
         }
     }
 
     /// The `half` of `clip`'s file just after its end or just before its start, if it has sound there.
     private func borrowedSound(of clip: Clip, afterEnd: Bool, half: CMTime) -> CMTimeRange? {
         guard let media = asset(id: clip.assetID), media.hasAudio, !media.isImage, !clip.isFrozen, !clip.soundDetached,
-              clip.speedCurve == nil, clip.effectiveVolume > 0,
-              (afterEnd ? clip.heardFades.out : clip.heardFades.in) == .zero else { return nil }
+            clip.speedCurve == nil, clip.effectiveVolume > 0,
+            (afterEnd ? clip.heardFades.out : clip.heardFades.in) == .zero
+        else { return nil }
         let length = CMTimeMultiplyByFloat64(half, multiplier: clip.speed)
-        let range = afterEnd ? CMTimeRange(start: clip.sourceRange.end, duration: length)
-                             : CMTimeRange(start: clip.sourceStart - length, duration: length)
+        let range =
+            afterEnd
+            ? CMTimeRange(start: clip.sourceRange.end, duration: length)
+            : CMTimeRange(start: clip.sourceStart - length, duration: length)
         guard range.start >= .zero, range.end <= media.duration else { return nil }
         return range
     }

@@ -1,6 +1,7 @@
 @preconcurrency import AVFoundation
 import EditorCore
 import Testing
+
 @testable import RenderEngine
 
 /// Stage L drawn: the cover picture has its big text where it was put.

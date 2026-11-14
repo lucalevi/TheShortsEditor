@@ -40,7 +40,9 @@ extension EditorModel {
     func playTitle(_ id: TextOverlay.ID, end: Bool = false) {
         guard let title = project.title(id: id), let range = title.visibleRange(in: project) else { return }
         let length = CMTime(value: 2, timescale: 1)
-        let part = end ? CMTimeRange(start: max(range.start, range.end - length), end: range.end) : CMTimeRange(start: range.start, duration: min(length, range.duration))
+        let part =
+            end
+            ? CMTimeRange(start: max(range.start, range.end - length), end: range.end) : CMTimeRange(start: range.start, duration: min(length, range.duration))
         skimTime = nil
         seek(to: part.start)
         playRange = part

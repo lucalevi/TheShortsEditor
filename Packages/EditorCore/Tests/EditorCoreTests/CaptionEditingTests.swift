@@ -1,13 +1,15 @@
 import CoreMedia
 import Foundation
 import Testing
+
 @testable import EditorCore
 
 private func seconds(_ s: Double) -> CMTime { CMTime(seconds: s, preferredTimescale: 600) }
 
 private func asset(_ name: String, length: Double = 10, video: Bool = true) -> MediaAsset {
-    MediaAsset(url: URL(fileURLWithPath: "/tmp/\(name).mov"), name: name, duration: seconds(length),
-               displaySize: video ? CGSize(width: 1080, height: 1920) : .zero, hasAudio: true, hasVideo: video)
+    MediaAsset(
+        url: URL(fileURLWithPath: "/tmp/\(name).mov"), name: name, duration: seconds(length),
+        displaySize: video ? CGSize(width: 1080, height: 1920) : .zero, hasAudio: true, hasVideo: video)
 }
 
 private func transcript(_ words: [(String, Double, Double)]) -> Transcript {
@@ -47,7 +49,7 @@ struct CaptionSourcesTests {
         p.addAsset(voice)
         let made = p.addSound(of: voice.id, at: seconds(3.5), isVoiceOver: true)
         try #require(made != nil)
-        p.transcripts[voice.id] = transcript([("over", 0.4, 0.4)])  // 3.9–4.3 s, over "talk"
+        p.transcripts[voice.id] = transcript([("over", 0.4, 0.4)]) // 3.9–4.3 s, over "talk"
         #expect(CaptionLayout.timelineWords(in: p).map(\.text) == ["clip", "over"])
     }
 
@@ -88,8 +90,9 @@ struct CaptionSourcesTests {
 
     @Test func builtInSoundEffectsAreNeverTranscribed() throws {
         var p = project([])
-        let effect = MediaAsset(url: URL(fileURLWithPath: "/Users/x/Library/Application Support/Shorts Editor/Sound Effects/whoosh.m4a"),
-                                name: "Whoosh", duration: seconds(1), displaySize: .zero, hasAudio: true, hasVideo: false)
+        let effect = MediaAsset(
+            url: URL(fileURLWithPath: "/Users/x/Library/Application Support/Shorts Editor/Sound Effects/whoosh.m4a"),
+            name: "Whoosh", duration: seconds(1), displaySize: .zero, hasAudio: true, hasVideo: false)
         p.addAsset(effect)
         let made = p.addSound(of: effect.id, at: .zero)
         try #require(made != nil)
@@ -175,13 +178,13 @@ struct CaptionTextEditingTests {
         #expect(edited.text == "one two\nthree four five")
         #expect(edited.plainText == "one two three four five")
         #expect(edited.lineBreaks == [1])
-        #expect(edited.words[0].range.start == .zero)  // same words, same timing
+        #expect(edited.words[0].range.start == .zero) // same words, same timing
     }
 
     @Test func draggingTheEndMakesTheCaptionEndExactlyThere() {
         var p = project([("hi", 1, 0.5)])
         var page = CaptionLayout.pages(in: p)[0]
-        #expect(page.range.end == seconds(2))  // lingers half a second
+        #expect(page.range.end == seconds(2)) // lingers half a second
         p.moveCaptionEdge(page, .end, to: seconds(1.2))
         page = CaptionLayout.pages(in: p)[0]
         #expect(page.range.end == seconds(1.2))
@@ -204,7 +207,7 @@ struct CaptionTextEditingTests {
         p.timeline.clips[0].duration = seconds(5)
         let page = CaptionLayout.pages(in: p)[0]
         #expect(page.range.start == seconds(1))
-        p.moveCaptionEdge(page, .start, to: seconds(0.5))  // source 1 s
+        p.moveCaptionEdge(page, .start, to: seconds(0.5)) // source 1 s
         #expect(p.transcripts.values.first?.words[0].start == seconds(1))
     }
 
@@ -356,8 +359,10 @@ struct SRTTests {
         let voice = asset("voice", length: 5, video: false)
         p.addAsset(voice)
         _ = p.addSound(of: voice.id, at: seconds(1.8), isVoiceOver: true)
-        let cues = [CaptionCue(start: seconds(4.62), end: seconds(5.58), text: "semplice per studiare"),
-                    CaptionCue(start: seconds(5.58), end: seconds(6), text: "meglio")]
+        let cues = [
+            CaptionCue(start: seconds(4.62), end: seconds(5.58), text: "semplice per studiare"),
+            CaptionCue(start: seconds(5.58), end: seconds(6), text: "meglio"),
+        ]
         #expect(p.importCaptions(cues, language: .italian) == 2)
         #expect(CaptionLayout.pages(in: p).map(\.text) == ["semplice per studiare", "meglio"])
     }

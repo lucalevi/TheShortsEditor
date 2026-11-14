@@ -24,9 +24,11 @@ public nonisolated enum Stabilizer {
         guard let track = try await asset.loadTracks(withMediaType: .video).first else { throw AnalysisError.noPicture }
         let (range, naturalSize) = try await track.load(.timeRange, .naturalSize)
         let reader = try AVAssetReader(asset: asset)
-        let output = AVAssetReaderTrackOutput(track: track, outputSettings: [
-            kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA,
-        ])
+        let output = AVAssetReaderTrackOutput(
+            track: track,
+            outputSettings: [
+                kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA
+            ])
         output.alwaysCopiesSampleData = false
         reader.add(output)
         guard reader.startReading() else { throw reader.error ?? AnalysisError.noPicture }
@@ -95,7 +97,8 @@ public enum ShakeCache {
     public static func path(for url: URL) -> ShakePath? {
         if let path = known[url] { return path }
         guard let data = try? Data(contentsOf: fileURL(for: url)),
-              let path = try? JSONDecoder().decode(ShakePath.self, from: data) else { return nil }
+            let path = try? JSONDecoder().decode(ShakePath.self, from: data)
+        else { return nil }
         known[url] = path
         return path
     }

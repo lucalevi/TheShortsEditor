@@ -31,7 +31,9 @@ public enum Exporter {
     /// called on the main actor. Cancelling the task stops the export and removes the partial file.
     /// With `evenOutLoudness`, the sound is first measured and then brought to YouTube's level
     /// (−14 LUFS), without letting peaks clip.
-    public static func export(_ project: Project, to url: URL, evenOutLoudness: Bool = true, progress: @escaping @MainActor (Double) -> Void = { _ in }) async throws {
+    public static func export(
+        _ project: Project, to url: URL, evenOutLoudness: Bool = true, progress: @escaping @MainActor (Double) -> Void = { _ in }
+    ) async throws {
         var gain = 1.0
         if evenOutLoudness, let meter = try await AudioProbe.loudness(of: project) {
             gain = meter.normalizingGain()
@@ -54,9 +56,11 @@ public enum Exporter {
 
         // Video: frames drawn by the compositor, encoded to YouTube's recommendation.
         let videoTracks = try await composition.loadTracks(withMediaType: .video)
-        let videoOutput = AVAssetReaderVideoCompositionOutput(videoTracks: videoTracks, videoSettings: [
-            kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA,
-        ])
+        let videoOutput = AVAssetReaderVideoCompositionOutput(
+            videoTracks: videoTracks,
+            videoSettings: [
+                kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA
+            ])
         videoOutput.videoComposition = built.videoComposition
         videoOutput.alwaysCopiesSampleData = false
         let videoInput = AVAssetWriterInput(mediaType: .video, outputSettings: videoSettings)
@@ -73,24 +77,28 @@ public enum Exporter {
         // Sound, when there is any: mixed down to stereo 48 kHz, then AAC.
         let audioTracks = try await composition.loadTracks(withMediaType: .audio)
         if !audioTracks.isEmpty {
-            let audioOutput = AVAssetReaderAudioMixOutput(audioTracks: audioTracks, audioSettings: [
-                AVFormatIDKey: kAudioFormatLinearPCM,
-                AVSampleRateKey: audioSampleRate,
-                AVNumberOfChannelsKey: 2,
-                AVLinearPCMBitDepthKey: 32,
-                AVLinearPCMIsFloatKey: true,
-                AVLinearPCMIsNonInterleaved: false,
-                AVLinearPCMIsBigEndianKey: false,
-            ])
+            let audioOutput = AVAssetReaderAudioMixOutput(
+                audioTracks: audioTracks,
+                audioSettings: [
+                    AVFormatIDKey: kAudioFormatLinearPCM,
+                    AVSampleRateKey: audioSampleRate,
+                    AVNumberOfChannelsKey: 2,
+                    AVLinearPCMBitDepthKey: 32,
+                    AVLinearPCMIsFloatKey: true,
+                    AVLinearPCMIsNonInterleaved: false,
+                    AVLinearPCMIsBigEndianKey: false,
+                ])
             audioOutput.alwaysCopiesSampleData = false
             audioOutput.audioMix = built.audioMix
             audioOutput.audioTimePitchAlgorithm = .spectral
-            let audioInput = AVAssetWriterInput(mediaType: .audio, outputSettings: [
-                AVFormatIDKey: kAudioFormatMPEG4AAC,
-                AVSampleRateKey: audioSampleRate,
-                AVNumberOfChannelsKey: 2,
-                AVEncoderBitRateKey: audioBitRate,
-            ])
+            let audioInput = AVAssetWriterInput(
+                mediaType: .audio,
+                outputSettings: [
+                    AVFormatIDKey: kAudioFormatMPEG4AAC,
+                    AVSampleRateKey: audioSampleRate,
+                    AVNumberOfChannelsKey: 2,
+                    AVEncoderBitRateKey: audioBitRate,
+                ])
             audioInput.expectsMediaDataInRealTime = false
             guard reader.canAdd(audioOutput), writer.canAdd(audioInput) else {
                 throw ExportError.cannotWrite("The sound settings weren't accepted.")

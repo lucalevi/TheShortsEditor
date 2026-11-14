@@ -130,7 +130,8 @@ public extension TitleStyle {
         case .popShadow: TextLook(weight: 0.75, size: 100, popShadowColor: RGBA(0.95, 0.18, 0.25), letterSpacing: 2)
         case .comic: TextLook(weight: 0.8, size: 100, textColor: .yellow, outlineColor: .black, outlineWidth: 26, shadow: true, uppercase: true)
         case .pill: TextLook(weight: 0.62, size: 72, boxColor: RGBA(0.95, 0.18, 0.25))
-        case .typewriter: TextLook(fontFamily: "American Typewriter", weight: 0.2, size: 66, textColor: .black, boxColor: RGBA(0.98, 0.96, 0.88), boxPerLine: true)
+        case .typewriter:
+            TextLook(fontFamily: "American Typewriter", weight: 0.2, size: 66, textColor: .black, boxColor: RGBA(0.98, 0.96, 0.88), boxPerLine: true)
         case .cinema: TextLook(fontFamily: "Futura", weight: 0, size: 62, shadow: true, uppercase: true, letterSpacing: 30)
         case .handwritten: TextLook(fontFamily: "Marker Felt", weight: 0.62, size: 100, shadow: true)
         }

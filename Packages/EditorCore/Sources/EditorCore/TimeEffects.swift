@@ -123,7 +123,7 @@ public extension Timeline {
         guard index >= 0, index + 1 < clips.count else { return 0 }
         let a = clips[index], b = clips[index + 1]
         guard a.smoothSpeed, b.smoothSpeed, a.speed != b.speed, a.speedCurve == nil, b.speedCurve == nil, !a.isFrozen, !b.isFrozen, a.transitionOut == nil,
-              a.assetID == b.assetID, abs((a.sourceRange.end - b.sourceStart).seconds) < 0.5 / Double(Project.frameRate)
+            a.assetID == b.assetID, abs((a.sourceRange.end - b.sourceStart).seconds) < 0.5 / Double(Project.frameRate)
         else { return 0 }
         func half(_ clip: Clip) -> Int64 { clip.duration.convertScale(Project.frameRate, method: .roundTowardNegativeInfinity).value / 2 }
         let frames = min(Clip.speedRampFrames, half(a), half(b))
@@ -286,7 +286,8 @@ public extension Project {
         let slack = CMTime.oneFrame
         for candidate in assets {
             guard let from = candidate.reversedFrom, from.assetID == media.id,
-                  from.range.start <= clip.sourceStart + slack, from.range.end >= clip.sourceRange.end - slack else { continue }
+                from.range.start <= clip.sourceStart + slack, from.range.end >= clip.sourceRange.end - slack
+            else { continue }
             return (candidate, from.range.end)
         }
         return nil

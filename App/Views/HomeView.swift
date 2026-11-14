@@ -23,17 +23,25 @@ struct HomeView: View {
                 if search.isEmpty {
                     LazyVGrid(columns: columns, alignment: .leading, spacing: 22) {
                         NewShortTile { model.newShort() }
-                        StartTile(title: "Magic Short", systemImage: "wand.and.stars",
-                                  help: "Choose clips and get a first cut: pauses out, captions, a hook title and music") { model.newMagicShort() }
-                        StartTile(title: "Storyboard", systemImage: "list.bullet.rectangle.portrait",
-                                  help: "Start from a shot list that tells you what to film (how-to, review, top 3…)") { model.choosesStoryboard = true }
-                        StartTile(title: "Template", systemImage: "square.grid.3x3.square",
-                                  help: "Choose clips and get a Short cut on the beat, with text and transitions (montage, top 5, recipe…)") { model.choosesTemplate = true }
+                        StartTile(
+                            title: "Magic Short", systemImage: "wand.and.stars",
+                            help: "Choose clips and get a first cut: pauses out, captions, a hook title and music"
+                        ) { model.newMagicShort() }
+                        StartTile(
+                            title: "Storyboard", systemImage: "list.bullet.rectangle.portrait",
+                            help: "Start from a shot list that tells you what to film (how-to, review, top 3…)"
+                        ) { model.choosesStoryboard = true }
+                        StartTile(
+                            title: "Template", systemImage: "square.grid.3x3.square",
+                            help: "Choose clips and get a Short cut on the beat, with text and transitions (montage, top 5, recipe…)"
+                        ) { model.choosesTemplate = true }
                     }
                     if model.shorts.isEmpty {
-                        Text("Start an empty Short, let Magic Short make a first cut from your clips, or follow a storyboard. Your Shorts will appear here. Each one is saved as you edit it, so you can come back to it any time.")
-                            .foregroundStyle(.secondary)
-                            .frame(maxWidth: 460, alignment: .leading)
+                        Text(
+                            "Start an empty Short, let Magic Short make a first cut from your clips, or follow a storyboard. Your Shorts will appear here. Each one is saved as you edit it, so you can come back to it any time."
+                        )
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: 460, alignment: .leading)
                     }
                 }
                 ForEach(ShortsLibrary.grouped(shown, date: \.modified), id: \.0) { section, entries in
@@ -62,7 +70,9 @@ struct HomeView: View {
             // Videos dropped here start a new Short with them; a project file is added.
             model.importFiles(urls, addToTimeline: true)
             return true
-        } isTargeted: { isDropTargeted = $0 }
+        } isTargeted: {
+            isDropTargeted = $0
+        }
         .toolbar {
             ToolbarItem {
                 Button("New Short", systemImage: "plus") { model.newShort() }
@@ -112,7 +122,7 @@ private struct NewShortTile: View {
                     }
                 }
                 .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(.secondary.opacity(0.5), style: StrokeStyle(lineWidth: 1.5, dash: [6, 4])))
-                Text(" ").font(.callout)   // lines up with the names under the other tiles
+                Text(" ").font(.callout) // lines up with the names under the other tiles
             }
         }
         .buttonStyle(.plain)
@@ -135,7 +145,9 @@ private struct ShortTile: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Button { model.openShort(entry.id) } label: {
+            Button {
+                model.openShort(entry.id)
+            } label: {
                 Poster {
                     ZStack(alignment: .bottomTrailing) {
                         if let poster = model.posters[entry.id] {

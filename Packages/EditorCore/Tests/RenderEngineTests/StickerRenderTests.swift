@@ -1,6 +1,7 @@
 @preconcurrency import AVFoundation
 import EditorCore
 import Testing
+
 @testable import RenderEngine
 
 private let red: (UInt8, UInt8, UInt8, UInt8) = (0, 0, 255, 255)

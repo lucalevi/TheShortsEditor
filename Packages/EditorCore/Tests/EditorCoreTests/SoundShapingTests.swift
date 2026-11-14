@@ -2,13 +2,15 @@ import CoreGraphics
 import CoreMedia
 import Foundation
 import Testing
+
 @testable import EditorCore
 
 private func t(_ s: Double) -> CMTime { CMTime(seconds: s, preferredTimescale: 600).snappedToFrame() }
 
 private func video(_ name: String, seconds: Int64 = 10) -> MediaAsset {
-    MediaAsset(url: URL(fileURLWithPath: "/tmp/\(name)"), name: name, duration: CMTime(value: seconds, timescale: 1),
-               displaySize: CGSize(width: 1080, height: 1920), hasAudio: true)
+    MediaAsset(
+        url: URL(fileURLWithPath: "/tmp/\(name)"), name: name, duration: CMTime(value: seconds, timescale: 1),
+        displaySize: CGSize(width: 1080, height: 1920), hasAudio: true)
 }
 
 private func near(_ a: Double, _ b: Double, _ tolerance: Double = 0.02) -> Bool { abs(a - b) < tolerance }
@@ -43,10 +45,10 @@ struct VolumeLineTests {
         clip.addVolumeKey(atOffset: t(3), level: 0)
         // The first point pinned the line at both ends too.
         #expect(clip.volumeKeys.count == 4)
-        #expect(clip.volumeKeys[1].time == t(3))  // source time
-        #expect(near(clip.soundLevel(atOffset: t(2)), 0.25))  // 0.5 × halfway between 1 and 0
+        #expect(clip.volumeKeys[1].time == t(3)) // source time
+        #expect(near(clip.soundLevel(atOffset: t(2)), 0.25)) // 0.5 × halfway between 1 and 0
         #expect(near(clip.soundLevel(atOffset: t(3)), 0))
-        #expect(near(clip.soundLevel(atOffset: t(3.5)), 0.25))  // back up towards the pinned end
+        #expect(near(clip.soundLevel(atOffset: t(3.5)), 0.25)) // back up towards the pinned end
         // A point added where one is replaces it.
         clip.addVolumeKey(atOffset: t(1), level: 2)
         #expect(clip.volumeKeys.count == 4 && clip.volumeKeys[1].level == 2)
@@ -78,7 +80,7 @@ struct VolumeLineTests {
         let first = p.timeline.clips[0], second = p.timeline.clips[1]
         #expect(first.fadeIn == t(1) && first.fadeOut == .zero)
         #expect(second.fadeIn == .zero && second.fadeOut == t(1))
-        #expect(first.visibleVolumeKeys.count == 1 && second.visibleVolumeKeys.count == 2)  // start / the point and the end
+        #expect(first.visibleVolumeKeys.count == 1 && second.visibleVolumeKeys.count == 2) // start / the point and the end
         #expect(second.visibleVolumeKeys[0].offset == t(2))
     }
 
@@ -87,7 +89,9 @@ struct VolumeLineTests {
         let a = p.addAsset(video("a.mov"))
         p.appendClip(of: a)
         let id = p.timeline.clips[0].id
-        p.updateAnyClip(id) { $0.fadeIn = t(1); $0.fadeOut = t(1) }
+        p.updateAnyClip(id) {
+            $0.fadeIn = t(1); $0.fadeOut = t(1)
+        }
         p.apply(SilencePlan(sourceCuts: [id: [CMTimeRange(start: t(3), duration: t(2))]]))
         #expect(p.timeline.clips.count == 2)
         #expect(p.timeline.clips[0].fadeIn == t(1) && p.timeline.clips[0].fadeOut == .zero)
@@ -113,7 +117,7 @@ struct VolumeLineTests {
         var clip = Clip(assetID: UUID(), sourceStart: .zero, duration: t(2))
         let ranges = AudioMix.tooLoudRanges(of: clip, levels: levels)
         #expect(ranges.count == 1 && near(ranges[0].start.seconds, 1, 0.04) && near(ranges[0].end.seconds, 2, 0.04))
-        clip.volume = 2  // +6 dB: all of it
+        clip.volume = 2 // +6 dB: all of it
         #expect(AudioMix.tooLoudRanges(of: clip, levels: levels).first.map { near($0.duration.seconds, 2, 0.04) } == true)
         clip.volume = 0.25
         #expect(AudioMix.tooLoudRanges(of: clip, levels: levels).isEmpty)
@@ -132,7 +136,9 @@ struct DetachSoundTests {
 
     @Test func detachMovesTheSoundToTheSoundRow() throws {
         var (p, id) = project()
-        p.updateAnyClip(id) { $0.volume = 0.7; $0.fadeIn = t(1) }
+        p.updateAnyClip(id) {
+            $0.volume = 0.7; $0.fadeIn = t(1)
+        }
         let detached = p.detachSound(of: id)
         let soundID = try #require(detached)
         let sound = try #require(p.sound(id: soundID))
@@ -141,7 +147,7 @@ struct DetachSoundTests {
         let clip = try #require(p.anyClip(id: id))
         #expect(clip.soundDetached && clip.effectiveVolume == 0)
         let again = p.detachSound(of: id)
-        #expect(again == nil)  // only once
+        #expect(again == nil) // only once
     }
 
     @Test func detachedSoundCanStartBeforeThePicture() throws {
@@ -149,8 +155,12 @@ struct DetachSoundTests {
         let detached = p.detachSound(of: id)
         let soundID = try #require(detached)
         // The second file has sound before the part used: trim its start a second earlier (a J-cut).
-        p.updateAnyClip(id) { $0.sourceStart = t(2); $0.duration = t(8) }
-        p.updateSound(soundID) { $0.clip.sourceStart = t(2); $0.clip.duration = t(8) }
+        p.updateAnyClip(id) {
+            $0.sourceStart = t(2); $0.duration = t(8)
+        }
+        p.updateSound(soundID) {
+            $0.clip.sourceStart = t(2); $0.clip.duration = t(8)
+        }
         let trimmed = p.trimSound(soundID, edge: .start, by: t(-1))
         #expect(trimmed)
         let sound = try #require(p.sound(id: soundID))
@@ -203,7 +213,8 @@ struct DetachSoundTests {
         let back = try JSONDecoder().decode(Project.self, from: data)
         #expect(back == p)
         // A clip saved before this stage has none of the new keys.
-        let old = #"{"id":"\#(UUID())","assetID":"\#(UUID())","sourceStart":{"value":0,"timescale":600},"duration":{"value":600,"timescale":600},"framing":"fill"}"#
+        let old =
+            #"{"id":"\#(UUID())","assetID":"\#(UUID())","sourceStart":{"value":0,"timescale":600},"duration":{"value":600,"timescale":600},"framing":"fill"}"#
         let clip = try JSONDecoder().decode(Clip.self, from: Data(old.utf8))
         #expect(!clip.hasSoundShaping && !clip.soundDetached)
     }

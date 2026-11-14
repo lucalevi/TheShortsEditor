@@ -2,13 +2,15 @@ import CoreMedia
 import EditorCore
 import Foundation
 import Testing
+
 @testable import RenderEngine
 
 @MainActor
 struct StorageCleanerTests {
     private func project(file: URL) -> (Project, Clip.ID) {
         var p = Project()
-        let id = p.addAsset(MediaAsset(url: file, name: "a", duration: CMTime(value: 10, timescale: 1), displaySize: CGSize(width: 1080, height: 1920), hasAudio: true))
+        let id = p.addAsset(
+            MediaAsset(url: file, name: "a", duration: CMTime(value: 10, timescale: 1), displaySize: CGSize(width: 1080, height: 1920), hasAudio: true))
         p.appendClip(of: id)
         return (p, p.timeline.clips[0].id)
     }
@@ -18,7 +20,9 @@ struct StorageCleanerTests {
         try Data([1, 2, 3]).write(to: file)
         var (p, id) = project(file: file)
         #expect(StorageCleaner.filesInUse(by: [p]) == [file.standardizedFileURL])
-        p.updateAnyClip(id) { $0.cutout.removeBackground = .people; $0.cleansVoice = true; $0.steadiness = 0.5 }
+        p.updateAnyClip(id) {
+            $0.cutout.removeBackground = .people; $0.cleansVoice = true; $0.steadiness = 0.5
+        }
         let used = StorageCleaner.filesInUse(by: [p])
         #expect(used.contains(CutoutCache.copyURL(for: file, subject: .people, isImage: false).standardizedFileURL))
         #expect(used.contains(VoiceCleaner.cleanedURL(for: file).standardizedFileURL))

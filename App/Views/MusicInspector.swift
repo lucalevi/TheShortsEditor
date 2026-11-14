@@ -33,19 +33,31 @@ struct MusicInspector: View {
             }
 
             VStack(alignment: .leading, spacing: 6) {
-                Toggle("Lower while people talk", isOn: Binding(get: { music.lowersUnderSpeech }, set: { on in
-                    model.editMusic(on ? "Lower Music Under Speech" : "Keep Music Level") { $0.lowersUnderSpeech = on }
-                }))
+                Toggle(
+                    "Lower while people talk",
+                    isOn: Binding(
+                        get: { music.lowersUnderSpeech },
+                        set: { on in
+                            model.editMusic(on ? "Lower Music Under Speech" : "Keep Music Level") { $0.lowersUnderSpeech = on }
+                        }))
                 Text("The music goes down whenever there's speech in your clips, so every word is heard. The line on the timeline shows it.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
-                Toggle("Fade in at the start", isOn: Binding(get: { music.fadesIn }, set: { on in
-                    model.editMusic("Change Music Fade") { $0.fadesIn = on }
-                }))
-                Toggle("Fade out at the end", isOn: Binding(get: { music.fadesOut }, set: { on in
-                    model.editMusic("Change Music Fade") { $0.fadesOut = on }
-                }))
+                Toggle(
+                    "Fade in at the start",
+                    isOn: Binding(
+                        get: { music.fadesIn },
+                        set: { on in
+                            model.editMusic("Change Music Fade") { $0.fadesIn = on }
+                        }))
+                Toggle(
+                    "Fade out at the end",
+                    isOn: Binding(
+                        get: { music.fadesOut },
+                        set: { on in
+                            model.editMusic("Change Music Fade") { $0.fadesOut = on }
+                        }))
             }
             .toggleStyle(.checkbox)
 
@@ -53,7 +65,8 @@ struct MusicInspector: View {
                 Text("Start the song at").font(.subheadline.weight(.semibold))
                 let latest = max(song.duration.seconds - 1, 0)
                 HStack {
-                    Slider(value: Binding(get: { draggingStart ?? music.sourceStart.seconds }, set: { draggingStart = $0 }), in: 0...max(latest, 0.01)) { editing in
+                    Slider(value: Binding(get: { draggingStart ?? music.sourceStart.seconds }, set: { draggingStart = $0 }), in: 0...max(latest, 0.01)) {
+                        editing in
                         if !editing, let value = draggingStart {
                             draggingStart = nil
                             model.setMusicStart(CMTime(seconds: value, preferredTimescale: 600))
@@ -69,19 +82,25 @@ struct MusicInspector: View {
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
                 if model.project.musicEndsEarly, let range = model.project.musicRange {
-                    Label("The song ends at \(TimeFormat.string(range.end)), before your Short does. Start it earlier, loop it, or pick a longer song.", systemImage: "info.circle")
-                        .font(.caption)
-                        .fixedSize(horizontal: false, vertical: true)
+                    Label(
+                        "The song ends at \(TimeFormat.string(range.end)), before your Short does. Start it earlier, loop it, or pick a longer song.",
+                        systemImage: "info.circle"
+                    )
+                    .font(.caption)
+                    .fixedSize(horizontal: false, vertical: true)
                 }
             }
 
             MusicRhythmSection(model: model, music: music, song: song)
 
             if model.duration > CMTime(value: 60, timescale: 1) {
-                Label("Your Short is longer than 1:00. If the song's owner claims it, YouTube blocks the Short. Use music you have the rights to.", systemImage: "exclamationmark.triangle.fill")
-                    .font(.caption)
-                    .foregroundStyle(.orange)
-                    .fixedSize(horizontal: false, vertical: true)
+                Label(
+                    "Your Short is longer than 1:00. If the song's owner claims it, YouTube blocks the Short. Use music you have the rights to.",
+                    systemImage: "exclamationmark.triangle.fill"
+                )
+                .font(.caption)
+                .foregroundStyle(.orange)
+                .fixedSize(horizontal: false, vertical: true)
             }
 
             HStack {

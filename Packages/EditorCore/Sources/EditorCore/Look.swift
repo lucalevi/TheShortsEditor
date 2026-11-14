@@ -71,8 +71,10 @@ public struct ColorAdjustments: Codable, Equatable, Hashable, Sendable {
 
     public static let range: ClosedRange<Double> = -1...1
 
-    public init(exposure: Double = 0, contrast: Double = 0, highlights: Double = 0, shadows: Double = 0,
-                saturation: Double = 0, warmth: Double = 0, tint: Double = 0) {
+    public init(
+        exposure: Double = 0, contrast: Double = 0, highlights: Double = 0, shadows: Double = 0,
+        saturation: Double = 0, warmth: Double = 0, tint: Double = 0
+    ) {
         self.exposure = exposure
         self.contrast = contrast
         self.highlights = highlights
@@ -87,8 +89,9 @@ public struct ColorAdjustments: Codable, Equatable, Hashable, Sendable {
     /// Every value kept inside −1…1 and rounded to hundredths, so sliders and saved files agree.
     public var tidied: ColorAdjustments {
         func t(_ v: Double) -> Double { (v.clamped(-1, 1) * 100).rounded() / 100 }
-        return ColorAdjustments(exposure: t(exposure), contrast: t(contrast), highlights: t(highlights), shadows: t(shadows),
-                                saturation: t(saturation), warmth: t(warmth), tint: t(tint))
+        return ColorAdjustments(
+            exposure: t(exposure), contrast: t(contrast), highlights: t(highlights), shadows: t(shadows),
+            saturation: t(saturation), warmth: t(warmth), tint: t(tint))
     }
 
     // How strong the sliders are at ±1.
@@ -197,8 +200,9 @@ public struct ColorAdjustments: Codable, Equatable, Hashable, Sendable {
             if min(now.mean.r, now.mean.g, now.mean.b) > 0.02, min(reference.mean.r, reference.mean.g, reference.mean.b) > 0.02 {
                 let wanted = reference.mean
                 result.warmth += (log(wanted.r / wanted.b) - log(now.mean.r / now.mean.b)) / (2 * warmthStrength)
-                result.tint += (log(now.mean.g / (now.mean.r * now.mean.b).squareRoot())
-                    - log(wanted.g / (wanted.r * wanted.b).squareRoot())) / tintStrength
+                result.tint +=
+                    (log(now.mean.g / (now.mean.r * now.mean.b).squareRoot())
+                        - log(wanted.g / (wanted.r * wanted.b).squareRoot())) / tintStrength
             }
             if now.median > 0.01, reference.median > 0.01 {
                 result.exposure += log2(reference.median / now.median) / exposureStops

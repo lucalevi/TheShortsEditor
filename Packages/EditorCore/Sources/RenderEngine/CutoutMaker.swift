@@ -29,17 +29,21 @@ public nonisolated enum CutoutMaker {
     /// Makes the see-through copy of the video at `url` into `destination`. `matte` (for tests)
     /// replaces Vision: it gets each upright frame and gives a grey picture, white where it is kept.
     @concurrent
-    public static func makeVideo(from url: URL, to destination: URL, subject: CutoutSubject,
-                                 matte: (@Sendable (CIImage) -> CIImage?)? = nil,
-                                 progress: @escaping @Sendable (Double) -> Void = { _ in }) async throws {
+    public static func makeVideo(
+        from url: URL, to destination: URL, subject: CutoutSubject,
+        matte: (@Sendable (CIImage) -> CIImage?)? = nil,
+        progress: @escaping @Sendable (Double) -> Void = { _ in }
+    ) async throws {
         let asset = AVURLAsset(url: url)
         guard let track = try await asset.loadTracks(withMediaType: .video).first else { throw CutoutError.unreadable }
         let (naturalSize, transform, range) = try await track.load(.naturalSize, .preferredTransform, .timeRange)
         guard naturalSize.width > 0, naturalSize.height > 0 else { throw CutoutError.unreadable }
         let reader = try AVAssetReader(asset: asset)
-        let output = AVAssetReaderTrackOutput(track: track, outputSettings: [
-            kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA,
-        ])
+        let output = AVAssetReaderTrackOutput(
+            track: track,
+            outputSettings: [
+                kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA
+            ])
         output.alwaysCopiesSampleData = false
         reader.add(output)
 
@@ -50,21 +54,26 @@ public nonisolated enum CutoutMaker {
         let partial = destination.deletingPathExtension().appendingPathExtension("partial.mov")
         try? FileManager.default.removeItem(at: partial)
         let writer = try AVAssetWriter(outputURL: partial, fileType: .mov)
-        let input = AVAssetWriterInput(mediaType: .video, outputSettings: [
-            AVVideoCodecKey: AVVideoCodecType.hevcWithAlpha,
-            AVVideoWidthKey: width,
-            AVVideoHeightKey: height,
-            AVVideoCompressionPropertiesKey: [AVVideoQualityKey: 0.8] as [String: Any],
-        ])
+        let input = AVAssetWriterInput(
+            mediaType: .video,
+            outputSettings: [
+                AVVideoCodecKey: AVVideoCodecType.hevcWithAlpha,
+                AVVideoWidthKey: width,
+                AVVideoHeightKey: height,
+                AVVideoCompressionPropertiesKey: [AVVideoQualityKey: 0.8] as [String: Any],
+            ])
         input.expectsMediaDataInRealTime = false
         // The same turn; its move is in pixels of the smaller copy.
-        input.transform = CGAffineTransform(a: transform.a, b: transform.b, c: transform.c, d: transform.d,
-                                            tx: transform.tx * CGFloat(width) / naturalSize.width, ty: transform.ty * CGFloat(height) / naturalSize.height)
-        let adaptor = AVAssetWriterInputPixelBufferAdaptor(assetWriterInput: input, sourcePixelBufferAttributes: [
-            kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA,
-            kCVPixelBufferWidthKey as String: width,
-            kCVPixelBufferHeightKey as String: height,
-        ])
+        input.transform = CGAffineTransform(
+            a: transform.a, b: transform.b, c: transform.c, d: transform.d,
+            tx: transform.tx * CGFloat(width) / naturalSize.width, ty: transform.ty * CGFloat(height) / naturalSize.height)
+        let adaptor = AVAssetWriterInputPixelBufferAdaptor(
+            assetWriterInput: input,
+            sourcePixelBufferAttributes: [
+                kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA,
+                kCVPixelBufferWidthKey as String: width,
+                kCVPixelBufferHeightKey as String: height,
+            ])
         guard writer.canAdd(input) else { throw CutoutError.failed }
         writer.add(input)
         guard reader.startReading() else { throw reader.error ?? CutoutError.unreadable }
@@ -129,14 +138,17 @@ public nonisolated enum CutoutMaker {
 
     /// Makes the see-through copy of the picture at `url` (a PNG) into `destination`.
     @concurrent
-    public static func makePicture(from url: URL, to destination: URL, subject: CutoutSubject,
-                                   matte: (@Sendable (CIImage) -> CIImage?)? = nil) async throws {
+    public static func makePicture(
+        from url: URL, to destination: URL, subject: CutoutSubject,
+        matte: (@Sendable (CIImage) -> CIImage?)? = nil
+    ) async throws {
         guard let picture = StillImages.image(at: url) else { throw CutoutError.unreadable }
         let image = CIImage(cgImage: picture)
         let kept = (matte?(image) ?? MatteFinder(subject: subject, forVideo: false).matte(of: image)) ?? CIImage(color: .black).cropped(to: image.extent)
         let cut = CutoutRenderer.masked(image, by: kept)
         let context = CIContext(options: [.workingColorSpace: NSNull(), .cacheIntermediates: false])
-        guard let cg = context.createCGImage(cut, from: image.extent, format: .RGBA8, colorSpace: picture.colorSpace ?? CGColorSpace(name: CGColorSpace.sRGB)) else {
+        guard let cg = context.createCGImage(cut, from: image.extent, format: .RGBA8, colorSpace: picture.colorSpace ?? CGColorSpace(name: CGColorSpace.sRGB))
+        else {
             throw CutoutError.failed
         }
         try FileManager.default.createDirectory(at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
@@ -216,13 +228,16 @@ public enum CutoutCache {
     /// and the copy has been made, else its own file.
     public static func pictureURL(for clip: Clip, media: MediaAsset) -> URL {
         guard let subject = clip.cutout.removeBackground,
-              let copy = existingCopy(of: media.url, subject: subject, isImage: media.isImage) else { return media.url }
+            let copy = existingCopy(of: media.url, subject: subject, isImage: media.isImage)
+        else { return media.url }
         return copy
     }
 
     /// Makes the copy unless that was done already.
-    public static func make(_ url: URL, subject: CutoutSubject, isImage: Bool,
-                            progress: @escaping @Sendable (Double) -> Void = { _ in }) async throws -> URL {
+    public static func make(
+        _ url: URL, subject: CutoutSubject, isImage: Bool,
+        progress: @escaping @Sendable (Double) -> Void = { _ in }
+    ) async throws -> URL {
         if let copy = existingCopy(of: url, subject: subject, isImage: isImage) { return copy }
         let copy = copyURL(for: url, subject: subject, isImage: isImage)
         if isImage {

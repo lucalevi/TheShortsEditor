@@ -166,8 +166,10 @@ public struct ClipMask: Codable, Equatable, Hashable, Sendable {
     /// Hides the shape instead of keeping it.
     public var inverted: Bool
 
-    public init(shape: Shape, centerX: Double = 0.5, centerY: Double = 0.5, size: Double? = nil, stretch: Double = 1,
-                rotation: Double = 0, feather: Double = 0.1, roundness: Double = 0.2, inverted: Bool = false) {
+    public init(
+        shape: Shape, centerX: Double = 0.5, centerY: Double = 0.5, size: Double? = nil, stretch: Double = 1,
+        rotation: Double = 0, feather: Double = 0.1, roundness: Double = 0.2, inverted: Bool = false
+    ) {
         self.shape = shape
         self.centerX = centerX
         self.centerY = centerY

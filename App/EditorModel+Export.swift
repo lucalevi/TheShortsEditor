@@ -22,7 +22,7 @@ extension EditorModel {
                 peak = try await AudioProbe.peak(of: project, in: firstSecond)
             } catch {
                 Log.export.failure("beginExport", error)
-                peak = 1  // Couldn't measure: skip that check rather than claim silence.
+                peak = 1 // Couldn't measure: skip that check rather than claim silence.
             }
             guard exportPhase == .checking else { return }
             exportPhase = .review(ExportReview.issues(for: project, openingPeak: peak, titleFrames: TitlePreview.frames(in: project), missing: missingAssets))

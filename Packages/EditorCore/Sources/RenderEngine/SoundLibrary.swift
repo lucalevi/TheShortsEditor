@@ -352,7 +352,9 @@ public nonisolated enum SoundEffect: String, CaseIterable, Identifiable, Sendabl
             case .notification:
                 value = (t < 0.15 ? tone(t, 988) : tone(t, 1319)) * exp(-(t < 0.15 ? t : t - 0.15) * 7) * min(t * 400, 1) * (t > 0.14 && t < 0.15 ? 0 : 1)
             case .typing:
-                value = typingHits.reduce(0.0) { sum, at in sum + (t >= at ? knock(t, at: at, frequency: 2200, decay: 180) + 0.5 * noise() * exp(-(t - at) * 300) : 0) }
+                value = typingHits.reduce(0.0) { sum, at in
+                    sum + (t >= at ? knock(t, at: at, frequency: 2200, decay: 180) + 0.5 * noise() * exp(-(t - at) * 300) : 0)
+                }
             case .shutter:
                 value = noise() * (exp(-t * 120) + (t > 0.12 ? exp(-(t - 0.12) * 90) : 0)) * lowPass(1, &low, 4000)
             case .correct:
@@ -433,7 +435,9 @@ public nonisolated enum SoundEffect: String, CaseIterable, Identifiable, Sendabl
                 value = ping
             case .kaching:
                 let rattle = t < 0.12 ? lowPass(noise(), &low, 5000) * 0.6 : 0
-                let bells = knock(t, at: 0.12, frequency: 2637, decay: 5) + 0.6 * knock(t, at: 0.12, frequency: 3951, decay: 6) + 0.5 * knock(t, at: 0.2, frequency: 3136, decay: 5)
+                let bells =
+                    knock(t, at: 0.12, frequency: 2637, decay: 5) + 0.6 * knock(t, at: 0.12, frequency: 3951, decay: 6) + 0.5
+                    * knock(t, at: 0.2, frequency: 3136, decay: 5)
                 value = rattle + bells
             case .vibrate:
                 let on = t < 0.4 || (t > 0.55 && t < 0.95)
@@ -483,17 +487,19 @@ public nonisolated enum SoundEffect: String, CaseIterable, Identifiable, Sendabl
     func write(to url: URL) throws {
         let values = samples()
         guard let format = AVAudioFormat(standardFormatWithSampleRate: Self.sampleRate, channels: 2),
-              let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(values.count))
+            let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(values.count))
         else { throw CocoaError(.fileWriteUnknown) }
         buffer.frameLength = AVAudioFrameCount(values.count)
         for channel in 0..<2 {
             values.withUnsafeBufferPointer { buffer.floatChannelData![channel].update(from: $0.baseAddress!, count: values.count) }
         }
         let temporary = url.deletingLastPathComponent().appending(path: UUID().uuidString + ".caf")
-        let file = try AVAudioFile(forWriting: temporary, settings: [
-            AVFormatIDKey: kAudioFormatLinearPCM, AVSampleRateKey: Self.sampleRate, AVNumberOfChannelsKey: 2,
-            AVLinearPCMBitDepthKey: 16, AVLinearPCMIsFloatKey: false,
-        ])
+        let file = try AVAudioFile(
+            forWriting: temporary,
+            settings: [
+                AVFormatIDKey: kAudioFormatLinearPCM, AVSampleRateKey: Self.sampleRate, AVNumberOfChannelsKey: 2,
+                AVLinearPCMBitDepthKey: 16, AVLinearPCMIsFloatKey: false,
+            ])
         try file.write(from: buffer)
         file.close()
         try? FileManager.default.removeItem(at: url)

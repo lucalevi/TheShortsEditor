@@ -2,14 +2,16 @@ import CoreGraphics
 import CoreMedia
 import Foundation
 import Testing
+
 @testable import EditorCore
 
 private func t(_ s: Double) -> CMTime { CMTime(seconds: s, preferredTimescale: 600).snappedToFrame() }
 
 private func oneClip(seconds: Int64 = 10) -> Project {
     var p = Project()
-    let asset = MediaAsset(url: URL(fileURLWithPath: "/tmp/a.mov"), name: "a.mov", duration: CMTime(value: seconds, timescale: 1),
-                           displaySize: CGSize(width: 1080, height: 1920), hasAudio: true)
+    let asset = MediaAsset(
+        url: URL(fileURLWithPath: "/tmp/a.mov"), name: "a.mov", duration: CMTime(value: seconds, timescale: 1),
+        displaySize: CGSize(width: 1080, height: 1920), hasAudio: true)
     p.appendClip(of: p.addAsset(asset))
     return p
 }
@@ -36,7 +38,9 @@ struct EffectTests {
         p.addEffect(.flash, to: [id])
         #expect(p.timeline.clips[0].effects[1].part == .start)
         let effect = p.timeline.clips[0].effects[0].id
-        p.updateEffect(effect, on: id) { $0.strength = 3; $0.length = t(20) }
+        p.updateEffect(effect, on: id) {
+            $0.strength = 3; $0.length = t(20)
+        }
         #expect(p.timeline.clips[0].effects[0].strength == 1)
         #expect(p.timeline.clips[0].effects[0].length == t(3))
         p.removeEffect(effect, from: id)

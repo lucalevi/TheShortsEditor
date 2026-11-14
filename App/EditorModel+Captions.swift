@@ -95,7 +95,8 @@ extension EditorModel {
         let panel = NSOpenPanel()
         panel.allowedContentTypes = [Self.srtType]
         panel.allowsOtherFileTypes = true
-        panel.message = project.hasCaptions
+        panel.message =
+            project.hasCaptions
             ? "Choose a subtitle file (.srt). Its captions replace the ones you have now."
             : "Choose a subtitle file (.srt). Its captions are placed at their times on the timeline."
         panel.prompt = "Import"
@@ -208,7 +209,7 @@ extension EditorModel {
         Task {
             defer { wordModelJob = nil }
             guard let picks = try? await WordModel.picks(for: words, language: project.captionLanguageInUse, task: .keywords),
-                  !picks.keywords.isEmpty
+                !picks.keywords.isEmpty
             else { return pickKeywordsByRules() }
             apply("Highlight Key Words") { project in
                 project.setKeywords(picks.keywords)
@@ -236,7 +237,7 @@ extension EditorModel {
         Task {
             defer { wordModelJob = nil }
             guard let picks = try? await WordModel.picks(for: words, language: project.captionLanguageInUse, task: .emoji),
-                  !picks.emoji.isEmpty
+                !picks.emoji.isEmpty
             else { return suggestEmojiByRules() }
             apply("Add Emoji") { project in
                 project.setEmoji(picks.emoji)
@@ -266,7 +267,8 @@ extension EditorModel {
                 let picks = try await WordModel.picks(for: words, language: project.captionLanguageInUse, task: .fillers)
                 modelFillers = picks.fillers
                 if picks.fillers.isEmpty {
-                    alert = AlertMessage(title: "No other fillers found", message: "Apple Intelligence didn't find words like “like” or “tipo” used as fillers.")
+                    alert = AlertMessage(
+                        title: "No other fillers found", message: "Apple Intelligence didn't find words like “like” or “tipo” used as fillers.")
                 }
             } catch {
                 Log.captions.failure("findMoreFillers", error)

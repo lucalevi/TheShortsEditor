@@ -279,8 +279,9 @@ extension EditorModel {
         player.pause()
         Task {
             guard await AVCaptureDevice.requestAccess(for: .audio) else {
-                alert = AlertMessage(title: "The microphone is off for Shorts Editor",
-                                     message: "Turn it on in System Settings ▸ Privacy & Security ▸ Microphone, then try again.")
+                alert = AlertMessage(
+                    title: "The microphone is off for Shorts Editor",
+                    message: "Turn it on in System Settings ▸ Privacy & Security ▸ Microphone, then try again.")
                 return
             }
             if currentTime >= duration - .oneFrame { seek(to: .zero) }
@@ -295,9 +296,11 @@ extension EditorModel {
                 try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
                 let stamp = Date.now.formatted(.iso8601.year().month().day().time(includingFractionalSeconds: false)).replacingOccurrences(of: ":", with: ".")
                 let url = folder.appending(path: "Voice-over \(stamp).m4a")
-                let recorder = try AVAudioRecorder(url: url, settings: [
-                    AVFormatIDKey: kAudioFormatMPEG4AAC, AVSampleRateKey: 48_000, AVNumberOfChannelsKey: 1, AVEncoderBitRateKey: 192_000,
-                ])
+                let recorder = try AVAudioRecorder(
+                    url: url,
+                    settings: [
+                        AVFormatIDKey: kAudioFormatMPEG4AAC, AVSampleRateKey: 48_000, AVNumberOfChannelsKey: 1, AVEncoderBitRateKey: 192_000,
+                    ])
                 guard recorder.record() else { throw CocoaError(.fileWriteUnknown) }
                 self.recorder = recorder
                 voiceOverURL = url

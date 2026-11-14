@@ -11,9 +11,11 @@ enum Placeholder {
         if let cached, let track = try await cached.loadTracks(withMediaType: .video).first { return (cached, track) }
         let url = FileManager.default.temporaryDirectory.appending(path: "shorts-editor-missing-\(UUID().uuidString).mov")
         let writer = try AVAssetWriter(outputURL: url, fileType: .mov)
-        let input = AVAssetWriterInput(mediaType: .video, outputSettings: [
-            AVVideoCodecKey: AVVideoCodecType.h264, AVVideoWidthKey: 64, AVVideoHeightKey: 64,
-        ])
+        let input = AVAssetWriterInput(
+            mediaType: .video,
+            outputSettings: [
+                AVVideoCodecKey: AVVideoCodecType.h264, AVVideoWidthKey: 64, AVVideoHeightKey: 64,
+            ])
         input.expectsMediaDataInRealTime = false
         let adaptor = AVAssetWriterInputPixelBufferAdaptor(assetWriterInput: input, sourcePixelBufferAttributes: nil)
         writer.add(input)
@@ -25,7 +27,7 @@ enum Placeholder {
         guard let buffer else { throw CancellationError() }
         CVPixelBufferLockBaseAddress(buffer, [])
         memset(CVPixelBufferGetBaseAddress(buffer), 0, CVPixelBufferGetDataSize(buffer))
-        for y in 0..<64 {  // opaque black (alpha 255)
+        for y in 0..<64 { // opaque black (alpha 255)
             let row = CVPixelBufferGetBaseAddress(buffer)!.advanced(by: y * CVPixelBufferGetBytesPerRow(buffer)).assumingMemoryBound(to: UInt8.self)
             for x in 0..<64 { row[x * 4 + 3] = 255 }
         }

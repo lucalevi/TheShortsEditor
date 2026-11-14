@@ -199,7 +199,9 @@ extension EditorModel {
                         if let newID = project.replaceClip(clipID, with: id, part: part, mode: action), let range = project.timeline.range(of: newID) {
                             at = range.end
                         }
-                    } else if let newID = project.insertClip(of: id, part: part, at: at), let range = project.timeline.range(of: newID) { at = range.end }
+                    } else if let newID = project.insertClip(of: id, part: part, at: at), let range = project.timeline.range(of: newID) {
+                        at = range.end
+                    }
                 case .overClips, .splitScreen, .pictureInPicture:
                     if let newID = project.addOverlay(of: id, part: part, at: at, as: action), let overlay = project.overlay(id: newID) { at = overlay.end }
                 }
@@ -215,7 +217,10 @@ extension EditorModel {
             var at = time
             for (index, id) in ids.enumerated() where project.asset(id: id)?.hasVideo == true {
                 if let newID = project.insertClip(of: id, part: index < urlParts.count ? urlParts[index] : nil, at: at),
-                   let range = project.timeline.range(of: newID) { at = range.end }
+                    let range = project.timeline.range(of: newID)
+                {
+                    at = range.end
+                }
             }
         }
     }
@@ -223,14 +228,17 @@ extension EditorModel {
     /// The menu shown where files are dropped on a clip: replace it, put them in, or over it.
     func showDropMenu(for urls: [URL], on clipID: Clip.ID, at time: CMTime) {
         let menu = NSMenu()
-        let header = NSMenuItem(title: urls.count == 1 ? "Drop “\(urls[0].deletingPathExtension().lastPathComponent)”:" : "Drop \(urls.count) files:", action: nil, keyEquivalent: "")
+        let header = NSMenuItem(
+            title: urls.count == 1 ? "Drop “\(urls[0].deletingPathExtension().lastPathComponent)”:" : "Drop \(urls.count) files:", action: nil,
+            keyEquivalent: "")
         header.isEnabled = false
         menu.addItem(header)
         for action in DropAction.allCases {
             if action == .overClips { menu.addItem(.separator()) }
-            menu.addItem(ActionMenuItem(title: action.displayName) { [weak self] in
-                self?.dropFiles(urls, on: clipID, at: time, action: action)
-            })
+            menu.addItem(
+                ActionMenuItem(title: action.displayName) { [weak self] in
+                    self?.dropFiles(urls, on: clipID, at: time, action: action)
+                })
         }
         menu.addItem(.separator())
         menu.addItem(ActionMenuItem(title: "Cancel") {})
@@ -341,15 +349,17 @@ extension EditorModel {
 
     /// /: plays the range, or the selected item, once (or over and over with loop on).
     func playSelection() {
-        let range: CMTimeRange? = timelineRange ?? {
-            switch selection {
-            case .clip(let id)?: project.timeline.range(of: id)
-            case .title(let id)?: project.title(id: id)?.visibleRange(in: project)
-            case .overlay(let id)?: project.overlay(id: id)?.visibleRange(in: project)
-            case .sound(let id)?: project.sound(id: id)?.audibleRange(in: project)
-            default: nil
-            }
-        }()
+        let range: CMTimeRange? =
+            timelineRange
+            ?? {
+                switch selection {
+                case .clip(let id)?: project.timeline.range(of: id)
+                case .title(let id)?: project.title(id: id)?.visibleRange(in: project)
+                case .overlay(let id)?: project.overlay(id: id)?.visibleRange(in: project)
+                case .sound(let id)?: project.sound(id: id)?.audibleRange(in: project)
+                default: nil
+                }
+            }()
         guard let range, range.duration > .zero else { NSSound.beep(); return }
         skimTime = nil
         seek(to: range.start)
@@ -420,7 +430,8 @@ enum EditorTip: String, CaseIterable {
         case .mediaKeys: "Press E to add this file to the end, or W to put it in at the playhead. Drag across the bar under it to use only part of it."
         case .follow: "Titles, B-roll and sounds move with the clip under their start (the thin line shows which one). You can turn this off in the inspector."
         case .dropOnClip: "Drop on a cut to put it in there. Drop on a clip to replace it, or to show it over the clip."
-        case .transitions: "The white square on the cut is the transition. Click it to choose another kind or change its length. Move the pointer across it to see it."
+        case .transitions:
+            "The white square on the cut is the transition. Click it to choose another kind or change its length. Move the pointer across it to see it."
         case .freezeFrame: "The freeze frame holds this picture for three seconds. Drag its edges to make it shorter or longer."
         case .looks: "Press ⌥C to compare with the original. Copy Settings (⌥⌘C) and Paste Settings ▸ Look give other clips the same colour and filter."
         case .markers: "Double-click a marker to name it, drag it to move it. Dragged edges stick to markers, and ⌃' / ⌃; jump between them."

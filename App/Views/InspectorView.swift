@@ -7,14 +7,25 @@ struct InspectorView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            PanelHeader(title: model.silenceSession != nil ? "Remove Pauses"
-                        : model.timelineRange != nil ? "Range"
-                        : model.timelineSelection.count > 1 ? "\(model.timelineSelection.count) Selected"
-                        : model.selectedTitle != nil ? (model.selectedTitle?.isSticker == true ? "Sticker" : "Title")
-                        : model.selectedOverlay != nil ? "Over the Clips"
-                        : model.selectedSound != nil ? (model.selectedSound!.isVoiceOver ? "Voice-Over" : model.selectedSound!.detachedFrom != nil ? "Clip Sound" : model.selectedSound!.lowersUnderSpeech ? "Song" : "Sound Effect")
-                        : model.selection == .music && model.project.music != nil ? "Music"
-                        : model.selectedClip == nil ? "Your Short" : "Clip")
+            PanelHeader(
+                title: model.silenceSession != nil
+                    ? "Remove Pauses"
+                    : model.timelineRange != nil
+                        ? "Range"
+                        : model.timelineSelection.count > 1
+                            ? "\(model.timelineSelection.count) Selected"
+                            : model.selectedTitle != nil
+                                ? (model.selectedTitle?.isSticker == true ? "Sticker" : "Title")
+                                : model.selectedOverlay != nil
+                                    ? "Over the Clips"
+                                    : model.selectedSound != nil
+                                        ? (model.selectedSound!.isVoiceOver
+                                            ? "Voice-Over"
+                                            : model.selectedSound!.detachedFrom != nil
+                                                ? "Clip Sound" : model.selectedSound!.lowersUnderSpeech ? "Song" : "Sound Effect")
+                                        : model.selection == .music && model.project.music != nil
+                                            ? "Music"
+                                            : model.selectedClip == nil ? "Your Short" : "Clip")
             ScrollView {
                 Group {
                     if model.silenceSession != nil {
@@ -252,10 +263,13 @@ private struct ClipSound: View {
                         .monospacedDigit()
                         .frame(width: 40, alignment: .trailing)
                 }
-                Text(clip.isMuted ? "This clip is silent." : "100% is the sound as recorded. Your whole Short is evened out to YouTube's loudness when you export.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+                Text(
+                    clip.isMuted
+                        ? "This clip is silent." : "100% is the sound as recorded. Your whole Short is evened out to YouTube's loudness when you export."
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
                 if clip.volume != 1, !clip.isMuted {
                     Button("Reset to 100%") { model.setClipVolume(clip.id, 1) }.controlSize(.small)
                 }
@@ -392,7 +406,11 @@ private struct ProjectInspector: View {
                 Tip(icon: "hand.tap", text: "Click a clip to select it. Drag it to move it, or drag its edges to trim it.")
                 Tip(icon: "rectangle.on.rectangle", text: "Drop B-roll or pictures on the row above the clips to show them over your clips.")
                 Tip(icon: "plus.magnifyingglass", text: "Punch in on every other cut (Clip menu) to hide jump cuts.")
-                Tip(icon: "circle.lefthalf.filled", text: "Press ⌥T to put a transition on the cut nearest the playhead. Plain cuts are usually best; keep transitions for a change of place or time.")
+                Tip(
+                    icon: "circle.lefthalf.filled",
+                    text:
+                        "Press ⌥T to put a transition on the cut nearest the playhead. Plain cuts are usually best; keep transitions for a change of place or time."
+                )
             }
         }
     }

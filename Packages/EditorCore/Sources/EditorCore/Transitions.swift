@@ -143,8 +143,10 @@ public extension Timeline {
             let frames = min(wanted, room)
             guard frames >= 1 else { continue }
             let half = CMTime(value: frames, timescale: Project.frameRate)
-            spans.append(TransitionSpan(from: clip.id, to: next.id, kind: transition.kind, cut: cut,
-                                        range: CMTimeRange(start: cut - half, end: cut + half)))
+            spans.append(
+                TransitionSpan(
+                    from: clip.id, to: next.id, kind: transition.kind, cut: cut,
+                    range: CMTimeRange(start: cut - half, end: cut + half)))
         }
         return spans
     }

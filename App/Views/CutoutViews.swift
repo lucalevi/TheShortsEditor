@@ -56,12 +56,15 @@ struct CutoutSection: View {
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             } else {
-                Text(clip.cutout.removeBackground?.hint.appending(". What is under it shows through.")
-                     ?? (isMain ? "Keep only the people or the main subject, over the colour behind the picture."
-                               : "Keep only the people or the main subject, over the clips under it."))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+                Text(
+                    clip.cutout.removeBackground?.hint.appending(". What is under it shows through.")
+                        ?? (isMain
+                            ? "Keep only the people or the main subject, over the colour behind the picture."
+                            : "Keep only the people or the main subject, over the clips under it.")
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
             }
         }
     }
@@ -121,12 +124,16 @@ struct CutoutSection: View {
                 slider("Across", mask.centerX, in: 0...1, help: "Left and right") { $0.mask?.centerX = $1 }
                 slider("Up/down", mask.centerY, in: 0...1, help: "Up and down") { $0.mask?.centerY = $1 }
                 if mask.shape.hasSize {
-                    slider("Size", mask.size, in: ClipMask.sizeRange, help: mask.shape == .band ? "How thick the band is" : "How big the shape is") { $0.mask?.size = $1 }
+                    slider("Size", mask.size, in: ClipMask.sizeRange, help: mask.shape == .band ? "How thick the band is" : "How big the shape is") {
+                        $0.mask?.size = $1
+                    }
                 }
                 if mask.shape.stretches {
                     // Stretch is shown from narrow (left) to wide (right) evenly.
-                    slider("Stretch", log2(mask.stretch), in: -2...2, label: { String(format: "%.1f×", pow(2, $0)) },
-                           help: "Narrower or wider") { $0.mask?.stretch = pow(2, $1) }
+                    slider(
+                        "Stretch", log2(mask.stretch), in: -2...2, label: { String(format: "%.1f×", pow(2, $0)) },
+                        help: "Narrower or wider"
+                    ) { $0.mask?.stretch = pow(2, $1) }
                 }
                 slider("Turn", mask.rotation, in: -180...180, label: { "\(Int($0.rounded()))°" }, help: "Turn the shape") { cutout, value in
                     cutout.mask?.rotation = abs(value) < 3 ? 0 : value
@@ -135,9 +142,13 @@ struct CutoutSection: View {
                 if mask.shape == .rectangle {
                     slider("Corners", mask.roundness, in: 0...1, help: "How round the corners are") { $0.mask?.roundness = $1 }
                 }
-                Toggle("Hide the shape instead", isOn: Binding(get: { mask.inverted }, set: { on in
-                    model.updateCutout(of: clip.id, "Invert Mask") { $0.mask?.inverted = on }
-                }))
+                Toggle(
+                    "Hide the shape instead",
+                    isOn: Binding(
+                        get: { mask.inverted },
+                        set: { on in
+                            model.updateCutout(of: clip.id, "Invert Mask") { $0.mask?.inverted = on }
+                        }))
             } else {
                 Text("Keep only a shape of the picture: a circle, one side of a line, a band…")
                     .font(.caption)
@@ -199,9 +210,14 @@ struct CutoutSection: View {
             HStack {
                 Text("Mix with the clips under it")
                 Spacer()
-                Picker("Mix with the clips under it", selection: Binding(get: { clip.cutout.blend }, set: { mode in
-                    model.updateCutout(of: clip.id, "Blend Mode") { $0.blend = mode }
-                })) {
+                Picker(
+                    "Mix with the clips under it",
+                    selection: Binding(
+                        get: { clip.cutout.blend },
+                        set: { mode in
+                            model.updateCutout(of: clip.id, "Blend Mode") { $0.blend = mode }
+                        })
+                ) {
                     ForEach(BlendMode.allCases) { Text($0.displayName).tag($0) }
                 }
                 .labelsHidden()
@@ -216,17 +232,23 @@ struct CutoutSection: View {
 
     // MARK: Sliders
 
-    private func slider(_ name: String, _ value: Double, in range: ClosedRange<Double>,
-                        label: @escaping (Double) -> String = { "\(Int(($0 * 100).rounded()))%" }, help: String,
-                        _ set: @escaping (inout ClipCutout, Double) -> Void) -> some View {
+    private func slider(
+        _ name: String, _ value: Double, in range: ClosedRange<Double>,
+        label: @escaping (Double) -> String = { "\(Int(($0 * 100).rounded()))%" }, help: String,
+        _ set: @escaping (inout ClipCutout, Double) -> Void
+    ) -> some View {
         HStack {
             Text(name).font(.caption).frame(width: 58, alignment: .leading)
-            Slider(value: Binding(get: { value }, set: { newValue in
-                var changed = cutout
-                set(&changed, newValue)
-                draft = changed
-                model.previewCutout(changed, for: clip.id)
-            }), in: range) { editing in
+            Slider(
+                value: Binding(
+                    get: { value },
+                    set: { newValue in
+                        var changed = cutout
+                        set(&changed, newValue)
+                        draft = changed
+                        model.previewCutout(changed, for: clip.id)
+                    }), in: range
+            ) { editing in
                 guard !editing, let final = draft else { return }
                 draft = nil
                 model.updateCutout(of: clip.id, "Change \(name)") { $0 = final }

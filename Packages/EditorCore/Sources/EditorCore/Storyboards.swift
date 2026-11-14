@@ -138,8 +138,10 @@ public struct Shot: Codable, Equatable, Sendable {
     /// for the whole shot (templates: the cuts fall on the beat).
     public var fitsExactly = false
 
-    public init(name: String, direction: String, length: CMTime, title: String? = nil, isTalking: Bool = false,
-                transition: TransitionKind? = nil, entrance: MotionAnimation? = nil, fitsExactly: Bool = false) {
+    public init(
+        name: String, direction: String, length: CMTime, title: String? = nil, isTalking: Bool = false,
+        transition: TransitionKind? = nil, entrance: MotionAnimation? = nil, fitsExactly: Bool = false
+    ) {
         self.name = name
         self.direction = direction
         self.length = length
@@ -243,7 +245,8 @@ public extension Project {
     @discardableResult
     mutating func fill(_ slotID: Storyboard.Slot.ID, with assetID: MediaAsset.ID, part: CMTimeRange? = nil) -> Clip.ID? {
         guard var board = storyboard, let slotIndex = board.slots.firstIndex(where: { $0.id == slotID }),
-              var clip = makeClip(of: assetID, part: part), let asset = asset(id: assetID) else { return nil }
+            var clip = makeClip(of: assetID, part: part), let asset = asset(id: assetID)
+        else { return nil }
         let slot = board.slots[slotIndex]
         let wanted = slot.shot.length.snappedToFrame()
         if asset.isImage {
@@ -273,10 +276,12 @@ public extension Project {
             index = at
             timeline.clips.remove(at: at)
         } else if let before = board.slots[..<slotIndex].reversed().compactMap({ filled[$0.id] }).first,
-                  let at = timeline.index(of: before.id) {
+            let at = timeline.index(of: before.id)
+        {
             index = at + 1
         } else if let after = board.slots[(slotIndex + 1)...].compactMap({ filled[$0.id] }).first,
-                  let at = timeline.index(of: after.id) {
+            let at = timeline.index(of: after.id)
+        {
             index = at
         }
         timeline.clips.insert(clip, at: min(index, timeline.clips.count))

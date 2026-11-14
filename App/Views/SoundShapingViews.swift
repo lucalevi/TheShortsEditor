@@ -24,7 +24,9 @@ struct SoundShapingSection: View {
                 if isMain {
                     Button("Detach Sound", systemImage: "waveform.path") { model.detachSound(of: [clip.id]) }
                         .controlSize(.small)
-                        .help("Put this clip's sound on the sound row, so you can trim or move it on its own: start it before the picture, or let it carry on into the next clip (⌥⌘B)")
+                        .help(
+                            "Put this clip's sound on the sound row, so you can trim or move it on its own: start it before the picture, or let it carry on into the next clip (⌥⌘B)"
+                        )
                 }
             }
         }
@@ -54,8 +56,10 @@ struct SoundShapingSection: View {
         if !ranges.isEmpty {
             let seconds = ranges.reduce(0) { $0 + $1.duration.seconds }
             Label {
-                Text("Too loud in places (\(seconds.formatted(.number.precision(.fractionLength(1)))) s): it may crackle. Lower the volume, or the line where the waveform is marked.")
-                    .fixedSize(horizontal: false, vertical: true)
+                Text(
+                    "Too loud in places (\(seconds.formatted(.number.precision(.fractionLength(1)))) s): it may crackle. Lower the volume, or the line where the waveform is marked."
+                )
+                .fixedSize(horizontal: false, vertical: true)
             } icon: {
                 Image(systemName: "exclamationmark.triangle.fill")
             }

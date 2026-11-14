@@ -76,13 +76,15 @@ public nonisolated enum LookRenderer {
         let extent = image.extent
         let half = hypot(extent.width, extent.height) / 2
         let edge = 1 - 0.75 * min(amount, 1)
-        let shade = CIFilter(name: "CIRadialGradient", parameters: [
-            "inputCenter": CIVector(x: extent.midX, y: extent.midY),
-            "inputRadius0": half * 0.45,
-            "inputRadius1": half,
-            "inputColor0": CIColor(red: 1, green: 1, blue: 1),
-            "inputColor1": CIColor(red: edge, green: edge, blue: edge),
-        ])!.outputImage!.cropped(to: extent)
+        let shade = CIFilter(
+            name: "CIRadialGradient",
+            parameters: [
+                "inputCenter": CIVector(x: extent.midX, y: extent.midY),
+                "inputRadius0": half * 0.45,
+                "inputRadius1": half,
+                "inputColor0": CIColor(red: 1, green: 1, blue: 1),
+                "inputColor1": CIColor(red: edge, green: edge, blue: edge),
+            ])!.outputImage!.cropped(to: extent)
         return image.applyingFilter("CIMultiplyCompositing", parameters: [kCIInputBackgroundImageKey: shade]).cropped(to: extent)
     }
 
@@ -104,8 +106,9 @@ public nonisolated enum LookRenderer {
         let width = max(1, Int(Double(image.width) * scale)), height = max(1, Int(Double(image.height) * scale))
         var data = [UInt8](repeating: 0, count: width * height * 4)
         guard let space = CGColorSpace(name: CGColorSpace.sRGB),
-              let context = CGContext(data: &data, width: width, height: height, bitsPerComponent: 8, bytesPerRow: width * 4,
-                                      space: space, bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue)
+            let context = CGContext(
+                data: &data, width: width, height: height, bitsPerComponent: 8, bytesPerRow: width * 4,
+                space: space, bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue)
         else { return [] }
         context.interpolationQuality = .medium
         context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
@@ -119,8 +122,9 @@ public nonisolated enum LookRenderer {
         let size = radius * 2 + 1
         var data = [UInt8](repeating: 0, count: size * size * 4)
         guard let space = CGColorSpace(name: CGColorSpace.sRGB),
-              let context = CGContext(data: &data, width: size, height: size, bitsPerComponent: 8, bytesPerRow: size * 4,
-                                      space: space, bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue)
+            let context = CGContext(
+                data: &data, width: size, height: size, bitsPerComponent: 8, bytesPerRow: size * 4,
+                space: space, bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue)
         else { return nil }
         let x = Int(point.x.rounded()) - radius, y = Int(point.y.rounded()) - radius
         // Bitmap contexts have their origin at the bottom left.

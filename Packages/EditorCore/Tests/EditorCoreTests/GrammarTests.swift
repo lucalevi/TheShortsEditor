@@ -2,13 +2,15 @@ import CoreGraphics
 import CoreMedia
 import Foundation
 import Testing
+
 @testable import EditorCore
 
 private func t(_ s: Double) -> CMTime { CMTime(seconds: s, preferredTimescale: 600).snappedToFrame() }
 
 private func video(_ name: String, seconds: Int64 = 10) -> MediaAsset {
-    MediaAsset(url: URL(fileURLWithPath: "/tmp/\(name)"), name: name, duration: CMTime(value: seconds, timescale: 1),
-               displaySize: CGSize(width: 1080, height: 1920), hasAudio: true)
+    MediaAsset(
+        url: URL(fileURLWithPath: "/tmp/\(name)"), name: name, duration: CMTime(value: seconds, timescale: 1),
+        displaySize: CGSize(width: 1080, height: 1920), hasAudio: true)
 }
 
 /// Clips A (10 s) and B (10 s), back to back.
@@ -80,9 +82,9 @@ struct PuttingMediaInTests {
 
     @Test func usedPartsAreMerged() {
         var (p, a, _) = twoFiles()
-        p.trimClip(p.timeline.clips[0].id, edge: .end, by: t(-6))   // A 0–4
-        p.appendClip(of: a, part: CMTimeRange(start: t(3), duration: t(3)))  // A 3–6
-        p.addOverlay(of: a, at: .zero)  // A 0–4 again
+        p.trimClip(p.timeline.clips[0].id, edge: .end, by: t(-6)) // A 0–4
+        p.appendClip(of: a, part: CMTimeRange(start: t(3), duration: t(3))) // A 3–6
+        p.addOverlay(of: a, at: .zero) // A 0–4 again
         #expect(p.usedParts(of: a) == [CMTimeRange(start: .zero, end: t(6))])
     }
 
@@ -174,7 +176,9 @@ struct FollowingTests {
 
     @Test func splittingChangesNothing() {
         let (p, title, overlay) = withItems()
-        let new = edited(p) { $0.timeline.split(at: t(12)); $0.timeline.split(at: t(2)) }
+        let new = edited(p) {
+            $0.timeline.split(at: t(12)); $0.timeline.split(at: t(2))
+        }
         #expect(new.title(id: title)?.start == t(12))
         #expect(new.overlay(id: overlay)?.start == t(3))
     }
@@ -183,7 +187,9 @@ struct FollowingTests {
         let (p, title, _) = withItems()
         let a = p.timeline.clips[0].id
         let b = p.timeline.clips[1].id
-        let new = edited(p) { $0.setSpeed(2, for: a); $0.setSpeed(2, for: b) }
+        let new = edited(p) {
+            $0.setSpeed(2, for: a); $0.setSpeed(2, for: b)
+        }
         // A is now 5 s; 2 s into B's source is 1 s into the faster B.
         #expect(new.title(id: title)?.start == t(6))
     }
@@ -206,7 +212,9 @@ struct FollowingTests {
     @Test func anItemTheEditMovesItselfStaysWhereItWasPut() {
         let (p, title, _) = withItems()
         let a = p.timeline.clips[0].id
-        let new = edited(p) { $0.timeline.remove(a); $0.moveTitle(title, to: t(7)) }
+        let new = edited(p) {
+            $0.timeline.remove(a); $0.moveTitle(title, to: t(7))
+        }
         #expect(new.title(id: title)?.start == t(7))
     }
 
@@ -242,7 +250,7 @@ struct SettingsTests {
         let b = p.timeline.clips[1].id
         p.updateAnyClip(a) { $0.applyMotion(.slowZoomIn, playheadSource: .zero) }
         p.timeline.clips[1].sourceStart = t(0)
-        p.trimClip(b, edge: .start, by: t(2))   // B shows 2–10
+        p.trimClip(b, edge: .start, by: t(2)) // B shows 2–10
         let source = p.anyClip(id: a)!
         p.pasteSettings([.motion], from: source, to: b)
         let pasted = p.anyClip(id: b)!
@@ -254,7 +262,9 @@ struct SettingsTests {
         var (p, _, _) = twoFiles()
         let a = p.timeline.clips[0].id
         let b = p.timeline.clips[1].id
-        p.updateAnyClip(a) { $0.volume = 1.5; $0.cleansVoice = true }
+        p.updateAnyClip(a) {
+            $0.volume = 1.5; $0.cleansVoice = true
+        }
         p.setSpeed(2, for: a)
         p.pasteSettings([.sound, .speed], from: p.anyClip(id: a)!, to: b)
         let pasted = p.anyClip(id: b)!
@@ -264,7 +274,9 @@ struct SettingsTests {
     @Test func resetPutsBackWhatANewClipHas() {
         var (p, _, _) = twoFiles()
         let a = p.timeline.clips[0].id
-        p.updateAnyClip(a) { $0.placement.scale = 1.2; $0.volume = 0.5; $0.isMuted = true }
+        p.updateAnyClip(a) {
+            $0.placement.scale = 1.2; $0.volume = 0.5; $0.isMuted = true
+        }
         p.setSpeed(0.5, for: a)
         #expect(p.changedSettings(of: a) == [.picture, .sound, .speed])
         p.resetSettings(Set(SettingsKind.allCases), of: a)
@@ -276,7 +288,9 @@ struct SettingsTests {
         var p = twoFiles().0
         let one = p.addTitle(at: .zero, text: "One")
         let two = p.addTitle(at: t(5), text: "Two")
-        p.updateTitle(one) { $0.applyStyle(.marker); $0.verticalPosition = 0.6 }
+        p.updateTitle(one) {
+            $0.applyStyle(.marker); $0.verticalPosition = 0.6
+        }
         p.pasteTitleDesign(from: p.title(id: one)!, to: two)
         #expect(p.title(id: two)?.style == .marker && p.title(id: two)?.verticalPosition == 0.6 && p.title(id: two)?.text == "Two")
     }

@@ -1,6 +1,6 @@
 import AVFoundation
-import os
 import EditorCore
+import os
 
 /// What AVFoundation needs to play (and later export) a project.
 public struct PlayableComposition {
@@ -102,7 +102,10 @@ public enum CompositionBuilder {
                     let insertAt = insertionTime(audioTrack, cursor + clip.timelineOffset(ofSourceTime: range.start))
                     padToTime(audioTrack, insertAt)
                     try audioTrack.insertTimeRange(range, of: sourceAudio, at: insertAt)
-                    if clip.speed != 1 { audioTrack.scaleTimeRange(CMTimeRange(start: insertAt, duration: range.duration), toDuration: clip.timelineDuration(ofSource: range.duration)) }
+                    if clip.speed != 1 {
+                        audioTrack.scaleTimeRange(
+                            CMTimeRange(start: insertAt, duration: range.duration), toDuration: clip.timelineDuration(ofSource: range.duration))
+                    }
                 }
             }
             layers.append((CMTimeRange(start: cursor, duration: clip.duration), layer))
@@ -122,7 +125,9 @@ public enum CompositionBuilder {
         var transitionTrack: AVMutableCompositionTrack?
         var transitions: [(span: TransitionSpan, incoming: CompositorLayer, outgoing: CompositorLayer)] = []
         for span in spans {
-            guard let from = layers.first(where: { $0.layer.clip.id == span.from }), let to = layers.first(where: { $0.layer.clip.id == span.to }) else { continue }
+            guard let from = layers.first(where: { $0.layer.clip.id == span.from }), let to = layers.first(where: { $0.layer.clip.id == span.to }) else {
+                continue
+            }
             if transitionTrack == nil { transitionTrack = composition.addMutableTrack(withMediaType: .video, preferredTrackID: kCMPersistentTrackID_Invalid) }
             guard let track = transitionTrack else { continue }
             let incoming = try await media.borrowedLayer(like: to.layer, before: true, half: span.half, at: span.range.start, in: track)
@@ -139,7 +144,8 @@ public enum CompositionBuilder {
             parameters.setVolume(0, at: .zero)
             for fade in crossfades {
                 guard let from = layers.first(where: { $0.layer.clip.id == fade.span.from })?.layer.clip,
-                      let to = layers.first(where: { $0.layer.clip.id == fade.span.to })?.layer.clip else { continue }
+                    let to = layers.first(where: { $0.layer.clip.id == fade.span.to })?.layer.clip
+                else { continue }
                 let halves: [(clip: Clip, source: CMTimeRange, at: CMTime, volumes: (Double, Double))] = [
                     (to, fade.incomingSource, fade.span.range.start, (0, fade.incomingLevel * 0.5)),
                     (from, fade.outgoingSource, fade.span.cut, (fade.outgoingLevel * 0.5, 0)),
@@ -154,8 +160,9 @@ public enum CompositionBuilder {
                     try fadeTrack.insertTimeRange(half.source, of: sourceAudio, at: insertAt)
                     let end = half.at + fade.span.half
                     fadeTrack.scaleTimeRange(CMTimeRange(start: insertAt, duration: half.source.duration), toDuration: end - insertAt)
-                    parameters.setVolumeRamp(fromStartVolume: Float(half.volumes.0 * gain), toEndVolume: Float(half.volumes.1 * gain),
-                                             timeRange: CMTimeRange(start: insertAt, end: end))
+                    parameters.setVolumeRamp(
+                        fromStartVolume: Float(half.volumes.0 * gain), toEndVolume: Float(half.volumes.1 * gain),
+                        timeRange: CMTimeRange(start: insertAt, end: end))
                 }
             }
             if fadeTrack.segments.isEmpty { composition.removeTrack(fadeTrack) } else { mixInputs.append(parameters) }
@@ -172,12 +179,13 @@ public enum CompositionBuilder {
             if rowVideo[row] == nil { rowVideo[row] = composition.addMutableTrack(withMediaType: .video, preferredTrackID: kCMPersistentTrackID_Invalid) }
             guard let track = rowVideo[row] else { continue }
             var clip = overlay.clip
-            clip.duration = range.duration  // the part after the end of the Short isn't shown
+            clip.duration = range.duration // the part after the end of the Short isn't shown
             let layer = try await media.layer(for: clip, at: overlay.start, in: track, isMain: false)
             overlayLayers.append((range, layer))
 
             guard case .track = layer.source, clip.effectiveVolume > 0,
-                  let sourceAudio = try await media.audioTrack(for: clip) else { continue }
+                let sourceAudio = try await media.audioTrack(for: clip)
+            else { continue }
             if rowAudio[row] == nil, let audio = composition.addMutableTrack(withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid) {
                 rowAudio[row] = (audio, AVMutableAudioMixInputParameters(track: audio))
             }
@@ -186,7 +194,9 @@ public enum CompositionBuilder {
             guard source.duration > .zero else { continue }
             let at = overlay.start + clip.timelineOffset(ofSourceTime: source.start)
             try audio.track.insertTimeRange(source, of: sourceAudio, at: at)
-            if clip.speed != 1 { audio.track.scaleTimeRange(CMTimeRange(start: at, duration: source.duration), toDuration: clip.timelineDuration(ofSource: source.duration)) }
+            if clip.speed != 1 {
+                audio.track.scaleTimeRange(CMTimeRange(start: at, duration: source.duration), toDuration: clip.timelineDuration(ofSource: source.duration))
+            }
             apply(overlay.clip.soundEnvelope(), at: overlay.start, gain: gain, to: audio.parameters, within: range)
         }
         for track in rowVideo.values where track.segments.isEmpty { composition.removeTrack(track) }
@@ -215,7 +225,9 @@ public enum CompositionBuilder {
             guard source.duration > .zero else { continue }
             let at = sound.start + clip.timelineOffset(ofSourceTime: source.start)
             try target.track.insertTimeRange(source, of: sourceAudio, at: at)
-            if clip.speed != 1 { target.track.scaleTimeRange(CMTimeRange(start: at, duration: source.duration), toDuration: clip.timelineDuration(ofSource: source.duration)) }
+            if clip.speed != 1 {
+                target.track.scaleTimeRange(CMTimeRange(start: at, duration: source.duration), toDuration: clip.timelineDuration(ofSource: source.duration))
+            }
             var envelope = sound.clip.soundEnvelope()
             if sound.lowersUnderSpeech, sound.canLowerUnderSpeech {
                 envelope = AudioMix.lowered(envelope, startingAt: sound.start, speech: soundSpeech)
@@ -237,13 +249,15 @@ public enum CompositionBuilder {
             var drawing: TransitionDrawing?
             if let transition = transitions.first(where: { $0.span.range.containsTime(from) }) {
                 let beforeCut = from < transition.span.cut
-                drawing = TransitionDrawing(kind: transition.span.kind, range: transition.span.range,
-                                            other: (beforeCut ? transition.incoming : transition.outgoing).with(region: regions.main), otherIsIncoming: beforeCut)
+                drawing = TransitionDrawing(
+                    kind: transition.span.kind, range: transition.span.range,
+                    other: (beforeCut ? transition.incoming : transition.outgoing).with(region: regions.main), otherIsIncoming: beforeCut)
             }
-            instructions.append(ShortsInstruction(
-                timeRange: CMTimeRange(start: from, end: to), layers: [main.with(region: regions.main)] + over, captions: captions, titles: titles,
-                transition: drawing, look: project.look
-            ))
+            instructions.append(
+                ShortsInstruction(
+                    timeRange: CMTimeRange(start: from, end: to), layers: [main.with(region: regions.main)] + over, captions: captions, titles: titles,
+                    transition: drawing, look: project.look
+                ))
         }
         var missing = media.missing
 
@@ -261,7 +275,8 @@ public enum CompositionBuilder {
             if songAudio == nil { missing.insert(song.id) }
         }
         if let track = project.music, project.musicRange != nil, let songAudio,
-           let musicTrack = composition.addMutableTrack(withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid) {
+            let musicTrack = composition.addMutableTrack(withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid)
+        {
             let available = try await songAudio.load(.timeRange)
             // Once, or over and over when it loops; it may start later than the Short.
             var inserted = false
@@ -276,8 +291,9 @@ public enum CompositionBuilder {
                 envelope = AudioMix.musicEnvelope(for: project, speech: musicSpeech)
                 let parameters = AVMutableAudioMixInputParameters(track: musicTrack)
                 for (a, b) in zip(envelope, envelope.dropFirst()) where b.time > a.time {
-                    parameters.setVolumeRamp(fromStartVolume: Float(a.volume * gain), toEndVolume: Float(b.volume * gain),
-                                             timeRange: CMTimeRange(start: a.time, end: b.time))
+                    parameters.setVolumeRamp(
+                        fromStartVolume: Float(a.volume * gain), toEndVolume: Float(b.volume * gain),
+                        timeRange: CMTimeRange(start: a.time, end: b.time))
                 }
                 mixInputs.append(parameters)
             } else {
@@ -287,14 +303,16 @@ public enum CompositionBuilder {
         let audioMix = AVMutableAudioMix()
         audioMix.inputParameters = mixInputs
 
-        let videoComposition = AVVideoComposition(configuration: .init(
-            customVideoCompositorClass: ShortsCompositor.self,
-            frameDuration: .oneFrame,
-            instructions: instructions,
-            renderSize: Project.canvasSize
-        ))
-        return PlayableComposition(composition: composition, videoComposition: videoComposition, audioMix: audioMix,
-                                   musicEnvelope: envelope, missingAssets: missing)
+        let videoComposition = AVVideoComposition(
+            configuration: .init(
+                customVideoCompositorClass: ShortsCompositor.self,
+                frameDuration: .oneFrame,
+                instructions: instructions,
+                renderSize: Project.canvasSize
+            ))
+        return PlayableComposition(
+            composition: composition, videoComposition: videoComposition, audioMix: audioMix,
+            musicEnvelope: envelope, missingAssets: missing)
     }
 
     /// Where people talk in the Short, from the measured loudness of the clips' files.
@@ -309,8 +327,10 @@ public enum CompositionBuilder {
 
     /// Sets a volume curve (offsets from `start`) on a track's mix, scaled by `gain`, only
     /// inside `within` when given.
-    private static func apply(_ envelope: [VolumePoint], at start: CMTime, gain: Double, to parameters: AVMutableAudioMixInputParameters,
-                              within: CMTimeRange? = nil) {
+    private static func apply(
+        _ envelope: [VolumePoint], at start: CMTime, gain: Double, to parameters: AVMutableAudioMixInputParameters,
+        within: CMTimeRange? = nil
+    ) {
         let limit = within ?? CMTimeRange(start: .zero, duration: .positiveInfinity)
         for (a, b) in zip(envelope, envelope.dropFirst()) {
             let range = CMTimeRange(start: start + a.time, end: start + b.time).intersection(limit)
@@ -428,10 +448,14 @@ private struct MediaSources {
     /// Puts `clip`'s picture into `track` at `start` and says how to draw it. A picture file is
     /// drawn by the compositor; missing media is black (main clip) or nothing (overlay). The main
     /// track always gets something for the whole clip, so the Short keeps its length.
-    mutating func layer(for clip: Clip, at start: CMTime, in track: AVMutableCompositionTrack, isMain: Bool,
-                        segments: [SpeedSegment]? = nil) async throws -> CompositorLayer {
+    mutating func layer(
+        for clip: Clip, at start: CMTime, in track: AVMutableCompositionTrack, isMain: Bool,
+        segments: [SpeedSegment]? = nil
+    ) async throws -> CompositorLayer {
         func make(_ source: CompositorLayer.Source, _ size: CGSize, _ transform: CGAffineTransform = .identity) -> CompositorLayer {
-            CompositorLayer(source: source, clip: clip, timelineStart: start, naturalSize: size, preferredTransform: transform, isMain: isMain, region: CGRect(origin: .zero, size: Project.canvasSize))
+            CompositorLayer(
+                source: source, clip: clip, timelineStart: start, naturalSize: size, preferredTransform: transform, isMain: isMain,
+                region: CGRect(origin: .zero, size: Project.canvasSize))
         }
         let media = project.asset(id: clip.assetID)
         if let media, media.hasVideo, !media.isImage, clip.isFrozen {
@@ -480,7 +504,9 @@ private struct MediaSources {
             } else {
                 let range = inFile(clip.sourceRange)
                 try track.insertTimeRange(range, of: video, at: start)
-                if clip.speed != 1 || range.duration != clip.duration { track.scaleTimeRange(CMTimeRange(start: start, duration: range.duration), toDuration: clip.duration) }
+                if clip.speed != 1 || range.duration != clip.duration {
+                    track.scaleTimeRange(CMTimeRange(start: start, duration: range.duration), toDuration: clip.duration)
+                }
             }
             let (naturalSize, preferredTransform) = try await video.load(.naturalSize, .preferredTransform)
             var layer = make(.track(track.trackID), naturalSize, preferredTransform)
@@ -499,16 +525,21 @@ private struct MediaSources {
     /// The picture of a main clip for the half of a transition where the clip isn't on the main
     /// track: the `half` just before its start (`before`) or just after its end, put into `track`
     /// at `time`. Where its file has no more (or it is a still), it holds its first or last picture.
-    mutating func borrowedLayer(like layer: CompositorLayer, before: Bool, half: CMTime, at time: CMTime,
-                                in track: AVMutableCompositionTrack) async throws -> CompositorLayer {
+    mutating func borrowedLayer(
+        like layer: CompositorLayer, before: Bool, half: CMTime, at time: CMTime,
+        in track: AVMutableCompositionTrack
+    ) async throws -> CompositorLayer {
         let clip = layer.clip
         func make(_ source: CompositorLayer.Source, _ size: CGSize, _ transform: CGAffineTransform) -> CompositorLayer {
-            CompositorLayer(source: source, clip: clip, timelineStart: layer.timelineStart, naturalSize: size, preferredTransform: transform, isMain: true, region: layer.region,
-                            steadying: layer.steadying)
+            CompositorLayer(
+                source: source, clip: clip, timelineStart: layer.timelineStart, naturalSize: size, preferredTransform: transform, isMain: true,
+                region: layer.region,
+                steadying: layer.steadying)
         }
         // Pictures, freeze frames and missing media look the same before and after.
         guard case .track = layer.source, let media = project.asset(id: clip.assetID),
-              let video = try? await pictureAsset(for: clip, media: media).loadTracks(withMediaType: .video).first else { return layer }
+            let video = try? await pictureAsset(for: clip, media: media).loadTracks(withMediaType: .video).first
+        else { return layer }
         let length = CMTimeMultiplyByFloat64(half, multiplier: clip.speed(atOffset: before ? .zero : clip.duration - .oneFrame))
         let source = before ? CMTimeRange(start: clip.sourceStart - length, duration: length) : CMTimeRange(start: clip.sourceRange.end, duration: length)
         let available = try await video.load(.timeRange)

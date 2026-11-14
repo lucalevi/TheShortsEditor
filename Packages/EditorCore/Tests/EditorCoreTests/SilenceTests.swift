@@ -1,6 +1,7 @@
 import CoreMedia
 import Foundation
 import Testing
+
 @testable import EditorCore
 
 private func frames(_ n: Int64) -> CMTime { CMTime(value: n, timescale: 30) }
@@ -12,8 +13,9 @@ private func levels(_ pattern: String) -> AudioLevels {
 
 private func project(_ pattern: String, hasAudio: Bool = true) -> Project {
     var project = Project()
-    let asset = MediaAsset(url: URL(fileURLWithPath: "/tmp/a.mov"), name: "a", duration: frames(Int64(pattern.count)),
-                           displaySize: CGSize(width: 1080, height: 1920), hasAudio: hasAudio)
+    let asset = MediaAsset(
+        url: URL(fileURLWithPath: "/tmp/a.mov"), name: "a", duration: frames(Int64(pattern.count)),
+        displaySize: CGSize(width: 1080, height: 1920), hasAudio: hasAudio)
     project.addAsset(asset)
     project.appendClip(of: asset.id)
     return project
@@ -25,7 +27,7 @@ struct SilenceTests {
     @Test func cutsLongPausesAndKeepsPaddingAroundSpeech() {
         //                 0         1         2
         //                 0123456789012345678901234
-        let pattern =     "#####..........##########"
+        let pattern = "#####..........##########"
         let p = project(pattern)
         let plan = SilencePlan.make(for: p, levels: [p.assets[0].id: levels(pattern)], settings: settings)
         // Quiet frames 5..<15, minus 2 frames of padding each side.
@@ -34,13 +36,14 @@ struct SilenceTests {
     }
 
     @Test func shortPausesStay() {
-        let pattern = "#####....#####"  // 4 quiet frames, shorter than the 5-frame shortest pause.
+        let pattern = "#####....#####" // 4 quiet frames, shorter than the 5-frame shortest pause.
         let p = project(pattern)
         #expect(SilencePlan.make(for: p, levels: [p.assets[0].id: levels(pattern)], settings: settings).isEmpty)
         // 6 quiet frames are a pause: 1 frame of room each side instead of 2, so it is still cut.
         let longer = "#####......#####"
         let q = project(longer)
-        #expect(SilencePlan.make(for: q, levels: [q.assets[0].id: levels(longer)], settings: settings).timelineCuts
+        #expect(
+            SilencePlan.make(for: q, levels: [q.assets[0].id: levels(longer)], settings: settings).timelineCuts
                 == [CMTimeRange(start: frames(6), end: frames(10))])
     }
 
@@ -48,10 +51,11 @@ struct SilenceTests {
         let pattern = "........#####........"
         let p = project(pattern)
         let plan = SilencePlan.make(for: p, levels: [p.assets[0].id: levels(pattern)], settings: settings)
-        #expect(plan.timelineCuts == [
-            CMTimeRange(start: .zero, end: frames(6)),
-            CMTimeRange(start: frames(15), end: frames(21)),
-        ])
+        #expect(
+            plan.timelineCuts == [
+                CMTimeRange(start: .zero, end: frames(6)),
+                CMTimeRange(start: frames(15), end: frames(21)),
+            ])
     }
 
     @Test func applyingKeepsSourceContinuityAndTheClip() throws {
@@ -70,13 +74,14 @@ struct SilenceTests {
     @Test func followsClipsAfterEdits() {
         let pattern = "#####..........##########"
         var p = project(pattern)
-        p.timeline.split(at: frames(10))  // Cut in the middle of the pause.
+        p.timeline.split(at: frames(10)) // Cut in the middle of the pause.
         let plan = SilencePlan.make(for: p, levels: [p.assets[0].id: levels(pattern)], settings: settings)
         // Each half's quiet part touches the cut, so that side gets no padding.
-        #expect(plan.timelineCuts == [
-            CMTimeRange(start: frames(7), end: frames(10)),
-            CMTimeRange(start: frames(10), end: frames(13)),
-        ])
+        #expect(
+            plan.timelineCuts == [
+                CMTimeRange(start: frames(7), end: frames(10)),
+                CMTimeRange(start: frames(10), end: frames(13)),
+            ])
         p.apply(plan)
         #expect(p.duration == frames(25) - plan.removedDuration)
     }
@@ -91,17 +96,19 @@ struct SilenceTests {
         let pattern = "#####..........##########"
         var p = project(pattern)
         let id = p.assets[0].id
-        p.transcripts[id] = Transcript(language: .english, words: [
-            Word(text: "hello", start: .zero, duration: frames(5)),
-            Word(text: "um", start: frames(9), duration: frames(2)),
-            Word(text: "world", start: frames(15), duration: frames(5)),
-        ])
+        p.transcripts[id] = Transcript(
+            language: .english,
+            words: [
+                Word(text: "hello", start: .zero, duration: frames(5)),
+                Word(text: "um", start: frames(9), duration: frames(2)),
+                Word(text: "world", start: frames(15), duration: frames(5)),
+            ])
         p.apply(SilencePlan.make(for: p, levels: [id: levels(pattern)], settings: settings))
         #expect(CaptionLayout.timelineWords(in: p).map(\.text) == ["hello", "world"])
     }
 
     @Test func theShortestPauseIsTheLengthOfTheQuiet() {
-        let pattern = "#####..........##########"   // 10 quiet frames
+        let pattern = "#####..........##########" // 10 quiet frames
         let p = project(pattern)
         var longer = settings
         longer.minimumPause = frames(11)

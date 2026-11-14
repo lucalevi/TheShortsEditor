@@ -26,8 +26,10 @@ public enum SubjectTracker {
     /// The path of what is at `point` (fractions of the canvas) at the start of `range`, through
     /// `range` of `project`'s timeline. Where it is lost, the path stops (the item then stays
     /// where it was last).
-    public static func track(project: Project, at point: (x: Double, y: Double), during range: CMTimeRange,
-                             progress: @escaping @Sendable (Double) -> Void = { _ in }) async throws -> [TrackPoint] {
+    public static func track(
+        project: Project, at point: (x: Double, y: Double), during range: CMTimeRange,
+        progress: @escaping @Sendable (Double) -> Void = { _ in }
+    ) async throws -> [TrackPoint] {
         var plain = project
         plain.titles = []
         plain.captions.isVisible = false
@@ -41,8 +43,9 @@ public enum SubjectTracker {
         let count = max(Int(range.duration.seconds * rate), 1)
         let times = (0...count).map { range.start + CMTime(seconds: Double($0) / rate, preferredTimescale: 600) }.filter { $0 < range.end }
         guard let first = try? await gray(generator.image(at: range.start).image) else { throw TrackError.nothingToFollow }
-        var tracker = PatchTracker(frame: first, x: point.x * Double(first.width), y: point.y * Double(first.height),
-                                   radius: Int(patchWidth * Double(first.width) / 2), reach: Int(reach * Double(first.width)))
+        var tracker = PatchTracker(
+            frame: first, x: point.x * Double(first.width), y: point.y * Double(first.height),
+            radius: Int(patchWidth * Double(first.width) / 2), reach: Int(reach * Double(first.width)))
         var points: [TrackPoint] = [TrackPoint(offset: .zero, x: point.x, y: point.y)]
         for (index, time) in times.enumerated() where index > 0 {
             try Task.checkCancellation()
@@ -60,8 +63,11 @@ public enum SubjectTracker {
     static func gray(_ image: CGImage) -> GrayFrame? {
         let width = image.width, height = image.height
         var bytes = [UInt8](repeating: 0, count: width * height)
-        guard let context = CGContext(data: &bytes, width: width, height: height, bitsPerComponent: 8, bytesPerRow: width,
-                                      space: CGColorSpaceCreateDeviceGray(), bitmapInfo: CGImageAlphaInfo.none.rawValue) else { return nil }
+        guard
+            let context = CGContext(
+                data: &bytes, width: width, height: height, bitsPerComponent: 8, bytesPerRow: width,
+                space: CGColorSpaceCreateDeviceGray(), bitmapInfo: CGImageAlphaInfo.none.rawValue)
+        else { return nil }
         context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
         return GrayFrame(width: width, height: height, pixels: bytes.map(Float.init))
     }

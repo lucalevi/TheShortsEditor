@@ -60,9 +60,11 @@ nonisolated enum TransitionMixer {
     }
 
     private static func scaled(_ image: CIImage, _ scale: Double, in region: CGRect) -> CIImage {
-        image.transformed(by: CGAffineTransform(translationX: -region.midX, y: -region.midY)
-            .concatenating(CGAffineTransform(scaleX: scale, y: scale))
-            .concatenating(CGAffineTransform(translationX: region.midX, y: region.midY)))
-            .cropped(to: region)
+        image.transformed(
+            by: CGAffineTransform(translationX: -region.midX, y: -region.midY)
+                .concatenating(CGAffineTransform(scaleX: scale, y: scale))
+                .concatenating(CGAffineTransform(translationX: region.midX, y: region.midY))
+        )
+        .cropped(to: region)
     }
 }

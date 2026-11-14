@@ -201,7 +201,8 @@ public extension Project {
     /// The time in the song playing at timeline `time` (nil outside the music).
     func songTime(atTimeline time: CMTime) -> CMTime? {
         guard let music, let range = musicRange, let song = asset(id: music.assetID),
-              time >= range.start, time <= range.end else { return nil }
+            time >= range.start, time <= range.end
+        else { return nil }
         let into = time - music.start
         let firstPass = song.duration - music.sourceStart
         if into < firstPass || !music.loops || song.duration <= .zero { return music.sourceStart + into }
@@ -279,8 +280,9 @@ public extension Project {
     @discardableResult
     mutating func removeBeat(nearTimeline time: CMTime, tolerance: CMTime = CMTime(value: 4, timescale: Project.frameRate)) -> Bool {
         guard let nearest = timelineBeats.min(by: { abs(($0.time - time).seconds) < abs(($1.time - time).seconds) }),
-              abs((nearest.time - time).seconds) <= tolerance.seconds,
-              let songTime = songTime(atTimeline: nearest.time) else { return false }
+            abs((nearest.time - time).seconds) <= tolerance.seconds,
+            let songTime = songTime(atTimeline: nearest.time)
+        else { return false }
         var beats = songBeats
         guard let index = beats.indices.min(by: { abs((beats[$0].time - songTime).seconds) < abs((beats[$1].time - songTime).seconds) }) else { return false }
         beats.remove(at: index)

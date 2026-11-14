@@ -1,5 +1,5 @@
-import Accelerate
 @preconcurrency import AVFoundation
+import Accelerate
 import EditorCore
 import Foundation
 
@@ -18,8 +18,8 @@ public nonisolated enum BeatDetector {
     public static func beats(of url: URL) async -> [Beat] {
         let asset = AVURLAsset(url: url)
         guard let track = try? await asset.loadTracks(withMediaType: .audio).first,
-              let duration = try? await asset.load(.duration),
-              let samples = try? readMono(asset: asset, track: track), samples.count > windowSize
+            let duration = try? await asset.load(.duration),
+            let samples = try? readMono(asset: asset, track: track), samples.count > windowSize
         else { return [] }
         let (onsets, bass) = onsetStrength(samples)
         // A measurement is labelled by where its window starts, but it hears a sound start about
@@ -33,10 +33,12 @@ public nonisolated enum BeatDetector {
     /// The sound as one channel of floats at `sampleRate`.
     static func readMono(asset: AVAsset, track: AVAssetTrack) throws -> [Float] {
         let reader = try AVAssetReader(asset: asset)
-        let output = AVAssetReaderTrackOutput(track: track, outputSettings: [
-            AVFormatIDKey: kAudioFormatLinearPCM, AVSampleRateKey: sampleRate, AVNumberOfChannelsKey: 1,
-            AVLinearPCMBitDepthKey: 32, AVLinearPCMIsFloatKey: true, AVLinearPCMIsBigEndianKey: false, AVLinearPCMIsNonInterleaved: false,
-        ])
+        let output = AVAssetReaderTrackOutput(
+            track: track,
+            outputSettings: [
+                AVFormatIDKey: kAudioFormatLinearPCM, AVSampleRateKey: sampleRate, AVNumberOfChannelsKey: 1,
+                AVLinearPCMBitDepthKey: 32, AVLinearPCMIsFloatKey: true, AVLinearPCMIsBigEndianKey: false, AVLinearPCMIsNonInterleaved: false,
+            ])
         guard reader.canAdd(output) else { return [] }
         reader.add(output)
         guard reader.startReading() else { throw reader.error ?? CocoaError(.fileReadUnknown) }

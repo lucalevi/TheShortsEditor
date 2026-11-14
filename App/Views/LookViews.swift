@@ -42,12 +42,16 @@ struct LookSection: View {
             if let choice = clip.look.filter {
                 HStack {
                     Text("Strength").frame(width: 64, alignment: .leading)
-                    Slider(value: Binding(get: { draggingStrength ?? choice.strength }, set: { value in
-                        draggingStrength = value
-                        var look = clip.look
-                        look.filter?.strength = value
-                        model.previewLook(look, for: clip.id)
-                    }), in: 0...1) { editing in
+                    Slider(
+                        value: Binding(
+                            get: { draggingStrength ?? choice.strength },
+                            set: { value in
+                                draggingStrength = value
+                                var look = clip.look
+                                look.filter?.strength = value
+                                model.previewLook(look, for: clip.id)
+                            }), in: 0...1
+                    ) { editing in
                         if !editing, let value = draggingStrength {
                             draggingStrength = nil
                             model.setFilterStrength(value, for: [clip.id])
@@ -73,10 +77,12 @@ struct LookSection: View {
                     slider("Tint", \.tint, help: "Greener (left) or more magenta (right)")
 
                     HStack {
-                        pickButton("Pick White", systemImage: "eyedropper", target: .white,
-                                   help: "Then click something white or grey in the viewer: its colour becomes neutral")
-                        pickButton("Pick Skin", systemImage: "face.smiling", target: .skin,
-                                   help: "Then click someone's skin in the viewer: it gets a natural skin colour")
+                        pickButton(
+                            "Pick White", systemImage: "eyedropper", target: .white,
+                            help: "Then click something white or grey in the viewer: its colour becomes neutral")
+                        pickButton(
+                            "Pick Skin", systemImage: "face.smiling", target: .skin,
+                            help: "Then click someone's skin in the viewer: it gets a natural skin colour")
                     }
                     .controlSize(.small)
 
@@ -97,11 +103,14 @@ struct LookSection: View {
                     .font(.callout)
             }
 
-            Text(model.colorPick?.clipID == clip.id ? model.colorPick!.prompt + ". Press Escape to stop."
-                 : "Filters change the mood. Enhance fixes dull or dark clips. Press ⌥C to compare with the original.")
-                .font(.caption)
-                .foregroundStyle(model.colorPick?.clipID == clip.id ? AnyShapeStyle(.tint) : AnyShapeStyle(.secondary))
-                .fixedSize(horizontal: false, vertical: true)
+            Text(
+                model.colorPick?.clipID == clip.id
+                    ? model.colorPick!.prompt + ". Press Escape to stop."
+                    : "Filters change the mood. Enhance fixes dull or dark clips. Press ⌥C to compare with the original."
+            )
+            .font(.caption)
+            .foregroundStyle(model.colorPick?.clipID == clip.id ? AnyShapeStyle(.tint) : AnyShapeStyle(.secondary))
+            .fixedSize(horizontal: false, vertical: true)
         }
         .onAppear { showsColor = !clip.look.color.isNeutral }
     }
@@ -109,15 +118,19 @@ struct LookSection: View {
     private func slider(_ title: String, _ keyPath: WritableKeyPath<ColorAdjustments, Double>, help: String) -> some View {
         HStack {
             Text(title).frame(width: 64, alignment: .leading)
-            Slider(value: Binding(get: { color[keyPath: keyPath] }, set: { value in
-                // Sticks to the middle.
-                var adjusted = dragging ?? clip.look.color
-                adjusted[keyPath: keyPath] = abs(value) < 0.04 ? 0 : value
-                dragging = adjusted
-                var look = clip.look
-                look.color = adjusted
-                model.previewLook(look, for: clip.id)
-            }), in: ColorAdjustments.range) { editing in
+            Slider(
+                value: Binding(
+                    get: { color[keyPath: keyPath] },
+                    set: { value in
+                        // Sticks to the middle.
+                        var adjusted = dragging ?? clip.look.color
+                        adjusted[keyPath: keyPath] = abs(value) < 0.04 ? 0 : value
+                        dragging = adjusted
+                        var look = clip.look
+                        look.color = adjusted
+                        model.previewLook(look, for: clip.id)
+                    }), in: ColorAdjustments.range
+            ) { editing in
                 if !editing, let value = dragging {
                     dragging = nil
                     model.editColor(of: [clip.id], title) { $0 = value }
@@ -187,7 +200,9 @@ struct FilterGrid: View {
     }
 
     private func tile(_ filter: LookFilter?, name: String) -> some View {
-        Button { choose(filter) } label: {
+        Button {
+            choose(filter)
+        } label: {
             VStack(spacing: 2) {
                 ZStack {
                     Rectangle().fill(.quaternary)
@@ -243,9 +258,14 @@ struct SteadySection: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Toggle("Steady shaky video", isOn: Binding(get: { clip.steadiness > 0 }, set: { on in
-                model.setSteadiness(on ? Clip.defaultSteadiness : 0, for: [clip.id])
-            }))
+            Toggle(
+                "Steady shaky video",
+                isOn: Binding(
+                    get: { clip.steadiness > 0 },
+                    set: { on in
+                        model.setSteadiness(on ? Clip.defaultSteadiness : 0, for: [clip.id])
+                    })
+            )
             .font(.subheadline.weight(.semibold))
             if clip.steadiness > 0 {
                 HStack {
@@ -264,12 +284,14 @@ struct SteadySection: View {
                     ProgressView(value: progress) { Text("Looking at how the camera moves…").font(.caption) }
                 }
             }
-            Text(clip.steadiness > 0
-                 ? "More steadies more, but zooms in a little more to hide the moving edges. Planned camera moves are kept."
-                 : "Smooths out a shaky hand. The picture zooms in a little to hide the edges.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
+            Text(
+                clip.steadiness > 0
+                    ? "More steadies more, but zooms in a little more to hide the moving edges. Planned camera moves are kept."
+                    : "Smooths out a shaky hand. The picture zooms in a little to hide the edges."
+            )
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
         }
     }
 }
@@ -290,10 +312,14 @@ struct ShortLookSection: View {
             if let choice = model.project.look {
                 HStack {
                     Text("Strength").frame(width: 64, alignment: .leading)
-                    Slider(value: Binding(get: { dragging ?? choice.strength }, set: { value in
-                        dragging = value
-                        model.previewShortFilterStrength(value)
-                    }), in: 0...1) { editing in
+                    Slider(
+                        value: Binding(
+                            get: { dragging ?? choice.strength },
+                            set: { value in
+                                dragging = value
+                                model.previewShortFilterStrength(value)
+                            }), in: 0...1
+                    ) { editing in
                         if !editing, let value = dragging {
                             dragging = nil
                             model.setShortFilterStrength(value)

@@ -63,8 +63,9 @@ public extension Project {
         guard !text.isEmpty else { return project }
         // A title already on screen saying the same thing would show twice.
         project.titles.removeAll { $0.sticker == nil && CMTimeRange(start: $0.start, duration: $0.duration).containsTime(time) }
-        var title = TextOverlay(text: text, start: time, duration: CMTime(value: 1, timescale: 1),
-                                verticalPosition: cover.textPosition)
+        var title = TextOverlay(
+            text: text, start: time, duration: CMTime(value: 1, timescale: 1),
+            verticalPosition: cover.textPosition)
         if let style { title.takeLook(of: style) }
         title.entrance = .none
         title.exit = nil

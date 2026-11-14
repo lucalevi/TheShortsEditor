@@ -3,6 +3,7 @@ import EditorCore
 import Foundation
 import Speech
 import Testing
+
 @testable import Transcription
 
 /// Speech for the tests, spoken by macOS's own `say` into a file.
@@ -19,7 +20,8 @@ private func spoken(_ text: String, voice: String? = nil) throws -> URL {
 private var englishInstalled: Bool {
     get async {
         guard SpeechTranscriber.isAvailable,
-              let locale = try? await Transcriber.locale(for: .english) else { return false }
+            let locale = try? await Transcriber.locale(for: .english)
+        else { return false }
         return await SpeechTranscriber.installedLocales.contains(locale)
     }
 }
@@ -48,7 +50,7 @@ struct TranscriberTests {
 
     @Test(.timeLimit(.minutes(2)))
     func transcribesSpeechWithWordTimes() async throws {
-        guard await englishInstalled else { return }  // Needs the English model on this Mac.
+        guard await englishInstalled else { return } // Needs the English model on this Mac.
         let url = try spoken("Welcome to my channel. Today we make a short video.", voice: "Samantha")
         let transcript = try await Transcriber.transcribe(url, name: "speech", language: .english)
         let text = transcript.words.map(\.text).joined(separator: " ").lowercased()

@@ -40,8 +40,10 @@ struct MediaBrowserView: View {
             if assets.count == 1, let asset = assets.first, asset.hasAudio {
                 Button(asset.hasVideo ? "Use Its Sound as Music" : "Use as Music") { model.useAsMusic(asset.id) }
                 if !asset.hasVideo {
-                    Button(asset.duration >= SoundClip.songLength ? "Add as Extra Song at Playhead" : "Add as Sound Effect at Playhead") { model.addSound(asset.id) }
-                        .disabled(model.project.timeline.clips.isEmpty)
+                    Button(asset.duration >= SoundClip.songLength ? "Add as Extra Song at Playhead" : "Add as Sound Effect at Playhead") {
+                        model.addSound(asset.id)
+                    }
+                    .disabled(model.project.timeline.clips.isEmpty)
                 }
             }
         } primaryAction: { ids in
@@ -93,7 +95,9 @@ struct SidebarView: View {
 
             // A Short started from a storyboard has its shot list above the tabs.
             if let board = model.project.storyboard {
-                Button { model.sidebar = .storyboard } label: {
+                Button {
+                    model.sidebar = .storyboard
+                } label: {
                     HStack(spacing: 6) {
                         Image(systemName: board.template?.systemImage ?? board.kind.systemImage)
                         Text("Shot List: \(board.name)").fontWeight(model.sidebar == .storyboard ? .bold : .regular)
@@ -196,7 +200,11 @@ private struct MediaRow: View {
             }
         }
         .padding(.vertical, 2)
-        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { rowWidth = max($0, 1) }
+        .onGeometryChange(for: CGFloat.self) {
+            $0.size.width
+        } action: {
+            rowWidth = max($0, 1)
+        }
         .onContinuousHover { phase in
             switch phase {
             case .active(let point):
@@ -209,8 +217,10 @@ private struct MediaRow: View {
                 model.skimMedia(asset.id, at: nil)
             }
         }
-        .help(asset.hasVideo ? "Move the pointer across it to look through it. Double-click or press E to add it to the end, W to put it in at the playhead. Drag across the bar under it to use only part."
-              : "Double-click to use as the music")
+        .help(
+            asset.hasVideo
+                ? "Move the pointer across it to look through it. Double-click or press E to add it to the end, W to put it in at the playhead. Drag across the bar under it to use only part."
+                : "Double-click to use as the music")
     }
 }
 
@@ -249,19 +259,24 @@ private struct MediaStrip: View {
                 }
             }
             .contentShape(Rectangle())
-            .highPriorityGesture(DragGesture(minimumDistance: 0).onChanged { value in
-                guard asset.hasVideo else { return }
-                let seconds = { (x: CGFloat) in Double(min(max(x / max(width, 1), 0), 1)) * asset.duration.seconds }
-                if anchor == nil { anchor = seconds(value.startLocation.x) }
-                let a = anchor!, b = seconds(value.location.x)
-                guard abs(b - a) * Double(width) / max(asset.duration.seconds, 0.001) > 3 else { return }
-                model.selectedAssetID = asset.id
-                model.mediaRange = (asset.id, CMTimeRange(start: CMTime(seconds: min(a, b), preferredTimescale: 600).snappedToFrame(),
-                                                          end: CMTime(seconds: max(a, b), preferredTimescale: 600).snappedToFrame()))
-            }.onEnded { value in
-                if abs(value.translation.width) < 3, model.mediaRange?.assetID == asset.id { model.mediaRange = nil }
-                anchor = nil
-            })
+            .highPriorityGesture(
+                DragGesture(minimumDistance: 0).onChanged { value in
+                    guard asset.hasVideo else { return }
+                    let seconds = { (x: CGFloat) in Double(min(max(x / max(width, 1), 0), 1)) * asset.duration.seconds }
+                    if anchor == nil { anchor = seconds(value.startLocation.x) }
+                    let a = anchor!, b = seconds(value.location.x)
+                    guard abs(b - a) * Double(width) / max(asset.duration.seconds, 0.001) > 3 else { return }
+                    model.selectedAssetID = asset.id
+                    model.mediaRange = (
+                        asset.id,
+                        CMTimeRange(
+                            start: CMTime(seconds: min(a, b), preferredTimescale: 600).snappedToFrame(),
+                            end: CMTime(seconds: max(a, b), preferredTimescale: 600).snappedToFrame())
+                    )
+                }.onEnded { value in
+                    if abs(value.translation.width) < 3, model.mediaRange?.assetID == asset.id { model.mediaRange = nil }
+                    anchor = nil
+                })
         }
         .frame(height: 10)
         .help("Drag across to use only this part of the file. Orange marks the parts already in your Short.")

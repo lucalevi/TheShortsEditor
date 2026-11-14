@@ -2,6 +2,7 @@
 import EditorCore
 import ImageIO
 import Testing
+
 @testable import RenderEngine
 
 /// Saving a frame as a picture.

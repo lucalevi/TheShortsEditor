@@ -37,7 +37,8 @@ struct SilencePanel: View {
         VStack(alignment: .leading, spacing: 4) {
             if plan.isEmpty {
                 Text("No pauses long enough to cut.").font(.headline)
-                Text("Try a shorter pause, or counting softer sounds as pauses. With music or noise behind the voice, listen to the voice only.").font(.caption).foregroundStyle(.secondary)
+                Text("Try a shorter pause, or counting softer sounds as pauses. With music or noise behind the voice, listen to the voice only.").font(.caption)
+                    .foregroundStyle(.secondary)
             } else {
                 let count = plan.timelineCuts.count
                 Text("Cuts \(TimeFormat.string(plan.removedDuration)) in \(count) \(count == 1 ? "place" : "places")")
@@ -55,10 +56,13 @@ struct SilencePanel: View {
         VStack(alignment: .leading, spacing: 14) {
             if VoiceCleaner.isAvailable, let session = model.silenceSession {
                 VStack(alignment: .leading, spacing: 4) {
-                    Toggle("Listen to the voice only", isOn: Binding(
-                        get: { session.listensToVoiceOnly },
-                        set: { model.setPausesListenToVoiceOnly($0) }
-                    ))
+                    Toggle(
+                        "Listen to the voice only",
+                        isOn: Binding(
+                            get: { session.listensToVoiceOnly },
+                            set: { model.setPausesListenToVoiceOnly($0) }
+                        )
+                    )
                     .disabled(session.separating != nil)
                     if let fraction = session.separating {
                         ProgressView(value: fraction) { Text("Separating the voice…").font(.caption) }
@@ -71,10 +75,14 @@ struct SilencePanel: View {
             }
             VStack(alignment: .leading, spacing: 4) {
                 Text("What counts as a pause").font(.subheadline.weight(.semibold))
-                Slider(value: Binding(
-                    get: { Double(settings.threshold) },
-                    set: { var s = settings; s.threshold = Float($0.rounded()); model.updateSilenceSettings(s) }
-                ), in: -60 ... -15) {
+                Slider(
+                    value: Binding(
+                        get: { Double(settings.threshold) },
+                        set: {
+                            var s = settings; s.threshold = Float($0.rounded()); model.updateSilenceSettings(s)
+                        }
+                    ), in: -60 ... -15
+                ) {
                     EmptyView()
                 } minimumValueLabel: {
                     Text("Silence").font(.caption)
@@ -91,10 +99,15 @@ struct SilencePanel: View {
                         .monospacedDigit()
                         .foregroundStyle(.secondary)
                 }
-                Slider(value: Binding(
-                    get: { settings.minimumPause.seconds },
-                    set: { var s = settings; s.minimumPause = CMTime(seconds: ($0 * 10).rounded() / 10, preferredTimescale: 600); model.updateSilenceSettings(s) }
-                ), in: SilenceSettings.minimumPauseRange.lowerBound.seconds ... SilenceSettings.minimumPauseRange.upperBound.seconds) {
+                Slider(
+                    value: Binding(
+                        get: { settings.minimumPause.seconds },
+                        set: {
+                            var s = settings; s.minimumPause = CMTime(seconds: ($0 * 10).rounded() / 10, preferredTimescale: 600);
+                            model.updateSilenceSettings(s)
+                        }
+                    ), in: SilenceSettings.minimumPauseRange.lowerBound.seconds...SilenceSettings.minimumPauseRange.upperBound.seconds
+                ) {
                     EmptyView()
                 } minimumValueLabel: {
                     Text("Short").font(.caption)
@@ -107,10 +120,14 @@ struct SilencePanel: View {
             }
             VStack(alignment: .leading, spacing: 4) {
                 Text("Room around words").font(.subheadline.weight(.semibold))
-                Slider(value: Binding(
-                    get: { Double(settings.padding.value) },
-                    set: { var s = settings; s.padding = CMTime(value: Int64($0.rounded()), timescale: Project.frameRate); model.updateSilenceSettings(s) }
-                ), in: 0...12) {
+                Slider(
+                    value: Binding(
+                        get: { Double(settings.padding.value) },
+                        set: {
+                            var s = settings; s.padding = CMTime(value: Int64($0.rounded()), timescale: Project.frameRate); model.updateSilenceSettings(s)
+                        }
+                    ), in: 0...12
+                ) {
                     EmptyView()
                 } minimumValueLabel: {
                     Text("Tight").font(.caption)

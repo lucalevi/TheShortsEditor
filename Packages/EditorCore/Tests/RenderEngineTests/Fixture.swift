@@ -18,20 +18,24 @@ enum Fixture {
     ) async throws -> URL {
         let url = FileManager.default.temporaryDirectory.appending(path: "fixture-\(UUID().uuidString).mov")
         let writer = try AVAssetWriter(outputURL: url, fileType: .mov)
-        let input = AVAssetWriterInput(mediaType: .video, outputSettings: [
-            AVVideoCodecKey: AVVideoCodecType.h264,
-            AVVideoWidthKey: width,
-            AVVideoHeightKey: height,
-        ])
+        let input = AVAssetWriterInput(
+            mediaType: .video,
+            outputSettings: [
+                AVVideoCodecKey: AVVideoCodecType.h264,
+                AVVideoWidthKey: width,
+                AVVideoHeightKey: height,
+            ])
         input.expectsMediaDataInRealTime = false
         input.transform = transform
         let adaptor = AVAssetWriterInputPixelBufferAdaptor(assetWriterInput: input, sourcePixelBufferAttributes: nil)
         writer.add(input)
         var audio: AVAssetWriterInput?
         if toneFrom != nil {
-            let audioInput = AVAssetWriterInput(mediaType: .audio, outputSettings: [
-                AVFormatIDKey: kAudioFormatMPEG4AAC, AVSampleRateKey: 48_000, AVNumberOfChannelsKey: 1,
-            ])
+            let audioInput = AVAssetWriterInput(
+                mediaType: .audio,
+                outputSettings: [
+                    AVFormatIDKey: kAudioFormatMPEG4AAC, AVSampleRateKey: 48_000, AVNumberOfChannelsKey: 1,
+                ])
             audioInput.expectsMediaDataInRealTime = false
             writer.add(audioInput)
             audio = audioInput
@@ -50,7 +54,10 @@ enum Fixture {
         while nextVideo < frames || nextAudio < frames {
             var progressed = false
             if nextVideo < frames, input.isReadyForMoreMediaData {
-                guard adaptor.append(later != nil && nextVideo >= laterFrame ? later! : buffer, withPresentationTime: CMTime(value: Int64(nextVideo), timescale: 30)) else {
+                guard
+                    adaptor.append(
+                        later != nil && nextVideo >= laterFrame ? later! : buffer, withPresentationTime: CMTime(value: Int64(nextVideo), timescale: 30))
+                else {
                     throw writer.error ?? WriteError()
                 }
                 nextVideo += 1
@@ -78,9 +85,11 @@ enum Fixture {
     static func shakyVideo(width: Int = 320, height: Int = 180, seconds: Int = 2, offsets: [(Int, Int)]) async throws -> URL {
         let url = FileManager.default.temporaryDirectory.appending(path: "fixture-\(UUID().uuidString).mov")
         let writer = try AVAssetWriter(outputURL: url, fileType: .mov)
-        let input = AVAssetWriterInput(mediaType: .video, outputSettings: [
-            AVVideoCodecKey: AVVideoCodecType.h264, AVVideoWidthKey: width, AVVideoHeightKey: height,
-        ])
+        let input = AVAssetWriterInput(
+            mediaType: .video,
+            outputSettings: [
+                AVVideoCodecKey: AVVideoCodecType.h264, AVVideoWidthKey: width, AVVideoHeightKey: height,
+            ])
         input.expectsMediaDataInRealTime = false
         let adaptor = AVAssetWriterInputPixelBufferAdaptor(assetWriterInput: input, sourcePixelBufferAttributes: nil)
         writer.add(input)
@@ -127,8 +136,9 @@ enum Fixture {
     static func whiteCentre(_ image: CGImage) -> CGPoint? {
         let width = image.width, height = image.height
         var data = [UInt8](repeating: 0, count: width * height * 4)
-        let context = CGContext(data: &data, width: width, height: height, bitsPerComponent: 8, bytesPerRow: width * 4,
-                                space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+        let context = CGContext(
+            data: &data, width: width, height: height, bitsPerComponent: 8, bytesPerRow: width * 4,
+            space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
         context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
         var sx = 0.0, sy = 0.0, n = 0.0
         for y in 0..<height {
@@ -148,9 +158,11 @@ enum Fixture {
     static func sound(seconds: Int, frequency: Double = 660, amplitude: Double = 0.3) async throws -> URL {
         let url = FileManager.default.temporaryDirectory.appending(path: "fixture-\(UUID().uuidString).m4a")
         let writer = try AVAssetWriter(outputURL: url, fileType: .m4a)
-        let input = AVAssetWriterInput(mediaType: .audio, outputSettings: [
-            AVFormatIDKey: kAudioFormatMPEG4AAC, AVSampleRateKey: 48_000, AVNumberOfChannelsKey: 1,
-        ])
+        let input = AVAssetWriterInput(
+            mediaType: .audio,
+            outputSettings: [
+                AVFormatIDKey: kAudioFormatMPEG4AAC, AVSampleRateKey: 48_000, AVNumberOfChannelsKey: 1,
+            ])
         input.expectsMediaDataInRealTime = false
         writer.add(input)
         guard writer.startWriting() else { throw writer.error ?? WriteError() }
@@ -186,14 +198,20 @@ enum Fixture {
             mBytesPerPacket: 2, mFramesPerPacket: 1, mBytesPerFrame: 2, mChannelsPerFrame: 1, mBitsPerChannel: 16, mReserved: 0
         )
         var format: CMAudioFormatDescription?
-        CMAudioFormatDescriptionCreate(allocator: nil, asbd: &description, layoutSize: 0, layout: nil, magicCookieSize: 0, magicCookie: nil, extensions: nil, formatDescriptionOut: &format)
+        CMAudioFormatDescriptionCreate(
+            allocator: nil, asbd: &description, layoutSize: 0, layout: nil, magicCookieSize: 0, magicCookie: nil, extensions: nil, formatDescriptionOut: &format
+        )
         var block: CMBlockBuffer?
         let bytes = count * 2
-        CMBlockBufferCreateWithMemoryBlock(allocator: nil, memoryBlock: nil, blockLength: bytes, blockAllocator: nil, customBlockSource: nil, offsetToData: 0, dataLength: bytes, flags: kCMBlockBufferAssureMemoryNowFlag, blockBufferOut: &block)
+        CMBlockBufferCreateWithMemoryBlock(
+            allocator: nil, memoryBlock: nil, blockLength: bytes, blockAllocator: nil, customBlockSource: nil, offsetToData: 0, dataLength: bytes,
+            flags: kCMBlockBufferAssureMemoryNowFlag, blockBufferOut: &block)
         guard let format, let block else { throw WriteError() }
         _ = samples.withUnsafeBytes { CMBlockBufferReplaceDataBytes(with: $0.baseAddress!, blockBuffer: block, offsetIntoDestination: 0, dataLength: bytes) }
         var sample: CMSampleBuffer?
-        CMAudioSampleBufferCreateReadyWithPacketDescriptions(allocator: nil, dataBuffer: block, formatDescription: format, sampleCount: count, presentationTimeStamp: CMTime(value: CMTimeValue(first), timescale: 48_000), packetDescriptions: nil, sampleBufferOut: &sample)
+        CMAudioSampleBufferCreateReadyWithPacketDescriptions(
+            allocator: nil, dataBuffer: block, formatDescription: format, sampleCount: count,
+            presentationTimeStamp: CMTime(value: CMTimeValue(first), timescale: 48_000), packetDescriptions: nil, sampleBufferOut: &sample)
         guard let sample else { throw WriteError() }
         return sample
     }
@@ -226,10 +244,11 @@ enum Fixture {
                 (data[i], data[i + 1], data[i + 2]) = y < height / 2 ? top : bottom
             }
         }
-        let context = CGContext(data: &data, width: width, height: height, bitsPerComponent: 8, bytesPerRow: width * 4,
-                                space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+        let context = CGContext(
+            data: &data, width: width, height: height, bitsPerComponent: 8, bytesPerRow: width * 4,
+            space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
         guard let image = context.makeImage(),
-              let destination = CGImageDestinationCreateWithURL(url as CFURL, "public.png" as CFString, 1, nil)
+            let destination = CGImageDestinationCreateWithURL(url as CFURL, "public.png" as CFString, 1, nil)
         else { throw WriteError() }
         CGImageDestinationAddImage(destination, image, nil)
         guard CGImageDestinationFinalize(destination) else { throw WriteError() }

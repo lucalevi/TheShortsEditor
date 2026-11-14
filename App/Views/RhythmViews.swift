@@ -80,11 +80,15 @@ struct RhythmSpeedExtras: View {
                 LazyVGrid(columns: columns, alignment: .leading, spacing: 6) {
                     RhythmTile(name: "None", hint: "One speed all through", isChosen: curve == nil) {
                         model.setSpeedCurve(nil, for: mainClips.map(\.id))
-                    } icon: { SpeedCurveDrawing(shape: nil) }
+                    } icon: {
+                        SpeedCurveDrawing(shape: nil)
+                    }
                     ForEach(SpeedCurveShape.allCases) { shape in
                         RhythmTile(name: shape.displayName, hint: shape.hint, isChosen: curve == shape) {
                             model.setSpeedCurve(shape, for: mainClips.map(\.id))
-                        } icon: { SpeedCurveDrawing(shape: shape) }
+                        } icon: {
+                            SpeedCurveDrawing(shape: shape)
+                        }
                     }
                 }
                 if curve != nil {
@@ -109,18 +113,24 @@ struct SmoothSlowMotionToggle: View {
         if !candidates.isEmpty {
             let progress = candidates.compactMap { model.smoothing[$0.id] }.first
             VStack(alignment: .leading, spacing: 4) {
-                Toggle("Smooth slow motion", isOn: Binding(get: { candidates.allSatisfy(\.smoothSlowMotion) },
-                                                          set: { model.setSmoothSlowMotion($0, for: candidates.map(\.id)) }))
-                    .toggleStyle(.checkbox)
+                Toggle(
+                    "Smooth slow motion",
+                    isOn: Binding(
+                        get: { candidates.allSatisfy(\.smoothSlowMotion) },
+                        set: { model.setSmoothSlowMotion($0, for: candidates.map(\.id)) })
+                )
+                .toggleStyle(.checkbox)
                 if let progress {
                     ProgressView(value: progress) { Text("Making the pictures in between…").font(.caption) }
                 } else {
-                    Text(FrameInterpolator.usesOpticalFlow
-                         ? "Slowed down, this video would show the same picture several times. This makes the pictures in between, on this Mac."
-                         : "Slowed down, this video would show the same picture several times. This blends the pictures in between.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
+                    Text(
+                        FrameInterpolator.usesOpticalFlow
+                            ? "Slowed down, this video would show the same picture several times. This makes the pictures in between, on this Mac."
+                            : "Slowed down, this video would show the same picture several times. This blends the pictures in between."
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
                 }
             }
         }
@@ -146,7 +156,10 @@ struct ClipAnimationSection: View {
         VStack(alignment: .leading, spacing: 4) {
             HStack {
                 Text(entering ? "Comes in" : "Goes out").frame(width: 64, alignment: .leading)
-                Picker(entering ? "Comes in" : "Goes out", selection: Binding(get: { animation?.kind }, set: { model.setAnimation($0, entering: entering, for: [clip.id]) })) {
+                Picker(
+                    entering ? "Comes in" : "Goes out",
+                    selection: Binding(get: { animation?.kind }, set: { model.setAnimation($0, entering: entering, for: [clip.id]) })
+                ) {
                     Text("None").tag(MotionAnimation?.none)
                     Divider()
                     ForEach(MotionAnimation.allCases) { kind in
@@ -206,12 +219,14 @@ struct MusicRhythmSection: View {
                         Text("Listening…").font(.caption).foregroundStyle(.secondary)
                     }
                 }
-                Text(music.mood != nil
-                     ? "The app's music knows its beats. They show on the music, and cuts and edges snap to them."
-                     : "Finds the song's beats by listening to it, on this Mac. They show on the music, and cuts and edges snap to them.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+                Text(
+                    music.mood != nil
+                        ? "The app's music knows its beats. They show on the music, and cuts and edges snap to them."
+                        : "Finds the song's beats by listening to it, on this Mac. They show on the music, and cuts and edges snap to them."
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
                 Menu("Cut to the Beat") {
                     ForEach(BeatSpacing.allCases) { spacing in
                         Button(spacing.displayName) { model.cutToBeat(spacing) }

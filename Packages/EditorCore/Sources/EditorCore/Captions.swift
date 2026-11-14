@@ -25,8 +25,10 @@ public struct Word: Identifiable, Codable, Equatable, Sendable {
     /// The caption this word starts, in another language, shown as a second line.
     public var translation: CaptionTranslation?
 
-    public init(id: UUID = UUID(), text: String, start: CMTime, duration: CMTime, isKeyword: Bool = false, emoji: String? = nil,
-                captionBreak: CaptionBreak? = nil, lineBreakAfter: Bool = false, endsExactly: Bool = false) {
+    public init(
+        id: UUID = UUID(), text: String, start: CMTime, duration: CMTime, isKeyword: Bool = false, emoji: String? = nil,
+        captionBreak: CaptionBreak? = nil, lineBreakAfter: Bool = false, endsExactly: Bool = false
+    ) {
         self.id = id
         self.text = text
         self.start = start
@@ -375,7 +377,7 @@ public extension SafeZone {
     /// The range `CaptionSettings.verticalPosition` is kept in: between the covered top and bottom.
     static var captionRange: ClosedRange<Double> {
         let height = Double(Project.canvasSize.height)
-        return (Double(top) + 120) / height ... (height - Double(bottom) - 120) / height
+        return (Double(top) + 120) / height...(height - Double(bottom) - 120) / height
     }
 }
 
@@ -422,8 +424,10 @@ public enum CaptionLayout {
     }
 
     /// The words of `clip`'s file it plays, on the timeline, cut to the clip and to `within`.
-    private static func words(of clip: Clip, at clipStart: CMTime, source kind: CaptionSource, in project: Project,
-                              within bounds: CMTimeRange) -> [TimedWord] {
+    private static func words(
+        of clip: Clip, at clipStart: CMTime, source kind: CaptionSource, in project: Project,
+        within bounds: CMTimeRange
+    ) -> [TimedWord] {
         guard let transcript = project.transcripts[clip.assetID] else { return [] }
         let source = clip.sourceRange
         let clipRange = CMTimeRange(start: clipStart, duration: clip.duration).intersection(bounds)
@@ -435,9 +439,11 @@ public enum CaptionLayout {
             let start = clipStart + clip.timelineOffset(ofSourceTime: word.start)
             let range = CMTimeRange(start: start, duration: clip.timelineDuration(ofSource: word.duration)).intersection(clipRange)
             guard range.duration > .zero else { continue }
-            result.append(TimedWord(wordID: word.id, assetID: clip.assetID, clipID: clip.id, text: word.text, range: range,
-                                    isKeyword: word.isKeyword, emoji: word.emoji, source: kind, captionBreak: word.captionBreak,
-                                    lineBreakAfter: word.lineBreakAfter, endsExactly: word.endsExactly, translation: word.translation))
+            result.append(
+                TimedWord(
+                    wordID: word.id, assetID: clip.assetID, clipID: clip.id, text: word.text, range: range,
+                    isKeyword: word.isKeyword, emoji: word.emoji, source: kind, captionBreak: word.captionBreak,
+                    lineBreakAfter: word.lineBreakAfter, endsExactly: word.endsExactly, translation: word.translation))
         }
         return result
     }
@@ -474,7 +480,8 @@ public enum CaptionLayout {
                 } else if let chosen = word.captionBreak {
                     breaks = chosen == .newCaption
                 } else {
-                    breaks = word.range.start - last.range.end >= pauseBreak
+                    breaks =
+                        word.range.start - last.range.end >= pauseBreak
                         || endsSentence(last.text)
                         || characters(current + [word]) > style.maxCharacters
                         || style.maxWords.map { current.count >= $0 } ?? false
@@ -545,11 +552,13 @@ public extension Project {
             var accumulated = 0.0
             for (index, token) in tokens.enumerated() {
                 accumulated += weights[index]
-                let end = index == tokens.count - 1
+                let end =
+                    index == tokens.count - 1
                     ? start + total
                     : start + CMTimeMultiplyByFloat64(total, multiplier: accumulated / sum)
-                var word = Word(id: index < old.count ? old[index].id : UUID(), text: token.text, start: cursor, duration: end - cursor,
-                                lineBreakAfter: token.lineBreakAfter)
+                var word = Word(
+                    id: index < old.count ? old[index].id : UUID(), text: token.text, start: cursor, duration: end - cursor,
+                    lineBreakAfter: token.lineBreakAfter)
                 if index < old.count {
                     word.isKeyword = old[index].isKeyword
                     word.emoji = old[index].emoji
@@ -587,7 +596,7 @@ public extension Project {
         let clips = sounds.sorted { $0.isVoiceOver && !$1.isVoiceOver }.map(\.clip) + timeline.clips + overlays.map(\.clip)
         return clips.compactMap { clip in
             guard clip.effectiveVolume > 0, seen.insert(clip.assetID).inserted,
-                  let asset = asset(id: clip.assetID), asset.hasAudio, !asset.isBuiltInSound
+                let asset = asset(id: clip.assetID), asset.hasAudio, !asset.isBuiltInSound
             else { return nil }
             return asset
         }

@@ -29,11 +29,11 @@ struct CaptionTextField: NSViewRepresentable {
     /// because the list around the field never passes it key equivalents.
     static func endEditingOnClickOutside(_ event: NSEvent) {
         guard let window = event.window,
-              let editor = window.firstResponder as? NSTextView,
-              // The field editor's delegate is the field. Cast through AnyObject: the SDK doesn't
-              // declare NSTextField a text view delegate, so a direct cast "always fails" and an
-              // optimised build may drop it.
-              let field = (editor.delegate as AnyObject?) as? Field
+            let editor = window.firstResponder as? NSTextView,
+            // The field editor's delegate is the field. Cast through AnyObject: the SDK doesn't
+            // declare NSTextField a text view delegate, so a direct cast "always fails" and an
+            // optimised build may drop it.
+            let field = (editor.delegate as AnyObject?) as? Field
         else { return }
         let point = field.convert(event.locationInWindow, from: nil)
         if !field.bounds.contains(point) { window.makeFirstResponder(nil) }
@@ -41,9 +41,9 @@ struct CaptionTextField: NSViewRepresentable {
 
     static func handleCommandReturn(_ event: NSEvent) -> Bool {
         guard event.keyCode == 36 || event.keyCode == 76,
-              event.modifierFlags.intersection([.command, .control, .option, .shift]) == .command,
-              let editor = event.window?.firstResponder as? NSTextView,
-              (editor.delegate as AnyObject?) is Field
+            event.modifierFlags.intersection([.command, .control, .option, .shift]) == .command,
+            let editor = event.window?.firstResponder as? NSTextView,
+            (editor.delegate as AnyObject?) is Field
         else { return false }
         editor.insertText("\n", replacementRange: editor.selectedRange())
         // insertText doesn't always tell the delegate; make sure the row grows.
@@ -84,7 +84,8 @@ struct CaptionTextField: NSViewRepresentable {
                 if window.makeFirstResponder(field) {
                     let text = field.stringValue
                     let index = text.index(text.startIndex, offsetBy: min(cursor, text.count))
-                    field.currentEditor()?.selectedRange = NSRange(location: text.utf16.distance(from: text.utf16.startIndex, to: index.samePosition(in: text.utf16) ?? text.utf16.endIndex), length: 0)
+                    field.currentEditor()?.selectedRange = NSRange(
+                        location: text.utf16.distance(from: text.utf16.startIndex, to: index.samePosition(in: text.utf16) ?? text.utf16.endIndex), length: 0)
                 }
                 onStartedEditing()
             }

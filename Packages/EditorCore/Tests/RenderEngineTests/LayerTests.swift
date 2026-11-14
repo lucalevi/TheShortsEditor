@@ -1,6 +1,7 @@
 @preconcurrency import AVFoundation
 import EditorCore
 import Testing
+
 @testable import RenderEngine
 
 private let red: (UInt8, UInt8, UInt8, UInt8) = (0, 0, 255, 255)
@@ -89,8 +90,10 @@ struct LayerTests {
     @Test func keyframesMoveThePictureOverTime() async throws {
         var (project, id) = try await redOverBlue(seconds: 2)
         project.updateAnyClip(id) { clip in
-            clip.keyframes = [Keyframe(time: .zero, placement: .identity, easing: .linear),
-                              Keyframe(time: CMTime(value: 2, timescale: 1), placement: Placement(offsetY: 0.25), easing: .linear)]
+            clip.keyframes = [
+                Keyframe(time: .zero, placement: .identity, easing: .linear),
+                Keyframe(time: CMTime(value: 2, timescale: 1), placement: Placement(offsetY: 0.25), easing: .linear),
+            ]
         }
         let built = try await CompositionBuilder.build(project)
         #expect(isBlue(Fixture.pixel(try await frame(of: built, at: 0.1), x: 540, y: 1100)))

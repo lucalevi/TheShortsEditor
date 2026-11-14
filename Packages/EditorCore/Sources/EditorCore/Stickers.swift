@@ -61,36 +61,42 @@ public enum StickerCatalog {
     }
 
     public static let groups: [Group] = [
-        Group(name: "Arrows", symbols: [
-            Symbol(name: "arrow.down", displayName: "Arrow Down"),
-            Symbol(name: "arrow.up", displayName: "Arrow Up"),
-            Symbol(name: "arrow.left", displayName: "Arrow Left"),
-            Symbol(name: "arrow.right", displayName: "Arrow Right"),
-            Symbol(name: "arrow.turn.right.down", displayName: "Curved Arrow"),
-            Symbol(name: "arrowshape.down.fill", displayName: "Big Arrow"),
-            Symbol(name: "hand.point.down.fill", displayName: "Pointing Hand"),
-            Symbol(name: "hand.tap.fill", displayName: "Tap"),
-        ]),
-        Group(name: "Shapes", symbols: [
-            Symbol(name: "circle", displayName: "Ring"),
-            Symbol(name: "square", displayName: "Frame"),
-            Symbol(name: "circle.fill", displayName: "Dot"),
-            Symbol(name: "star.fill", displayName: "Star"),
-            Symbol(name: "heart.fill", displayName: "Heart"),
-            Symbol(name: "bolt.fill", displayName: "Lightning"),
-            Symbol(name: "sparkles", displayName: "Sparkles"),
-            Symbol(name: "flame.fill", displayName: "Flame"),
-        ]),
-        Group(name: "Signs", symbols: [
-            Symbol(name: "bell.fill", displayName: "Bell"),
-            Symbol(name: "hand.thumbsup.fill", displayName: "Thumbs Up"),
-            Symbol(name: "checkmark.circle.fill", displayName: "Tick"),
-            Symbol(name: "xmark.circle.fill", displayName: "Cross"),
-            Symbol(name: "exclamationmark.triangle.fill", displayName: "Warning"),
-            Symbol(name: "questionmark.circle.fill", displayName: "Question"),
-            Symbol(name: "play.rectangle.fill", displayName: "Play Button"),
-            Symbol(name: "link", displayName: "Link"),
-        ]),
+        Group(
+            name: "Arrows",
+            symbols: [
+                Symbol(name: "arrow.down", displayName: "Arrow Down"),
+                Symbol(name: "arrow.up", displayName: "Arrow Up"),
+                Symbol(name: "arrow.left", displayName: "Arrow Left"),
+                Symbol(name: "arrow.right", displayName: "Arrow Right"),
+                Symbol(name: "arrow.turn.right.down", displayName: "Curved Arrow"),
+                Symbol(name: "arrowshape.down.fill", displayName: "Big Arrow"),
+                Symbol(name: "hand.point.down.fill", displayName: "Pointing Hand"),
+                Symbol(name: "hand.tap.fill", displayName: "Tap"),
+            ]),
+        Group(
+            name: "Shapes",
+            symbols: [
+                Symbol(name: "circle", displayName: "Ring"),
+                Symbol(name: "square", displayName: "Frame"),
+                Symbol(name: "circle.fill", displayName: "Dot"),
+                Symbol(name: "star.fill", displayName: "Star"),
+                Symbol(name: "heart.fill", displayName: "Heart"),
+                Symbol(name: "bolt.fill", displayName: "Lightning"),
+                Symbol(name: "sparkles", displayName: "Sparkles"),
+                Symbol(name: "flame.fill", displayName: "Flame"),
+            ]),
+        Group(
+            name: "Signs",
+            symbols: [
+                Symbol(name: "bell.fill", displayName: "Bell"),
+                Symbol(name: "hand.thumbsup.fill", displayName: "Thumbs Up"),
+                Symbol(name: "checkmark.circle.fill", displayName: "Tick"),
+                Symbol(name: "xmark.circle.fill", displayName: "Cross"),
+                Symbol(name: "exclamationmark.triangle.fill", displayName: "Warning"),
+                Symbol(name: "questionmark.circle.fill", displayName: "Question"),
+                Symbol(name: "play.rectangle.fill", displayName: "Play Button"),
+                Symbol(name: "link", displayName: "Link"),
+            ]),
     ]
 
     public static var symbols: [Symbol] { groups.flatMap(\.symbols) }
@@ -240,8 +246,9 @@ public extension Project {
         let wanted = min(Self.stickerDuration, length)
         var start = time.snappedToFrame().clamped(.zero, length)
         if length - start < wanted { start = max(.zero, length - wanted) }
-        var item = TextOverlay(text: sticker.name, style: .simple, entrance: .pop, start: start.snappedToFrame(),
-                               duration: wanted.snappedToFrame(), verticalPosition: y, horizontalPosition: x)
+        var item = TextOverlay(
+            text: sticker.name, style: .simple, entrance: .pop, start: start.snappedToFrame(),
+            duration: wanted.snappedToFrame(), verticalPosition: y, horizontalPosition: x)
         item.sticker = sticker
         titles.append(item)
         return item.id
@@ -280,8 +287,10 @@ public enum TextTemplate: String, CaseIterable, Identifiable, Sendable {
     /// The items it adds, timed from 0 (all as long as the template).
     public func items() -> [TextOverlay] {
         let length = CMTime(value: 3, timescale: 1)
-        func title(_ text: String, _ style: TitleStyle, y: Double, x: Double = 0.5, size: Double? = nil, entrance: TitleEntrance = .pop,
-                   exit: MotionAnimation? = .fade, loop: TitleLoop? = nil) -> TextOverlay {
+        func title(
+            _ text: String, _ style: TitleStyle, y: Double, x: Double = 0.5, size: Double? = nil, entrance: TitleEntrance = .pop,
+            exit: MotionAnimation? = .fade, loop: TitleLoop? = nil
+        ) -> TextOverlay {
             var item = TextOverlay(text: text, style: style, entrance: entrance, start: .zero, duration: length, verticalPosition: y, horizontalPosition: x)
             if let size { item.look.size = size }
             item.exit = exit.map { ClipAnimation($0, duration: TextOverlay.exitDuration) }
@@ -289,7 +298,8 @@ public enum TextTemplate: String, CaseIterable, Identifiable, Sendable {
             return item
         }
         func sticker(_ kind: Sticker.Kind, color: RGBA = .white, size: Double = 200, x: Double, y: Double, loop: TitleLoop?) -> TextOverlay {
-            var item = TextOverlay(text: Sticker(kind).name, style: .simple, entrance: .pop, start: .zero, duration: length, verticalPosition: y, horizontalPosition: x)
+            var item = TextOverlay(
+                text: Sticker(kind).name, style: .simple, entrance: .pop, start: .zero, duration: length, verticalPosition: y, horizontalPosition: x)
             item.sticker = Sticker(kind, color: color, size: size)
             item.exit = ClipAnimation(.fade, duration: TextOverlay.exitDuration)
             item.loop = loop
@@ -353,8 +363,9 @@ public extension Project {
 extension TextOverlay {
     /// The same item with a new id, start and length.
     init(copying other: TextOverlay, start: CMTime, duration: CMTime) {
-        self = TextOverlay(id: UUID(), text: other.text, style: other.style, look: other.look, entrance: other.entrance,
-                           start: start, duration: duration, verticalPosition: other.verticalPosition, horizontalPosition: other.horizontalPosition)
+        self = TextOverlay(
+            id: UUID(), text: other.text, style: other.style, look: other.look, entrance: other.entrance,
+            start: start, duration: duration, verticalPosition: other.verticalPosition, horizontalPosition: other.horizontalPosition)
         followsClip = other.followsClip
         exit = other.exit
         loop = other.loop

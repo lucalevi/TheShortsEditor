@@ -68,19 +68,23 @@ public nonisolated enum CutoutRenderer {
                 .applyingFilter("CIMinimumCompositing", parameters: [kCIInputBackgroundImageKey: gradient(from: half + feather / 2, to: half - feather / 2)])
         case .circle:
             let radius = max(box.height / 2, 0.5)
-            shape = CIFilter(name: "CIRadialGradient", parameters: [
-                "inputCenter": CIVector(x: 0, y: 0),
-                "inputRadius0": max(radius - feather / 2, 0),
-                "inputRadius1": radius + feather / 2,
-                "inputColor0": CIColor.white, "inputColor1": CIColor.black,
-            ])!.outputImage!
+            shape = CIFilter(
+                name: "CIRadialGradient",
+                parameters: [
+                    "inputCenter": CIVector(x: 0, y: 0),
+                    "inputRadius0": max(radius - feather / 2, 0),
+                    "inputRadius1": radius + feather / 2,
+                    "inputColor0": CIColor.white, "inputColor1": CIColor.black,
+                ])!.outputImage!
             shape = shape.transformed(by: CGAffineTransform(scaleX: box.width / box.height, y: 1))
         case .rectangle:
             let corner = min(max(mask.roundness, 0), 1) * min(box.width, box.height) / 2
             let rect = CGRect(x: -box.width / 2, y: -box.height / 2, width: box.width, height: box.height)
-            shape = CIFilter(name: "CIRoundedRectangleGenerator", parameters: [
-                "inputExtent": CIVector(cgRect: rect), "inputRadius": corner, "inputColor": CIColor.white,
-            ])!.outputImage!.composited(over: black)
+            shape = CIFilter(
+                name: "CIRoundedRectangleGenerator",
+                parameters: [
+                    "inputExtent": CIVector(cgRect: rect), "inputRadius": corner, "inputColor": CIColor.white,
+                ])!.outputImage!.composited(over: black)
             shape = softened(shape, feather: feather)
         case .heart, .star:
             guard let picture = shapePicture(mask.shape, side: box.width) else { return white.cropped(to: ciRegion) }
@@ -105,18 +109,23 @@ public nonisolated enum CutoutRenderer {
 
     /// `image` kept where `mask` is white, see-through where it is black.
     public static func masked(_ image: CIImage, by mask: CIImage) -> CIImage {
-        image.applyingFilter("CIBlendWithMask", parameters: [
-            kCIInputBackgroundImageKey: CIImage(color: .clear).cropped(to: image.extent),
-            kCIInputMaskImageKey: mask,
-        ]).cropped(to: image.extent)
+        image.applyingFilter(
+            "CIBlendWithMask",
+            parameters: [
+                kCIInputBackgroundImageKey: CIImage(color: .clear).cropped(to: image.extent),
+                kCIInputMaskImageKey: mask,
+            ]
+        ).cropped(to: image.extent)
     }
 
     /// Black below `from`, white above `to` (along y), smoothly in between.
     private static func gradient(from: CGFloat, to: CGFloat) -> CIImage {
-        CIFilter(name: "CISmoothLinearGradient", parameters: [
-            "inputPoint0": CIVector(x: 0, y: from), "inputPoint1": CIVector(x: 0, y: to),
-            "inputColor0": CIColor.black, "inputColor1": CIColor.white,
-        ])!.outputImage!
+        CIFilter(
+            name: "CISmoothLinearGradient",
+            parameters: [
+                "inputPoint0": CIVector(x: 0, y: from), "inputPoint1": CIVector(x: 0, y: to),
+                "inputColor0": CIColor.black, "inputColor1": CIColor.white,
+            ])!.outputImage!
     }
 
     private static func softened(_ image: CIImage, feather: CGFloat) -> CIImage {
@@ -129,8 +138,11 @@ public nonisolated enum CutoutRenderer {
         let pixels = Int(min(max(side, 16), 1024).rounded())
         let key = "\(shape.rawValue)|\(pixels)"
         if let known = shapes.withLock({ $0[key] }) { return known }
-        guard let context = CGContext(data: nil, width: pixels, height: pixels, bitsPerComponent: 8, bytesPerRow: 0,
-                                      space: CGColorSpaceCreateDeviceGray(), bitmapInfo: CGImageAlphaInfo.none.rawValue) else { return nil }
+        guard
+            let context = CGContext(
+                data: nil, width: pixels, height: pixels, bitsPerComponent: 8, bytesPerRow: 0,
+                space: CGColorSpaceCreateDeviceGray(), bitmapInfo: CGImageAlphaInfo.none.rawValue)
+        else { return nil }
         let s = CGFloat(pixels)
         context.setFillColor(gray: 1, alpha: 1)
         // Core Graphics' y goes up, like the shape's frame.

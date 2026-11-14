@@ -2,14 +2,16 @@ import CoreGraphics
 import CoreMedia
 import Foundation
 import Testing
+
 @testable import EditorCore
 
 private func t(_ s: Double) -> CMTime { CMTime(seconds: s, preferredTimescale: 600).snappedToFrame() }
 
 private func oneClip() -> Project {
     var p = Project()
-    let asset = MediaAsset(url: URL(fileURLWithPath: "/tmp/a.mov"), name: "a.mov", duration: CMTime(value: 10, timescale: 1),
-                           displaySize: CGSize(width: 1080, height: 1920), hasAudio: true)
+    let asset = MediaAsset(
+        url: URL(fileURLWithPath: "/tmp/a.mov"), name: "a.mov", duration: CMTime(value: 10, timescale: 1),
+        displaySize: CGSize(width: 1080, height: 1920), hasAudio: true)
     p.appendClip(of: p.addAsset(asset))
     return p
 }

@@ -226,7 +226,9 @@ public struct Timeline: Codable, Equatable, Sendable {
         // Effects at the start stay with the first part, those at the end with the second.
         first.effects.removeAll { $0.part == .end }
         second.effects.removeAll { $0.part == .start }
-        second.effects = second.effects.map { var effect = $0; effect.id = UUID(); return effect }
+        second.effects = second.effects.map {
+            var effect = $0; effect.id = UUID(); return effect
+        }
         first.keepFades(isFirst: true, isLast: false)
         second.keepFades(isFirst: false, isLast: true)
         clips[index] = first

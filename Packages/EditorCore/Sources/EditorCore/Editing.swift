@@ -212,7 +212,8 @@ public extension Project {
         let offset = time - overlay.start
         guard offset >= Clip.minimumDuration, overlay.duration - offset >= Clip.minimumDuration else { return nil }
         let isImage = asset(id: overlay.clip.assetID)?.isImage == true
-        var second = overlay.clip.piece(sourceStart: isImage ? overlay.clip.sourceStart : overlay.clip.sourceTime(atOffset: offset), duration: overlay.duration - offset)
+        var second = overlay.clip.piece(
+            sourceStart: isImage ? overlay.clip.sourceStart : overlay.clip.sourceTime(atOffset: offset), duration: overlay.duration - offset)
         second.keepFades(isFirst: false, isLast: true)
         overlays[index].clip.duration = offset
         overlays[index].clip.keepFades(isFirst: true, isLast: false)
@@ -360,8 +361,10 @@ public struct SoundClip: Identifiable, Codable, Equatable, Sendable {
     /// Turned down while someone talks, like the song: for a second song or a music bed.
     public var lowersUnderSpeech: Bool
 
-    public init(clip: Clip, start: CMTime, isVoiceOver: Bool = false, followsClip: Bool = true, detachedFrom: Clip.ID? = nil,
-                lowersUnderSpeech: Bool = false) {
+    public init(
+        clip: Clip, start: CMTime, isVoiceOver: Bool = false, followsClip: Bool = true, detachedFrom: Clip.ID? = nil,
+        lowersUnderSpeech: Bool = false
+    ) {
         self.lowersUnderSpeech = lowersUnderSpeech
         self.clip = clip
         self.start = start
@@ -478,8 +481,10 @@ public extension Project {
         second.keepFades(isFirst: false, isLast: true)
         sounds[index].clip.duration = offset
         sounds[index].clip.keepFades(isFirst: true, isLast: false)
-        sounds.insert(SoundClip(clip: second, start: time, isVoiceOver: sound.isVoiceOver, followsClip: sound.followsClip, detachedFrom: sound.detachedFrom,
-                                    lowersUnderSpeech: sound.lowersUnderSpeech), at: index + 1)
+        sounds.insert(
+            SoundClip(
+                clip: second, start: time, isVoiceOver: sound.isVoiceOver, followsClip: sound.followsClip, detachedFrom: sound.detachedFrom,
+                lowersUnderSpeech: sound.lowersUnderSpeech), at: index + 1)
         return second.id
     }
 

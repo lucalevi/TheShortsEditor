@@ -71,9 +71,11 @@ struct EdgeHandle: View {
             .frame(maxHeight: .infinity)
             .contentShape(Rectangle())
             .pointerStyle(.frameResize(position: edge == .leading ? .leading : .trailing))
-            .gesture(DragGesture(minimumDistance: 1, coordinateSpace: .global)
-                .onChanged { onChange($0.translation.width) }
-                .onEnded { _ in onEnd() })
+            .gesture(
+                DragGesture(minimumDistance: 1, coordinateSpace: .global)
+                    .onChanged { onChange($0.translation.width) }
+                    .onEnded { _ in onEnd() }
+            )
             .help(help)
     }
 }
@@ -149,11 +151,14 @@ struct TitleBlock: View {
         RoundedRectangle(cornerRadius: 4)
             .fill(Color.purple.opacity(isSelected ? 0.6 : 0.35))
             .overlay(alignment: .leading) {
-                Label(title.text.replacingOccurrences(of: "\n", with: " "), systemImage: title.isSticker ? "face.smiling" : title.track != nil ? "scope" : "textformat")
-                    .font(.caption2.weight(.medium))
-                    .lineLimit(1)
-                    .padding(.horizontal, 4)
-                    .padding(.trailing, 6)
+                Label(
+                    title.text.replacingOccurrences(of: "\n", with: " "),
+                    systemImage: title.isSticker ? "face.smiling" : title.track != nil ? "scope" : "textformat"
+                )
+                .font(.caption2.weight(.medium))
+                .lineLimit(1)
+                .padding(.horizontal, 4)
+                .padding(.trailing, 6)
             }
             .clipShape(RoundedRectangle(cornerRadius: 4))
             .overlay {
@@ -187,8 +192,10 @@ struct OverlayBlock: View {
         RoundedRectangle(cornerRadius: 5)
             .fill(Color.teal.opacity(0.35))
             .overlay {
-                FilmstripView(filmstrip: filmstrip, sourceStart: sourceStart, pointsPerSecond: pointsPerSecond / CGFloat(overlay.clip.averageSpeed), aspect: aspect)
-                    .opacity(0.75)
+                FilmstripView(
+                    filmstrip: filmstrip, sourceStart: sourceStart, pointsPerSecond: pointsPerSecond / CGFloat(overlay.clip.averageSpeed), aspect: aspect
+                )
+                .opacity(0.75)
             }
             .overlay(alignment: .topLeading) {
                 HStack(spacing: 3) {
@@ -213,8 +220,11 @@ struct OverlayBlock: View {
             }
             .opacity(isAfterEnd ? 0.4 : 1)
             .contentShape(Rectangle())
-            .help(isAfterEnd ? "After the end of your Short, so it won't be seen"
-                  : "Over the clips: \(name). Drag to move, drag an edge to trim.")
+            .help(
+                isAfterEnd
+                    ? "After the end of your Short, so it won't be seen"
+                    : "Over the clips: \(name). Drag to move, drag an edge to trim."
+            )
             .accessibilityElement(children: .combine)
             .accessibilityLabel("Over the clips: \(name)")
             .accessibilityAddTraits(isSelected ? .isSelected : [])
@@ -238,7 +248,8 @@ struct ClipBlock: View, Equatable {
     var progress: Double?
 
     nonisolated static func == (a: ClipBlock, b: ClipBlock) -> Bool {
-        a.clip == b.clip && a.isReversed == b.isReversed && a.progress == b.progress && a.name == b.name && a.tooLoud == b.tooLoud && a.aspect == b.aspect && a.pointsPerSecond == b.pointsPerSecond
+        a.clip == b.clip && a.isReversed == b.isReversed && a.progress == b.progress && a.name == b.name && a.tooLoud == b.tooLoud && a.aspect == b.aspect
+            && a.pointsPerSecond == b.pointsPerSecond
             && a.isSelected == b.isSelected && a.levels?.decibels.count == b.levels?.decibels.count
             && a.filmstrip?.images.count == b.filmstrip?.images.count
     }
@@ -251,9 +262,12 @@ struct ClipBlock: View, Equatable {
             .fill(Color.accentColor.opacity(0.25))
             .overlay(alignment: .top) {
                 // A freeze frame shows its one picture all along.
-                FilmstripView(filmstrip: filmstrip, sourceStart: clip.sourceStart, pointsPerSecond: clip.isFrozen ? 1_000_000 : pointsPerSecond / CGFloat(clip.averageSpeed), aspect: aspect)
-                    .padding(.bottom, levels == nil ? 0 : waveHeight)
-                    .opacity(0.85)
+                FilmstripView(
+                    filmstrip: filmstrip, sourceStart: clip.sourceStart,
+                    pointsPerSecond: clip.isFrozen ? 1_000_000 : pointsPerSecond / CGFloat(clip.averageSpeed), aspect: aspect
+                )
+                .padding(.bottom, levels == nil ? 0 : waveHeight)
+                .opacity(0.85)
             }
             .overlay(alignment: .bottom) {
                 if levels != nil, clip.isFrozen {

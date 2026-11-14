@@ -59,7 +59,8 @@ public extension Project {
             }
             // Two words said twice ("I think I think"): drop the first time.
             if index + 3 < words.count, same(words[index], words[index + 2]), same(words[index + 1], words[index + 3]),
-               !same(words[index], words[index + 1]) {
+                !same(words[index], words[index + 1])
+            {
                 found += [words[index].ref, words[index + 1].ref]
                 index += 2
                 continue
@@ -89,7 +90,8 @@ public extension Project {
             guard let word = sourceWords[timed.wordID], let clip = timeline.clips.first(where: { $0.id == timed.clipID }) else { continue }
             var end = word.end
             if index + 1 < all.count, all[index + 1].clipID == timed.clipID, let next = sourceWords[all[index + 1].wordID],
-               next.start >= word.end, (next.start - word.end).seconds < 1 {
+                next.start >= word.end, (next.start - word.end).seconds < 1
+            {
                 end = next.start
             }
             let range = CMTimeRange(start: word.start, end: end).intersection(clip.sourceRange)

@@ -45,9 +45,11 @@ public nonisolated enum EffectRenderer {
     /// One colour channel of `image` (0 red, 1 green, 2 blue), the others black.
     private static func channel(_ image: CIImage, _ index: Int) -> CIImage {
         let keep = { (i: Int) in CIVector(x: i == 0 && index == 0 ? 1 : 0, y: i == 1 && index == 1 ? 1 : 0, z: i == 2 && index == 2 ? 1 : 0, w: 0) }
-        return image.applyingFilter("CIColorMatrix", parameters: [
-            "inputRVector": keep(0), "inputGVector": keep(1), "inputBVector": keep(2), "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 1),
-        ])
+        return image.applyingFilter(
+            "CIColorMatrix",
+            parameters: [
+                "inputRVector": keep(0), "inputGVector": keep(1), "inputBVector": keep(2), "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 1),
+            ])
     }
 
     /// Red moved one way, blue the other, by `distance` pixels.
@@ -65,11 +67,12 @@ public nonisolated enum EffectRenderer {
         let s = moment.effect.strength, t = moment.seconds, p = moment.progress, frame = moment.frame
         let part = moment.effect.part
         // How much the effect shows now: the start fades out, the end fades in.
-        let ramp: Double = switch part {
-        case .wholeClip: 1
-        case .start: 1 - p
-        case .end: p
-        }
+        let ramp: Double =
+            switch part {
+            case .wholeClip: 1
+            case .start: 1 - p
+            case .end: p
+            }
         let width = region.width, height = region.height
 
         switch moment.effect.kind {
@@ -82,11 +85,12 @@ public nonisolated enum EffectRenderer {
             return image.transformed(by: around(region, scale: 1 + 2.4 * amount, dx: dx, dy: dy, angle: angle))
 
         case .flash:
-            let alpha: Double = switch part {
-            case .start: s * pow(1 - p, 2)
-            case .end: s * pow(p, 2)
-            case .wholeClip: s * beat(t, period: 1, fall: 0.12)
-            }
+            let alpha: Double =
+                switch part {
+                case .start: s * pow(1 - p, 2)
+                case .end: s * pow(p, 2)
+                case .wholeClip: s * beat(t, period: 1, fall: 0.12)
+                }
             let white = CIImage(color: CIColor(red: 1, green: 1, blue: 1, alpha: CGFloat(min(alpha, 1)))).cropped(to: region)
             return white.composited(over: image)
 
@@ -120,16 +124,19 @@ public nonisolated enum EffectRenderer {
                 out = out.transformed(by: CGAffineTransform(translationX: (random(frame, 51) - 0.5) * 0.03 * width, y: 0))
             }
             // Fine lines across the picture.
-            let lines = CIFilter(name: "CIStripesGenerator", parameters: [
-                "inputColor0": CIColor(red: 0, green: 0, blue: 0, alpha: CGFloat(0.22 * amount)), "inputColor1": CIColor.clear,
-                "inputWidth": 2.0, "inputSharpness": 0.5, "inputCenter": CIVector(x: 0, y: 0),
-            ])?.outputImage?.transformed(by: CGAffineTransform(rotationAngle: .pi / 2)).cropped(to: region)
+            let lines = CIFilter(
+                name: "CIStripesGenerator",
+                parameters: [
+                    "inputColor0": CIColor(red: 0, green: 0, blue: 0, alpha: CGFloat(0.22 * amount)), "inputColor1": CIColor.clear,
+                    "inputWidth": 2.0, "inputSharpness": 0.5, "inputCenter": CIVector(x: 0, y: 0),
+                ])?.outputImage?.transformed(by: CGAffineTransform(rotationAngle: .pi / 2)).cropped(to: region)
             if let lines { out = lines.composited(over: out) }
             // A band of noise rolling up from the bottom.
             let bandY = region.minY + (t * 0.25).truncatingRemainder(dividingBy: 1) * height
             if let noise = CIFilter(name: "CIRandomGenerator")?.outputImage?
                 .transformed(by: CGAffineTransform(translationX: CGFloat(frame * 37 % 500), y: CGFloat(frame * 91 % 500)))
-                .applyingFilter("CIColorControls", parameters: [kCIInputSaturationKey: 0]) {
+                .applyingFilter("CIColorControls", parameters: [kCIInputSaturationKey: 0])
+            {
                 let band = faded(noise.cropped(to: CGRect(x: region.minX, y: bandY, width: width, height: 0.03 * height)), 0.35 * amount)
                 out = band.composited(over: out)
             }
@@ -138,13 +145,16 @@ public nonisolated enum EffectRenderer {
         case .filmGrain:
             let amount = s * ramp
             guard let noise = CIFilter(name: "CIRandomGenerator")?.outputImage else { return image }
-            let grain = noise
+            let grain =
+                noise
                 .transformed(by: CGAffineTransform(translationX: CGFloat(frame * 53 % 800), y: CGFloat(frame * 29 % 800)))
                 .applyingFilter("CIColorControls", parameters: [kCIInputSaturationKey: 0, kCIInputContrastKey: 1.6])
                 .cropped(to: region)
-            let warm = image.applyingFilter("CITemperatureAndTint", parameters: [
-                "inputNeutral": CIVector(x: 6500, y: 0), "inputTargetNeutral": CIVector(x: 6500 - 900 * amount, y: 0),
-            ])
+            let warm = image.applyingFilter(
+                "CITemperatureAndTint",
+                parameters: [
+                    "inputNeutral": CIVector(x: 6500, y: 0), "inputTargetNeutral": CIVector(x: 6500 - 900 * amount, y: 0),
+                ])
             let grained = faded(grain, 0.45 * amount).applyingFilter("CISoftLightBlendMode", parameters: [kCIInputBackgroundImageKey: warm])
             return grained.applyingFilter("CIVignette", parameters: [kCIInputIntensityKey: 0.6 * amount, kCIInputRadiusKey: 1.6]).cropped(to: region)
 
@@ -153,11 +163,15 @@ public nonisolated enum EffectRenderer {
             // A warm glow drifting across, slowly.
             let phase = (t / 4).truncatingRemainder(dividingBy: 1)
             let centre = CIVector(x: region.minX + width * (-0.2 + 1.4 * phase), y: region.minY + height * (0.7 - 0.3 * sin(2 * .pi * phase)))
-            guard let glow = CIFilter(name: "CIRadialGradient", parameters: [
-                "inputCenter": centre, "inputRadius0": 0.05 * width, "inputRadius1": 0.75 * width,
-                "inputColor0": CIColor(red: 1, green: 0.45, blue: 0.15, alpha: CGFloat(0.85 * amount)),
-                "inputColor1": CIColor(red: 1, green: 0.2, blue: 0.5, alpha: 0),
-            ])?.outputImage?.cropped(to: region) else { return image }
+            guard
+                let glow = CIFilter(
+                    name: "CIRadialGradient",
+                    parameters: [
+                        "inputCenter": centre, "inputRadius0": 0.05 * width, "inputRadius1": 0.75 * width,
+                        "inputColor0": CIColor(red: 1, green: 0.45, blue: 0.15, alpha: CGFloat(0.85 * amount)),
+                        "inputColor1": CIColor(red: 1, green: 0.2, blue: 0.5, alpha: 0),
+                    ])?.outputImage?.cropped(to: region)
+            else { return image }
             return glow.applyingFilter("CIScreenBlendMode", parameters: [kCIInputBackgroundImageKey: image])
 
         case .blur:
@@ -167,27 +181,32 @@ public nonisolated enum EffectRenderer {
 
         case .vignettePulse:
             let pulse = 0.5 + 0.5 * sin(2 * .pi * t / 1.2)
-            return image.applyingFilter("CIVignetteEffect", parameters: [
-                kCIInputCenterKey: CIVector(x: region.midX, y: region.midY),
-                kCIInputRadiusKey: height * (0.55 - 0.12 * pulse * s),
-                kCIInputIntensityKey: (0.6 + 0.4 * pulse) * s * ramp,
-                "inputFalloff": 0.6,
-            ])
+            return image.applyingFilter(
+                "CIVignetteEffect",
+                parameters: [
+                    kCIInputCenterKey: CIVector(x: region.midX, y: region.midY),
+                    kCIInputRadiusKey: height * (0.55 - 0.12 * pulse * s),
+                    kCIInputIntensityKey: (0.6 + 0.4 * pulse) * s * ramp,
+                    "inputFalloff": 0.6,
+                ])
 
         case .mirror:
             // The left half, flipped onto the right.
             let left = image.cropped(to: CGRect(x: region.minX, y: region.minY, width: width / 2, height: height))
-            let flipped = left.transformed(by: CGAffineTransform(translationX: -region.midX, y: 0)
-                .concatenating(CGAffineTransform(scaleX: -1, y: 1))
-                .concatenating(CGAffineTransform(translationX: region.midX, y: 0)))
+            let flipped = left.transformed(
+                by: CGAffineTransform(translationX: -region.midX, y: 0)
+                    .concatenating(CGAffineTransform(scaleX: -1, y: 1))
+                    .concatenating(CGAffineTransform(translationX: region.midX, y: 0)))
             let mirrored = flipped.composited(over: image)
             return ramp >= 1 ? mirrored : faded(mirrored, ramp).composited(over: image)
 
         case .colorPop:
             guard let cube = colorPopCube() else { return image }
-            let popped = image.applyingFilter("CIColorCubeWithColorSpace", parameters: [
-                "inputCubeDimension": colorPopSize, "inputCubeData": cube, "inputColorSpace": NSNull(),
-            ])
+            let popped = image.applyingFilter(
+                "CIColorCubeWithColorSpace",
+                parameters: [
+                    "inputCubeDimension": colorPopSize, "inputCubeData": cube, "inputColorSpace": NSNull(),
+                ])
             let amount = s * ramp
             return amount >= 1 ? popped : faded(popped, amount).composited(over: image)
         }
@@ -237,11 +256,12 @@ public nonisolated enum EffectRenderer {
         var effect = ClipEffect(kind, strength: 0.85)
         effect.part = .wholeClip
         // A moment that shows it: right on a beat, in a glitch burst, part way through a drift.
-        let seconds: Double = switch kind {
-        case .lightLeak: 1.6
-        case .vignettePulse: 0.3
-        default: 0.02
-        }
+        let seconds: Double =
+            switch kind {
+            case .lightLeak: 1.6
+            case .vignettePulse: 0.3
+            default: 0.02
+            }
         let frame = kind == .glitch ? (0..<200).first { random($0, 10) < 0.2 } ?? 0 : 7
         if kind == .blur { effect.strength = 0.35 }
         let moment = EffectMoment(effect: effect, seconds: seconds, progress: 0.3, frame: frame)

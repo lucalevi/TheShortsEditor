@@ -20,8 +20,9 @@ public enum SpeechMaker {
         return AVSpeechSynthesisVoice.speechVoices()
             .filter { $0.language.hasPrefix(prefix) }
             .map { voice in
-                Voice(id: voice.identifier, name: voice.name, language: voice.language,
-                      isPersonal: voice.voiceTraits.contains(.isPersonalVoice), isBetter: voice.quality != .default)
+                Voice(
+                    id: voice.identifier, name: voice.name, language: voice.language,
+                    isPersonal: voice.voiceTraits.contains(.isPersonalVoice), isBetter: voice.quality != .default)
             }
             .sorted { a, b in
                 if a.isPersonal != b.isPersonal { return a.isPersonal }
@@ -47,7 +48,8 @@ public enum SpeechMaker {
         let utterance = AVSpeechUtterance(string: text)
         utterance.voice = voice.flatMap(AVSpeechSynthesisVoice.init(identifier:))
         // 1 is the voice's normal pace.
-        utterance.rate = Float(Double(AVSpeechUtteranceDefaultSpeechRate) * rate).clamped(AVSpeechUtteranceMinimumSpeechRate, AVSpeechUtteranceMaximumSpeechRate)
+        utterance.rate = Float(Double(AVSpeechUtteranceDefaultSpeechRate) * rate).clamped(
+            AVSpeechUtteranceMinimumSpeechRate, AVSpeechUtteranceMaximumSpeechRate)
         return utterance
     }
 
@@ -107,7 +109,8 @@ public enum SpeechMaker {
             lock.lock(); defer { lock.unlock() }
             if file == nil {
                 file = Log.audio.attempt("Making the spoken voice's file") {
-                    try AVAudioFile(forWriting: url, settings: buffer.format.settings, commonFormat: buffer.format.commonFormat, interleaved: buffer.format.isInterleaved)
+                    try AVAudioFile(
+                        forWriting: url, settings: buffer.format.settings, commonFormat: buffer.format.commonFormat, interleaved: buffer.format.isInterleaved)
                 }
             }
             if let file { Log.audio.attempt("Writing the spoken voice") { try file.write(from: buffer) } }

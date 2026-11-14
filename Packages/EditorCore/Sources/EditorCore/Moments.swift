@@ -71,7 +71,9 @@ public enum MomentPicker {
         guard !chosen.isEmpty else { return nil }
         func length(_ list: [Int]) -> Double { list.reduce(0) { $0 + sentences[$1].seconds } }
         while length(chosen) > target, chosen.count > 1 {
-            let weakest = chosen.dropFirst().min { score(sentences[$0]) / max(sentences[$0].seconds, 0.1) < score(sentences[$1]) / max(sentences[$1].seconds, 0.1) }!
+            let weakest = chosen.dropFirst().min {
+                score(sentences[$0]) / max(sentences[$0].seconds, 0.1) < score(sentences[$1]) / max(sentences[$1].seconds, 0.1)
+            }!
             chosen.removeAll { $0 == weakest }
         }
         // Too little kept (under a third of what was asked) isn't a Short: the rules do better.
@@ -87,9 +89,11 @@ public extension Project {
         var current: [TimedWord] = []
         func close() {
             guard let first = current.first, let last = current.last else { return }
-            sentences.append(SpokenSentence(text: current.map(\.text).joined(separator: " "),
-                                            range: CMTimeRange(start: first.range.start, end: last.range.end),
-                                            firstWordID: first.wordID, wordCount: current.count))
+            sentences.append(
+                SpokenSentence(
+                    text: current.map(\.text).joined(separator: " "),
+                    range: CMTimeRange(start: first.range.start, end: last.range.end),
+                    firstWordID: first.wordID, wordCount: current.count))
             current = []
         }
         for word in words {

@@ -1,6 +1,7 @@
 import CoreMedia
 import Foundation
 import Testing
+
 @testable import EditorCore
 
 private func seconds(_ s: Double) -> CMTime { CMTime(seconds: s, preferredTimescale: 600) }
@@ -8,13 +9,16 @@ private func seconds(_ s: Double) -> CMTime { CMTime(seconds: s, preferredTimesc
 /// A project with one 10-second file on the timeline, whose words are given as (text, start, length).
 private func project(_ words: [(String, Double, Double)]) -> Project {
     var project = Project()
-    let asset = MediaAsset(url: URL(fileURLWithPath: "/tmp/a.mov"), name: "a", duration: seconds(10),
-                           displaySize: CGSize(width: 1080, height: 1920), hasAudio: true)
+    let asset = MediaAsset(
+        url: URL(fileURLWithPath: "/tmp/a.mov"), name: "a", duration: seconds(10),
+        displaySize: CGSize(width: 1080, height: 1920), hasAudio: true)
     project.addAsset(asset)
     project.appendClip(of: asset.id)
-    project.transcripts[asset.id] = Transcript(language: .english, words: words.map {
-        Word(text: $0.0, start: seconds($0.1), duration: seconds($0.2))
-    })
+    project.transcripts[asset.id] = Transcript(
+        language: .english,
+        words: words.map {
+            Word(text: $0.0, start: seconds($0.1), duration: seconds($0.2))
+        })
     return project
 }
 
@@ -31,7 +35,7 @@ struct CaptionTests {
     }
 
     @Test func aWordCutInHalfGoesWithItsMiddle() {
-        var p = project([("hello", 2.8, 0.6)])  // middle at 3.1 s
+        var p = project([("hello", 2.8, 0.6)]) // middle at 3.1 s
         p.timeline.split(at: seconds(3))
         let words = CaptionLayout.timelineWords(in: p)
         #expect(words.count == 1)

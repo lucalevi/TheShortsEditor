@@ -2,13 +2,15 @@ import CoreGraphics
 import CoreMedia
 import Foundation
 import Testing
+
 @testable import EditorCore
 
 private func t(_ s: Double) -> CMTime { CMTime(seconds: s, preferredTimescale: 600).snappedToFrame() }
 
 private func video(_ name: String, seconds: Int64 = 10, size: CGSize = CGSize(width: 1080, height: 1920), frameRate: Double? = nil) -> MediaAsset {
-    MediaAsset(url: URL(fileURLWithPath: "/tmp/\(name)"), name: name, duration: CMTime(value: seconds, timescale: 1),
-               displaySize: size, hasAudio: true, frameRate: frameRate)
+    MediaAsset(
+        url: URL(fileURLWithPath: "/tmp/\(name)"), name: name, duration: CMTime(value: seconds, timescale: 1),
+        displaySize: size, hasAudio: true, frameRate: frameRate)
 }
 
 private func picture(_ name: String, size: CGSize) -> MediaAsset {
@@ -106,7 +108,7 @@ struct MarkerTests {
 
     @Test func markersFollowTheirClip() {
         var p = twoClips()
-        let id = p.addMarker(at: t(14))  // 4 s into the second clip
+        let id = p.addMarker(at: t(14)) // 4 s into the second clip
         let old = p
         p.timeline.remove(p.timeline.clips[0].id)
         p.followClips(from: old)
@@ -130,7 +132,7 @@ struct MarkerTests {
         var freeze = p.timeline.clips[1].piece(sourceStart: t(4.5), duration: t(3))
         freeze.isFrozen = true
         p.timeline.clips.insert(freeze, at: 1)
-        let id = p.addMarker(at: t(3))  // 1 s into the freeze frame
+        let id = p.addMarker(at: t(3)) // 1 s into the freeze frame
         let old = p
         // Showing another part of the last clip, which now contains 4.5 s of the file.
         p.slipClip(p.timeline.clips[2].id, by: t(-1))

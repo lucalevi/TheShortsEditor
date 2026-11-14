@@ -105,9 +105,9 @@ public extension Project {
     /// splitting or joining one caption never reflows the ones after it.
     private mutating func keepCaptionStarting(after wordID: Word.ID, in assetID: MediaAsset.ID) {
         guard var transcript = transcripts[assetID],
-              let index = transcript.words.firstIndex(where: { $0.id == wordID }),
-              index + 1 < transcript.words.count,
-              transcript.words[index + 1].captionBreak == nil
+            let index = transcript.words.firstIndex(where: { $0.id == wordID }),
+            index + 1 < transcript.words.count,
+            transcript.words[index + 1].captionBreak == nil
         else { return }
         transcript.words[index + 1].captionBreak = .newCaption
         transcripts[assetID] = transcript
@@ -335,7 +335,9 @@ public enum SRT {
             if line.contains("-->") {
                 finish()
                 let parts = line.components(separatedBy: "-->")
-                if parts.count == 2, let start = time(parts[0]), let end = time(parts[1].split(separator: " ", omittingEmptySubsequences: true).first.map(String.init) ?? "") {
+                if parts.count == 2, let start = time(parts[0]),
+                    let end = time(parts[1].split(separator: " ", omittingEmptySubsequences: true).first.map(String.init) ?? "")
+                {
                     current = (start, end, [])
                 }
             } else if line.isEmpty {
@@ -417,7 +419,11 @@ public enum SmartWords {
     public static func picks(in chunk: [TimedWord], keywords: [Int], fillers: [Int], emoji: [(Int, String)]) -> SmartWordPicks {
         func word(_ number: Int) -> TimedWord? { chunk.indices.contains(number - 1) ? chunk[number - 1] : nil }
         var picks = SmartWordPicks()
-        for number in keywords { if let word = word(number), Keywords.score(word.text, startsSentence: false) > 0 || word.text.contains(where: \.isNumber) { picks.keywords.insert(word.wordID) } }
+        for number in keywords {
+            if let word = word(number), Keywords.score(word.text, startsSentence: false) > 0 || word.text.contains(where: \.isNumber) {
+                picks.keywords.insert(word.wordID)
+            }
+        }
         for number in fillers {
             if let word = word(number), !word.text.contains(where: \.isNumber), WordText.normalized(word.text).count <= 12 {
                 picks.fillers.insert(word.wordID)

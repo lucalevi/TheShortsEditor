@@ -68,7 +68,8 @@ struct ExportSheet: View {
 
     private var summary: some View {
         VStack(alignment: .leading, spacing: 4) {
-            let captions = model.project.hasCaptions && model.project.captions.isVisible
+            let captions =
+                model.project.hasCaptions && model.project.captions.isVisible
                 ? "captions: \(model.project.captions.style.displayName)" : "no captions"
             let music = model.project.musicRange != nil ? " · music" : ""
             Text("\(TimeFormat.string(model.duration)) · vertical 1080 × 1920 · \(captions)\(music)")

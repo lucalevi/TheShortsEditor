@@ -1,6 +1,7 @@
 import CoreGraphics
 import EditorCore
 import Testing
+
 @testable import RenderEngine
 
 @MainActor
@@ -34,8 +35,9 @@ private struct Pixels {
         width = image.width
         height = image.height
         var data = [UInt8](repeating: 0, count: width * height * 4)
-        let context = CGContext(data: &data, width: width, height: height, bitsPerComponent: 8, bytesPerRow: width * 4,
-                                space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+        let context = CGContext(
+            data: &data, width: width, height: height, bitsPerComponent: 8, bytesPerRow: width * 4,
+            space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
         context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
         self.data = data
     }
@@ -96,13 +98,15 @@ struct CaptionLookTests {
         let words = ["one", "two", "three", "four"]
         let first = try #require(CaptionRenderer.image(CaptionDrawing(words: words, currentWord: 0), settings: settings(.typewriter)))
         let all = try #require(CaptionRenderer.image(CaptionDrawing(words: words, currentWord: 3), settings: settings(.typewriter)))
-        #expect(first.width == all.width && first.height == all.height)  // nothing moves as words appear
+        #expect(first.width == all.width && first.height == all.height) // nothing moves as words appear
         #expect(Pixels(first).visible < Pixels(all).visible / 2)
     }
 
     @Test func bounceLiftsTheSpokenWord() throws {
         let still = try #require(CaptionRenderer.image(CaptionDrawing(words: ["up", "here"], currentWord: 0, wordAge: 1), settings: settings(.bounce)))
-        let jumping = try #require(CaptionRenderer.image(CaptionDrawing(words: ["up", "here"], currentWord: 0, wordAge: CaptionRenderer.bounceSeconds / 2), settings: settings(.bounce)))
+        let jumping = try #require(
+            CaptionRenderer.image(
+                CaptionDrawing(words: ["up", "here"], currentWord: 0, wordAge: CaptionRenderer.bounceSeconds / 2), settings: settings(.bounce)))
         #expect(still.width == jumping.width && still.height == jumping.height)
         #expect(Pixels(still).data != Pixels(jumping).data)
     }
@@ -134,12 +138,14 @@ struct CaptionLookTests {
     }
 
     @Test func previewsDrawOverTheShortsFrame() throws {
-        let red = try #require(CGContext(data: nil, width: 108, height: 192, bitsPerComponent: 8, bytesPerRow: 0, space: CGColorSpace(name: CGColorSpace.sRGB)!,
-                                          bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
+        let red = try #require(
+            CGContext(
+                data: nil, width: 108, height: 192, bitsPerComponent: 8, bytesPerRow: 0, space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
         red.setFillColor(CGColor(red: 0.9, green: 0.1, blue: 0.1, alpha: 1))
         red.fill(CGRect(x: 0, y: 0, width: 108, height: 192))
         let chip = try #require(CaptionPreview.image(for: .glow, settings: CaptionSettings(), over: red.makeImage(), size: CGSize(width: 160, height: 80)))
         #expect(chip.width == 160)
-        #expect(Pixels(chip).colourful > 3000)  // mostly the red frame
+        #expect(Pixels(chip).colourful > 3000) // mostly the red frame
     }
 }

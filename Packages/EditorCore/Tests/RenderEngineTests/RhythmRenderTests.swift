@@ -1,6 +1,7 @@
 @preconcurrency import AVFoundation
 import EditorCore
 import Testing
+
 @testable import RenderEngine
 
 private let red: (UInt8, UInt8, UInt8, UInt8) = (0, 0, 255, 255)
@@ -45,7 +46,7 @@ struct RhythmRenderTests {
         // Steps of the same speed next to each other join into one stretch.
         #expect(video.segments.count > 20)
         let audio = try #require(try await built.composition.loadTracks(withMediaType: .audio).first)
-        #expect(audio.segments.count > 3)  // the sound in stretches of at least 0.2 s
+        #expect(audio.segments.count > 3) // the sound in stretches of at least 0.2 s
         // The file's third second (the change to blue) is where the curve says it plays.
         let change = clip.timelineOffset(ofSourceTime: t(3)).seconds
         #expect(isRed(try await pixel(built, at: change - 0.1)))
@@ -125,7 +126,8 @@ struct RhythmRenderTests {
         #expect(offGrid.allSatisfy { $0 < 0.012 }, "\(beats.prefix(3).map { $0.time.seconds })")
         // The loud click every fourth beat starts the bars.
         let bars = beats.filter(\.isBarStart).map { $0.time.seconds }
-        #expect(bars.allSatisfy { abs(($0 - 0.25).truncatingRemainder(dividingBy: 2)) < 0.05 || abs(($0 - 0.25).truncatingRemainder(dividingBy: 2) - 2) < 0.05 })
+        #expect(
+            bars.allSatisfy { abs(($0 - 0.25).truncatingRemainder(dividingBy: 2)) < 0.05 || abs(($0 - 0.25).truncatingRemainder(dividingBy: 2) - 2) < 0.05 })
     }
 
     /// A WAV of short clicks (a low thump on every fourth), `bpm` a minute.

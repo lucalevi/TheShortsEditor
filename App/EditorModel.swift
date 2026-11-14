@@ -47,7 +47,9 @@ final class EditorModel {
 
     /// A click on a timeline item, with ⌘ (add/remove) or ⇧ (add the clips in between) as held.
     func click(_ item: Selection, modifiers: NSEvent.ModifierFlags) {
-        let kind: TimelineSelection.ClickKind = modifiers.contains(.command) ? .toggle
+        let kind: TimelineSelection.ClickKind =
+            modifiers.contains(.command)
+            ? .toggle
             : modifiers.contains(.shift) ? .extend : .replace
         timelineSelection.click(item, kind, in: project.timeline)
     }
@@ -408,8 +410,10 @@ final class EditorModel {
     }
 
     /// Reads the files, adds the usable ones to Media, and puts them where `destination` says.
-    func importFiles(_ urls: [URL], to destination: ImportDestination, actionName customName: String? = nil,
-                     then: ((inout Project, [MediaAsset.ID]) -> Void)? = nil) {
+    func importFiles(
+        _ urls: [URL], to destination: ImportDestination, actionName customName: String? = nil,
+        then: ((inout Project, [MediaAsset.ID]) -> Void)? = nil
+    ) {
         let addToTimeline = destination == .timelineEnd
         // A project file dropped or opened opens that Short instead.
         if let projectFile = urls.first(where: { $0.pathExtension.lowercased() == ProjectFile.fileExtension }) {
@@ -441,12 +445,13 @@ final class EditorModel {
 
             let songs = probed.filter { !$0.hasVideo }
             var overlayIDs: [Clip.ID] = []
-            let actionName = switch destination {
-            case .media: "Import"
-            case .timelineEnd: probed.allSatisfy { !$0.hasVideo } ? "Add Music" : "Add to Timeline"
-            case .overlay: "Add Over Clips"
-            case .sound: "Add Sound"
-            }
+            let actionName =
+                switch destination {
+                case .media: "Import"
+                case .timelineEnd: probed.allSatisfy { !$0.hasVideo } ? "Add Music" : "Add to Timeline"
+                case .overlay: "Add Over Clips"
+                case .sound: "Add Sound"
+                }
             apply(customName ?? actionName) { project in
                 var importedIDs: [MediaAsset.ID] = []
                 defer { then?(&project, importedIDs) }
@@ -466,7 +471,9 @@ final class EditorModel {
                     }
                 }
                 // A sound file dropped on the timeline or viewer becomes the music.
-                if addToTimeline, let song = songs.first, let id = project.assets.first(where: { $0.url.standardizedFileURL == song.url.standardizedFileURL })?.id {
+                if addToTimeline, let song = songs.first,
+                    let id = project.assets.first(where: { $0.url.standardizedFileURL == song.url.standardizedFileURL })?.id
+                {
                     project.setMusic(id)
                 }
             }
@@ -705,7 +712,8 @@ final class EditorModel {
                 if !project.hasCaptions, !quietly {
                     alert = AlertMessage(
                         title: "No speech found",
-                        message: "No words in \(language.displayName) were heard in your Short. Check the language, or that the clips or voice-overs have someone talking."
+                        message:
+                            "No words in \(language.displayName) were heard in your Short. Check the language, or that the clips or voice-overs have someone talking."
                     )
                 }
             } catch is CancellationError {
@@ -762,7 +770,8 @@ final class EditorModel {
         if let target = skipTarget, frame < target { return }
         skipTarget = nil
         if let cuts = silenceSession?.plan.timelineCuts, player.rate > 0,
-           let cut = cuts.first(where: { $0.containsTime(frame) }) {
+            let cut = cuts.first(where: { $0.containsTime(frame) })
+        {
             skipTarget = cut.end
             seek(to: cut.end)
         }

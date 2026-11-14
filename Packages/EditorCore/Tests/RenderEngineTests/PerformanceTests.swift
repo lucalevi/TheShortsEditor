@@ -2,6 +2,7 @@
 import EditorCore
 import Foundation
 import Testing
+
 @testable import RenderEngine
 
 /// How fast the compositor draws full-size frames: real-time playback needs under 33 ms a frame.
@@ -15,8 +16,9 @@ struct PerformanceTests {
     private func msPerFrame(_ project: Project) async throws -> Double {
         let built = try await CompositionBuilder.build(project)
         let reader = try AVAssetReader(asset: built.composition)
-        let output = AVAssetReaderVideoCompositionOutput(videoTracks: try await built.composition.loadTracks(withMediaType: .video),
-                                                         videoSettings: [kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA])
+        let output = AVAssetReaderVideoCompositionOutput(
+            videoTracks: try await built.composition.loadTracks(withMediaType: .video),
+            videoSettings: [kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA])
         output.videoComposition = built.videoComposition
         output.alwaysCopiesSampleData = false
         reader.add(output)
@@ -30,7 +32,8 @@ struct PerformanceTests {
     }
 
     private func clipOfWide(width: Int = 1920, height: Int = 1080) async throws -> (Project, MediaAsset.ID) {
-        let url = try await Fixture.video(width: width, height: height, seconds: seconds, bgra: (40, 90, 200, 255), bottomBGRA: (200, 200, 40, 255), toneFrom: 0)
+        let url = try await Fixture.video(
+            width: width, height: height, seconds: seconds, bgra: (40, 90, 200, 255), bottomBGRA: (200, 200, 40, 255), toneFrom: 0)
         var p = Project()
         let id = p.addAsset(try await MediaProbe.probe(url))
         return (p, id)
@@ -56,9 +59,13 @@ struct PerformanceTests {
         }
         heavy.addOverlay(of: upID, at: .zero)
         heavy.addOverlay(of: upID, at: CMTime(value: 1, timescale: 1))
-        heavy.transcripts[wide] = Transcript(language: .english, words: (0..<(seconds * 3)).map { i in
-            Word(text: ["This", "is", "really", "fast", "now"][i % 5], start: CMTime(value: Int64(i), timescale: 3), duration: CMTime(value: 1, timescale: 4))
-        })
+        heavy.transcripts[wide] = Transcript(
+            language: .english,
+            words: (0..<(seconds * 3)).map { i in
+                Word(
+                    text: ["This", "is", "really", "fast", "now"][i % 5], start: CMTime(value: Int64(i), timescale: 3), duration: CMTime(value: 1, timescale: 4)
+                )
+            })
         heavy.captions.style = .karaoke
         heavy.addTitle(at: .zero, text: "Watch this")
         heavy.look = FilterChoice(.film)

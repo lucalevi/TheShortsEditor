@@ -120,9 +120,14 @@ private struct EffectRow: View {
                     .help("Take this effect off")
             }
             .buttonStyle(.borderless)
-            Picker("Plays", selection: Binding(get: { effect.part }, set: { part in
-                model.updateEffect(effect.id, on: clip.id, "Effect Timing") { $0.part = part }
-            })) {
+            Picker(
+                "Plays",
+                selection: Binding(
+                    get: { effect.part },
+                    set: { part in
+                        model.updateEffect(effect.id, on: clip.id, "Effect Timing") { $0.part = part }
+                    })
+            ) {
                 ForEach(EffectPart.allCases) { Text($0.displayName).tag($0) }
             }
             .pickerStyle(.segmented)
@@ -152,8 +157,10 @@ private struct EffectRow: View {
         .background(Color.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 6))
     }
 
-    private func slider(_ name: String, value: Double, in range: ClosedRange<Double>, label: String,
-                        change: @escaping @MainActor (Double) -> Void, done: @escaping () -> Void) -> some View {
+    private func slider(
+        _ name: String, value: Double, in range: ClosedRange<Double>, label: String,
+        change: @escaping @MainActor (Double) -> Void, done: @escaping () -> Void
+    ) -> some View {
         HStack {
             Text(name).font(.caption).frame(width: 52, alignment: .leading)
             Slider(value: Binding(get: { value }, set: change), in: range) { editing in if !editing { done() } }

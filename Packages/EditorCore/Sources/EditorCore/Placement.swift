@@ -82,8 +82,9 @@ public struct Placement: Codable, Equatable, Hashable, Sendable {
         let f = min(max(fraction, 0), 1)
         func mix(_ a: Double, _ b: Double) -> Double { a + (b - a) * f }
         let scale = self.scale > 0 && other.scale > 0 ? exp(mix(log(self.scale), log(other.scale))) : mix(self.scale, other.scale)
-        return Placement(offsetX: mix(offsetX, other.offsetX), offsetY: mix(offsetY, other.offsetY), scale: scale, rotation: mix(rotation, other.rotation),
-                         opacity: mix(opacity, other.opacity))
+        return Placement(
+            offsetX: mix(offsetX, other.offsetX), offsetY: mix(offsetY, other.offsetY), scale: scale, rotation: mix(rotation, other.rotation),
+            opacity: mix(opacity, other.opacity))
     }
 }
 
@@ -312,9 +313,13 @@ public extension Clip {
         }
         switch preset {
         case .slowZoomIn:
-            keyframes = [Keyframe(time: start, placement: base, easing: .linear), Keyframe(time: end, placement: scaled(MotionPreset.slowZoom), easing: .linear)]
+            keyframes = [
+                Keyframe(time: start, placement: base, easing: .linear), Keyframe(time: end, placement: scaled(MotionPreset.slowZoom), easing: .linear),
+            ]
         case .slowZoomOut:
-            keyframes = [Keyframe(time: start, placement: scaled(MotionPreset.slowZoom), easing: .linear), Keyframe(time: end, placement: base, easing: .linear)]
+            keyframes = [
+                Keyframe(time: start, placement: scaled(MotionPreset.slowZoom), easing: .linear), Keyframe(time: end, placement: base, easing: .linear),
+            ]
         case .panLeft, .panRight:
             // Big enough that the edges never show, then slide across most of the spare width.
             var from = base

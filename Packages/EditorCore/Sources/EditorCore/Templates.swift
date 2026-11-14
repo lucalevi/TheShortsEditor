@@ -150,8 +150,10 @@ public struct TemplateShot: Equatable, Sendable {
     /// How the first shot comes in.
     public var animation: MotionAnimation?
 
-    public init(_ name: String, _ direction: String, beats: Int, title: String? = nil,
-                transition: TransitionKind? = nil, animation: MotionAnimation? = nil) {
+    public init(
+        _ name: String, _ direction: String, beats: Int, title: String? = nil,
+        transition: TransitionKind? = nil, animation: MotionAnimation? = nil
+    ) {
         self.name = name
         self.direction = direction
         self.beats = beats
@@ -170,8 +172,10 @@ public extension Storyboard {
             let (shot, length) = pair
             // The transition goes on the shot before, which changes into this one.
             let next = template.shots.indices.contains(index + 1) ? template.shots[index + 1].transition : nil
-            return Slot(shot: Shot(name: shot.name, direction: shot.direction, length: length, title: shot.title,
-                                   transition: next, entrance: shot.animation, fitsExactly: true))
+            return Slot(
+                shot: Shot(
+                    name: shot.name, direction: shot.direction, length: length, title: shot.title,
+                    transition: next, entrance: shot.animation, fitsExactly: true))
         }
     }
 }
@@ -193,7 +197,8 @@ public extension Project {
                 // long enough for its shot (a short file is used whole every time).
                 let share = CMTimeMultiplyByRatio(asset.duration, multiplier: 1, divisor: Int32(uses))
                 if share >= slot.shot.length {
-                    part = CMTimeRange(start: CMTimeMultiplyByRatio(share, multiplier: Int32(use), divisor: 1).snappedToFrame(), duration: share.snappedToFrame())
+                    part = CMTimeRange(
+                        start: CMTimeMultiplyByRatio(share, multiplier: Int32(use), divisor: 1).snappedToFrame(), duration: share.snappedToFrame())
                 }
             }
             fill(slot.id, with: assetID, part: part)

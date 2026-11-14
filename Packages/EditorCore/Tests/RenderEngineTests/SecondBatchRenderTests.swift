@@ -1,6 +1,7 @@
 @preconcurrency import AVFoundation
 import EditorCore
 import Testing
+
 @testable import RenderEngine
 
 private let red: (UInt8, UInt8, UInt8, UInt8) = (0, 0, 255, 255)
@@ -29,8 +30,9 @@ struct SecondBatchRenderTests {
     private func count(_ image: CGImage, near color: (Int, Int, Int)) -> Int {
         let width = image.width, height = image.height
         var data = [UInt8](repeating: 0, count: width * height * 4)
-        let context = CGContext(data: &data, width: width, height: height, bitsPerComponent: 8, bytesPerRow: width * 4,
-                                space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+        let context = CGContext(
+            data: &data, width: width, height: height, bitsPerComponent: 8, bytesPerRow: width * 4,
+            space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
         context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
         return stride(from: 0, to: data.count, by: 4).count {
             data[$0 + 3] > 200 && abs(Int(data[$0]) - color.0) < 40 && abs(Int(data[$0 + 1]) - color.1) < 40 && abs(Int(data[$0 + 2]) - color.2) < 40
@@ -99,7 +101,7 @@ struct SecondBatchRenderTests {
             title.horizontalPosition = 0.2
         }
         let box = try #require(TitlePreview.frame(of: project.titles[0]))
-        #expect(box.minX < 20)   // pushed to the left edge, but kept on the canvas
+        #expect(box.minX < 20) // pushed to the left edge, but kept on the canvas
         let image = try await frame(of: CompositionBuilder.build(project), at: 0.5)
         #expect(isRed(Fixture.pixel(image, x: Int(box.minX) + 6, y: Int(box.midY))))
     }
@@ -147,8 +149,9 @@ struct SecondBatchRenderTests {
     @Test func theSubjectIsFoundOnTheLeft() async throws {
         let url = FileManager.default.temporaryDirectory.appending(path: "subject-\(UUID().uuidString).png")
         let width = 640, height = 360
-        let context = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0,
-                                space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+        let context = CGContext(
+            data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0,
+            space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
         context.setFillColor(CGColor(red: 0.1, green: 0.1, blue: 0.1, alpha: 1))
         context.fill(CGRect(x: 0, y: 0, width: width, height: height))
         context.setFillColor(CGColor(red: 1, green: 0.9, blue: 0.2, alpha: 1))

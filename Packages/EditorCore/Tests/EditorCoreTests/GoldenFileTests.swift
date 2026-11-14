@@ -1,6 +1,7 @@
 import CoreMedia
 import Foundation
 import Testing
+
 @testable import EditorCore
 
 /// Shorts saved by every earlier version of the app still open, with everything they had.
@@ -49,8 +50,8 @@ struct GoldenFileTests {
         let clips = p.timeline.clips
         // From version 4 a freeze frame splits the first clip at 1 s: talk 0–1 s, freeze, talk 1–4 s.
         let first = clips[0]
-        let middle = version >= 4 ? clips[2] : clips[0]  // the talk clip's part that ends at 4 s
-        let second = version >= 4 ? clips[3] : clips[1]  // talk 4–10 s
+        let middle = version >= 4 ? clips[2] : clips[0] // the talk clip's part that ends at 4 s
+        let second = version >= 4 ? clips[3] : clips[1] // talk 4–10 s
         #expect(first.assetID == talk && second.assetID == talk)
         #expect(first.sourceStart == .zero)
         #expect(middle.sourceStart + middle.duration == Self.seconds(4))

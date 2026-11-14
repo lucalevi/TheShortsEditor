@@ -1,6 +1,7 @@
 @preconcurrency import AVFoundation
 import EditorCore
 import Testing
+
 @testable import RenderEngine
 
 @MainActor
@@ -77,7 +78,8 @@ struct AudioMixTests {
         #expect(abs(AudioMix.volume(at: CMTime(value: 3, timescale: 1), in: envelope) - v * BackgroundMusic.loweredFraction) < 0.001)
         // And the mix really is quieter there: music alone before the speech, lowered after.
         p.timeline.clips[0].isMuted = false
-        let before = try #require(try await AudioProbe.peak(of: p, in: CMTimeRange(start: CMTime(value: 1, timescale: 2), duration: CMTime(value: 1, timescale: 2))))
+        let before = try #require(
+            try await AudioProbe.peak(of: p, in: CMTimeRange(start: CMTime(value: 1, timescale: 2), duration: CMTime(value: 1, timescale: 2))))
         #expect(abs(before - Float(0.3 * v)) < 0.03)
         p.music?.lowersUnderSpeech = false
         let flat = try await CompositionBuilder.build(p).musicEnvelope
@@ -97,7 +99,9 @@ struct AudioMixTests {
         let parameters = try #require(inputs.last)
         func volume(at seconds: Double) -> Float? {
             var from: Float = 0, to: Float = 0, range = CMTimeRange()
-            guard parameters.getVolumeRamp(for: CMTime(seconds: seconds, preferredTimescale: 600), startVolume: &from, endVolume: &to, timeRange: &range) else { return nil }
+            guard parameters.getVolumeRamp(for: CMTime(seconds: seconds, preferredTimescale: 600), startVolume: &from, endVolume: &to, timeRange: &range) else {
+                return nil
+            }
             let fraction = range.duration.seconds > 0 ? Float((seconds - range.start.seconds) / range.duration.seconds) : 0
             return from + (to - from) * fraction
         }
@@ -121,7 +125,7 @@ struct AudioMixTests {
     @Test func exportBringsTheSoundToYouTubesLevel() async throws {
         let p = try await project(seconds: 3)
         let before = try #require(try await AudioProbe.loudness(of: p)?.integratedLoudness)
-        #expect(before > -10)  // the fixture tone is loud
+        #expect(before > -10) // the fixture tone is loud
         let url = FileManager.default.temporaryDirectory.appending(path: "loud-\(UUID().uuidString).mp4")
         try await Exporter.export(p, to: url)
         let after = try #require(try await loudness(of: url))
@@ -148,8 +152,10 @@ struct TransitionSoundTests {
         var p = Project()
         let a = p.addAsset(try await MediaProbe.probe(quiet))
         let b = p.addAsset(try await MediaProbe.probe(loud))
-        p.timeline.clips = [Clip(assetID: a, sourceStart: .zero, duration: CMTime(value: 2, timescale: 1)),
-                            Clip(assetID: b, sourceStart: CMTime(value: 1, timescale: 1), duration: CMTime(value: 2, timescale: 1))]
+        p.timeline.clips = [
+            Clip(assetID: a, sourceStart: .zero, duration: CMTime(value: 2, timescale: 1)),
+            Clip(assetID: b, sourceStart: CMTime(value: 1, timescale: 1), duration: CMTime(value: 2, timescale: 1)),
+        ]
         let noFade = try await AudioProbe.peak(of: p, in: range(1.6, 1.95))
         #expect(noFade == nil || noFade! < 0.001)
         p.setTransition(ClipTransition(kind: .dissolve, duration: CMTime(value: 30, timescale: Project.frameRate)), after: p.timeline.clips[0].id)

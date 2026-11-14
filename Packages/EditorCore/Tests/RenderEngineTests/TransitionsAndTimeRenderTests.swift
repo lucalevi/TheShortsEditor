@@ -1,6 +1,7 @@
 @preconcurrency import AVFoundation
 import EditorCore
 import Testing
+
 @testable import RenderEngine
 
 private let red: (UInt8, UInt8, UInt8, UInt8) = (0, 0, 255, 255)
@@ -163,7 +164,7 @@ struct TransitionsAndTimeRenderTests {
         let url = try await Fixture.video(width: 180, height: 320, seconds: 6, bgra: red, toneFrom: 0, laterBGRA: blue, laterFrom: 5)
         var project = Project()
         project.appendClip(of: project.addAsset(try await MediaProbe.probe(url)))
-        project.setSpeed(0.5, in: CMTimeRange(start: t(2), end: t(3)))  // 2 + 2 + 3 s
+        project.setSpeed(0.5, in: CMTimeRange(start: t(2), end: t(3))) // 2 + 2 + 3 s
         let built = try await CompositionBuilder.build(project)
         #expect(abs(built.composition.duration.seconds - 7) < 0.05)
         let video = try #require(try await built.composition.loadTracks(withMediaType: .video).first)
@@ -199,9 +200,12 @@ struct TransitionsAndTimeRenderTests {
         let half = try await middle(try await CompositionBuilder.build(project), at: 1)
         #expect(half.r > 90 && half.r < 165 && half.b > 90 && half.b < 165)
 
-        project.updateOverlay(id) { $0.clip.placement.opacity = 1; $0.clip.pictureFadeIn = t(1); $0.clip.pictureFadeOut = t(0.5) }
+        project.updateOverlay(id) {
+            $0.clip.placement.opacity = 1; $0.clip.pictureFadeIn = t(1); $0.clip.pictureFadeOut = t(0.5)
+        }
         let built = try await CompositionBuilder.build(project)
-        let first = try await middle(built, at: 0), mid = try await middle(built, at: 0.5), full = try await middle(built, at: 1.2), last = try await middle(built, at: 1.9)
+        let first = try await middle(built, at: 0), mid = try await middle(built, at: 0.5), full = try await middle(built, at: 1.2),
+            last = try await middle(built, at: 1.9)
         #expect(first.r > 200 && first.b < 50)
         #expect(mid.r > 90 && mid.b > 90)
         #expect(isBlue(full))

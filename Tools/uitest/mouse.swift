@@ -1,5 +1,6 @@
 import CoreGraphics
 import Foundation
+
 // mouse click X Y [count] | mouse rclick X Y | mouse drag X1 Y1 X2 Y2   (global screen points)
 let a = CommandLine.arguments
 func post(_ type: CGEventType, _ p: CGPoint, clicks: Int64 = 1) {

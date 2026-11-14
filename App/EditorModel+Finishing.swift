@@ -80,12 +80,14 @@ extension EditorModel {
     /// The clip the trimmer works on: the selected main clip or B-roll (a video, not a freeze frame).
     var trimmableClip: Clip? {
         guard timelineSelection.count == 1 else { return nil }
-        let id: Clip.ID? = switch selection {
-        case .clip(let id)?, .overlay(let id)?: id
-        default: nil
-        }
+        let id: Clip.ID? =
+            switch selection {
+            case .clip(let id)?, .overlay(let id)?: id
+            default: nil
+            }
         guard let id, let clip = project.anyClip(id: id), let media = project.asset(id: clip.assetID),
-              media.hasVideo, !media.isImage, !clip.isFrozen else { return nil }
+            media.hasVideo, !media.isImage, !clip.isFrozen
+        else { return nil }
         return clip
     }
 

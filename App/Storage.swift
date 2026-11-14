@@ -25,7 +25,8 @@ extension ProjectStore {
             for asset in project.assets {
                 var stale = false
                 guard let bookmark = file.bookmarks[asset.id],
-                      let resolved = try? URL(resolvingBookmarkData: bookmark, options: .withSecurityScope, relativeTo: nil, bookmarkDataIsStale: &stale) else { continue }
+                    let resolved = try? URL(resolvingBookmarkData: bookmark, options: .withSecurityScope, relativeTo: nil, bookmarkDataIsStale: &stale)
+                else { continue }
                 if resolved.startAccessingSecurityScopedResource() { opened.append(resolved) }
                 if resolved.standardizedFileURL != asset.url.standardizedFileURL { project.relink(asset.id, to: resolved) }
             }
@@ -59,19 +60,25 @@ struct StorageSettings: View {
     var body: some View {
         Section {
             LabeledContent("Copies the app made", value: format(copies))
-            Text("Cleaned-up voices, slowed-down and cut-out copies of your videos. They are made again when needed; ones no Short has used for a week are removed by themselves.")
-                .font(.caption).foregroundStyle(.secondary)
+            Text(
+                "Cleaned-up voices, slowed-down and cut-out copies of your videos. They are made again when needed; ones no Short has used for a week are removed by themselves."
+            )
+            .font(.caption).foregroundStyle(.secondary)
             LabeledContent("Recordings and copied media", value: format(media))
-            LabeledContent("Not used by any Short", value: unused.isEmpty ? "None" : "\(format(StorageCleaner.size(of: unused))) in \(unused.count) \(unused.count == 1 ? "file" : "files")")
+            LabeledContent(
+                "Not used by any Short",
+                value: unused.isEmpty ? "None" : "\(format(StorageCleaner.size(of: unused))) in \(unused.count) \(unused.count == 1 ? "file" : "files")")
             HStack {
                 Button("Move Unused to Trash…") { moveToTrash() }
                     .disabled(unused.isEmpty || model.screen != .home)
                 if let result { Text(result).font(.caption).foregroundStyle(.secondary) }
             }
-            Text(model.screen == .home
-                 ? "Voice-overs, spoken text, backwards copies and videos copied from Photos that none of your Shorts use."
-                 : "Go back to All Shorts first: the Short you are editing may still need them to undo.")
-                .font(.caption).foregroundStyle(.secondary)
+            Text(
+                model.screen == .home
+                    ? "Voice-overs, spoken text, backwards copies and videos copied from Photos that none of your Shorts use."
+                    : "Go back to All Shorts first: the Short you are editing may still need them to undo."
+            )
+            .font(.caption).foregroundStyle(.secondary)
         } header: {
             Text("Storage")
         }
@@ -88,7 +95,8 @@ struct StorageSettings: View {
     private func moveToTrash() {
         let alert = NSAlert()
         alert.messageText = unused.count == 1 ? "Move 1 unused file to the Trash?" : "Move \(unused.count) unused files to the Trash?"
-        alert.informativeText = "None of your Shorts use them. A copy of a Short saved elsewhere with Save a Copy… may; you can take them back out of the Trash."
+        alert.informativeText =
+            "None of your Shorts use them. A copy of a Short saved elsewhere with Save a Copy… may; you can take them back out of the Trash."
         alert.addButton(withTitle: "Move to Trash")
         alert.addButton(withTitle: "Cancel")
         guard alert.runModal() == .alertFirstButtonReturn else { return }

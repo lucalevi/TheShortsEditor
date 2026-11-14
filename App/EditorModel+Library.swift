@@ -9,7 +9,6 @@ import Transcription
 extension EditorModel {
     // MARK: The home window and saving
 
-
     /// The open Short's name, shown in the title bar. Renaming it there renames the Short.
     var shortName: String {
         get { openShortName }
@@ -207,14 +206,16 @@ extension EditorModel {
             for entry in entries {
                 guard !Task.isCancelled else { return }
                 if posters[entry.id] == nil, let url = ProjectStore.freshPoster(for: entry),
-                   let source = CGImageSourceCreateWithURL(url as CFURL, nil),
-                   let image = CGImageSourceCreateImageAtIndex(source, 0, nil) {
+                    let source = CGImageSourceCreateWithURL(url as CFURL, nil),
+                    let image = CGImageSourceCreateImageAtIndex(source, 0, nil)
+                {
                     posters[entry.id] = image
                     continue
                 }
                 guard ProjectStore.freshPoster(for: entry) == nil, entry.clipCount > 0,
-                      let project = try? ProjectStore.read(ProjectStore.fileURL(for: entry.id)),
-                      let image = try? await ProjectPoster.image(of: project) else { continue }
+                    let project = try? ProjectStore.read(ProjectStore.fileURL(for: entry.id)),
+                    let image = try? await ProjectPoster.image(of: project)
+                else { continue }
                 guard !Task.isCancelled else { return }
                 ProjectStore.writePoster(image, for: entry.id)
                 posters[entry.id] = image
@@ -239,7 +240,8 @@ extension EditorModel {
         // Folders must be listed too: with only file types allowed, a folder can't be chosen.
         panel.allowedContentTypes = [.movie, .audio, .image, .folder]
         panel.prompt = "Use"
-        panel.message = missing.count == 1
+        panel.message =
+            missing.count == 1
             ? "Where is “\(first.url.lastPathComponent)” now? Choose the file, or the folder it is in."
             : "Where are the \(missing.count) missing files now? Choose the folder they are in, or one of the files."
         guard panel.runModal() == .OK, let chosen = panel.url else { return }
@@ -251,12 +253,14 @@ extension EditorModel {
             let contents = (try? FileManager.default.contentsOfDirectory(at: chosen, includingPropertiesForKeys: nil)) ?? []
             candidates = project.relinkMatches(for: missingAssets, in: contents)
         } else if let match = missing.first(where: { $0.url.lastPathComponent.lowercased() == chosen.lastPathComponent.lowercased() })
-                    ?? (missing.count == 1 ? first : nil) {
+            ?? (missing.count == 1 ? first : nil)
+        {
             candidates = [match.id: chosen]
         }
         guard !candidates.isEmpty else {
-            alert = AlertMessage(title: "No missing files there",
-                                 message: "None of the files there has the name of a missing one (\(missing.map(\.url.lastPathComponent).joined(separator: ", "))).")
+            alert = AlertMessage(
+                title: "No missing files there",
+                message: "None of the files there has the name of a missing one (\(missing.map(\.url.lastPathComponent).joined(separator: ", "))).")
             return
         }
         Task {
@@ -281,7 +285,8 @@ extension EditorModel {
             if !rejected.isEmpty {
                 alert = AlertMessage(
                     title: rejected.count == 1 ? "This file doesn't match" : "These files don't match",
-                    message: rejected.joined(separator: "\n") + "\n\nThey have a different length or kind than the missing media, so your cuts would land in the wrong places."
+                    message: rejected.joined(separator: "\n")
+                        + "\n\nThey have a different length or kind than the missing media, so your cuts would land in the wrong places."
                 )
             }
         }

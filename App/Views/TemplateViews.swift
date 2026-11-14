@@ -14,14 +14,18 @@ struct TemplateChooser: View {
         VStack(alignment: .leading, spacing: 16) {
             VStack(alignment: .leading, spacing: 2) {
                 Text("Start from a Template").font(.title2.weight(.semibold))
-                Text("Choose your clips and get a finished Short: each shot cut on the beat of the music, with its text and transitions. Swap any shot afterwards.")
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+                Text(
+                    "Choose your clips and get a finished Short: each shot cut on the beat of the music, with its text and transitions. Swap any shot afterwards."
+                )
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
             }
             HStack(alignment: .top, spacing: 16) {
                 VStack(spacing: 6) {
                     ForEach(ShortTemplate.allCases) { template in
-                        Button { chosen = template } label: {
+                        Button {
+                            chosen = template
+                        } label: {
                             HStack(spacing: 10) {
                                 Image(systemName: template.systemImage).frame(width: 22)
                                 VStack(alignment: .leading, spacing: 1) {
@@ -136,9 +140,11 @@ struct CoverSheet: View {
                 VStack(alignment: .leading, spacing: 12) {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Moment").font(.headline)
-                        Slider(value: Binding(get: { cover.time.seconds },
-                                              set: { cover.time = CMTime(seconds: $0, preferredTimescale: 600).snappedToFrame() }),
-                               in: 0...max(lastFrame, 0.01))
+                        Slider(
+                            value: Binding(
+                                get: { cover.time.seconds },
+                                set: { cover.time = CMTime(seconds: $0, preferredTimescale: 600).snappedToFrame() }),
+                            in: 0...max(lastFrame, 0.01))
                         HStack {
                             Text(TimeFormat.string(cover.time)).monospacedDigit().font(.caption)
                             Spacer()

@@ -184,9 +184,10 @@ extension EditorModel {
 
     /// Zooms in on every other cut of the same recording: the selected clips, or all of them.
     func punchInOnAlternateCuts() {
-        let selected = Set(timelineSelection.items.compactMap { item -> Clip.ID? in
-            if case .clip(let id) = item { id } else { nil }
-        })
+        let selected = Set(
+            timelineSelection.items.compactMap { item -> Clip.ID? in
+                if case .clip(let id) = item { id } else { nil }
+            })
         apply("Punch In on Every Other Cut") { $0.punchInOnAlternateCuts(selected.count > 1 ? selected : nil) }
     }
 

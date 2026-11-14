@@ -57,7 +57,9 @@ struct StylePicker: View {
 
     private func card(_ style: ShortStyle?) -> some View {
         let isSelected = style == selected
-        return Button { choose(style) } label: {
+        return Button {
+            choose(style)
+        } label: {
             VStack(alignment: .leading, spacing: 4) {
                 StyleSample(style: style)
                     .overlay(alignment: .topTrailing) {
@@ -113,10 +115,12 @@ struct ShortStyleSection: View {
                     .help("Make a first cut for you: pauses and filler words out, captions, a hook title and music")
             }
             StylePicker(selected: model.project.style, busy: model.styleBeingMade) { model.setStyle($0) }
-            Text("Changes the titles, captions, transitions, motion, filter and music of the whole Short. Your own song, and anything you moved by hand, stay as they are.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
+            Text(
+                "Changes the titles, captions, transitions, motion, filter and music of the whole Short. Your own song, and anything you moved by hand, stay as they are."
+            )
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
         }
     }
 }
@@ -211,11 +215,13 @@ struct MagicShortSheet: View {
                 }
                 toggle("A hook title from the first sentence", \.addsHookTitle)
                 toggle("\(session.options.style.music.displayName) music, made by the app (free to use)", \.addsMusic)
-                Text("Clips with nobody talking are cut to their middle 4 seconds. The end comes right after the last word, so the Short loops back to the start cleanly.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .padding(.top, 2)
+                Text(
+                    "Clips with nobody talking are cut to their middle 4 seconds. The end comes right after the last word, so the Short loops back to the start cleanly."
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.top, 2)
             }
 
             HStack {
@@ -233,8 +239,11 @@ struct MagicShortSheet: View {
     }
 
     private func toggle(_ title: String, _ key: WritableKeyPath<MagicOptions, Bool>) -> some View {
-        Toggle(title, isOn: Binding(get: { model.magic?.options[keyPath: key] ?? false },
-                                    set: { value in model.updateMagic { $0.options[keyPath: key] = value } }))
+        Toggle(
+            title,
+            isOn: Binding(
+                get: { model.magic?.options[keyPath: key] ?? false },
+                set: { value in model.updateMagic { $0.options[keyPath: key] = value } }))
     }
 
     // MARK: Working
@@ -271,8 +280,11 @@ struct MagicShortSheet: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 if report.hookNeedsText {
-                    Label("Nobody talks in these clips, so the hook title says “\(MagicShort.placeholderHook)”. Type your own when this closes.", systemImage: "pencil")
-                        .fixedSize(horizontal: false, vertical: true)
+                    Label(
+                        "Nobody talks in these clips, so the hook title says “\(MagicShort.placeholderHook)”. Type your own when this closes.",
+                        systemImage: "pencil"
+                    )
+                    .fixedSize(horizontal: false, vertical: true)
                 }
             }
             HStack {
@@ -328,7 +340,9 @@ struct StoryboardChooser: View {
             HStack(alignment: .top, spacing: 16) {
                 VStack(spacing: 6) {
                     ForEach(StoryboardKind.allCases) { kind in
-                        Button { chosen = kind } label: {
+                        Button {
+                            chosen = kind
+                        } label: {
                             HStack(spacing: 10) {
                                 Image(systemName: kind.systemImage).frame(width: 22)
                                 VStack(alignment: .leading, spacing: 1) {
@@ -493,7 +507,9 @@ private struct ShotRow: View {
         .dropDestination(for: URL.self) { urls, _ in
             model.fill(slot.id, withFiles: urls)
             return true
-        } isTargeted: { isTargeted = $0 }
+        } isTargeted: {
+            isTargeted = $0
+        }
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Shot \(number), \(slot.shot.name)")
     }

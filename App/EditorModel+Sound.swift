@@ -121,7 +121,8 @@ extension EditorModel {
         let base = SoundProcessor.baseURL(for: clip, media: media)
         let recipe = SoundProcessor.Recipe(clip)
         guard media.hasAudio, !media.isImage, !recipe.isEmpty,
-              SoundProcessor.existingProcessedURL(for: base, recipe: recipe) == nil else { return true }
+            SoundProcessor.existingProcessedURL(for: base, recipe: recipe) == nil
+        else { return true }
         soundProcessing[clip.id] = 0
         defer { soundProcessing[clip.id] = nil }
         do {

@@ -2,6 +2,7 @@ import CoreGraphics
 import CoreMedia
 import Foundation
 import Testing
+
 @testable import EditorCore
 
 private func seconds(_ s: Double) -> CMTime { CMTime(seconds: s, preferredTimescale: 600).snappedToFrame() }
@@ -92,8 +93,10 @@ struct MotionTests {
 
     @Test func movesBetweenKeyframesAndHoldsOutside() {
         var c = clip()
-        c.keyframes = [Keyframe(time: seconds(1), placement: Placement(offsetX: 0), easing: .linear),
-                       Keyframe(time: seconds(3), placement: Placement(offsetX: 0.2), easing: .linear)]
+        c.keyframes = [
+            Keyframe(time: seconds(1), placement: Placement(offsetX: 0), easing: .linear),
+            Keyframe(time: seconds(3), placement: Placement(offsetX: 0.2), easing: .linear),
+        ]
         #expect(c.placement(atSourceTime: seconds(0)).offsetX == 0)
         #expect(abs(c.placement(atSourceTime: seconds(2)).offsetX - 0.1) < 0.0001)
         #expect(c.placement(atSourceTime: seconds(3.5)).offsetX == 0.2)
@@ -101,8 +104,10 @@ struct MotionTests {
 
     @Test func smoothEasingStartsSlowly() {
         var c = clip()
-        c.keyframes = [Keyframe(time: seconds(0), placement: Placement(offsetX: 0)),
-                       Keyframe(time: seconds(2), placement: Placement(offsetX: 1))]
+        c.keyframes = [
+            Keyframe(time: seconds(0), placement: Placement(offsetX: 0)),
+            Keyframe(time: seconds(2), placement: Placement(offsetX: 1)),
+        ]
         #expect(c.placement(atSourceTime: seconds(0.2)).offsetX < 0.1)
         #expect(abs(c.placement(atSourceTime: seconds(1)).offsetX - 0.5) < 0.0001)
     }
@@ -330,7 +335,8 @@ struct OverlayTests {
 
     @Test func soundCannotBeAnOverlay() {
         var p = twoClips()
-        let song = p.addAsset(MediaAsset(url: URL(fileURLWithPath: "/tmp/song.m4a"), name: "song", duration: seconds(30), displaySize: .zero, hasAudio: true, hasVideo: false))
+        let song = p.addAsset(
+            MediaAsset(url: URL(fileURLWithPath: "/tmp/song.m4a"), name: "song", duration: seconds(30), displaySize: .zero, hasAudio: true, hasVideo: false))
         let id = p.addOverlay(of: song, at: .zero)
         #expect(id == nil)
     }
@@ -467,10 +473,10 @@ struct EditingFileTests {
     @Test func olderFilesStillOpen() throws {
         // What version 1 saved: no overlays, no placement, motion or background on clips.
         let json = """
-        {"version":1,"bookmarks":[],"project":{"assets":[],"timeline":{"clips":[{"id":"\(UUID())","assetID":"\(UUID())",
-        "sourceStart":{"value":0,"timescale":1},"duration":{"value":2,"timescale":1},"framing":"fit","volume":1,"isMuted":false}]},
-        "transcripts":[],"captions":{"isVisible":false,"style":"bold","verticalPosition":0.6},"titles":[]}}
-        """
+            {"version":1,"bookmarks":[],"project":{"assets":[],"timeline":{"clips":[{"id":"\(UUID())","assetID":"\(UUID())",
+            "sourceStart":{"value":0,"timescale":1},"duration":{"value":2,"timescale":1},"framing":"fit","volume":1,"isMuted":false}]},
+            "transcripts":[],"captions":{"isVisible":false,"style":"bold","verticalPosition":0.6},"titles":[]}}
+            """
         let project = try ProjectFile.decode(Data(json.utf8)).project
         #expect(project.overlays.isEmpty)
         #expect(project.timeline.clips[0].placement == .identity)

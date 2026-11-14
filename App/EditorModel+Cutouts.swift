@@ -37,10 +37,12 @@ extension EditorModel {
         var needed: [String: (url: URL, subject: CutoutSubject, isImage: Bool)] = [:]
         for clip in clips {
             guard let subject = clip.cutout.removeBackground, let media = project.asset(id: clip.assetID), media.hasVideo,
-                  !missingAssets.contains(media.id) else { continue }
+                !missingAssets.contains(media.id)
+            else { continue }
             let job = cutoutJob(media.id, subject)
             guard cuttingOut[job] == nil, !uncuttable.contains(job),
-                  CutoutCache.existingCopy(of: media.url, subject: subject, isImage: media.isImage) == nil else { continue }
+                CutoutCache.existingCopy(of: media.url, subject: subject, isImage: media.isImage) == nil
+            else { continue }
             needed[job] = (media.url, subject, media.isImage)
         }
         guard !needed.isEmpty else { return }
@@ -113,8 +115,11 @@ extension EditorModel {
         let time = currentTime
         Task {
             guard let image = try? await ProjectPoster.frame(of: plain, at: time),
-                  let sample = LookRenderer.sample(image, at: CGPoint(x: point.x * CGFloat(image.width) / Project.canvasSize.width,
-                                                                       y: point.y * CGFloat(image.height) / Project.canvasSize.height))
+                let sample = LookRenderer.sample(
+                    image,
+                    at: CGPoint(
+                        x: point.x * CGFloat(image.width) / Project.canvasSize.width,
+                        y: point.y * CGFloat(image.height) / Project.canvasSize.height))
             else {
                 NSSound.beep()
                 return

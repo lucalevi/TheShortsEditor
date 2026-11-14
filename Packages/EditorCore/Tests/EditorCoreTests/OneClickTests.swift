@@ -2,25 +2,30 @@ import CoreGraphics
 import CoreMedia
 import Foundation
 import Testing
+
 @testable import EditorCore
 
 private func t(_ s: Double) -> CMTime { CMTime(seconds: s, preferredTimescale: 600).snappedToFrame() }
 
 private func video(_ name: String, seconds: Int64 = 10) -> MediaAsset {
-    MediaAsset(url: URL(fileURLWithPath: "/tmp/\(name)"), name: name, duration: CMTime(value: seconds, timescale: 1),
-               displaySize: CGSize(width: 1080, height: 1920), hasAudio: true)
+    MediaAsset(
+        url: URL(fileURLWithPath: "/tmp/\(name)"), name: name, duration: CMTime(value: seconds, timescale: 1),
+        displaySize: CGSize(width: 1080, height: 1920), hasAudio: true)
 }
 
 private func song(_ name: String) -> MediaAsset {
-    MediaAsset(url: URL(fileURLWithPath: "/tmp/\(name)"), name: name, duration: CMTime(value: 184, timescale: 1),
-               displaySize: .zero, hasAudio: true, hasVideo: false)
+    MediaAsset(
+        url: URL(fileURLWithPath: "/tmp/\(name)"), name: name, duration: CMTime(value: 184, timescale: 1),
+        displaySize: .zero, hasAudio: true, hasVideo: false)
 }
 
 /// Words one a second, starting at `from` seconds, each half a second long.
 private func words(_ texts: [String], from: Double = 0) -> Transcript {
-    Transcript(language: .english, words: texts.enumerated().map { index, text in
-        Word(text: text, start: t(from + Double(index)), duration: t(0.5))
-    })
+    Transcript(
+        language: .english,
+        words: texts.enumerated().map { index, text in
+            Word(text: text, start: t(from + Double(index)), duration: t(0.5))
+        })
 }
 
 /// Sound levels per frame (30 a second): loud where `loud` says, quiet elsewhere.
@@ -69,8 +74,8 @@ struct ShortStyleTests {
         let a = p.addAsset(video("a.mov"))
         p.appendClip(of: a)
         p.appendClip(of: a)
-        p.timeline.clips[0].placement.offsetX = 0.2          // moved by hand
-        p.look = FilterChoice(.noir)                        // a filter the user chose
+        p.timeline.clips[0].placement.offsetX = 0.2 // moved by hand
+        p.look = FilterChoice(.noir) // a filter the user chose
         let own = p.addAsset(song("mine.m4a"))
         p.setMusic(own)
         p.applyStyle(.cinematic, music: song("Dramatic.m4a"))
@@ -181,7 +186,8 @@ struct MagicShortTests {
         #expect(MagicShort.hookText(from: timed(["did", "you", "know?", "Yes"])) == "Did you know?")
         #expect(MagicShort.hookText(from: timed(["one", "two", "three", "four", "five", "six", "seven", "eight."])) == "One two three four five six…")
         // Lead-ins are left out, and a shortened title doesn't stop on a little word.
-        #expect(MagicShort.hookText(from: timed(["Okay,", "did", "you", "know", "that", "most", "people", "waste", "hours?"]))
+        #expect(
+            MagicShort.hookText(from: timed(["Okay,", "did", "you", "know", "that", "most", "people", "waste", "hours?"]))
                 == "Did you know that most people…")
         #expect(MagicShort.hookText(from: timed(["So", "here's", "the", "trick", "to", "it", "all", "really.", "Yes"])) == "Here's the trick to it all really")
         #expect(MagicShort.hookText(from: timed(["Allora,", "ecco", "il", "mio", "trucco."])) == "Il mio trucco")
@@ -318,7 +324,7 @@ struct StoryboardTests {
         let board = try #require(p.storyboard)
         let a = p.addAsset(video("room.mov", seconds: 10))
         let idFilled = p.fill(board.slots[1].id, with: a)
-        let id = try #require(idFilled)   // "Before", 3 s
+        let id = try #require(idFilled) // "Before", 3 s
         let clip = try #require(p.timeline.clips.first { $0.id == id })
         #expect(clip.duration == t(3))
         #expect(clip.sourceStart == t(3.5))

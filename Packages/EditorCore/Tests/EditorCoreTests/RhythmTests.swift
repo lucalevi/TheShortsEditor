@@ -2,18 +2,21 @@ import CoreGraphics
 import CoreMedia
 import Foundation
 import Testing
+
 @testable import EditorCore
 
 private func t(_ s: Double) -> CMTime { CMTime(seconds: s, preferredTimescale: 600).snappedToFrame() }
 
 private func video(_ name: String, seconds: Int64 = 10) -> MediaAsset {
-    MediaAsset(url: URL(fileURLWithPath: "/tmp/\(name)"), name: name, duration: CMTime(value: seconds, timescale: 1),
-               displaySize: CGSize(width: 1080, height: 1920), hasAudio: true)
+    MediaAsset(
+        url: URL(fileURLWithPath: "/tmp/\(name)"), name: name, duration: CMTime(value: seconds, timescale: 1),
+        displaySize: CGSize(width: 1080, height: 1920), hasAudio: true)
 }
 
 private func song(_ name: String = "song.m4a", seconds: Int64 = 60) -> MediaAsset {
-    MediaAsset(url: URL(fileURLWithPath: "/tmp/\(name)"), name: name, duration: CMTime(value: seconds, timescale: 1),
-               displaySize: .zero, hasAudio: true, hasVideo: false)
+    MediaAsset(
+        url: URL(fileURLWithPath: "/tmp/\(name)"), name: name, duration: CMTime(value: seconds, timescale: 1),
+        displaySize: .zero, hasAudio: true, hasVideo: false)
 }
 
 /// Three 10 s files, each used whole, and a song.
@@ -65,7 +68,8 @@ struct BeatTests {
     }
 
     @Test func silenceHasNoBeats() {
-        let beats = BeatFinder.beats(onsets: [Float](repeating: 0, count: 2000), bass: [Float](repeating: 0, count: 2000), rate: 100, length: CMTime(value: 20, timescale: 1))
+        let beats = BeatFinder.beats(
+            onsets: [Float](repeating: 0, count: 2000), bass: [Float](repeating: 0, count: 2000), rate: 100, length: CMTime(value: 20, timescale: 1))
         #expect(beats.isEmpty)
     }
 
@@ -76,7 +80,9 @@ struct BeatTests {
         // Starting the song 1.25 s in moves every beat back by as much.
         p.setMusicStart(t(1.25))
         let shifted = p.timelineBeats
-        #expect(near(shifted.first?.time ?? .invalid, CMTime(value: 1, timescale: 2) - p.music!.sourceStart + CMTime(value: 1, timescale: 1)), "\(shifted.prefix(2)) \(p.music!.sourceStart.seconds)")
+        #expect(
+            near(shifted.first?.time ?? .invalid, CMTime(value: 1, timescale: 2) - p.music!.sourceStart + CMTime(value: 1, timescale: 1)),
+            "\(shifted.prefix(2)) \(p.music!.sourceStart.seconds)")
         #expect(shifted[0].indexInBar == 1 || shifted[0].isBarStart == false)
         // Starting the music later on the timeline moves them forward.
         p.setMusicStart(.zero)
@@ -179,9 +185,9 @@ struct CutToBeatTests {
     @Test func everyCutLandsOnABeat() {
         var p = Project()
         for name in ["a.mov", "b.mov", "c.mov"] { p.appendClip(of: p.addAsset(video(name))) }
-        p.trimClip(p.timeline.clips[0].id, edge: .end, by: t(-7.1))   // 2.9 s
-        p.trimClip(p.timeline.clips[1].id, edge: .end, by: t(-6.0))   // 4 s
-        p.trimClip(p.timeline.clips[2].id, edge: .end, by: t(-8.3))   // 1.7 s
+        p.trimClip(p.timeline.clips[0].id, edge: .end, by: t(-7.1)) // 2.9 s
+        p.trimClip(p.timeline.clips[1].id, edge: .end, by: t(-6.0)) // 4 s
+        p.trimClip(p.timeline.clips[2].id, edge: .end, by: t(-8.3)) // 1.7 s
         p.setMusic(p.addAsset(song()))
         steady(&p)
         let moved = p.cutToBeat(.everyBeat)
@@ -230,7 +236,7 @@ struct SpeedCurveTests {
     private func oneClip() -> Project {
         var p = Project()
         p.appendClip(of: p.addAsset(video("a.mov", seconds: 20)))
-        p.trimClip(p.timeline.clips[0].id, edge: .end, by: t(-14))  // 6 s of the file
+        p.trimClip(p.timeline.clips[0].id, edge: .end, by: t(-14)) // 6 s of the file
         return p
     }
 
@@ -298,8 +304,9 @@ struct SpeedCurveTests {
 
     @Test func picturesHaveNoCurve() {
         var p = Project()
-        let picture = MediaAsset(url: URL(fileURLWithPath: "/tmp/p.jpg"), name: "p.jpg", duration: MediaAsset.imageDuration,
-                                 displaySize: CGSize(width: 100, height: 100), hasAudio: false, isImage: true)
+        let picture = MediaAsset(
+            url: URL(fileURLWithPath: "/tmp/p.jpg"), name: "p.jpg", duration: MediaAsset.imageDuration,
+            displaySize: CGSize(width: 100, height: 100), hasAudio: false, isImage: true)
         p.appendClip(of: p.addAsset(picture))
         p.setSpeedCurve(.hero, for: p.timeline.clips[0].id)
         #expect(p.timeline.clips[0].speedCurve == nil)

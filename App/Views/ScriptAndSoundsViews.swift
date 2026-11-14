@@ -41,10 +41,12 @@ struct ScriptView: View {
         let selectedWords = words.filter { selected.contains($0.ref) }
         return VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 6) {
-                Button(fillers.isEmpty ? "No Filler Words" : "Remove \(fillers.count) Filler Word\(fillers.count == 1 ? "" : "s")",
-                       systemImage: "wand.and.stars") { model.removeFillerWords() }
-                    .disabled(fillers.isEmpty)
-                    .help("Cuts “um”, “eh”, words said twice in a row, and fillers Apple Intelligence found. Underlined with dots below.")
+                Button(
+                    fillers.isEmpty ? "No Filler Words" : "Remove \(fillers.count) Filler Word\(fillers.count == 1 ? "" : "s")",
+                    systemImage: "wand.and.stars"
+                ) { model.removeFillerWords() }
+                .disabled(fillers.isEmpty)
+                .help("Cuts “um”, “eh”, words said twice in a row, and fillers Apple Intelligence found. Underlined with dots below.")
                 if model.canUseWordModel, words.contains(where: { $0.source == .clip }) {
                     if model.wordModelJob == .fillers {
                         ProgressView().controlSize(.small)
@@ -65,9 +67,10 @@ struct ScriptView: View {
                     let cuttable = selectedWords.filter { $0.source == .clip }.count
                     Button("Cut \(cuttable)", systemImage: "scissors") { model.cutWords(selected) }
                         .disabled(cuttable == 0)
-                        .help(cuttable == 0
-                              ? "Words in voice-overs and B-roll can't be cut here: trim the sound on the timeline instead"
-                              : "Cut these words (and the pause after each) out of the video (⌫)")
+                        .help(
+                            cuttable == 0
+                                ? "Words in voice-overs and B-roll can't be cut here: trim the sound on the timeline instead"
+                                : "Cut these words (and the pause after each) out of the video (⌫)")
                     let allKey = selectedWords.allSatisfy(\.isKeyword)
                     Button(allKey ? "Unhighlight" : "Highlight", systemImage: "highlighter") {
                         model.setKeyword(!allKey, words: Set(selectedWords.map(\.wordID)))
@@ -116,9 +119,11 @@ struct ScriptView: View {
                     }
                     FlowLayout(spacing: 3, lineSpacing: 4) {
                         ForEach(groups[clipID] ?? [], id: \.element.ref) { index, word in
-                            WordChip(word: word, isSelected: model.scriptSelection.contains(word.ref),
-                                     isCurrent: current == word.ref, isFiller: fillers.contains(word.ref))
-                                .onTapGesture { click(word, index: index, in: words) }
+                            WordChip(
+                                word: word, isSelected: model.scriptSelection.contains(word.ref),
+                                isCurrent: current == word.ref, isFiller: fillers.contains(word.ref)
+                            )
+                            .onTapGesture { click(word, index: index, in: words) }
                         }
                     }
                 }
@@ -235,10 +240,12 @@ struct SoundsView: View {
                             .controlSize(.large)
                             .disabled(model.project.timeline.clips.isEmpty)
                     }
-                    Text("Starts at the playhead after 3-2-1. Your Short plays silently while you talk. Stop with the button or Space. The music is lowered under your voice.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
+                    Text(
+                        "Starts at the playhead after 3-2-1. Your Short plays silently while you talk. Stop with the button or Space. The music is lowered under your voice."
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
                 }
                 .padding(.vertical, 4)
             }

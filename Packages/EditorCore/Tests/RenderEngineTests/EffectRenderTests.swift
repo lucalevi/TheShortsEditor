@@ -2,6 +2,7 @@
 import CoreImage
 import EditorCore
 import Testing
+
 @testable import RenderEngine
 
 private let red: (UInt8, UInt8, UInt8, UInt8) = (0, 0, 255, 255)
@@ -123,7 +124,9 @@ struct EffectRenderTests {
     }
 
     @Test func theNewSoundsAreAudible() throws {
-        let new: [SoundEffect] = [.subDrop, .glitch, .drumRoll, .reverseCymbal, .countdown, .sparkle, .kaching, .vibrate, .dingDong, .recordScratch, .tada, .bubble]
+        let new: [SoundEffect] = [
+            .subDrop, .glitch, .drumRoll, .reverseCymbal, .countdown, .sparkle, .kaching, .vibrate, .dingDong, .recordScratch, .tada, .bubble,
+        ]
         #expect(SoundEffect.allCases.count == 46)
         for effect in new {
             let samples = effect.samples()

@@ -25,8 +25,9 @@ nonisolated enum StickerRenderer {
     }
 
     private static func context(_ side: Int) -> CGContext? {
-        CGContext(data: nil, width: side, height: side, bitsPerComponent: 8, bytesPerRow: 0,
-                  space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)
+        CGContext(
+            data: nil, width: side, height: side, bitsPerComponent: 8, bytesPerRow: 0,
+            space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)
     }
 
     private static func emojiImage(_ emoji: String, size: CGFloat) -> CGImage? {

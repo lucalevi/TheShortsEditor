@@ -56,7 +56,7 @@ public struct TimelineSelection: Equatable, Sendable {
             anchor = item
         case .extend:
             guard case .clip(let to) = item, case .clip(let from)? = anchor,
-                  let a = timeline.index(of: from), let b = timeline.index(of: to)
+                let a = timeline.index(of: from), let b = timeline.index(of: to)
             else {
                 items.insert(item)
                 if anchor == nil { anchor = item }

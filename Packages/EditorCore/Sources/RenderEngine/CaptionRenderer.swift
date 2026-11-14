@@ -190,7 +190,8 @@ nonisolated enum CaptionRenderer {
         guard !text.isEmpty else { return nil }
         if look.pops || look.bounces || look.fill != nil, drawing.lineBreaks.isEmpty {
             // The punchy styles read best on one line: shrink a long page a little rather than wrap it.
-            let plain = CFAttributedStringCreate(nil, text as CFString, [kCTFontAttributeName: makeFont(size: look.fontSize, weight: Double(look.weight), family: family)] as CFDictionary)!
+            let plain = CFAttributedStringCreate(
+                nil, text as CFString, [kCTFontAttributeName: makeFont(size: look.fontSize, weight: Double(look.weight), family: family)] as CFDictionary)!
             let kerning = look.wordBox == nil ? 0 : look.fontSize * 0.22 * CGFloat(shown.count - 1)
             let width = CTLineGetTypographicBounds(CTLineCreateWithAttributedString(plain), nil, nil, nil) + kerning + look.fontSize * 0.1
             // The spoken word is drawn a little bigger: leave room for it.
@@ -229,7 +230,8 @@ nonisolated enum CaptionRenderer {
             if look.wordBox != nil {
                 // Room between words for the box around the current one.
                 for range in wordRanges.dropLast() {
-                    CFAttributedStringSetAttribute(string, CFRange(location: range.location + range.length, length: 1), kCTKernAttributeName, look.fontSize * 0.22 as NSNumber)
+                    CFAttributedStringSetAttribute(
+                        string, CFRange(location: range.location + range.length, length: 1), kCTKernAttributeName, look.fontSize * 0.22 as NSNumber)
                 }
             }
             if let current, bigFont !== font {
@@ -277,26 +279,31 @@ nonisolated enum CaptionRenderer {
                 kCTParagraphStyleAttributeName: centred(),
             ]
             let setter = CTFramesetterCreateWithAttributedString(CFAttributedStringCreate(nil, trimmed as CFString, attributes as CFDictionary)!)
-            let fit = CTFramesetterSuggestFrameSizeWithConstraints(setter, CFRange(location: 0, length: 0), nil, CGSize(width: maxWidth, height: .greatestFiniteMagnitude), nil)
+            let fit = CTFramesetterSuggestFrameSizeWithConstraints(
+                setter, CFRange(location: 0, length: 0), nil, CGSize(width: maxWidth, height: .greatestFiniteMagnitude), nil)
             return (setter, CGSize(width: ceil(fit.width) + 2, height: ceil(fit.height) + 2))
         }
         let translationGap: CGFloat = translationFrame == nil ? 0 : ceil(look.fontSize * 0.15)
         let translationHeight = (translationFrame?.size.height ?? 0) + translationGap
 
         // Room above the text for the emoji.
-        let emojiLine: CTLine? = settings.showsEmoji ? drawing.emoji.map { emoji in
-            let emojiFont = CTFontCreateWithName("AppleColorEmoji" as CFString, look.fontSize * 1.05, nil)
-            return CTLineCreateWithAttributedString(CFAttributedStringCreate(nil, emoji as CFString, [kCTFontAttributeName: emojiFont] as CFDictionary)!)
-        } : nil
+        let emojiLine: CTLine? =
+            settings.showsEmoji
+            ? drawing.emoji.map { emoji in
+                let emojiFont = CTFontCreateWithName("AppleColorEmoji" as CFString, look.fontSize * 1.05, nil)
+                return CTLineCreateWithAttributedString(CFAttributedStringCreate(nil, emoji as CFString, [kCTFontAttributeName: emojiFont] as CFDictionary)!)
+            } : nil
         let emojiHeight: CGFloat = emojiLine == nil ? 0 : ceil(look.fontSize * 1.3)
         let width = max(textSize.width, translationFrame?.size.width ?? 0) + padding * 2
         let size = CGSize(width: max(width, emojiHeight * 1.6), height: textSize.height + padding * 2 + emojiHeight + translationHeight)
         let textRect = CGRect(origin: CGPoint(x: (size.width - textSize.width) / 2, y: padding + translationHeight), size: textSize)
 
-        guard let context = CGContext(
-            data: nil, width: Int(size.width), height: Int(size.height), bitsPerComponent: 8, bytesPerRow: 0,
-            space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
-        ) else { return nil }
+        guard
+            let context = CGContext(
+                data: nil, width: Int(size.width), height: Int(size.height), bitsPerComponent: 8, bytesPerRow: 0,
+                space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+            )
+        else { return nil }
         context.setLineJoin(.round)
 
         let path = CGPath(rect: textRect, transform: nil)
@@ -416,7 +423,8 @@ nonisolated enum CaptionRenderer {
         context.restoreGState()
 
         if let translationFrame {
-            let rect = CGRect(x: (size.width - translationFrame.size.width) / 2, y: padding, width: translationFrame.size.width, height: translationFrame.size.height)
+            let rect = CGRect(
+                x: (size.width - translationFrame.size.width) / 2, y: padding, width: translationFrame.size.width, height: translationFrame.size.height)
             let translationPath = CGPath(rect: rect, transform: nil)
             let drawn = CTFramesetterCreateFrame(translationFrame.framesetter, CFRange(location: 0, length: 0), translationPath, nil)
             context.saveGState()
@@ -456,12 +464,13 @@ nonisolated enum CaptionRenderer {
             CTLineGetTypographicBounds(line, &ascent, &descent, &leading)
             let x0 = CTLineGetOffsetForStringIndex(line, start, nil)
             let x1 = CTLineGetOffsetForStringIndex(line, end, nil)
-            result.append(CGRect(
-                x: origin.x + lineOrigin.x + x0,
-                y: origin.y + lineOrigin.y - descent,
-                width: x1 - x0,
-                height: ascent + descent
-            ))
+            result.append(
+                CGRect(
+                    x: origin.x + lineOrigin.x + x0,
+                    y: origin.y + lineOrigin.y - descent,
+                    width: x1 - x0,
+                    height: ascent + descent
+                ))
         }
         return result
     }
@@ -513,8 +522,9 @@ public enum CaptionPreview {
         case .phrase:
             return CaptionDrawing(words: ["Make", "it", "pop"], keywords: [2], currentWord: 1, emoji: emoji)
         default:
-            return CaptionDrawing(words: ["Make", "it", "pop"], keywords: [2], currentWord: 1, emoji: emoji,
-                                  wordProgress: 0.5, wordAge: CaptionRenderer.bounceSeconds / 2)
+            return CaptionDrawing(
+                words: ["Make", "it", "pop"], keywords: [2], currentWord: 1, emoji: emoji,
+                wordProgress: 0.5, wordAge: CaptionRenderer.bounceSeconds / 2)
         }
     }
 
@@ -524,8 +534,9 @@ public enum CaptionPreview {
         var settings = settings
         settings.style = style
         guard let caption = CaptionRenderer.image(sample(for: style), settings: settings),
-              let context = CGContext(data: nil, width: Int(size.width), height: Int(size.height), bitsPerComponent: 8, bytesPerRow: 0,
-                                      space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)
+            let context = CGContext(
+                data: nil, width: Int(size.width), height: Int(size.height), bitsPerComponent: 8, bytesPerRow: 0,
+                space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)
         else { return nil }
         let bounds = CGRect(origin: .zero, size: size)
         context.setFillColor(CGColor(gray: 0.22, alpha: 1))
@@ -546,7 +557,7 @@ public enum CaptionPreview {
     public static func frame(in project: Project, at time: CMTime) -> CGRect? {
         let track = CaptionTrack(project: project)
         guard let state = track.state(at: time),
-              let image = CaptionRenderer.image(track.drawing(for: state.page, currentWord: nil), settings: track.settings)
+            let image = CaptionRenderer.image(track.drawing(for: state.page, currentWord: nil), settings: track.settings)
         else { return nil }
         let size = CGSize(width: image.width, height: image.height)
         return CGRect(x: (Project.canvasSize.width - size.width) / 2, y: track.top(forHeight: size.height), width: size.width, height: size.height)
