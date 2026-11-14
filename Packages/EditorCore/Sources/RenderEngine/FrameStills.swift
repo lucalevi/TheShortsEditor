@@ -17,25 +17,29 @@ public nonisolated enum FrameStills {
     /// A 4K frame is over 30 MB, so only a few are kept.
     private static let limit = 16
 
-    /// The picture showing at `time` in the video at `url`, or nil when it can't be read.
+    /// The picture showing at `time` in the video at `url`, or nil when it can't be read. Its
+    /// colours are as stored (10 bits, HDR kept): the compositor converts it like the moving
+    /// picture (see `ColorPipeline`), so a freeze frame matches the clip it stops.
     @concurrent
     public static func still(of url: URL, at time: CMTime) async -> Still? {
         let key = "\(url.path)|\(time.value)/\(time.timescale)"
         if let cached = cache.withLock({ $0[key] }) { return cached }
         let asset = AVURLAsset(url: url)
         guard let track = try? await asset.loadTracks(withMediaType: .video).first,
-            let (size, transform, range) = try? await track.load(.naturalSize, .preferredTransform, .timeRange),
+            let (size, transform, available) = try? await track.load(.naturalSize, .preferredTransform, .timeRange),
             let reader = try? AVAssetReader(asset: asset)
         else { return nil }
         // Start a little early and keep the last picture that begins at or before the time: that
         // is the one on screen then.
-        let wanted = time.clamped(range.start, range.end)
-        let start = max(range.start, wanted - CMTime(value: 1, timescale: 2))
-        reader.timeRange = CMTimeRange(start: start, end: range.end)
+        let wanted = time.clamped(available.start, available.end)
+        let start = max(available.start, wanted - CMTime(value: 1, timescale: 2))
+        reader.timeRange = CMTimeRange(start: start, end: available.end)
+        // See-through copies (Remove Background) keep their alpha; others keep 10 bits.
+        let hasAlpha = await Self.hasAlpha(track)
         let output = AVAssetReaderTrackOutput(
             track: track,
             outputSettings: [
-                kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA,
+                kCVPixelBufferPixelFormatTypeKey as String: hasAlpha ? kCVPixelFormatType_32BGRA : kCVPixelFormatType_420YpCbCr10BiPlanarVideoRange,
                 kCVPixelBufferIOSurfacePropertiesKey as String: [String: Any](),
             ])
         output.alwaysCopiesSampleData = false
@@ -58,6 +62,11 @@ public nonisolated enum FrameStills {
             cache[key] = still
         }
         return still
+    }
+
+    private static func hasAlpha(_ track: AVAssetTrack) async -> Bool {
+        guard let description = try? await track.load(.formatDescriptions).first else { return false }
+        return (CMFormatDescriptionGetExtension(description, extensionKey: kCMFormatDescriptionExtension_ContainsAlphaChannel) as? Bool) == true
     }
 
     /// Forgets the pictures of a file, e.g. after it was relinked.

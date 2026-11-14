@@ -6,6 +6,14 @@ import ImageIO
 enum Fixture {
     struct WriteError: Error {}
 
+    /// Fixtures say they are ordinary HD video: untagged, a small one would be taken for SD
+    /// (Rec. 601) and its colours converted (that case has its own test in `MediaMatrixTests`).
+    static let rec709 = [
+        AVVideoColorPrimariesKey: AVVideoColorPrimaries_ITU_R_709_2,
+        AVVideoTransferFunctionKey: AVVideoTransferFunction_ITU_R_709_2,
+        AVVideoYCbCrMatrixKey: AVVideoYCbCrMatrix_ITU_R_709_2,
+    ]
+
     /// A video of one colour, or two when `bottomBGRA` is given (top half, then bottom half, as
     /// stored in the file). `transform` is the track's orientation, as an iPhone writes it.
     /// With `toneFrom`, the file also has sound: silence, then a loud 440 Hz tone from that second on.
@@ -14,17 +22,18 @@ enum Fixture {
         bgra: (UInt8, UInt8, UInt8, UInt8), bottomBGRA: (UInt8, UInt8, UInt8, UInt8)? = nil,
         transform: CGAffineTransform = .identity,
         toneFrom: Double? = nil,
-        laterBGRA: (UInt8, UInt8, UInt8, UInt8)? = nil, laterFrom: Double = 0
+        laterBGRA: (UInt8, UInt8, UInt8, UInt8)? = nil, laterFrom: Double = 0,
+        colorTagged: Bool = true
     ) async throws -> URL {
         let url = FileManager.default.temporaryDirectory.appending(path: "fixture-\(UUID().uuidString).mov")
         let writer = try AVAssetWriter(outputURL: url, fileType: .mov)
-        let input = AVAssetWriterInput(
-            mediaType: .video,
-            outputSettings: [
-                AVVideoCodecKey: AVVideoCodecType.h264,
-                AVVideoWidthKey: width,
-                AVVideoHeightKey: height,
-            ])
+        var settings: [String: Any] = [
+            AVVideoCodecKey: AVVideoCodecType.h264,
+            AVVideoWidthKey: width,
+            AVVideoHeightKey: height,
+        ]
+        if colorTagged { settings[AVVideoColorPropertiesKey] = rec709 }
+        let input = AVAssetWriterInput(mediaType: .video, outputSettings: settings)
         input.expectsMediaDataInRealTime = false
         input.transform = transform
         let adaptor = AVAssetWriterInputPixelBufferAdaptor(assetWriterInput: input, sourcePixelBufferAttributes: nil)
@@ -89,6 +98,7 @@ enum Fixture {
             mediaType: .video,
             outputSettings: [
                 AVVideoCodecKey: AVVideoCodecType.h264, AVVideoWidthKey: width, AVVideoHeightKey: height,
+                AVVideoColorPropertiesKey: rec709,
             ])
         input.expectsMediaDataInRealTime = false
         let adaptor = AVAssetWriterInputPixelBufferAdaptor(assetWriterInput: input, sourcePixelBufferAttributes: nil)

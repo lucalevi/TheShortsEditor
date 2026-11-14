@@ -166,16 +166,29 @@ composition's colour primaries / transfer function explicitly.
 2. **Optional HDR output** later (YouTube accepts HDR Shorts): 10-bit HEVC, Rec. 2020 / HLG,
    `supportsHDRSourceFrames = true`, half-float pixel buffers.
 
+*Done 2026-11-14 (Phase 3; details in STATUS.md).* Measured first: HLG and Dolby Vision were
+already tone-mapped consistently by AVFoundation (not washed out), but **HDR10 (PQ) was shown
+unconverted in the viewer and thumbnails and converted only on export**. Now `ColorPipeline`:
+explicit Rec. 709 composition, sources untouched (`canConformColorOfSourceFrames`) and HDR
+tone-mapped with VideoToolbox (identical to AVFoundation's), Core Image in extended sRGB
+(non-linear on purpose: the looks were tuned on non-linear values; linear would change them all),
+photos/titles converted, picked text colours fixed (they were Generic RGB), copies tagged, and an
+optional HDR export (HEVC Main 10, HLG).
+
 **F9. 8-bit pipeline (P2).** With colour grading, filters and blurs on 8-bit BGRA buffers,
 gradients band. Professional editors process in 16-bit float. Move the compositor's working
 buffers to `kCVPixelFormatType_64RGBAHalf` (or let Core Image work in float with 8-bit only at the
 edges), and measure the cost with the existing signposts.
+*Done 2026-11-14:* Core Image works in 16-bit float with native 8/10-bit Y′CbCr in and 8-bit out
+(HDR export: half float out). `64RGBAHalf` sources were measured at +50% per 4K frame and not used.
 
 **F10. Edge cases of real-world media (P1).** Tests use generated fixtures (good), but none cover:
 variable frame rate (screen recordings, many phone clips), 60/120/240 fps sources, 25 fps, rotated
 footage with odd sizes, 4K HEVC, 10-bit, audio at 44.1 kHz vs 48 kHz, mono vs stereo, files
 with no audio track, very long files. Add a small "media matrix" of fixtures and run the
 composition + export tests over all of them.
+*Done 2026-11-14:* `MediaFixture` + `MediaMatrixTests` (16 kinds of file, a 10-minute file,
+untagged SD); all played and exported correctly once the colour work was in.
 
 ### 3.3 Responsiveness and performance
 

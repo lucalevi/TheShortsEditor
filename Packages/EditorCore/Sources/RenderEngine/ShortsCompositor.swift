@@ -162,17 +162,41 @@ public nonisolated enum LivePreview {
 ///
 /// Preview, thumbnails and export all go through this one compositor, so what is seen while
 /// editing is exactly what gets exported.
-nonisolated final class ShortsCompositor: NSObject, AVVideoCompositing, Sendable {
-    private static let pixelFormat: [String: any Sendable] = [
-        kCVPixelBufferPixelFormatTypeKey as String: [kCVPixelFormatType_32BGRA],
+nonisolated class ShortsCompositor: NSObject, AVVideoCompositing, @unchecked Sendable {
+    /// What the frames are made for; `HDRShortsCompositor` makes HDR ones.
+    class var range: DynamicRange { .standard }
+
+    /// Frames as the decoder gives them where possible (8- or 10-bit Y′CbCr, read by Core Image at
+    /// full precision), so nothing is converted twice or rounded to 8 bits on the way in.
+    private static let sourceFormats: [String: any Sendable] = [
+        kCVPixelBufferPixelFormatTypeKey as String: [
+            kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange, kCVPixelFormatType_420YpCbCr8BiPlanarFullRange,
+            kCVPixelFormatType_420YpCbCr10BiPlanarVideoRange, kCVPixelFormatType_420YpCbCr10BiPlanarFullRange,
+            kCVPixelFormatType_32BGRA, kCVPixelFormatType_64RGBAHalf,
+        ],
         kCVPixelBufferIOSurfacePropertiesKey as String: [String: any Sendable](),
     ]
 
-    let sourcePixelBufferAttributes: [String: any Sendable]? = ShortsCompositor.pixelFormat
-    let requiredPixelBufferAttributesForRenderContext: [String: any Sendable] = ShortsCompositor.pixelFormat
+    let sourcePixelBufferAttributes: [String: any Sendable]? = ShortsCompositor.sourceFormats
+    /// 8 bits for a standard Short (what the encoder gets anyway), 16-bit float for HDR.
+    var requiredPixelBufferAttributesForRenderContext: [String: any Sendable] {
+        [
+            kCVPixelBufferPixelFormatTypeKey as String: [Self.range == .high ? kCVPixelFormatType_64RGBAHalf : kCVPixelFormatType_32BGRA],
+            kCVPixelBufferIOSurfacePropertiesKey as String: [String: any Sendable](),
+        ]
+    }
+    /// Wide-colour sources (Display P3 video) come as they are; Core Image converts them.
+    var supportsWideColorSourceFrames: Bool { true }
+    /// HDR sources always come as they are, so they look the same in the player, in thumbnails and
+    /// in export; for a standard Short, `hdrConversion` tone-maps them (see `ColorPipeline`).
+    var supportsHDRSourceFrames: Bool { true }
+    /// We convert colours ourselves, so AVFoundation hands frames over untouched. (Otherwise it
+    /// conforms them to the composition's colour space, and in the player that relabelled PQ
+    /// frames as Rec. 709 without converting them.)
+    var canConformColorOfSourceFrames: Bool { true }
 
-    // No colour conversion: video values pass through untouched, like the built-in compositor.
-    private let context = CIContext(options: [.workingColorSpace: NSNull(), .outputColorSpace: NSNull(), .cacheIntermediates: false])
+    private let context = ColorPipeline.makeContext()
+    private let hdrConversion = HDRConversion()
     private let overlayImages = Mutex<[String: CGImage]>([:])
 
     func renderContextChanged(_ newRenderContext: AVVideoCompositionRenderContext) {}
@@ -228,7 +252,9 @@ nonisolated final class ShortsCompositor: NSObject, AVVideoCompositing, Sendable
             image = caption.composited(over: image)
         }
 
-        context.render(image.cropped(to: canvas), to: output, bounds: canvas, colorSpace: nil)
+        let frameColor = ColorPipeline.output(Self.range)
+        ColorPipeline.tag(output, as: frameColor)
+        context.render(image.cropped(to: canvas), to: output, bounds: canvas, colorSpace: frameColor.space)
         request.finish(withComposedVideoFrame: output)
     }
 
@@ -310,7 +336,9 @@ nonisolated final class ShortsCompositor: NSObject, AVVideoCompositing, Sendable
             let behind: CIImage =
                 switch layer.clip.background {
                 case .color:
-                    CIImage(color: CIColor(red: layer.clip.backgroundColor.red, green: layer.clip.backgroundColor.green, blue: layer.clip.backgroundColor.blue))
+                    CIImage(
+                        color: ColorPipeline.color(
+                            red: layer.clip.backgroundColor.red, green: layer.clip.backgroundColor.green, blue: layer.clip.backgroundColor.blue))
                 case .blur where !covers && !cutout.isSeeThrough: Self.blurredBackground(unkeyed, layer: layer, sourceHeight: height)
                 default: CIImage(color: .black)
                 }
@@ -336,14 +364,20 @@ nonisolated final class ShortsCompositor: NSObject, AVVideoCompositing, Sendable
     private func sourceImage(for layer: CompositorLayer, request: AVAsynchronousVideoCompositionRequest) -> CIImage? {
         switch layer.source {
         case .track(let id):
-            return request.sourceFrame(byTrackID: id).map { CIImage(cvPixelBuffer: $0) }
+            return request.sourceFrame(byTrackID: id).flatMap(image(of:))
         case .image(let url):
             return StillImages.image(at: url).map { CIImage(cgImage: $0) }
         case .frame(let still):
-            return CIImage(cvPixelBuffer: still.buffer)
+            return image(of: still.buffer)
         case .none:
             return nil
         }
+    }
+
+    /// A source frame for Core Image, HDR turned into Rec. 709 first for a standard Short.
+    private func image(of buffer: CVPixelBuffer) -> CIImage? {
+        guard Self.range == .standard else { return CIImage(cvPixelBuffer: buffer) }
+        return hdrConversion.standard(buffer).map { CIImage(cvPixelBuffer: $0) }
     }
 
     /// The upright size of the layer's picture.
@@ -448,6 +482,11 @@ nonisolated final class ShortsCompositor: NSObject, AVVideoCompositing, Sendable
     }
 
     func cancelAllPendingVideoCompositionRequests() {}
+}
+
+/// The compositor for an HDR Short: sources stay HDR, frames are Rec. 2020 HLG.
+nonisolated final class HDRShortsCompositor: ShortsCompositor, @unchecked Sendable {
+    override static var range: DynamicRange { .high }
 }
 
 /// Still pictures, decoded once at a size good enough for a 1080×1920 Short (and turned the

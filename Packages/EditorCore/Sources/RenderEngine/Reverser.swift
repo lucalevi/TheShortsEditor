@@ -1,6 +1,7 @@
 @preconcurrency import AVFoundation
 import EditorCore
 import Foundation
+import VideoToolbox
 
 /// Makes a copy of (part of) a video that plays backwards, picture and sound. AVFoundation can't
 /// play a file backwards inside a composition, so a clip that plays backwards points at such a
@@ -45,18 +46,12 @@ public nonisolated enum Reverser {
         let scale = min(1, maxSide / max(naturalSize.width, naturalSize.height))
         let width = max(2, Int((naturalSize.width * scale / 2).rounded()) * 2), height = max(2, Int((naturalSize.height * scale / 2).rounded()) * 2)
         let bitRate = min(40_000_000, max(2_000_000, Int(Double(width * height) * min(frameRate, 60) * 0.22)))
+        // The source's colours as they are.
+        let color = await ColorPipeline.copyColor(of: video)
         let videoInput = AVAssetWriterInput(
             mediaType: .video,
-            outputSettings: [
-                AVVideoCodecKey: AVVideoCodecType.h264,
-                AVVideoWidthKey: width,
-                AVVideoHeightKey: height,
-                AVVideoCompressionPropertiesKey: [
-                    AVVideoAverageBitRateKey: bitRate,
-                    AVVideoMaxKeyFrameIntervalDurationKey: 1,
-                    AVVideoProfileLevelKey: AVVideoProfileLevelH264HighAutoLevel,
-                ] as [String: Any],
-            ])
+            outputSettings: color.writerSettings(
+                width: width, height: height, compression: [AVVideoAverageBitRateKey: bitRate, AVVideoMaxKeyFrameIntervalDurationKey: 1]))
         videoInput.expectsMediaDataInRealTime = false
         videoInput.transform = transform
         guard writer.canAdd(videoInput) else { throw ReverseError.failed }
@@ -84,7 +79,7 @@ public nonisolated enum Reverser {
         writer.startSession(atSourceTime: .zero)
 
         // The picture: read a short stretch at a time from the end, and write each backwards.
-        let bytesPerFrame = Int(naturalSize.width * naturalSize.height * 1.5)
+        let bytesPerFrame = Int(naturalSize.width * naturalSize.height * color.bytesPerPixel)
         let framesPerChunk = max(4, min(60, chunkBytes / max(bytesPerFrame, 1)))
         let chunkLength = CMTime(seconds: Double(framesPerChunk) / frameRate, preferredTimescale: 90000)
         var chunkEnd = range.end
@@ -101,7 +96,7 @@ public nonisolated enum Reverser {
             if !videoDone, videoInput.isReadyForMoreMediaData {
                 if pending.isEmpty, chunkEnd > range.start {
                     let chunkStart = max(range.start, chunkEnd - chunkLength)
-                    pending = try frames(of: video, in: asset, from: chunkStart, to: chunkEnd)
+                    pending = try frames(of: video, in: asset, from: chunkStart, to: chunkEnd, tenBit: color.tenBit)
                     chunkEnd = chunkStart
                     progress(min(max((range.end - chunkEnd).seconds / range.duration.seconds, 0), 1))
                 }
@@ -143,13 +138,16 @@ public nonisolated enum Reverser {
     }
 
     /// The decoded pictures that start in `from ..< to`, in order.
-    private static func frames(of track: AVAssetTrack, in asset: AVAsset, from: CMTime, to: CMTime) throws -> [(time: CMTime, buffer: CVPixelBuffer)] {
+    private static func frames(
+        of track: AVAssetTrack, in asset: AVAsset, from: CMTime, to: CMTime, tenBit: Bool
+    ) throws -> [(time: CMTime, buffer: CVPixelBuffer)] {
         let reader = try AVAssetReader(asset: asset)
         reader.timeRange = CMTimeRange(start: from, end: to)
         let output = AVAssetReaderTrackOutput(
             track: track,
             outputSettings: [
-                kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange
+                kCVPixelBufferPixelFormatTypeKey as String: tenBit
+                    ? kCVPixelFormatType_420YpCbCr10BiPlanarVideoRange : kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange
             ])
         output.alwaysCopiesSampleData = false
         guard reader.canAdd(output) else { throw ReverseError.unreadable }

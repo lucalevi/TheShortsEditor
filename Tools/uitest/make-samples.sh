@@ -26,4 +26,6 @@ ffmpeg -loglevel error -y -f lavfi -i "testsrc2=size=1080x1920:rate=30" -i $OUT/
 rm $OUT/long.aiff
 # The pauses sample with the song under it, for Remove Pauses' "Listen to the voice only".
 ffmpeg -loglevel error -y -i $OUT/pauses-sample.mp4 -i $OUT/music-sample.m4a -filter_complex "[1:a]volume=0.6[m];[0:a][m]amix=inputs=2:duration=first:normalize=0[a]" -map 0:v -map "[a]" -c:v copy -c:a aac -shortest $OUT/talk-with-music-sample.mp4
+# HDR as iPhones record it (10-bit HEVC, Rec. 2020, HLG), for the colour pipeline and Export ▸ Keep HDR.
+ffmpeg -loglevel error -y -f lavfi -i "testsrc2=size=1080x1920:rate=30" -f lavfi -i "sine=frequency=330:sample_rate=48000" -t 5 -vf format=yuv420p10le -c:v libx265 -x265-params "colorprim=bt2020:transfer=arib-std-b67:colormatrix=bt2020nc:log-level=error" -color_primaries bt2020 -color_trc arib-std-b67 -colorspace bt2020nc -tag:v hvc1 -c:a aac -shortest $OUT/hlg-sample.mov
 echo $OUT

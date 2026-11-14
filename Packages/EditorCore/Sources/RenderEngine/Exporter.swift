@@ -1,9 +1,11 @@
 @preconcurrency import AVFoundation
 import EditorCore
+import VideoToolbox
 
 /// Writes a project to an MP4 file that matches YouTube's recommended upload settings:
 /// H.264 High profile without B-frames, 1080×1920 at 30 fps, closed GOPs of half a second, AAC-LC 48 kHz stereo,
-/// and the index at the front of the file ("fast start").
+/// and the index at the front of the file ("fast start"). An HDR Short is 10-bit HEVC (Main 10),
+/// Rec. 2020 with Hybrid Log-Gamma, which YouTube shows as HDR (and as ordinary video elsewhere).
 ///
 /// Frames come from the same `ShortsCompositor` as the preview, so the file looks exactly like
 /// what was seen while editing.
@@ -30,16 +32,17 @@ public enum Exporter {
     /// Exports `project` to `url`, replacing any file there. `progress` goes from 0 to 1 and is
     /// called on the main actor. Cancelling the task stops the export and removes the partial file.
     /// With `evenOutLoudness`, the sound is first measured and then brought to YouTube's level
-    /// (−14 LUFS), without letting peaks clip.
+    /// (−14 LUFS), without letting peaks clip. `range` makes an ordinary or an HDR file.
     public static func export(
-        _ project: Project, to url: URL, evenOutLoudness: Bool = true, progress: @escaping @MainActor (Double) -> Void = { _ in }
+        _ project: Project, to url: URL, evenOutLoudness: Bool = true, range: DynamicRange = .standard,
+        progress: @escaping @MainActor (Double) -> Void = { _ in }
     ) async throws {
         var gain = 1.0
         if evenOutLoudness, let meter = try await AudioProbe.loudness(of: project) {
             gain = meter.normalizingGain()
         }
         try Task.checkCancellation()
-        let built = try await CompositionBuilder.build(project, gain: gain)
+        let built = try await CompositionBuilder.build(project, gain: gain, range: range)
         let composition = built.composition
         let duration = composition.duration
 
@@ -56,14 +59,10 @@ public enum Exporter {
 
         // Video: frames drawn by the compositor, encoded to YouTube's recommendation.
         let videoTracks = try await composition.loadTracks(withMediaType: .video)
-        let videoOutput = AVAssetReaderVideoCompositionOutput(
-            videoTracks: videoTracks,
-            videoSettings: [
-                kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA
-            ])
+        let videoOutput = AVAssetReaderVideoCompositionOutput(videoTracks: videoTracks, videoSettings: readerSettings(range))
         videoOutput.videoComposition = built.videoComposition
         videoOutput.alwaysCopiesSampleData = false
-        let videoInput = AVAssetWriterInput(mediaType: .video, outputSettings: videoSettings)
+        let videoInput = AVAssetWriterInput(mediaType: .video, outputSettings: videoSettings(range))
         videoInput.expectsMediaDataInRealTime = false
 
         var pumps: [Pump] = []
@@ -156,31 +155,43 @@ public enum Exporter {
         progress(1)
     }
 
-    static var videoSettings: [String: Any] {
+    /// Frames as the encoder takes them, in the Short's colour space (so nothing is converted).
+    static func readerSettings(_ range: DynamicRange) -> [String: Any] {
         [
-            AVVideoCodecKey: AVVideoCodecType.h264,
+            kCVPixelBufferPixelFormatTypeKey as String: range == .high ? kCVPixelFormatType_420YpCbCr10BiPlanarVideoRange : kCVPixelFormatType_32BGRA,
+            AVVideoColorPropertiesKey: ColorPipeline.output(range).properties,
+        ]
+    }
+
+    static func videoSettings(_ range: DynamicRange = .standard) -> [String: Any] {
+        var compression: [String: Any] = [AVVideoAverageBitRateKey: videoBitRate]
+        if range == .high {
+            compression[AVVideoProfileLevelKey] = kVTProfileLevel_HEVC_Main10_AutoLevel as String
+        } else {
+            compression[AVVideoProfileLevelKey] = AVVideoProfileLevelH264HighAutoLevel
+            compression[AVVideoH264EntropyModeKey] = AVVideoH264EntropyModeCABAC
+        }
+        return [
+            AVVideoCodecKey: range == .high ? AVVideoCodecType.hevc : AVVideoCodecType.h264,
             AVVideoWidthKey: Int(Project.canvasSize.width),
             AVVideoHeightKey: Int(Project.canvasSize.height),
-            AVVideoColorPropertiesKey: [
-                AVVideoColorPrimariesKey: AVVideoColorPrimaries_ITU_R_709_2,
-                AVVideoTransferFunctionKey: AVVideoTransferFunction_ITU_R_709_2,
-                AVVideoYCbCrMatrixKey: AVVideoYCbCrMatrix_ITU_R_709_2,
-            ],
-            AVVideoCompressionPropertiesKey: [
-                AVVideoAverageBitRateKey: videoBitRate,
-                AVVideoProfileLevelKey: AVVideoProfileLevelH264HighAutoLevel,
-                AVVideoH264EntropyModeKey: AVVideoH264EntropyModeCABAC,
-                AVVideoExpectedSourceFrameRateKey: Int(Project.frameRate),
-                // A key frame every half second: YouTube asks for closed GOPs of half the frame rate.
-                AVVideoMaxKeyFrameIntervalKey: Int(Project.frameRate) / 2,
-                // No B-frames. YouTube asks for no edit lists: with B-frames the video track needs one that
-                // skips two frames of decoding delay, so a tool ignoring it would show the picture 67 ms
-                // late; and its GOPs came out uneven (29 frames, then 13). Without them, every GOP is 15
-                // frames starting on an IDR frame and the edit list only covers the track as it is. At
-                // 12 Mbps the picture is the same (measured 2026-11-13). The sound's edit list, which
-                // drops AAC's 2112 priming samples, is in every AAC file and stays.
-                AVVideoAllowFrameReorderingKey: false,
-            ] as [String: Any],
+            AVVideoColorPropertiesKey: ColorPipeline.output(range).properties,
+            AVVideoCompressionPropertiesKey: compression.merging(sharedCompression) { a, _ in a },
+        ]
+    }
+
+    private static var sharedCompression: [String: Any] {
+        [
+            AVVideoExpectedSourceFrameRateKey: Int(Project.frameRate),
+            // A key frame every half second: YouTube asks for closed GOPs of half the frame rate.
+            AVVideoMaxKeyFrameIntervalKey: Int(Project.frameRate) / 2,
+            // No B-frames. YouTube asks for no edit lists: with B-frames the video track needs one that
+            // skips two frames of decoding delay, so a tool ignoring it would show the picture 67 ms
+            // late; and its GOPs came out uneven (29 frames, then 13). Without them, every GOP is 15
+            // frames starting on an IDR frame and the edit list only covers the track as it is. At
+            // 12 Mbps the picture is the same (measured 2026-11-13). The sound's edit list, which
+            // drops AAC's 2112 priming samples, is in every AAC file and stays.
+            AVVideoAllowFrameReorderingKey: false,
         ]
     }
 }

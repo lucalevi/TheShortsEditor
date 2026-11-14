@@ -112,8 +112,10 @@ nonisolated enum TitleRenderer {
         let contentRect: CGRect
     }
 
+    /// A colour of the model (sRGB values, as picked in the app). `CGColor(red:green:blue:)` would
+    /// be Generic RGB (gamma 1.8) on macOS, which drew every picked colour lighter than picked.
     static func cgColor(_ color: RGBA) -> CGColor {
-        CGColor(red: color.red, green: color.green, blue: color.blue, alpha: color.alpha)
+        CGColor(srgbRed: color.red, green: color.green, blue: color.blue, alpha: color.alpha)
     }
 
     /// The text as it is shown (in capitals when the look says so).
@@ -159,7 +161,7 @@ nonisolated enum TitleRenderer {
             CFAttributedStringSetAttribute(string, all, kCTForegroundColorAttributeName, cgColor(look.textColor))
         }
         if let visible, visible < length {
-            let clear = CGColor(red: 0, green: 0, blue: 0, alpha: 0)
+            let clear = CGColor(srgbRed: 0, green: 0, blue: 0, alpha: 0)
             let hidden = CFRange(location: visible, length: length - visible)
             CFAttributedStringSetAttribute(string, hidden, kCTForegroundColorAttributeName, clear)
             CFAttributedStringSetAttribute(string, hidden, kCTStrokeColorAttributeName, clear)
@@ -234,7 +236,7 @@ nonisolated enum TitleRenderer {
             context.restoreGState()
         }
         if look.shadow {
-            context.setShadow(offset: CGSize(width: 0, height: -4), blur: 16, color: CGColor(red: 0, green: 0, blue: 0, alpha: 0.85))
+            context.setShadow(offset: CGSize(width: 0, height: -4), blur: 16, color: CGColor(srgbRed: 0, green: 0, blue: 0, alpha: 0.85))
         }
         CTFrameDraw(frame, context)
         return context.makeImage()

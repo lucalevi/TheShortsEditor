@@ -205,7 +205,7 @@ public nonisolated enum EffectRenderer {
             let popped = image.applyingFilter(
                 "CIColorCubeWithColorSpace",
                 parameters: [
-                    "inputCubeDimension": colorPopSize, "inputCubeData": cube, "inputColorSpace": NSNull(),
+                    "inputCubeDimension": colorPopSize, "inputCubeData": cube, "inputColorSpace": ColorPipeline.sRGB,
                 ])
             let amount = s * ramp
             return amount >= 1 ? popped : faded(popped, amount).composited(over: image)
@@ -247,7 +247,7 @@ public nonisolated enum EffectRenderer {
 
     // MARK: Previews
 
-    private static let previewContext = CIContext(options: [.workingColorSpace: NSNull(), .outputColorSpace: NSNull()])
+    private static let previewContext = ColorPipeline.makeContext()
 
     /// `kind` on `image` (a frame of the clip), at a moment where it shows well, for the effect grid.
     public static func preview(_ image: CGImage, kind: EffectKind) -> CGImage? {
@@ -266,6 +266,6 @@ public nonisolated enum EffectRenderer {
         if kind == .blur { effect.strength = 0.35 }
         let moment = EffectMoment(effect: effect, seconds: seconds, progress: 0.3, frame: frame)
         let output = apply([moment], to: input, in: region)
-        return previewContext.createCGImage(output, from: region)
+        return previewContext.createCGImage(output, from: region, format: .RGBA8, colorSpace: ColorPipeline.sRGB)
     }
 }

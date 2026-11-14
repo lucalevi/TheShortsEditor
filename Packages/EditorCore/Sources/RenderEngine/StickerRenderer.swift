@@ -51,7 +51,7 @@ nonisolated enum StickerRenderer {
         let scale = size / max(symbolSize.width, symbolSize.height, 1)
         let drawn = CGSize(width: symbolSize.width * scale, height: symbolSize.height * scale)
         let rect = CGRect(x: (CGFloat(side) - drawn.width) / 2, y: (CGFloat(side) - drawn.height) / 2, width: drawn.width, height: drawn.height)
-        context.setShadow(offset: CGSize(width: 0, height: -size * 0.02), blur: size * 0.08, color: CGColor(red: 0, green: 0, blue: 0, alpha: 0.6))
+        context.setShadow(offset: CGSize(width: 0, height: -size * 0.02), blur: size * 0.08, color: CGColor(srgbRed: 0, green: 0, blue: 0, alpha: 0.6))
         // Drawn as shapes, so it stays sharp at any size.
         NSGraphicsContext.saveGraphicsState()
         NSGraphicsContext.current = NSGraphicsContext(cgContext: context, flipped: false)

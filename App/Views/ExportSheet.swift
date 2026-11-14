@@ -23,7 +23,7 @@ struct ExportSheet: View {
                 IssueList(issues: issues)
                 Divider()
                 VStack(alignment: .leading, spacing: 2) {
-                    Toggle("Even out the loudness", isOn: $model.evensOutLoudness)
+                    Toggle("Even out the loudness", isOn: $model.exportOptions.evensOutLoudness)
                     Text("Brings the sound to the level YouTube plays Shorts at, so yours isn't quieter than the next one. Recommended.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -31,6 +31,20 @@ struct ExportSheet: View {
                         .padding(.leading, 20)
                 }
                 .toggleStyle(.checkbox)
+                if model.exportOptions.shortHasHDR {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Toggle("Keep HDR", isOn: $model.exportOptions.keepsHDR)
+                        Text(
+                            "Some of your clips were filmed in HDR. Bright parts stay bright on screens that show HDR. "
+                                + "On other screens, clips not filmed in HDR can look a little darker. Makes an HEVC file."
+                        )
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.leading, 20)
+                    }
+                    .toggleStyle(.checkbox)
+                }
                 buttons {
                     coverButton
                     Button("Cancel", role: .cancel) { model.endExport() }
@@ -75,9 +89,13 @@ struct ExportSheet: View {
             Text("\(TimeFormat.string(model.duration)) · vertical 1080 × 1920 · \(captions)\(music)")
             Text("File size: \(model.exportSizeEstimate)")
                 .foregroundStyle(.secondary)
-            Text("MP4 file with YouTube's recommended settings (H.264, 30 fps, AAC sound).")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            Text(
+                model.exportOptions.range == .high
+                    ? "MP4 file in HDR (HEVC, 10-bit HLG, 30 fps, AAC sound), which YouTube shows in HDR."
+                    : "MP4 file with YouTube's recommended settings (H.264, 30 fps, AAC sound)."
+            )
+            .font(.caption)
+            .foregroundStyle(.secondary)
         }
     }
 

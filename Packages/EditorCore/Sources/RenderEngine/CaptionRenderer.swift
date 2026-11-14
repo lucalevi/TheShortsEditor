@@ -110,9 +110,9 @@ nonisolated enum CaptionRenderer {
         var hollow = false
     }
 
-    private static let white = CGColor(red: 1, green: 1, blue: 1, alpha: 1)
-    private static let black = CGColor(red: 0, green: 0, blue: 0, alpha: 1)
-    private static let yellow = CGColor(red: 1, green: 0.86, blue: 0.1, alpha: 1)
+    private static let white = CGColor(srgbRed: 1, green: 1, blue: 1, alpha: 1)
+    private static let black = CGColor(srgbRed: 0, green: 0, blue: 0, alpha: 1)
+    private static let yellow = CGColor(srgbRed: 1, green: 0.86, blue: 0.1, alpha: 1)
 
     /// The colour key words get when no accent is chosen: one that differs from the spoken word's.
     static func keywordColor(for style: CaptionStyle) -> RGBA {
@@ -141,7 +141,8 @@ nonisolated enum CaptionRenderer {
         case .bold:
             return Look(fontSize: 100, weight: 0.62, currentWord: yellow, outline: 24, pops: true, currentGrows: true)
         case .highlight:
-            return Look(fontSize: 92, weight: 0.56, outline: 20, wordBox: CGColor(red: 0.16, green: 0.78, blue: 0.36, alpha: 1), pops: true, currentGrows: true)
+            return Look(
+                fontSize: 92, weight: 0.56, outline: 20, wordBox: CGColor(srgbRed: 0.16, green: 0.78, blue: 0.36, alpha: 1), pops: true, currentGrows: true)
         case .oneWord:
             return Look(fontSize: 136, weight: 0.62, outline: 22, pops: true)
         case .phrase:
@@ -149,15 +150,15 @@ nonisolated enum CaptionRenderer {
         case .karaoke:
             return Look(fontSize: 84, weight: 0.56, outline: 20, fill: yellow)
         case .glow:
-            return Look(fontSize: 96, weight: 0.6, pops: true, glow: CGColor(red: 1, green: 0.3, blue: 0.78, alpha: 1))
+            return Look(fontSize: 96, weight: 0.6, pops: true, glow: CGColor(srgbRed: 1, green: 0.3, blue: 0.78, alpha: 1))
         case .bounce:
-            return Look(fontSize: 96, weight: 0.62, currentWord: CGColor(red: 0.35, green: 0.85, blue: 1, alpha: 1), outline: 22, bounces: true)
+            return Look(fontSize: 96, weight: 0.62, currentWord: CGColor(srgbRed: 0.35, green: 0.85, blue: 1, alpha: 1), outline: 22, bounces: true)
         case .typewriter:
-            return Look(fontSize: 72, weight: 0.45, backgroundBox: CGColor(red: 0, green: 0, blue: 0, alpha: 0.55), typewriter: true)
+            return Look(fontSize: 72, weight: 0.45, backgroundBox: CGColor(srgbRed: 0, green: 0, blue: 0, alpha: 0.55), typewriter: true)
         case .outline:
             return Look(fontSize: 104, weight: 0.72, currentWord: white, outline: 5, shadow: true, pops: true, hollow: true)
         case .classic:
-            return Look(fontSize: 54, weight: 0.3, backgroundBox: CGColor(red: 0, green: 0, blue: 0, alpha: 0.7))
+            return Look(fontSize: 54, weight: 0.3, backgroundBox: CGColor(srgbRed: 0, green: 0, blue: 0, alpha: 0.7))
         case .minimal:
             return Look(fontSize: 62, weight: 0.4, shadow: true)
         }
@@ -352,7 +353,7 @@ nonisolated enum CaptionRenderer {
             if look.outline > 0 {
                 if look.hollow, look.shadow {
                     context.saveGState()
-                    context.setShadow(offset: CGSize(width: 0, height: -3), blur: 10, color: CGColor(red: 0, green: 0, blue: 0, alpha: 0.9))
+                    context.setShadow(offset: CGSize(width: 0, height: -3), blur: 10, color: CGColor(srgbRed: 0, green: 0, blue: 0, alpha: 0.9))
                     CTFrameDraw(passFrame(.stroke), context)
                     context.restoreGState()
                 } else {
@@ -371,7 +372,7 @@ nonisolated enum CaptionRenderer {
             }
             context.saveGState()
             if look.shadow {
-                context.setShadow(offset: CGSize(width: 0, height: -4), blur: 14, color: CGColor(red: 0, green: 0, blue: 0, alpha: 0.85))
+                context.setShadow(offset: CGSize(width: 0, height: -4), blur: 14, color: CGColor(srgbRed: 0, green: 0, blue: 0, alpha: 0.85))
             }
             if let glow = look.glow {
                 context.setShadow(offset: .zero, blur: look.fontSize * 0.3, color: glow)
@@ -428,7 +429,7 @@ nonisolated enum CaptionRenderer {
             let translationPath = CGPath(rect: rect, transform: nil)
             let drawn = CTFramesetterCreateFrame(translationFrame.framesetter, CFRange(location: 0, length: 0), translationPath, nil)
             context.saveGState()
-            context.setShadow(offset: CGSize(width: 0, height: -3), blur: 10, color: CGColor(red: 0, green: 0, blue: 0, alpha: 0.95))
+            context.setShadow(offset: CGSize(width: 0, height: -3), blur: 10, color: CGColor(srgbRed: 0, green: 0, blue: 0, alpha: 0.95))
             CTFrameDraw(drawn, context)
             context.restoreGState()
         }

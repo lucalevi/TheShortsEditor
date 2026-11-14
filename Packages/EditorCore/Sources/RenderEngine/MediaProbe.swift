@@ -70,6 +70,8 @@ public enum MediaProbe {
     public static func thumbnail(for url: URL, maxSize: CGSize = CGSize(width: 320, height: 320)) async throws -> CGImage {
         let generator = AVAssetImageGenerator(asset: AVURLAsset(url: url))
         generator.appliesPreferredTrackTransform = true
+        // HDR clips look as they do in a standard Short (an HDR picture would be clipped when drawn).
+        generator.dynamicRangePolicy = .forceSDR
         generator.maximumSize = maxSize
         // Half a second in avoids the black first frame many recordings start with.
         return try await generator.image(at: CMTime(value: 1, timescale: 2)).image
@@ -80,6 +82,8 @@ public enum MediaProbe {
     public static func frame(of url: URL, at time: CMTime, maxSize: CGSize = CGSize(width: 720, height: 1280)) async throws -> CGImage {
         let generator = AVAssetImageGenerator(asset: AVURLAsset(url: url))
         generator.appliesPreferredTrackTransform = true
+        // HDR clips look as they do in a standard Short (an HDR picture would be clipped when drawn).
+        generator.dynamicRangePolicy = .forceSDR
         generator.maximumSize = maxSize
         let tolerance = CMTime(value: 1, timescale: 20)
         generator.requestedTimeToleranceBefore = tolerance
@@ -119,6 +123,8 @@ public extension MediaProbe {
         let count = max(1, Int((seconds / interval.seconds).rounded(.up)))
         let generator = AVAssetImageGenerator(asset: AVURLAsset(url: media.url))
         generator.appliesPreferredTrackTransform = true
+        // HDR clips look as they do in a standard Short (an HDR picture would be clipped when drawn).
+        generator.dynamicRangePolicy = .forceSDR
         generator.maximumSize = CGSize(width: height * 2, height: height)
         generator.requestedTimeToleranceBefore = CMTimeMultiplyByRatio(interval, multiplier: 1, divisor: 2)
         generator.requestedTimeToleranceAfter = CMTimeMultiplyByRatio(interval, multiplier: 1, divisor: 2)

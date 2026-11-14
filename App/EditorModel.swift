@@ -69,8 +69,8 @@ final class EditorModel {
     }
     /// The music's volume over the timeline, as built, for drawing it.
     private(set) var musicEnvelope: [VolumePoint] = []
-    /// Export at YouTube's loudness. On unless the user turns it off in the Export sheet.
-    var evensOutLoudness = true
+    /// The Export sheet's choices (loudness, HDR).
+    var exportOptions = ExportOptions()
     /// Asks the title inspector to put the cursor in the text (after adding a title). It resets it.
     var wantsTitleTextFocus = false
     var selectedAssetID: MediaAsset.ID? {

@@ -63,7 +63,7 @@ public nonisolated enum FrameInterpolator {
         let values = try? source.resourceValues(forKeys: [.fileSizeKey, .contentModificationDateKey])
         let key =
             "\(source.path)|\(values?.fileSize ?? 0)|\(values?.contentModificationDate?.timeIntervalSince1970 ?? 0)|"
-            + "\(recipe.range.start.seconds)|\(recipe.range.duration.seconds)|\(recipe.factor)|v1"
+            + "\(recipe.range.start.seconds)|\(recipe.range.duration.seconds)|\(recipe.factor)|v2"
         let digest = SHA256.hash(data: Data(key.utf8)).prefix(12).map { String(format: "%02x", $0) }.joined()
         return folder.appending(path: "\(digest).mov")
     }
@@ -99,21 +99,21 @@ public nonisolated enum FrameInterpolator {
         let writer = try AVAssetWriter(outputURL: temporary, fileType: .mov)
         let outputRate = min(fileRate * Double(recipe.factor), 480)
         let bitRate = min(60_000_000, max(4_000_000, Int(Double(width * height) * min(outputRate, 120) * 0.15)))
+        // The source's colours as they are (values pass through untouched, see `context`).
+        let color = await ColorPipeline.copyColor(of: video)
         let input = AVAssetWriterInput(
             mediaType: .video,
-            outputSettings: [
-                AVVideoCodecKey: AVVideoCodecType.h264, AVVideoWidthKey: width, AVVideoHeightKey: height,
-                AVVideoCompressionPropertiesKey: [
-                    AVVideoAverageBitRateKey: bitRate, AVVideoMaxKeyFrameIntervalDurationKey: 1,
-                    AVVideoProfileLevelKey: AVVideoProfileLevelH264HighAutoLevel,
-                ] as [String: Any],
-            ])
+            outputSettings: color.writerSettings(
+                width: width, height: height, compression: [AVVideoAverageBitRateKey: bitRate, AVVideoMaxKeyFrameIntervalDurationKey: 1]))
+        // 16-bit float pictures when there are more than 8 bits to keep (or optical flow wants them).
+        let flow = usesOpticalFlow ? OpticalFlow(width: width, height: height) : nil
+        let pictureFormat = flow != nil || color.tenBit ? kCVPixelFormatType_64RGBAHalf : kCVPixelFormatType_32BGRA
         input.expectsMediaDataInRealTime = false
         input.transform = transform
         let adaptor = AVAssetWriterInputPixelBufferAdaptor(
             assetWriterInput: input,
             sourcePixelBufferAttributes: [
-                kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA,
+                kCVPixelBufferPixelFormatTypeKey as String: pictureFormat,
                 kCVPixelBufferWidthKey as String: width, kCVPixelBufferHeightKey as String: height,
                 kCVPixelBufferIOSurfacePropertiesKey as String: [String: Any](),
             ])
@@ -123,13 +123,12 @@ public nonisolated enum FrameInterpolator {
         writer.startSession(atSourceTime: .zero)
 
         // The pictures are read already at the copy's size, in the format the processor wants.
-        let flow = usesOpticalFlow ? OpticalFlow(width: width, height: height) : nil
         let reader = try AVAssetReader(asset: asset)
         reader.timeRange = range
         let output = AVAssetReaderTrackOutput(
             track: video,
             outputSettings: [
-                kCVPixelBufferPixelFormatTypeKey as String: flow != nil ? kCVPixelFormatType_64RGBAHalf : kCVPixelFormatType_32BGRA,
+                kCVPixelBufferPixelFormatTypeKey as String: pictureFormat,
                 kCVPixelBufferWidthKey as String: width, kCVPixelBufferHeightKey as String: height,
                 kCVPixelBufferIOSurfacePropertiesKey as String: [String: Any](),
             ])
@@ -138,6 +137,7 @@ public nonisolated enum FrameInterpolator {
         reader.add(output)
         guard reader.startReading() else { throw reader.error ?? InterpolationError.unreadable }
 
+        // No colour conversion: the copy keeps the file's own values, tagged as the file is.
         let context = CIContext(options: [.workingColorSpace: NSNull(), .outputColorSpace: NSNull(), .cacheIntermediates: false])
         var previous: (time: CMTime, buffer: CVPixelBuffer)?
         var lastWritten = CMTime(value: -1, timescale: 90000)
@@ -154,6 +154,7 @@ public nonisolated enum FrameInterpolator {
             CVPixelBufferPoolCreatePixelBuffer(nil, pool, &target)
             guard let target else { throw InterpolationError.failed }
             context.render(CIImage(cvPixelBuffer: buffer), to: target)
+            color.tag(target)
             guard adaptor.append(target, withPresentationTime: time) else { throw writer.error ?? InterpolationError.failed }
             lastWritten = time
         }
@@ -203,7 +204,7 @@ public nonisolated enum FrameInterpolator {
             ])
         var target: CVPixelBuffer?
         CVPixelBufferCreate(
-            nil, CVPixelBufferGetWidth(a), CVPixelBufferGetHeight(a), kCVPixelFormatType_32BGRA,
+            nil, CVPixelBufferGetWidth(a), CVPixelBufferGetHeight(a), CVPixelBufferGetPixelFormatType(a),
             [kCVPixelBufferIOSurfacePropertiesKey: [String: Any]()] as CFDictionary, &target)
         guard let target else { return nil }
         context.render(mixed, to: target)

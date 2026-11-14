@@ -43,7 +43,9 @@ public enum CompositionBuilder {
     }
 
     /// `gain` scales all sound, for bringing the export to YouTube's loudness.
-    public static func build(_ project: Project, gain: Double = 1) async throws -> PlayableComposition {
+    /// `range` says what the frames are made for: standard (preview, thumbnails, the usual export)
+    /// or HDR (an HDR export).
+    public static func build(_ project: Project, gain: Double = 1, range: DynamicRange = .standard) async throws -> PlayableComposition {
         guard !project.timeline.clips.isEmpty else { throw BuildError.emptyTimeline }
         let signpost = Signposts.render.beginInterval("Build")
         defer { Signposts.render.endInterval("Build", signpost) }
@@ -303,16 +305,27 @@ public enum CompositionBuilder {
         let audioMix = AVMutableAudioMix()
         audioMix.inputParameters = mixInputs
 
-        let videoComposition = AVVideoComposition(
-            configuration: .init(
-                customVideoCompositorClass: ShortsCompositor.self,
-                frameDuration: .oneFrame,
-                instructions: instructions,
-                renderSize: Project.canvasSize
-            ))
+        let videoComposition = Self.videoComposition(instructions, range: range)
         return PlayableComposition(
             composition: composition, videoComposition: videoComposition, audioMix: audioMix,
             musicEnvelope: envelope, missingAssets: missing)
+    }
+
+    /// The video composition drawing `instructions` with our compositor. The frames' colour space
+    /// is said explicitly; the compositor converts every source to it (see `ColorPipeline`) and
+    /// tags its frames with it.
+    private static func videoComposition(_ instructions: [any AVVideoCompositionInstructionProtocol], range: DynamicRange) -> AVVideoComposition {
+        var configuration = AVVideoComposition.Configuration(
+            customVideoCompositorClass: range == .high ? HDRShortsCompositor.self : ShortsCompositor.self,
+            frameDuration: .oneFrame,
+            instructions: instructions,
+            renderSize: Project.canvasSize
+        )
+        let color = ColorPipeline.output(range)
+        configuration.colorPrimaries = color.primaries
+        configuration.colorTransferFunction = color.transferFunction
+        configuration.colorYCbCrMatrix = color.matrix
+        return AVVideoComposition(configuration: configuration)
     }
 
     /// Where people talk in the Short, from the measured loudness of the clips' files.

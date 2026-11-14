@@ -14,6 +14,8 @@ public nonisolated enum CutoutRenderer {
     // MARK: Green screen
 
     /// `image` with the colour of `key` taken out (see `ColorKey.keyed`, sampled into a table).
+    /// The table maps sRGB values (the compositor's working space, `ColorPipeline`), as the
+    /// colour picked from a frame is measured in sRGB.
     public static func keyed(_ image: CIImage, by key: ColorKey) -> CIImage {
         let data = cube(for: key)
         return image.applyingFilter("CIColorCube", parameters: ["inputCubeDimension": keyCubeSize, "inputCubeData": data])

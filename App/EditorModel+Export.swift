@@ -5,6 +5,18 @@ import RenderEngine
 import SwiftUI
 import Transcription
 
+/// What the Export sheet lets the user choose.
+struct ExportOptions {
+    /// Export at YouTube's loudness. On unless the user turns it off.
+    var evensOutLoudness = true
+    /// Whether the Short being exported has HDR footage (found when the Export sheet opens).
+    var shortHasHDR = false
+    /// Export as HDR (offered only when `shortHasHDR`). Off unless the user turns it on.
+    var keepsHDR = false
+
+    var range: DynamicRange { shortHasHDR && keepsHDR ? .high : .standard }
+}
+
 /// Exporting the Short, and removing pauses.
 extension EditorModel {
     // MARK: Export
@@ -24,6 +36,7 @@ extension EditorModel {
                 Log.export.failure("beginExport", error)
                 peak = 1 // Couldn't measure: skip that check rather than claim silence.
             }
+            exportOptions.shortHasHDR = await Self.hasHDR(project)
             guard exportPhase == .checking else { return }
             exportPhase = .review(ExportReview.issues(for: project, openingPeak: peak, titleFrames: TitlePreview.frames(in: project), missing: missingAssets))
         }
@@ -35,7 +48,8 @@ extension EditorModel {
         exportPhase = .exporting(0)
         exportTask = Task {
             do {
-                try await Exporter.export(project, to: url, evenOutLoudness: evensOutLoudness) { fraction in
+                let options = exportOptions
+                try await Exporter.export(project, to: url, evenOutLoudness: options.evensOutLoudness, range: options.range) { fraction in
                     if case .exporting = self.exportPhase { self.exportPhase = .exporting(fraction) }
                 }
                 exportPhase = .finished(url)
@@ -46,6 +60,16 @@ extension EditorModel {
                 exportPhase = .failed(error.localizedDescription)
             }
         }
+    }
+
+    /// Whether any video in the Short (main clips or B-roll) was filmed in HDR.
+    private static func hasHDR(_ project: Project) async -> Bool {
+        let ids = Set(project.timeline.clips.map(\.assetID) + project.overlays.map(\.clip.assetID))
+        for id in ids {
+            guard let media = project.asset(id: id), media.hasVideo, !media.isImage else { continue }
+            if await ColorPipeline.isHDR(media.url) { return true }
+        }
+        return false
     }
 
     /// Stops a running export (removing the partial file) or closes the sheet.

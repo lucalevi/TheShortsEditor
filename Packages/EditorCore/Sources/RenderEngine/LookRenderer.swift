@@ -28,7 +28,9 @@ public nonisolated enum LookRenderer {
         return vignetted(out, amount: choice.vignette)
     }
 
-    /// `image` with every colour sent through `map`, using a lookup table kept under `key`.
+    /// `image` with every colour sent through `map`, using a lookup table kept under `key`. The
+    /// compositor works in extended sRGB (`ColorPipeline`), so the table maps sRGB values, the
+    /// ones `pixels(of:)` measures for Enhance and Match Color.
     private static func colored(_ image: CIImage, key: Int, _ map: (RGB) -> RGB) -> CIImage {
         let data = cube(key: key, map)
         let extent = image.extent
@@ -90,12 +92,12 @@ public nonisolated enum LookRenderer {
 
     // MARK: Small pictures for the inspector
 
-    private static let context = CIContext(options: [.workingColorSpace: NSNull(), .outputColorSpace: NSNull(), .cacheIntermediates: false])
+    private static let context = ColorPipeline.makeContext()
 
-    /// `image` with `look`, for the filter grid.
+    /// `image` with `look`, for the filter grid: drawn like the compositor draws it.
     public static func preview(_ image: CGImage, look: ClipLook) -> CGImage? {
         let input = CIImage(cgImage: image)
-        return context.createCGImage(apply(look, to: input), from: input.extent)
+        return context.createCGImage(apply(look, to: input), from: input.extent, format: .RGBA8, colorSpace: ColorPipeline.sRGB)
     }
 
     // MARK: Measuring

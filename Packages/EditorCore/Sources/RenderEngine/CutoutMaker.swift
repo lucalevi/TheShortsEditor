@@ -54,14 +54,11 @@ public nonisolated enum CutoutMaker {
         let partial = destination.deletingPathExtension().appendingPathExtension("partial.mov")
         try? FileManager.default.removeItem(at: partial)
         let writer = try AVAssetWriter(outputURL: partial, fileType: .mov)
+        // Values pass through untouched (see `context`), so the copy is tagged like the file.
+        let color = await ColorPipeline.copyColor(of: track)
         let input = AVAssetWriterInput(
             mediaType: .video,
-            outputSettings: [
-                AVVideoCodecKey: AVVideoCodecType.hevcWithAlpha,
-                AVVideoWidthKey: width,
-                AVVideoHeightKey: height,
-                AVVideoCompressionPropertiesKey: [AVVideoQualityKey: 0.8] as [String: Any],
-            ])
+            outputSettings: color.writerSettings(width: width, height: height, codec: .hevcWithAlpha, compression: [AVVideoQualityKey: 0.8]))
         input.expectsMediaDataInRealTime = false
         // The same turn; its move is in pixels of the smaller copy.
         input.transform = CGAffineTransform(
@@ -79,6 +76,7 @@ public nonisolated enum CutoutMaker {
         guard reader.startReading() else { throw reader.error ?? CutoutError.unreadable }
         guard writer.startWriting() else { throw writer.error ?? CutoutError.failed }
 
+        // No colour conversion: the copy keeps the file's own values.
         let context = CIContext(options: [.workingColorSpace: NSNull(), .outputColorSpace: NSNull(), .cacheIntermediates: false])
         let finder = MatteFinder(subject: subject, forVideo: true)
         let small = CGAffineTransform(scaleX: CGFloat(width) / naturalSize.width, y: CGFloat(height) / naturalSize.height)
@@ -117,6 +115,7 @@ public nonisolated enum CutoutMaker {
                 CVPixelBufferPoolCreatePixelBuffer(nil, pool, &made)
                 guard let made else { throw CutoutError.failed }
                 context.render(cut, to: made, bounds: stored, colorSpace: nil)
+                color.tag(made)
                 guard adaptor.append(made, withPresentationTime: time) else { throw writer.error ?? CutoutError.failed }
                 count += 1
                 if count.isMultiple(of: 10) { progress(min((time - range.start).seconds / total, 0.99)) }
