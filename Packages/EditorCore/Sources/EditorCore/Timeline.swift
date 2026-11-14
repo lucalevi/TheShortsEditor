@@ -264,24 +264,24 @@ extension Clip {
         fadeIn = c.contains(.fadeIn) ? try c.decodeTime(forKey: .fadeIn) : .zero
         fadeOut = c.contains(.fadeOut) ? try c.decodeTime(forKey: .fadeOut) : .zero
         volumeKeys = try c.decodeIfPresent([VolumeKey].self, forKey: .volumeKeys) ?? []
-        voiceEffect = try? c.decodeIfPresent(VoiceEffect.self, forKey: .voiceEffect)
-        equalizer = try? c.decodeIfPresent(SoundEQ.self, forKey: .equalizer)
+        voiceEffect = try c.decodeIfPresent(VoiceEffect.self, forKey: .voiceEffect)
+        equalizer = try c.decodeIfPresent(SoundEQ.self, forKey: .equalizer)
         soundDetached = try c.decodeIfPresent(Bool.self, forKey: .soundDetached) ?? false
-        transitionOut = try? c.decodeIfPresent(ClipTransition.self, forKey: .transitionOut)
+        transitionOut = try c.decodeIfPresent(ClipTransition.self, forKey: .transitionOut)
         isFrozen = try c.decodeIfPresent(Bool.self, forKey: .isFrozen) ?? false
         pictureFadeIn = c.contains(.pictureFadeIn) ? try c.decodeTime(forKey: .pictureFadeIn) : .zero
         pictureFadeOut = c.contains(.pictureFadeOut) ? try c.decodeTime(forKey: .pictureFadeOut) : .zero
         smoothSpeed = try c.decodeIfPresent(Bool.self, forKey: .smoothSpeed) ?? true
-        look = (try? c.decodeIfPresent(ClipLook.self, forKey: .look)) ?? ClipLook()
+        look = (try c.decodeIfPresent(ClipLook.self, forKey: .look)) ?? ClipLook()
         steadiness = try c.decodeIfPresent(Double.self, forKey: .steadiness) ?? 0
         styledMotion = try c.decodeIfPresent(Bool.self, forKey: .styledMotion) ?? false
-        speedCurve = try? c.decodeIfPresent(SpeedCurve.self, forKey: .speedCurve)
+        speedCurve = try c.decodeIfPresent(SpeedCurve.self, forKey: .speedCurve)
         smoothSlowMotion = try c.decodeIfPresent(Bool.self, forKey: .smoothSlowMotion) ?? false
-        animationIn = try? c.decodeIfPresent(ClipAnimation.self, forKey: .animationIn)
-        animationOut = try? c.decodeIfPresent(ClipAnimation.self, forKey: .animationOut)
-        effects = (try? c.decodeIfPresent([ClipEffect].self, forKey: .effects)) ?? []
-        cutout = (try? c.decodeIfPresent(ClipCutout.self, forKey: .cutout)) ?? ClipCutout()
-        backgroundColor = (try? c.decodeIfPresent(RGBA.self, forKey: .backgroundColor)) ?? .white
+        animationIn = try c.decodeIfPresent(ClipAnimation.self, forKey: .animationIn)
+        animationOut = try c.decodeIfPresent(ClipAnimation.self, forKey: .animationOut)
+        effects = (try c.decodeIfPresent([ClipEffect].self, forKey: .effects)) ?? []
+        cutout = (try c.decodeIfPresent(ClipCutout.self, forKey: .cutout)) ?? ClipCutout()
+        backgroundColor = (try c.decodeIfPresent(RGBA.self, forKey: .backgroundColor)) ?? .white
     }
 
     public func encode(to encoder: any Encoder) throws {

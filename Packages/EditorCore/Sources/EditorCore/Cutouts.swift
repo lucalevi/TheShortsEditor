@@ -295,10 +295,10 @@ public struct ClipCutout: Codable, Equatable, Hashable, Sendable {
 
     public init(from decoder: any Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
-        removeBackground = try? c.decodeIfPresent(CutoutSubject.self, forKey: .removeBackground)
-        key = try? c.decodeIfPresent(ColorKey.self, forKey: .key)
-        mask = try? c.decodeIfPresent(ClipMask.self, forKey: .mask)
-        blend = (try? c.decodeIfPresent(BlendMode.self, forKey: .blend)) ?? .normal
+        removeBackground = try c.decodeIfPresent(CutoutSubject.self, forKey: .removeBackground)
+        key = try c.decodeIfPresent(ColorKey.self, forKey: .key)
+        mask = try c.decodeIfPresent(ClipMask.self, forKey: .mask)
+        blend = (try c.decodeIfPresent(BlendMode.self, forKey: .blend)) ?? .normal
     }
 
     public func encode(to encoder: any Encoder) throws {

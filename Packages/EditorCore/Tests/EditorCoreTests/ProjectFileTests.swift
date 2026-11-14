@@ -46,7 +46,95 @@ struct ProjectFileTests {
 
     @Test func otherFilesAreUnreadable() {
         #expect(throws: ProjectFile.ReadError.unreadable) { try ProjectFile.decode(Data("hello".utf8)) }
-        #expect(throws: ProjectFile.ReadError.unreadable) { try ProjectFile.decode(Data(#"{"version":1}"#.utf8)) }
+        #expect(throws: ProjectFile.ReadError.unreadable) { try ProjectFile.decode(Data(#"{"name":"x"}"#.utf8)) }
+    }
+
+    /// Changes one value in a saved file's JSON (found by `path`) and reads it back.
+    private func readEdited(_ path: [String], in project: Project = fullProject(), _ change: (inout Any) -> Void) throws -> ProjectFile {
+        let data = try ProjectFile(project: project).encoded()
+        var json: Any = try JSONSerialization.jsonObject(with: data)
+        func edit(_ value: inout Any, _ rest: ArraySlice<String>) {
+            guard let key = rest.first else { return change(&value) }
+            if var dictionary = value as? [String: Any], var inner = dictionary[key] {
+                edit(&inner, rest.dropFirst())
+                dictionary[key] = inner
+                value = dictionary
+            } else if var array = value as? [Any], let index = Int(key), index < array.count {
+                edit(&array[index], rest.dropFirst())
+                value = array
+            }
+        }
+        edit(&json, path[...])
+        return try ProjectFile.decode(JSONSerialization.data(withJSONObject: json))
+    }
+
+    @Test func aValueFromANewerAppIsRefusedNotDropped() throws {
+        // A caption style this version doesn't know: the file isn't opened (so never saved over),
+        // rather than opened with the style quietly reset.
+        do {
+            _ = try readEdited(["project", "captions", "style"]) { $0 = "sparkle" }
+            Issue.record("the file opened")
+        } catch let error as ProjectFile.ReadError {
+            guard case .unknownValue(let detail) = error else {
+                Issue.record("\(error)")
+                return
+            }
+            #expect(detail.hasPrefix("project.captions.style"))
+            #expect(error.localizedDescription.contains("newer version"))
+        }
+        // The same deep inside a clip, which used to be read leniently.
+        do {
+            var p = fullProject()
+            p.timeline.clips[0].transitionOut = ClipTransition(kind: .wipe)
+            _ = try readEdited(["project", "timeline", "clips", "0", "transitionOut", "kind"], in: p) { $0 = "teleport" }
+            Issue.record("the file opened")
+        } catch let error as ProjectFile.ReadError {
+            guard case .unknownValue(let detail) = error else {
+                Issue.record("\(error)")
+                return
+            }
+            #expect(detail.hasPrefix("project.timeline.clips.0.transitionOut.kind"))
+        }
+    }
+
+    @Test func aMissingPartIsDamagedAndSaysWhere() throws {
+        #expect(throws: ProjectFile.ReadError.damaged(detail: "project is missing")) { try ProjectFile.decode(Data(#"{"version":1}"#.utf8)) }
+        do {
+            _ = try readEdited(["project", "titles", "0"]) { value in
+                guard var title = value as? [String: Any] else { return }
+                title["text"] = nil
+                value = title
+            }
+            Issue.record("the file opened")
+        } catch let error as ProjectFile.ReadError {
+            #expect(error == .damaged(detail: "project.titles.0.text is missing"))
+            #expect(error.localizedDescription.contains("wasn't changed"))
+        }
+    }
+
+    @Test func theHomeWindowReadsTheSummary() throws {
+        let p = fullProject()
+        let file = ProjectFile(project: p, name: "Talk", created: Date(timeIntervalSince1970: 100))
+        let listing = try ProjectFile.readListing(file.encoded(compact: true))
+        #expect(listing.name == "Talk")
+        #expect(listing.created == Date(timeIntervalSince1970: 100))
+        #expect(listing.summary.duration == p.duration)
+        #expect(listing.summary.clipCount == 2)
+        // A file saved before summaries existed is read in full instead.
+        var old = file
+        old.summary = nil
+        #expect(try ProjectFile.readListing(old.encoded()).summary == file.summary)
+        #expect(throws: ProjectFile.ReadError.newerVersion) {
+            var newer = file
+            newer.version += 1
+            _ = try ProjectFile.readListing(newer.encoded())
+        }
+    }
+
+    @Test func compactFilesReadTheSame() throws {
+        let file = ProjectFile(project: fullProject(), name: "A")
+        #expect(try ProjectFile.decode(file.encoded(compact: true)) == file)
+        #expect(try file.encoded(compact: true).count < file.encoded().count)
     }
 
     @Test func usedAssetsAreClipsAndMusic() {

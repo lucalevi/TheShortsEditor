@@ -70,6 +70,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationWillTerminate(_ notification: Notification) {
         model?.saveNow()
+        // Saves are written in the background: wait for them before the app goes.
+        ProjectStore.finishSaving()
     }
 
     /// There is only one window, so closing it means being done; this also avoids a running app

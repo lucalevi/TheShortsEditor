@@ -85,6 +85,12 @@ not discarded.
 *Do:* replace `try?` with `try` in all model decoders. For forward compatibility of enums, decode
 unknown cases into an explicit `.unknown(rawValue)` that is written back unchanged. Before
 overwriting a file that was read with any repair, keep a backup (see F4).
+*Done 2026-11-14, with one change of plan:* instead of `.unknown(raw)` cases (which would touch every
+`switch` over every enum), a file with an unknown value refuses to open with a clear message
+(`ReadError.unknownValue`, "made with a newer version, update the app; the file wasn't changed"). A
+file that never opens is never saved over, so nothing is lost; this is also what Final Cut Pro does
+with newer libraries. Verified first against every golden version and all 31 Shorts in the real
+library.
 
 **F2. Decode errors are flattened to "unreadable" (P1).**
 `ProjectFile.decode` (`ProjectFile.swift:60-64`) catches every error and throws

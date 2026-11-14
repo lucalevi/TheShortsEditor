@@ -161,8 +161,8 @@ public struct Shot: Codable, Equatable, Sendable {
         length = try c.decodeTime(forKey: .length)
         title = try c.decodeIfPresent(String.self, forKey: .title)
         isTalking = try c.decodeIfPresent(Bool.self, forKey: .isTalking) ?? false
-        transition = try? c.decodeIfPresent(TransitionKind.self, forKey: .transition)
-        entrance = try? c.decodeIfPresent(MotionAnimation.self, forKey: .entrance)
+        transition = try c.decodeIfPresent(TransitionKind.self, forKey: .transition)
+        entrance = try c.decodeIfPresent(MotionAnimation.self, forKey: .entrance)
         fitsExactly = try c.decodeIfPresent(Bool.self, forKey: .fitsExactly) ?? false
     }
 

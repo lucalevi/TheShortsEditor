@@ -56,11 +56,11 @@ public struct Project: Codable, Equatable, Sendable {
         music = try c.decodeIfPresent(BackgroundMusic.self, forKey: .music)
         overlays = try c.decodeIfPresent([Overlay].self, forKey: .overlays) ?? []
         sounds = try c.decodeIfPresent([SoundClip].self, forKey: .sounds) ?? []
-        look = try? c.decodeIfPresent(FilterChoice.self, forKey: .look)
+        look = try c.decodeIfPresent(FilterChoice.self, forKey: .look)
         markers = try c.decodeIfPresent([Marker].self, forKey: .markers) ?? []
-        style = try? c.decodeIfPresent(ShortStyle.self, forKey: .style)
-        storyboard = try? c.decodeIfPresent(Storyboard.self, forKey: .storyboard)
-        cover = try? c.decodeIfPresent(ShortCover.self, forKey: .cover)
+        style = try c.decodeIfPresent(ShortStyle.self, forKey: .style)
+        storyboard = try c.decodeIfPresent(Storyboard.self, forKey: .storyboard)
+        cover = try c.decodeIfPresent(ShortCover.self, forKey: .cover)
     }
 
     public var duration: CMTime { timeline.duration }
@@ -173,7 +173,7 @@ extension MediaAsset {
         hasVideo = try c.decodeIfPresent(Bool.self, forKey: .hasVideo) ?? true
         isImage = try c.decodeIfPresent(Bool.self, forKey: .isImage) ?? false
         frameRate = try c.decodeIfPresent(Double.self, forKey: .frameRate)
-        reversedFrom = try? c.decodeIfPresent(ReversedSource.self, forKey: .reversedFrom)
+        reversedFrom = try c.decodeIfPresent(ReversedSource.self, forKey: .reversedFrom)
     }
 
     public func encode(to encoder: any Encoder) throws {

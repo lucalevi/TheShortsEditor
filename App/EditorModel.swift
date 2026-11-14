@@ -264,9 +264,11 @@ final class EditorModel {
     @ObservationIgnored var autosaveTask: Task<Void, Never>?
     @ObservationIgnored var hasUnsavedChanges = false
     @ObservationIgnored var didReportSaveError = false
+    /// The open Short's backups, newest first (File ▸ Revert To).
+    var backups: [ProjectStore.Backup] = []
     /// Opening several files from Finder makes SwiftUI create extra windows that stay hidden and
     /// report themselves too, so a hidden window is passed over for a visible one.
-    private var undoManager: UndoManager? {
+    var undoManager: UndoManager? {
         let candidates = [window, NSApp.mainWindow].compactMap(\.self)
         return (candidates.first(where: \.isVisible) ?? candidates.first)?.undoManager
     }
@@ -381,7 +383,9 @@ final class EditorModel {
         replaceProject(with: updated, actionName: actionName)
     }
 
-    private func replaceProject(with new: Project, actionName: String) {
+    /// Replaces the project as one undoable step, as it is (no following of clips): `apply`, and
+    /// reverting to a backup.
+    func replaceProject(with new: Project, actionName: String) {
         guard new != project else { return }
         let old = project
         project = new
@@ -860,6 +864,7 @@ final class EditorModel {
         LivePreview.clearAll()
         typedTitle = nil
         missingAssets = []
+        backups = []
         currentTime = .zero
         undoManager?.removeAllActions()
         for asset in project.assets { loadPreviews(for: asset) }

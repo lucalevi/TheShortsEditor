@@ -23,27 +23,56 @@ extension EditorModel {
 
     /// Writes the open Short to the library now, if anything changed. A Short with nothing in it
     /// isn't kept.
+    ///
+    /// The Short is written in the background (`ProjectStore.save`), from a snapshot taken now;
+    /// `ProjectStore.finishSaving()` waits for it (at quit).
     func saveNow() {
         autosaveTask?.cancel()
         autosaveTask = nil
         guard hasUnsavedChanges, let id = openShortID else { return }
+        hasUnsavedChanges = false
         if !isWorthKeeping {
-            try? FileManager.default.removeItem(at: ProjectStore.fileURL(for: id))
-            hasUnsavedChanges = false
+            ProjectStore.removeFromLibrary(id)
             return
         }
-        do {
-            try ProjectStore.write(project, to: ProjectStore.fileURL(for: id), name: openShortName, created: openShortCreated)
-            hasUnsavedChanges = false
-            didReportSaveError = false
-        } catch {
+        ProjectStore.save(project, id: id, name: openShortName, created: openShortCreated) { [weak self] error in
+            guard let self else { return }
+            guard let error else {
+                didReportSaveError = false
+                if openShortID == id { backups = ProjectStore.backups(for: id) }
+                return
+            }
             Log.file.failure("Saving the open Short", error)
-            // Say it once; keep trying with the next change.
+            // Try again with the next change (or now, if this is still the open Short); say it once.
+            if openShortID == id { hasUnsavedChanges = true }
             if !didReportSaveError {
                 didReportSaveError = true
                 alert = AlertMessage(title: "Your Short couldn't be saved", message: error.localizedDescription)
             }
         }
+    }
+
+    // MARK: Backups
+
+    /// File ▸ Revert To: the open Short goes back to a backup, as one undoable step. The Short as
+    /// it is now is backed up first, so reverting can be undone after quitting, too.
+    func revert(to backup: ProjectStore.Backup) {
+        guard let id = openShortID else { return }
+        saveNow()
+        let reverted: ProjectFile
+        do {
+            reverted = try ProjectStore.readFile(backup.url)
+        } catch {
+            Log.file.failure("Reading a backup", error)
+            alert = AlertMessage(title: "This backup can't be opened", message: error.localizedDescription)
+            return
+        }
+        ProjectStore.backUp(id, when: .always) { [weak self] in
+            guard let self, openShortID == id else { return }
+            backups = ProjectStore.backups(for: id)
+        }
+        replaceProject(with: reverted.project, actionName: "Revert to \(backup.title)")
+        for asset in project.assets { loadPreviews(for: asset) }
     }
 
     func scheduleAutosave() {
@@ -84,6 +113,7 @@ extension EditorModel {
         ProjectStore.moveOldProjectsIntoLibrary()
         // Before any Short is open, so nothing an undo might need is removed.
         ProjectStore.removeUnusedCopies()
+        ProjectStore.removeOrphanedBackups()
         showHome()
     }
 
@@ -93,7 +123,7 @@ extension EditorModel {
         saveNow()
         if let id = openShortID, !isWorthKeeping {
             // A Short left empty isn't kept.
-            try? FileManager.default.removeItem(at: ProjectStore.fileURL(for: id))
+            ProjectStore.removeFromLibrary(id)
         }
         openShortID = nil
         load(Project(), name: "", created: .now)
@@ -123,6 +153,12 @@ extension EditorModel {
         openShortID = id
         load(file.project, name: file.name ?? ShortsLibrary.defaultName, created: file.created ?? .now)
         screen = .editor
+        // How it was before this session, for File ▸ Revert To.
+        backups = ProjectStore.backups(for: id)
+        ProjectStore.backUp(id, when: .changed) { [weak self] in
+            guard let self, openShortID == id else { return }
+            backups = ProjectStore.backups(for: id)
+        }
     }
 
     /// File ▸ Open…: a Short saved as a file is added to the library and opened.
@@ -193,16 +229,47 @@ extension EditorModel {
         alert.addButton(withTitle: "Delete").hasDestructiveAction = true
         alert.addButton(withTitle: "Cancel")
         guard alert.runModal() == .alertFirstButtonReturn else { return }
-        for id in ids { ProjectStore.delete(id) }
+        let deleted = ids.compactMap { ProjectStore.delete($0) }
         refreshShorts()
+        guard !deleted.isEmpty else { return }
+        let actionName = deleted.count == 1 ? "Delete Short" : "Delete \(deleted.count) Shorts"
+        // Registered on the next turn of the main run loop: straight after the alert's modal run
+        // loop, the undo manager's automatic grouping didn't close the step, so Undo stayed disabled.
+        Task { @MainActor in
+            undoManager?.registerUndo(withTarget: self) { model in
+                MainActor.assumeIsolated { model.restoreShorts(deleted, actionName: actionName) }
+            }
+            undoManager?.setActionName(actionName)
+        }
+    }
+
+    /// Undo of deleting Shorts on the home window: they come back, and Redo deletes them again.
+    private func restoreShorts(_ deleted: [ProjectStore.DeletedShort], actionName: String) {
+        for short in deleted {
+            Log.file.attempt("Putting a deleted Short back") { try ProjectStore.restore(short) }
+        }
+        refreshShorts()
+        undoManager?.registerUndo(withTarget: self) { model in
+            MainActor.assumeIsolated {
+                let again = deleted.compactMap { ProjectStore.delete($0.id) }
+                model.refreshShorts()
+                model.undoManager?.registerUndo(withTarget: model) { model in
+                    MainActor.assumeIsolated { model.restoreShorts(again, actionName: actionName) }
+                }
+                model.undoManager?.setActionName(actionName)
+            }
+        }
+        undoManager?.setActionName(actionName)
     }
 
     /// Reads the library again, and makes posters for Shorts that changed since theirs.
     func refreshShorts() {
-        shorts = ProjectStore.libraryEntries()
         posterTask?.cancel()
-        let entries = shorts
         posterTask = Task {
+            // Read off the main thread, after any save still being written.
+            let entries = await ProjectStore.loadLibrary()
+            guard !Task.isCancelled else { return }
+            shorts = entries
             for entry in entries {
                 guard !Task.isCancelled else { return }
                 if posters[entry.id] == nil, let url = ProjectStore.freshPoster(for: entry),

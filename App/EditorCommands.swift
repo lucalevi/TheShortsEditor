@@ -39,6 +39,14 @@ struct EditorCommands: Commands {
                 .keyboardShortcut("s")
                 .disabled(model.screen == .home)
             Button("Save a Copy…") { model.saveCopy() }
+            Menu("Revert To") {
+                ForEach(model.backups) { backup in
+                    Button(backup.title) {
+                        model.revert(to: backup)
+                    }
+                }
+            }
+            .disabled(model.screen == .home || model.backups.isEmpty)
             Button("Cover…") { model.beginCover() }
                 .disabled(model.screen == .home || model.project.timeline.clips.isEmpty)
                 .keyboardShortcut("s", modifiers: [.command, .shift])

@@ -259,11 +259,11 @@ extension TextOverlay {
         duration = try c.decodeTime(forKey: .duration)
         verticalPosition = try c.decode(Double.self, forKey: .verticalPosition)
         followsClip = try c.decodeIfPresent(Bool.self, forKey: .followsClip) ?? true
-        exit = try? c.decodeIfPresent(ClipAnimation.self, forKey: .exit)
-        loop = try? c.decodeIfPresent(TitleLoop.self, forKey: .loop)
+        exit = try c.decodeIfPresent(ClipAnimation.self, forKey: .exit)
+        loop = try c.decodeIfPresent(TitleLoop.self, forKey: .loop)
         rotation = try c.decodeIfPresent(Double.self, forKey: .rotation) ?? 0
-        sticker = try? c.decodeIfPresent(Sticker.self, forKey: .sticker)
-        track = try? c.decodeIfPresent([TrackPoint].self, forKey: .track)
+        sticker = try c.decodeIfPresent(Sticker.self, forKey: .sticker)
+        track = try c.decodeIfPresent([TrackPoint].self, forKey: .track)
     }
 
     public func encode(to encoder: any Encoder) throws {

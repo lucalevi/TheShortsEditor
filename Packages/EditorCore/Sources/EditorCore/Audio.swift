@@ -348,10 +348,10 @@ extension BackgroundMusic {
         lowersUnderSpeech = try c.decode(Bool.self, forKey: .lowersUnderSpeech)
         fadesIn = try c.decode(Bool.self, forKey: .fadesIn)
         fadesOut = try c.decode(Bool.self, forKey: .fadesOut)
-        mood = try? c.decodeIfPresent(MusicMood.self, forKey: .mood)
+        mood = try c.decodeIfPresent(MusicMood.self, forKey: .mood)
         start = c.contains(.start) ? try c.decodeTime(forKey: .start) : .zero
         loops = try c.decodeIfPresent(Bool.self, forKey: .loops) ?? false
-        beats = try? c.decodeIfPresent([Beat].self, forKey: .beats)
+        beats = try c.decodeIfPresent([Beat].self, forKey: .beats)
         showsBeats = try c.decodeIfPresent(Bool.self, forKey: .showsBeats) ?? false
     }
 

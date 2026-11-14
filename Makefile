@@ -4,7 +4,9 @@ XCODEBUILD := xcodebuild -project TheShortsEditor.xcodeproj -scheme TheShortsEdi
 # Warnings fail the build in `check` (and so in CI and the pre-push hook).
 STRICT := SWIFT_TREAT_WARNINGS_AS_ERRORS=YES GCC_TREAT_WARNINGS_AS_ERRORS=YES
 
-.PHONY: project open build release run test check format format-check lint lint-baseline tsan asan analyze hooks clean help
+LIBRARY := $(HOME)/Library/Containers/com.lucalevi.TheShortsEditor/Data/Library/Application Support/Shorts Editor/Shorts
+
+.PHONY: project open build release run test check check-library format format-check lint lint-baseline tsan asan analyze hooks clean help
 
 help:               ## List the targets
 	@grep -E '^[a-z-]+:.*##' $(MAKEFILE_LIST) | sed -E 's/:.*## /\t/' | expand -t 20
@@ -34,6 +36,9 @@ check: format-check lint ## Format, lint, tests and both builds, all strict
 	$(MAKE) project
 	$(XCODEBUILD) -configuration Debug -derivedDataPath build $(STRICT) build
 	$(XCODEBUILD) -configuration Release -derivedDataPath build/release $(STRICT) build
+
+check-library:      ## Read every Short in this Mac's library with today's code (read-only); before changing how files are read
+	cd Packages/EditorCore && SHORTS_LIBRARY="$(LIBRARY)" swift test --filter LibraryCompatibilityTests
 
 format:             ## Format every Swift file in place (.swift-format)
 	swift format --in-place --parallel --recursive $(SOURCES)
