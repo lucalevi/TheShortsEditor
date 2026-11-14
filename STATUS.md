@@ -1,6 +1,6 @@
 # Project status
 
-_Last updated: 2026-11-13 (unverified on-screen items, pass 1: two fixes, not committed yet). Read this first when picking the project back up, then update it at the end of each session._
+_Last updated: 2026-11-14 (engineering-excellence research written; its 8 phases are now the plan, see "Engineering excellence: phases 1–8"). Read this first when picking the project back up, then update it at the end of each session._
 
 ## Where we are
 
@@ -16,7 +16,11 @@ Stages 1–7 are done, tested on screen, committed and pushed to https://github.
 | 6 | Audio: clip volume, music with ducking, loudness on export | 2026-11-09 |
 | 7 | Save/open projects, autosave, missing media | 2026-11-09 |
 
-**Pick up here (2026-11-13, latest): "Not yet verified on screen" items, pass 1 (not committed yet).** Made "My Short 31" through the UI (menus by name via System Events, clicks with `ui.sh`) with almost every kind of layer, exported it twice from the app and checked the MP4s (H.264 High, no B-frames, 1080×1920, 30 fps, −14.0/−14.5 LUFS with −1.0 dB peak, sound and picture the same length, frames sampled at each feature). Verified now:
+**Pick up here (2026-11-14, latest): engineering excellence.** The user wants the software raised from "works well" to professional, Final Cut Pro-level engineering before more features. I audited the code and wrote `research/engineering-excellence.md`: what "outstanding" means (trust, responsiveness, correctness, platform fit, maintainability, shipping), what is already strong, **32 findings (F1–F32)** with file/line evidence and priorities (P0 = can lose work or ship wrong pictures), a benchmark against Final Cut Pro, an **8-phase roadmap** and a **definition of done** for every future change. Baseline: `make test` = 436 tests in 74 suites, all pass (~80 s). Nothing in the code was changed yet.
+- P0 findings: **F1** model decoders use `try?`, so a field that fails to decode silently resets and autosave overwrites the good file; **F3** no golden files of old format versions (format is v8); **F8** no colour management (Core Image contexts with `NSNull` colour spaces, 8-bit BGRA) and HDR iPhone footage (HLG/Dolby Vision) isn't handled deliberately (suspected washed-out/clipped exports, **not yet verified** with a real HDR clip).
+- **Next: Phase 1 (safety net)**, then phases 2–8 in order. The checklist is in "Engineering excellence: phases 1–8" below; tick items there as they are done. On-screen dogfooding (item 19 of "What's next") is paused until the user says otherwise.
+
+**Before that (2026-11-13): "Not yet verified on screen" items, pass 1 (committed and pushed, 8870268).** Made "My Short 31" through the UI (menus by name via System Events, clicks with `ui.sh`) with almost every kind of layer, exported it twice from the app and checked the MP4s (H.264 High, no B-frames, 1080×1920, 30 fps, −14.0/−14.5 LUFS with −1.0 dB peak, sound and picture the same length, frames sampled at each feature). Verified now:
 - Export with: a look (Film) + effect (Glitch) on a main clip, a speed curve (Hero: 6.0 → 4.5 s) + Spin entrance, a green-screen key (black behind), a dissolve on every cut (Clip ▸ Transition ▸ Same on Every Cut), app music lowered under speech (Upbeat), an emoji sticker, the Subscribe ready-made text (pill + bell), B-roll with a Heart shape, Difference blend, Zoom Pulse and a Slide Up entrance, a freeze frame of the keyed clip (keeps the key).
 - Markers: M twice, Playback ▸ Next/Previous Marker (0:05.2 → 0:10.2 → 0:05.2). Beats by hand: Sound ▸ Show Beats, Add Beat at Playhead (app music's tempo beats are written out, 362 + 1), Remove Beat at Playhead (back to 362). Effect timing on B-roll (Whole clip / At the start / At the end, Length appears). Mask Size slider dragged: the viewer follows while dragging. Blend pop-up (Difference).
 - Fixed: **"Around it" said Blurred on a cut-out clip** while black is drawn; the picker now shows Black and offers only Black and Colour for a see-through clip (`PictureInspector.shownBackground`). **The selected title's box stayed on the viewer while skimming elsewhere** (it followed the playhead, not the frame shown); it now uses `skimTime ?? currentTime`.
@@ -386,6 +390,7 @@ Features 1–5 (2026-11-09, on the test Short): picture opened from Finder (3 s 
 - Support all kinds of footage, with **very friendly, intuitive UX** as the top requirement.
 - Repo is public on GitHub.
 - **Direction (2026-11-12): iMovie's look and feel, CapCut's features.** New features come from the CapCut list (stages G–L), shaped to iMovie's grammar.
+- **Quality (2026-11-14): professional, Final Cut Pro-level engineering before more features.** Work follows `research/engineering-excellence.md` (phases 1–8); every change meets its definition of done (§7). Kept on purpose (§5): snapshot undo of a value-type project, the library in Application Support (not `NSDocument`), rebuilding from the model, the fixed 1080×1920 30 fps canvas.
 
 ## What's next, in order
 
@@ -411,6 +416,71 @@ The P0 list from `research/shorts-editor-research.md` §5. Each stage ends with 
 18. ~~Known gaps~~ (done 2026-11-13, committed 1757bcc): first import undoable, titles while typing, extra songs lowered under speech, sentence translation, more split layouts, pause length and voice-only pauses.
 19. **Automated dogfooding** (2026-11-13, user's choice: I drive the app, the user doesn't test by hand yet): pass 1 done (three Shorts made and exported, six fixes); export edit-lists check done (B-frames off); unverified on-screen items pass 1 done (two fixes, one open layout bug); then the rest of the unverified on-screen items, golden export tests.
 20. **Later:** the user making real Shorts in the app (dogfooding), then features chosen from what is missing. Ask the user (see "Not yet verified on screen" in each stage, and the "Later" items in `research/capcut/capcut-reverse-engineering.md` §5).
+21. **Engineering excellence (decided 2026-11-14, now the current work):** phases 1–8 from `research/engineering-excellence.md` §6, checklist in "Engineering excellence: phases 1–8" below. Every change from now on meets the definition of done (research §7).
+
+## Engineering excellence: phases 1–8 (to do, decided 2026-11-14)
+
+**Source:** `research/engineering-excellence.md` (F-numbers refer to its findings, with file/line evidence and the reasoning). **Rule:** each phase is a few sessions; each ends with `make test` green, an on-screen check where the UI changed, a summary, and a commit only when the user says so. Tick items here as they are done.
+
+| Phase | What | State |
+|---|---|---|
+| 1 | Safety net: CI, format/lint, logging, golden files | **next** |
+| 2 | Never lose work | to do |
+| 3 | Correct pictures (colour, HDR, media matrix) | to do |
+| 4 | Architecture (split `EditorModel`, no global state) | to do |
+| 5 | Tests for the app (unit, UI, snapshots, coverage) | to do |
+| 6 | Responsiveness (budgets, incremental rebuilds) | to do |
+| 7 | Platform fit (accessibility, localization, Mac conventions) | to do |
+| 8 | Ship (Developer ID, notarization, updates, diagnostics) | to do |
+
+### Phase 1: safety net
+- [ ] F28 CI: a `make check` target (tests + Debug and Release builds + lint) and a `git pre-push` hook running it; then a self-hosted GitHub Actions runner on this Mac (hosted runners lack Xcode 27, which is why CI was removed on 2026-11-13). Warnings as errors in CI.
+- [ ] F29 swift-format (checked-in config) + SwiftLint (no `print`, no `try?` in model decoders, length limits), in `make check`
+- [ ] F21 (first half) `os.Logger` categories (file, import, render, export, audio, captions, jobs); remove the `print` in `App/Storage.swift`; log failures now hidden by `try?` on important paths
+- [ ] F3 golden `.shortsproject` files for format versions 2–8 with a test each; an "every field set, round-trips" test for `Clip`, `Project`, `TextOverlay` and friends
+- [ ] F30 align `SWIFT_VERSION` (project.yml 6.0 vs package tools 6.2); sanitizer and analyzer in a test scheme
+
+### Phase 2: never lose work
+- [ ] F1 no `try?` in model decoders; unknown enum cases kept as `.unknown(raw)` and written back unchanged
+- [ ] F2 `ProjectFile.ReadError.unreadable` keeps the underlying `DecodingError`; logged with its coding path
+- [ ] F4 rolling backups per Short (last 10 + one a day for a week) in `Application Support/Shorts Editor/Backups/<id>/`; File ▸ Revert To ▸ …
+- [ ] F5 atomic writes only for library files; safe write for Save a Copy
+- [ ] F6 save off the main thread (encode snapshot, write in background, no pretty-printing for library files); home window reads a small summary instead of decoding every project
+- [ ] F7 deleting a Short undoable on the home window
+
+### Phase 3: correct pictures
+- [ ] F10 fixture matrix: HLG, Dolby Vision, 10-bit, variable frame rate, 25/60/120 fps, rotated, 4K HEVC, 44.1 kHz, mono, no audio track, long file; composition + export tests over all of it
+- [ ] F8 explicit colour management: composition colour properties set, a real Core Image working colour space, overlays converted from sRGB; HDR→SDR verified against a reference; later optional HDR export (10-bit HEVC, HLG, `supportsHDRSourceFrames`)
+- [ ] F9 float working buffers (`64RGBAHalf`) measured with the signposts
+
+### Phase 4: architecture
+- [ ] F14 split `EditorModel` (~450 properties, ~320 functions): `BackgroundTasks` first (one `Job` type for all long work, plus a Background Tasks window ⌘9), then `PlaybackController`, `LibraryModel`, feature models; injected through the environment
+- [ ] F15 no process-wide mutable state (`LivePreview`, `ProjectStore.bookmarks`, `AudioProbe.measured`, `Stabilizer.known`)
+- [ ] F23 security-scoped access balanced: a `MediaAccess` owned by the open Short (9 starts vs 6 stops today)
+- [ ] F16 rename history-named files by feature (`Batch2Inspectors`, `EditorModel+Batch2`, `SecondBatchTests`, `SecondBatchRenderTests`)
+- [ ] F17 `EditorCore` internal by default (~1,280 `public` today)
+
+### Phase 5: tests for the app
+- [ ] F18 app unit-test target (controllers with a fake player and in-memory store); XCUITest target for import → edit → undo/redo → export, missing media, autosave after a forced quit, plus `performAccessibilityAudit()`; compositor snapshot tests (golden PNGs); coverage floor
+- [ ] F19 performance tests run on a schedule, numbers tracked
+- [ ] F20 cancellation/concurrency stress tests under Thread Sanitizer
+
+### Phase 6: responsiveness
+- [ ] F12 performance budgets as failing tests (rebuild, frame draw, save, library of 200 Shorts, long transcripts); MetricKit hang reports
+- [ ] F11 incremental rebuilds / reuse of the player item where measurements show the need (never by mutating AVFoundation objects)
+- [ ] F13 bounded undo (`levelsOfUndo`), memory checked after a long session
+
+### Phase 7: platform fit
+- [ ] F25 timeline, viewer handles and volume lines accessible (labels, values, custom actions); Reduce Motion, Increase Contrast, Differentiate Without Color (the user works with a B&W filter)
+- [ ] F26 `Localizable.xcstrings`; `String(localized:)` outside views; plural variations; no display text as raw values; Italian first
+- [ ] F27 app icon, Help, state restoration, Quick Look thumbnails for `.shortsproject`, several Shorts in several windows (needs F15)
+- [ ] F22 typed errors with recovery buttons instead of `AlertMessage(String, String)`
+
+### Phase 8: ship
+- [ ] F32 Developer ID (still to be decided, 99 USD/yr), notarization + stapling, signed `.dmg`, Sparkle updates, semantic versions, privacy manifest, `make release`
+- [ ] F21 (second half) MetricKit crash/hang reports; Help ▸ Report a Problem… (log + project structure, no media)
+- [ ] F31 `STATUS.md` kept short, history to `CHANGELOG.md`, decisions as ADRs in `docs/adr/`, DocC from the `///` comments
+- [ ] F24 per-Short "Delete Generated Files"
 
 ## CapCut list: stages G–L (to do, decided 2026-11-12)
 
@@ -473,6 +543,9 @@ Why first: the user asked for it, and their real CapCut Short ("Studiare per la 
 - Should the editor link exported Shorts to `channel_lab` plans (`~/Documents/Programming/YouTube`)? Recommended: not now; maybe later.
 
 ## Known limitations / tech debt
+
+The engineering-quality debt (silent decode fallbacks, no backups, no colour management, `EditorModel` size, no logging, no app tests, no localization…) is listed and planned in "Engineering excellence: phases 1–8" above; the items below are product limitations.
+
 
 - Undo was silently broken before 2026-11-08: opening files from Finder briefly creates a second window, and the model had attached to its undo manager. Now the model asks its window (re-set each time the window becomes active) for the undo manager at every edit.
 - Captions: a whole source file is transcribed even if only part of it is used (fine for Short-length clips, slow for long ones). Lines are grouped by length/pauses/sentence ends, plus the user's splits and joins. Captions move only up/down as a whole (no per-caption position). The test sample is a synthetic voice, so accuracy on real, noisy recordings is untested.

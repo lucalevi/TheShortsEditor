@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-TheShortsEditor ("Shorts Editor") is a native macOS 26+ video editor for **YouTube Shorts only**: a CapCut-like app with the ~20% of features that make ~80% of a good Short. Being very friendly and intuitive is the top requirement. Research is in `research/shorts-editor-research.md`. **`STATUS.md` holds the current state: what's done, what's next, open questions, and how to test on screen.** Read it at the start of a session and update it at the end.
+TheShortsEditor ("Shorts Editor") is a native macOS 26+ video editor for **YouTube Shorts only**: a CapCut-like app with the ~20% of features that make ~80% of a good Short. Being very friendly and intuitive is the top requirement. Research is in `research/shorts-editor-research.md`. The engineering standard (audit, phases 1–8, definition of done for every change) is `research/engineering-excellence.md`. **`STATUS.md` holds the current state: what's done, what's next, open questions, and how to test on screen.** Read it at the start of a session and update it at the end.
 
 ## Building
 
