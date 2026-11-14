@@ -153,7 +153,7 @@ private struct EffectRow: View {
     }
 
     private func slider(_ name: String, value: Double, in range: ClosedRange<Double>, label: String,
-                        change: @escaping (Double) -> Void, done: @escaping () -> Void) -> some View {
+                        change: @escaping @MainActor (Double) -> Void, done: @escaping () -> Void) -> some View {
         HStack {
             Text(name).font(.caption).frame(width: 52, alignment: .leading)
             Slider(value: Binding(get: { value }, set: change), in: range) { editing in if !editing { done() } }

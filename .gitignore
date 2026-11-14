@@ -7,3 +7,5 @@ Tools/uitest/.bin/
 Tools/uitest/.shots/
 Tools/uitest/.samples/
 Tools/uitest/.exports/
+.build-tsan/
+.build-asan/

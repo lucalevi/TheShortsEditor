@@ -341,9 +341,12 @@ Doing (b) immediately costs nothing and can be combined with (a).
 checked-in configuration, plus SwiftLint for rules such as "no `try?` on model decode", "no
 `print`", file and type length limits. Run both in CI and in a pre-commit hook.
 
-**F30. Build settings (P2).** `project.yml` says `SWIFT_VERSION: "6.0"` while the package uses tools
-6.2; align them. Turn on "Treat warnings as errors" in CI, the Address and Thread sanitizers in a
-test scheme, and Xcode's static analyzer.
+**F30. Build settings (P2).** Turn on "Treat warnings as errors" in CI, the Address and Thread
+sanitizers in a test run, and Xcode's static analyzer. (Corrected 2026-11-14: `SWIFT_VERSION: "6.0"`
+in `project.yml` is the Swift *language mode* and `swift-tools-version: 6.2` in `Package.swift` is
+the *package manifest* version, so they were never mismatched; `project.yml` now says `"6"` for
+clarity.) The Release build had 9 warnings, one of them a real bug: in `CaptionTextField` a cast the
+compiler reported as "always fails", which an optimised build may drop (⌘↩ and click-outside).
 
 **F31. `STATUS.md` is 537 lines (P2).** It has become a journal. Keep it short (state, next steps,
 open questions), move history into `CHANGELOG.md` and decisions into short Architecture Decision

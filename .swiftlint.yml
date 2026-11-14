@@ -1,0 +1,89 @@
+# SwiftLint: rules that catch mistakes. Layout is swift-format's job (.swift-format), so the
+# layout rules are off here. Existing violations are kept in .swiftlint-baseline.json and only new
+# ones fail (`make lint`); remove entries from the baseline as code is fixed, never add to it by hand.
+included:
+  - App
+  - Packages/EditorCore/Sources
+  - Packages/EditorCore/Tests
+  - Tools
+excluded:
+  - Packages/EditorCore/.build
+  - Packages/EditorCore/.build-tsan
+  - Packages/EditorCore/.build-asan
+  - build
+
+disabled_rules:
+  # Layout: swift-format decides.
+  - trailing_comma
+  - opening_brace
+  - closure_parameter_position
+  - vertical_parameter_alignment
+  - comma
+  - colon
+  - statement_position
+  - trailing_whitespace
+  - vertical_whitespace
+  # Short names (p, c, t, x, y) are used deliberately in maths and tests.
+  - identifier_name
+  - type_name
+  # Tuples of three are used for small, local results.
+  - large_tuple
+  # `case .a: x` on one line is the house style for short switches.
+  - switch_case_alignment
+  - nesting
+  - todo
+  # `= nil` defaults are needed for memberwise initialisers to treat a field as optional.
+  - implicit_optional_initialization
+  # `t = t + step` on CMTime reads better than `t += step` in the time maths.
+  - shorthand_operator
+
+opt_in_rules:
+  - empty_count
+  - first_where
+  - last_where
+  - contains_over_filter_count
+  - contains_over_first_not_nil
+  - sorted_first_last
+  - redundant_nil_coalescing
+  - discouraged_optional_boolean
+  - fatal_error_message
+  - unowned_variable_capture
+  - private_swiftui_state
+
+line_length:
+  warning: 160
+  error: 200
+  ignores_comments: true
+  ignores_urls: true
+file_length:
+  warning: 600
+  error: 1000
+type_body_length:
+  warning: 400
+  error: 800
+function_body_length:
+  warning: 80
+  error: 150
+cyclomatic_complexity:
+  warning: 15
+  error: 30
+
+custom_rules:
+  no_print:
+    name: "No print"
+    regex: '(?<![\w.])print\('
+    match_kinds: [identifier]
+    message: "Use Log (EditorCore/Log.swift), not print."
+    included: '^.*/(App|Packages/EditorCore/Sources)/.*\.swift$'
+    severity: error
+  no_try_optional_in_decoder:
+    name: "No try? in decoders"
+    regex: 'try\? c\.decode'
+    message: "A field that fails to decode must not silently reset (research F1): use try."
+    severity: error
+  no_userdefaults_string_keys:
+    name: "UserDefaults keys in one place"
+    regex: 'UserDefaults\.standard\.(set|bool|object|string|array|data|integer|double|removeObject)\([^)]*forKey: "'
+    message: "Name UserDefaults keys once (a constant), not as string literals at each use."
+    included: '^.*/(App|Packages/EditorCore/Sources)/.*\.swift$'
+    severity: warning

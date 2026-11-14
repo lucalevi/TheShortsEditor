@@ -433,6 +433,7 @@ final class EditorModel {
                 do {
                     probed.append(try await MediaProbe.probe(url))
                 } catch {
+                    Log.media.failure("Reading a file to add", error)
                     failures.append(url.lastPathComponent)
                 }
             }
@@ -710,6 +711,7 @@ final class EditorModel {
             } catch is CancellationError {
                 // The user stopped it; nothing changes.
             } catch {
+                Log.captions.failure("Making captions", error)
                 if !quietly { alert = AlertMessage(title: "Captions couldn't be made", message: error.localizedDescription) }
             }
         }
@@ -893,6 +895,7 @@ final class EditorModel {
                 remakeMissingStyleMusic()
             } catch {
                 guard !Task.isCancelled else { return }
+                Log.render.failure("Building the Short for playback", error)
                 alert = AlertMessage(title: "Playback problem", message: error.localizedDescription)
             }
         }

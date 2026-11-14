@@ -18,7 +18,7 @@ enum ProjectStore {
     /// The app's own folder in its container.
     static var appFolder: URL {
         let folder = URL.applicationSupportDirectory.appending(path: "Shorts Editor", directoryHint: .isDirectory)
-        try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        Log.file.attempt("Making the app's folder") { try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true) }
         return folder
     }
 
@@ -65,7 +65,9 @@ enum ProjectStore {
         for asset in project.assets {
             guard let data = file.bookmarks[asset.id] else { continue }
             var stale = false
-            guard let resolved = try? URL(resolvingBookmarkData: data, options: .withSecurityScope, relativeTo: nil, bookmarkDataIsStale: &stale) else {
+            guard let resolved = Log.file.attempt("Finding a Short's media file", {
+                try URL(resolvingBookmarkData: data, options: .withSecurityScope, relativeTo: nil, bookmarkDataIsStale: &stale)
+            }) else {
                 bookmarks[asset.url] = data
                 continue
             }
@@ -82,7 +84,9 @@ enum ProjectStore {
 
     private static func bookmark(for url: URL) -> Data? {
         if let known = bookmarks[url] { return known }
-        guard let data = try? url.bookmarkData(options: .withSecurityScope, includingResourceValuesForKeys: nil, relativeTo: nil) else { return nil }
+        guard let data = Log.file.attempt("Making a bookmark for a media file", {
+            try url.bookmarkData(options: .withSecurityScope, includingResourceValuesForKeys: nil, relativeTo: nil)
+        }) else { return nil }
         bookmarks[url] = data
         return data
     }
@@ -92,7 +96,7 @@ enum ProjectStore {
     /// Where every Short is kept: one project file per Short, named by its id, and its poster.
     static var libraryFolder: URL {
         let folder = appFolder.appending(path: "Shorts", directoryHint: .isDirectory)
-        try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        Log.file.attempt("Making the library folder") { try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true) }
         return folder
     }
 
@@ -110,8 +114,8 @@ enum ProjectStore {
         return files.compactMap { url -> ShortEntry? in
             guard url.pathExtension == ProjectFile.fileExtension,
                   let id = UUID(uuidString: url.deletingPathExtension().lastPathComponent),
-                  let data = try? Data(contentsOf: url),
-                  let file = try? ProjectFile.decode(data) else { return nil }
+                  let file = Log.file.attempt("Reading a Short for the home window", { try ProjectFile.decode(Data(contentsOf: url)) })
+            else { return nil }
             let modified = (try? url.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .now
             return ShortEntry(id: id, name: file.name ?? ShortsLibrary.defaultName, created: file.created ?? modified,
                               modified: modified, duration: file.project.duration,
@@ -140,9 +144,10 @@ enum ProjectStore {
     static func delete(_ id: UUID) {
         let url = fileURL(for: id)
         if (try? FileManager.default.trashItem(at: url, resultingItemURL: nil)) == nil {
-            try? FileManager.default.removeItem(at: url)
+            // The sandbox may not allow the Trash: remove it instead.
+            Log.file.attempt("Deleting a Short") { try FileManager.default.removeItem(at: url) }
         }
-        try? FileManager.default.removeItem(at: posterURL(for: id))
+        Log.file.attempt("Deleting a Short's poster") { try FileManager.default.removeItem(at: posterURL(for: id)) }
     }
 
     /// Changes only the name saved in a Short's file.
@@ -160,7 +165,7 @@ enum ProjectStore {
         file.created = .now
         let copy = UUID()
         try file.encoded().write(to: fileURL(for: copy), options: .atomic)
-        try? FileManager.default.copyItem(at: posterURL(for: id), to: posterURL(for: copy))
+        Log.file.attempt("Copying a Short's poster") { try FileManager.default.copyItem(at: posterURL(for: id), to: posterURL(for: copy)) }
         return copy
     }
 
@@ -187,7 +192,7 @@ enum ProjectStore {
         var names = libraryEntries().map(\.name)
         let recents = (defaults.array(forKey: "RecentProjects") as? [Data] ?? []).compactMap(resolve)
         for url in recents {
-            if let id = try? importProject(at: url, existingNames: names) {
+            if let id = Log.file.attempt("Moving an old project into the library", { try importProject(at: url, existingNames: names) }) {
                 names.append((try? ProjectFile.decode(Data(contentsOf: fileURL(for: id))))?.name ?? "")
             }
         }

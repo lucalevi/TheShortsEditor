@@ -1,0 +1,519 @@
+{
+  "bookmarks" : [
+    "5F3BC4E1-E4D6-4561-8B5D-59B8ACBF3A24",
+    "AQID"
+  ],
+  "created" : 821692800,
+  "name" : "Golden",
+  "project" : {
+    "assets" : [
+      {
+        "displaySize" : [
+          1080,
+          1920
+        ],
+        "duration" : {
+          "timescale" : 1,
+          "value" : 10
+        },
+        "hasAudio" : true,
+        "hasVideo" : true,
+        "id" : "5F3BC4E1-E4D6-4561-8B5D-59B8ACBF3A24",
+        "isImage" : false,
+        "name" : "talk.mov",
+        "url" : "file:\/\/\/golden\/talk.mov"
+      },
+      {
+        "displaySize" : [
+          0,
+          0
+        ],
+        "duration" : {
+          "timescale" : 1,
+          "value" : 60
+        },
+        "hasAudio" : true,
+        "hasVideo" : false,
+        "id" : "65A48DD9-0747-45AD-A147-5227159AEF4B",
+        "isImage" : false,
+        "name" : "song.m4a",
+        "url" : "file:\/\/\/golden\/song.m4a"
+      },
+      {
+        "displaySize" : [
+          1080,
+          1920
+        ],
+        "duration" : {
+          "timescale" : 1,
+          "value" : 5
+        },
+        "hasAudio" : true,
+        "hasVideo" : true,
+        "id" : "B6A8E3AA-63F8-4FE5-9AAB-40BBB0813E1C",
+        "isImage" : false,
+        "name" : "unused.mov",
+        "url" : "file:\/\/\/golden\/unused.mov"
+      },
+      {
+        "displaySize" : [
+          3000,
+          4000
+        ],
+        "duration" : {
+          "timescale" : 1,
+          "value" : 3600
+        },
+        "hasAudio" : false,
+        "hasVideo" : true,
+        "id" : "E85231AD-0F2B-4B87-89BA-A8FA5B380E01",
+        "isImage" : true,
+        "name" : "photo.jpg",
+        "url" : "file:\/\/\/golden\/photo.jpg"
+      },
+      {
+        "displaySize" : [
+          1080,
+          1920
+        ],
+        "duration" : {
+          "timescale" : 1,
+          "value" : 8
+        },
+        "hasAudio" : true,
+        "hasVideo" : true,
+        "id" : "B56F08AD-2F2F-4E03-B0B6-130E0BBD7A81",
+        "isImage" : false,
+        "name" : "broll.mov",
+        "url" : "file:\/\/\/golden\/broll.mov"
+      },
+      {
+        "displaySize" : [
+          0,
+          0
+        ],
+        "duration" : {
+          "timescale" : 1,
+          "value" : 3
+        },
+        "hasAudio" : true,
+        "hasVideo" : false,
+        "id" : "715A021E-BAE6-4F96-ACC8-BBDC51FF7A0C",
+        "isImage" : false,
+        "name" : "voice.m4a",
+        "url" : "file:\/\/\/golden\/voice.m4a"
+      }
+    ],
+    "captions" : {
+      "isVisible" : true,
+      "showsEmoji" : true,
+      "showsKeywords" : true,
+      "sizeScale" : 1,
+      "style" : "highlight",
+      "verticalPosition" : 0.66
+    },
+    "music" : {
+      "assetID" : "65A48DD9-0747-45AD-A147-5227159AEF4B",
+      "fadesIn" : true,
+      "fadesOut" : true,
+      "lowersUnderSpeech" : true,
+      "sourceStart" : {
+        "timescale" : 30,
+        "value" : 150
+      },
+      "volume" : 0.5
+    },
+    "overlays" : [
+      {
+        "clip" : {
+          "assetID" : "B56F08AD-2F2F-4E03-B0B6-130E0BBD7A81",
+          "background" : "blur",
+          "cleansVoice" : false,
+          "duration" : {
+            "timescale" : 30,
+            "value" : 120
+          },
+          "framing" : "fill",
+          "id" : "BF2758BC-7EBA-482C-9C80-6D6CCD655EEA",
+          "isMuted" : true,
+          "keyframes" : [
+
+          ],
+          "placement" : {
+            "offsetX" : 0,
+            "offsetY" : 0,
+            "rotation" : 0,
+            "scale" : 1
+          },
+          "sourceStart" : {
+            "timescale" : 1,
+            "value" : 0
+          },
+          "speed" : 1,
+          "volume" : 1
+        },
+        "followsClip" : true,
+        "layout" : "top",
+        "start" : {
+          "timescale" : 30,
+          "value" : 30
+        }
+      }
+    ],
+    "sounds" : [
+      {
+        "clip" : {
+          "assetID" : "715A021E-BAE6-4F96-ACC8-BBDC51FF7A0C",
+          "background" : "blur",
+          "cleansVoice" : false,
+          "duration" : {
+            "timescale" : 30,
+            "value" : 90
+          },
+          "framing" : "fill",
+          "id" : "832AD38F-55B6-45CC-978F-EAB83A5444B4",
+          "isMuted" : false,
+          "keyframes" : [
+
+          ],
+          "placement" : {
+            "offsetX" : 0,
+            "offsetY" : 0,
+            "rotation" : 0,
+            "scale" : 1
+          },
+          "sourceStart" : {
+            "timescale" : 1,
+            "value" : 0
+          },
+          "speed" : 1,
+          "volume" : 1
+        },
+        "followsClip" : true,
+        "isVoiceOver" : true,
+        "start" : {
+          "timescale" : 30,
+          "value" : 60
+        }
+      }
+    ],
+    "timeline" : {
+      "clips" : [
+        {
+          "assetID" : "5F3BC4E1-E4D6-4561-8B5D-59B8ACBF3A24",
+          "background" : "blur",
+          "cleansVoice" : true,
+          "duration" : {
+            "timescale" : 30,
+            "value" : 30
+          },
+          "framing" : "fit",
+          "id" : "C2A227A3-B136-419D-9845-3C587978E45D",
+          "isMuted" : false,
+          "keyframes" : [
+            {
+              "easing" : "smooth",
+              "id" : "BF00B854-6B77-4CFE-B4FB-5DB06BA6C536",
+              "placement" : {
+                "offsetX" : 0,
+                "offsetY" : 0,
+                "rotation" : 0,
+                "scale" : 1
+              },
+              "time" : {
+                "timescale" : 1,
+                "value" : 0
+              }
+            },
+            {
+              "easing" : "smooth",
+              "id" : "CCBE9C14-4F8B-440E-8B40-641C1639D783",
+              "placement" : {
+                "offsetX" : 0,
+                "offsetY" : 0,
+                "rotation" : 0,
+                "scale" : 1.5
+              },
+              "time" : {
+                "timescale" : 1,
+                "value" : 2
+              }
+            }
+          ],
+          "placement" : {
+            "offsetX" : 0.1,
+            "offsetY" : -0.05,
+            "rotation" : 5,
+            "scale" : 1.3
+          },
+          "sourceStart" : {
+            "timescale" : 1,
+            "value" : 0
+          },
+          "speed" : 1,
+          "volume" : 1,
+          "volumeKeys" : [
+            {
+              "id" : "0F49E230-9F58-4D08-82B9-DDE966D617A2",
+              "level" : 0.5,
+              "time" : {
+                "timescale" : 1,
+                "value" : 1
+              }
+            }
+          ]
+        },
+        {
+          "assetID" : "5F3BC4E1-E4D6-4561-8B5D-59B8ACBF3A24",
+          "background" : "blur",
+          "cleansVoice" : false,
+          "duration" : {
+            "timescale" : 30,
+            "value" : 90
+          },
+          "framing" : "fit",
+          "id" : "425F5299-F372-41C0-8F5C-C88FCF9E0C68",
+          "isFrozen" : true,
+          "isMuted" : false,
+          "keyframes" : [
+
+          ],
+          "placement" : {
+            "offsetX" : 0,
+            "offsetY" : 0,
+            "rotation" : 0,
+            "scale" : 1.224744871391589
+          },
+          "sourceStart" : {
+            "timescale" : 30,
+            "value" : 30
+          },
+          "speed" : 1,
+          "volume" : 1
+        },
+        {
+          "assetID" : "5F3BC4E1-E4D6-4561-8B5D-59B8ACBF3A24",
+          "background" : "blur",
+          "cleansVoice" : true,
+          "duration" : {
+            "timescale" : 30,
+            "value" : 90
+          },
+          "framing" : "fit",
+          "id" : "BD0F7B50-134B-45BC-8E81-979E2B49A446",
+          "isMuted" : false,
+          "keyframes" : [
+            {
+              "easing" : "smooth",
+              "id" : "BF00B854-6B77-4CFE-B4FB-5DB06BA6C536",
+              "placement" : {
+                "offsetX" : 0,
+                "offsetY" : 0,
+                "rotation" : 0,
+                "scale" : 1
+              },
+              "time" : {
+                "timescale" : 1,
+                "value" : 0
+              }
+            },
+            {
+              "easing" : "smooth",
+              "id" : "CCBE9C14-4F8B-440E-8B40-641C1639D783",
+              "placement" : {
+                "offsetX" : 0,
+                "offsetY" : 0,
+                "rotation" : 0,
+                "scale" : 1.5
+              },
+              "time" : {
+                "timescale" : 1,
+                "value" : 2
+              }
+            }
+          ],
+          "placement" : {
+            "offsetX" : 0.1,
+            "offsetY" : -0.05,
+            "rotation" : 5,
+            "scale" : 1.3
+          },
+          "sourceStart" : {
+            "timescale" : 30,
+            "value" : 30
+          },
+          "speed" : 1,
+          "transitionOut" : {
+            "duration" : {
+              "timescale" : 30,
+              "value" : 12
+            },
+            "kind" : "slideUp"
+          },
+          "volume" : 1,
+          "volumeKeys" : [
+            {
+              "id" : "0F49E230-9F58-4D08-82B9-DDE966D617A2",
+              "level" : 0.5,
+              "time" : {
+                "timescale" : 1,
+                "value" : 1
+              }
+            }
+          ]
+        },
+        {
+          "assetID" : "5F3BC4E1-E4D6-4561-8B5D-59B8ACBF3A24",
+          "background" : "blur",
+          "cleansVoice" : false,
+          "duration" : {
+            "timescale" : 30,
+            "value" : 90
+          },
+          "fadeOut" : {
+            "timescale" : 30,
+            "value" : 20
+          },
+          "framing" : "fill",
+          "id" : "5BBC2927-0C5E-4AFE-BB93-D6D32B574406",
+          "isMuted" : false,
+          "keyframes" : [
+
+          ],
+          "pictureFadeIn" : {
+            "timescale" : 30,
+            "value" : 10
+          },
+          "placement" : {
+            "offsetX" : 0,
+            "offsetY" : 0,
+            "rotation" : 0,
+            "scale" : 1
+          },
+          "sourceStart" : {
+            "timescale" : 30,
+            "value" : 120
+          },
+          "speed" : 2,
+          "voiceEffect" : "robot",
+          "volume" : 1.4
+        },
+        {
+          "assetID" : "E85231AD-0F2B-4B87-89BA-A8FA5B380E01",
+          "background" : "blur",
+          "cleansVoice" : false,
+          "duration" : {
+            "timescale" : 1,
+            "value" : 3
+          },
+          "framing" : "fill",
+          "id" : "3DFD8A44-D850-4E44-A86F-181E2B40EA42",
+          "isMuted" : false,
+          "keyframes" : [
+
+          ],
+          "placement" : {
+            "offsetX" : 0,
+            "offsetY" : 0,
+            "rotation" : 0,
+            "scale" : 1
+          },
+          "sourceStart" : {
+            "timescale" : 1,
+            "value" : 0
+          },
+          "speed" : 1,
+          "volume" : 1
+        }
+      ]
+    },
+    "titles" : [
+      {
+        "duration" : {
+          "timescale" : 30,
+          "value" : 90
+        },
+        "entrance" : "pop",
+        "followsClip" : true,
+        "horizontalPosition" : 0.5,
+        "id" : "5542B2ED-97DC-4AB5-83E0-2F6CC773C2E7",
+        "look" : {
+          "boxColor" : {
+            "alpha" : 1,
+            "blue" : 0.1,
+            "green" : 0.86,
+            "red" : 1
+          },
+          "boxPerLine" : true,
+          "outlineWidth" : 20,
+          "shadow" : false,
+          "size" : 76,
+          "textColor" : {
+            "alpha" : 1,
+            "blue" : 0,
+            "green" : 0,
+            "red" : 0
+          },
+          "uppercase" : false,
+          "weight" : 0.56
+        },
+        "start" : {
+          "timescale" : 30,
+          "value" : 0
+        },
+        "style" : "marker",
+        "text" : "Hook\nline two",
+        "verticalPosition" : 0.24
+      }
+    ],
+    "transcripts" : [
+      "5F3BC4E1-E4D6-4561-8B5D-59B8ACBF3A24",
+      {
+        "language" : "it",
+        "words" : [
+          {
+            "duration" : {
+              "timescale" : 30,
+              "value" : 15
+            },
+            "id" : "E0468BA2-B71C-4824-AFD8-4653F606BD5B",
+            "isKeyword" : false,
+            "start" : {
+              "timescale" : 1,
+              "value" : 0
+            },
+            "text" : "Ciao"
+          },
+          {
+            "duration" : {
+              "timescale" : 30,
+              "value" : 6
+            },
+            "id" : "6CCFC44B-7B4B-4CB0-B0A6-8982CD6E3C1E",
+            "isKeyword" : false,
+            "start" : {
+              "timescale" : 30,
+              "value" : 15
+            },
+            "text" : "a"
+          },
+          {
+            "duration" : {
+              "timescale" : 30,
+              "value" : 12
+            },
+            "emoji" : "🎉",
+            "id" : "CD0812F1-A86D-442B-A4E7-B550528639DD",
+            "isKeyword" : false,
+            "start" : {
+              "timescale" : 30,
+              "value" : 21
+            },
+            "text" : "tutti"
+          }
+        ]
+      }
+    ]
+  },
+  "version" : 4
+}

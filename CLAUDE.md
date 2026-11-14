@@ -8,12 +8,17 @@ TheShortsEditor ("Shorts Editor") is a native macOS 26+ video editor for **YouTu
 
 ## Building
 
-Requires Xcode 27+ and XcodeGen (`brew install xcodegen`). The `.xcodeproj` is generated from `project.yml` and gitignored. Edit `project.yml`, never the project itself.
+Requires Xcode 27+, XcodeGen and SwiftLint (`brew install xcodegen swiftlint`); swift-format comes with Xcode. The `.xcodeproj` is generated from `project.yml` and gitignored. Edit `project.yml`, never the project itself. Run `make hooks` once per clone.
 
 ```
-make test     # EditorCore + RenderEngine + Transcription tests (swift test); there is no CI, so run it before every commit
+make check    # what CI and the pre-push hook run: format-check, lint, tests and Debug + Release builds, warnings as errors
+make test     # EditorCore + RenderEngine + Transcription tests (swift test)
 make build    # xcodegen + xcodebuild Debug into ./build (no tests)
 make run      # build, then launch build/Build/Products/Debug/Shorts Editor.app
+make format   # swift-format every Swift file in place (.swift-format)
+make lint     # SwiftLint; only violations not in .swiftlint-baseline.json fail
+make tsan     # tests under the Thread Sanitizer (also: asan, analyze)
+make hooks    # pre-push runs `make check` and stops the push on failure
 make open     # open in Xcode
 
 # single test or suite (Swift Testing), from Packages/EditorCore
@@ -21,7 +26,13 @@ swift test --filter "TimelineTests/splitSnapsToWholeFrames"
 swift test --filter CompositionBuilderTests
 ```
 
-There is no linter. Tests live only in the package. The app target has none; check app behaviour on screen with `Tools/uitest` (see `STATUS.md`). Render tests write their own fixture videos, optionally with a tone (`Tests/RenderEngineTests/Fixture.swift`), and check pixels, so they need no media files. Export tests check the written file (codec, size, AAC, fast start). The app is signed ad hoc ("Sign to Run Locally"); there is no Developer ID yet.
+**Before every commit run `make check`** (the pre-push hook enforces it). GitHub's hosted runners lack Xcode 27, so CI is the hook plus an optional self-hosted runner (`Tools/ci/README.md`, `.github/workflows/check.yml`, off until the repo variable `SELF_HOSTED_RUNNER` is true). Formatting is swift-format's (`.swift-format`); SwiftLint (`.swiftlint.yml`) catches mistakes, with existing violations in `.swiftlint-baseline.json`: fix them and run `make lint-baseline` to drop them, never add new ones. Formatting-only commits are listed in `.git-blame-ignore-revs`.
+
+Tests live only in the package. The app target has none; check app behaviour on screen with `Tools/uitest` (see `STATUS.md`). Render tests write their own fixture videos, optionally with a tone (`Tests/RenderEngineTests/Fixture.swift`), and check pixels, so they need no media files. Export tests check the written file (codec, size, AAC, fast start). The app is signed ad hoc ("Sign to Run Locally"); there is no Developer ID yet.
+
+**Saved files:** `Tests/EditorCoreTests/Golden/v<N>.shortsproject` are project files written by the code of each format version and are never remade; `GoldenFileTests` checks today's code still reads them fully. **When `ProjectFile.currentVersion` goes up**, add the new file with `Tools/golden/make-golden.sh <version> <commit>` (extend `Tools/golden/GoldenWriter.swift` with a `#if GOLDEN_V<N>` block for the new fields) and its expectations. `SavingEveryFieldTests` fails when a model type gains a field it doesn't set: set it there, which proves the field is saved.
+
+**Logging:** use `Log.<category>` (`EditorCore/Log.swift`: file, media, render, export, audio, captions, storage), never `print`. For work whose failure the user can carry on from, use `Log.x.attempt("What was being done") { try … }` instead of `try?`, and `Log.x.failure(…, error)` in `catch` blocks. Read logs with `log show --predicate 'subsystem == "com.lucalevi.TheShortsEditor"' --last 1h`.
 
 ## Architecture
 

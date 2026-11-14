@@ -1,6 +1,6 @@
 # Project status
 
-_Last updated: 2026-11-14 (engineering-excellence research written; its 8 phases are now the plan, see "Engineering excellence: phases 1–8"). Read this first when picking the project back up, then update it at the end of each session._
+_Last updated: 2026-11-14 (Phase 1 of engineering excellence done, not committed yet; next Phase 2). Read this first when picking the project back up, then update it at the end of each session._
 
 ## Where we are
 
@@ -16,9 +16,11 @@ Stages 1–7 are done, tested on screen, committed and pushed to https://github.
 | 6 | Audio: clip volume, music with ducking, loudness on export | 2026-11-09 |
 | 7 | Save/open projects, autosave, missing media | 2026-11-09 |
 
-**Pick up here (2026-11-14, latest): engineering excellence.** The user wants the software raised from "works well" to professional, Final Cut Pro-level engineering before more features. I audited the code and wrote `research/engineering-excellence.md`: what "outstanding" means (trust, responsiveness, correctness, platform fit, maintainability, shipping), what is already strong, **32 findings (F1–F32)** with file/line evidence and priorities (P0 = can lose work or ship wrong pictures), a benchmark against Final Cut Pro, an **8-phase roadmap** and a **definition of done** for every future change. Baseline: `make test` = 436 tests in 74 suites, all pass (~80 s). Nothing in the code was changed yet.
+**Pick up here (2026-11-14, latest): Phase 1 (safety net) done, not committed yet.** `make check` (format, lint against a baseline, tests and both builds with warnings as errors) runs before every push through `Tools/hooks/pre-push`; logging through `Log`; golden project files for format versions 1–8 and an every-field saving test; 9 build warnings fixed (one a real Release-only bug in `CaptionTextField`); first Thread Sanitizer run clean. Details and what's left for the user (self-hosted runner) in the Phase 1 checklist below. Commit plan: the content first, then the formatting-only commit (its hash goes in `.git-blame-ignore-revs`). **Next: Phase 2 (never lose work), starting with F1** (the 27 `try? c.decode` in model decoders; SwiftLint already flags them as errors in the baseline).
+
+**Before that (2026-11-14): engineering excellence research.** The user wants the software raised from "works well" to professional, Final Cut Pro-level engineering before more features. I audited the code and wrote `research/engineering-excellence.md`: what "outstanding" means (trust, responsiveness, correctness, platform fit, maintainability, shipping), what is already strong, **32 findings (F1–F32)** with file/line evidence and priorities (P0 = can lose work or ship wrong pictures), a benchmark against Final Cut Pro, an **8-phase roadmap** and a **definition of done** for every future change. Baseline then: `make test` = 436 tests in 74 suites, all pass (~80 s).
 - P0 findings: **F1** model decoders use `try?`, so a field that fails to decode silently resets and autosave overwrites the good file; **F3** no golden files of old format versions (format is v8); **F8** no colour management (Core Image contexts with `NSNull` colour spaces, 8-bit BGRA) and HDR iPhone footage (HLG/Dolby Vision) isn't handled deliberately (suspected washed-out/clipped exports, **not yet verified** with a real HDR clip).
-- **Next: Phase 1 (safety net)**, then phases 2–8 in order. The checklist is in "Engineering excellence: phases 1–8" below; tick items there as they are done. On-screen dogfooding (item 19 of "What's next") is paused until the user says otherwise.
+- Then Phase 1 (safety net), now done; phases 2–8 in order. The checklist is in "Engineering excellence: phases 1–8" below; tick items there as they are done. On-screen dogfooding (item 19 of "What's next") is paused until the user says otherwise.
 
 **Before that (2026-11-13): "Not yet verified on screen" items, pass 1 (committed and pushed, 8870268).** Made "My Short 31" through the UI (menus by name via System Events, clicks with `ui.sh`) with almost every kind of layer, exported it twice from the app and checked the MP4s (H.264 High, no B-frames, 1080×1920, 30 fps, −14.0/−14.5 LUFS with −1.0 dB peak, sound and picture the same length, frames sampled at each feature). Verified now:
 - Export with: a look (Film) + effect (Glitch) on a main clip, a speed curve (Hero: 6.0 → 4.5 s) + Spin entrance, a green-screen key (black behind), a dissolve on every cut (Clip ▸ Transition ▸ Same on Every Cut), app music lowered under speech (Upbeat), an emoji sticker, the Subscribe ready-made text (pill + bell), B-roll with a Heart shape, Difference blend, Zoom Pulse and a Slide Up entrance, a freeze frame of the keyed clip (keeps the key).
@@ -424,8 +426,8 @@ The P0 list from `research/shorts-editor-research.md` §5. Each stage ends with 
 
 | Phase | What | State |
 |---|---|---|
-| 1 | Safety net: CI, format/lint, logging, golden files | **next** |
-| 2 | Never lose work | to do |
+| 1 | Safety net: CI, format/lint, logging, golden files | **done** 2026-11-14, not committed yet |
+| 2 | Never lose work | **next** |
 | 3 | Correct pictures (colour, HDR, media matrix) | to do |
 | 4 | Architecture (split `EditorModel`, no global state) | to do |
 | 5 | Tests for the app (unit, UI, snapshots, coverage) | to do |
@@ -433,12 +435,12 @@ The P0 list from `research/shorts-editor-research.md` §5. Each stage ends with 
 | 7 | Platform fit (accessibility, localization, Mac conventions) | to do |
 | 8 | Ship (Developer ID, notarization, updates, diagnostics) | to do |
 
-### Phase 1: safety net
-- [ ] F28 CI: a `make check` target (tests + Debug and Release builds + lint) and a `git pre-push` hook running it; then a self-hosted GitHub Actions runner on this Mac (hosted runners lack Xcode 27, which is why CI was removed on 2026-11-13). Warnings as errors in CI.
-- [ ] F29 swift-format (checked-in config) + SwiftLint (no `print`, no `try?` in model decoders, length limits), in `make check`
-- [ ] F21 (first half) `os.Logger` categories (file, import, render, export, audio, captions, jobs); remove the `print` in `App/Storage.swift`; log failures now hidden by `try?` on important paths
-- [ ] F3 golden `.shortsproject` files for format versions 2–8 with a test each; an "every field set, round-trips" test for `Clip`, `Project`, `TextOverlay` and friends
-- [ ] F30 align `SWIFT_VERSION` (project.yml 6.0 vs package tools 6.2); sanitizer and analyzer in a test scheme
+### Phase 1: safety net (done 2026-11-14, not committed yet)
+- [x] F28 CI: `make check` (format-check, lint, package tests with warnings as errors, Debug + Release app builds with warnings as errors) and `Tools/hooks/pre-push` running it (`make hooks` once per clone; installed here). `.github/workflows/check.yml` for a **self-hosted runner** on this Mac, off until the repo variable `SELF_HOSTED_RUNNER` is `true`; push/manual only, never pull requests (public repo). Setting up the runner needs the user (GitHub token, a background service): steps in `Tools/ci/README.md`.
+- [x] F29 swift-format (`.swift-format`: 4 spaces, 160 columns, keeps line breaks) and SwiftLint (`.swiftlint.yml`: no `print`, no `try? c.decode`, UserDefaults keys, length/complexity limits). The 149 existing violations are in `.swiftlint-baseline.json`; only new ones fail. The whole codebase was formatted once (156 files, layout only), as its own commit listed in `.git-blame-ignore-revs`.
+- [x] F21 (first half) `EditorCore/Log.swift`: `Log.file/media/render/export/audio/captions/storage` (`os.Logger`, paths and messages private), `Logger.failure(_:_:)` and `attempt("…") { try … }` instead of `try?`. The `print` is gone; failures are logged in the library/bookmark code, saving, import, captions, playback build, export, fonts, Magic Short listening, speech files, the shake cache, disk clean-up and the 25 app `catch` blocks that only showed an alert. (Optional thumbnails/frames keep `try?`.)
+- [x] F3 golden files `Tests/EditorCoreTests/Golden/v1…v8.shortsproject`, written by the app's own code at the last commit of each format version (`Tools/golden/make-golden.sh` + `GoldenWriter.swift`, `#if GOLDEN_V<n>` blocks); `GoldenFileTests` checks every version's content field by field, and that the current version has a file. `SavingEveryFieldTests` builds Clip, Project, TextOverlay, TextLook, MediaAsset, Word, BackgroundMusic, CaptionSettings, Shot, Storyboard, ClipCutout, ClipMask, ColorKey, Placement, Keyframe with **every** field off its default (checked with `Mirror`, so a new field fails until it is added there) and round-trips them. It found `Shot.fitsExactly` on its first run.
+- [x] F30 `project.yml` `SWIFT_VERSION: "6"` (it was the language mode all along; the research's "mismatch" was wrong and is corrected there). Fixed the 9 Release warnings, including a real bug: `CaptionTextField` cast the field editor's delegate with a cast the compiler said "always fails" (⌘↩ new line and click-outside could break in an optimised build); now cast through `AnyObject`. `make tsan`/`asan`/`analyze`. **First Thread Sanitizer run: no data races**; the only failures were time limits of whole-export tests under the 5–10× slowdown, so `make tsan` skips those (`SLOW_TESTS`).
 
 ### Phase 2: never lose work
 - [ ] F1 no `try?` in model decoders; unknown enum cases kept as `.unknown(raw)` and written back unchanged

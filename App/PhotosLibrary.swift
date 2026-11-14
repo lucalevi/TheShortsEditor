@@ -134,6 +134,7 @@ extension EditorModel {
                     }
                     urls.append(url)
                 } catch {
+                    Log.media.failure("importFromPhotos", error)
                     failed.append(error.localizedDescription)
                 }
                 photoDownloads[id] = nil

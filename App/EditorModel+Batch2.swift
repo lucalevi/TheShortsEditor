@@ -37,6 +37,7 @@ extension EditorModel {
                         Task { @MainActor in self.voiceCleaning[asset.id] = fraction }
                     }
                 } catch {
+                    Log.audio.failure("setCleansVoice", error)
                     voiceCleaning[asset.id] = nil
                     alert = AlertMessage(title: "The voice couldn't be cleaned up", message: error.localizedDescription)
                     return
@@ -78,6 +79,7 @@ extension EditorModel {
                 }
             } catch is CancellationError {
             } catch {
+                Log.audio.failure("followSubject", error)
                 alert = AlertMessage(title: "The subject couldn't be found", message: error.localizedDescription)
             }
         }
@@ -225,6 +227,7 @@ extension EditorModel {
                 if let id { selection = .sound(id) }
                 loadPreviewsIfNeeded(media)
             } catch {
+                Log.audio.failure("addSoundEffect", error)
                 alert = AlertMessage(title: "The sound couldn't be made", message: error.localizedDescription)
             }
         }
@@ -302,6 +305,7 @@ extension EditorModel {
                 player.isMuted = true
                 player.play()
             } catch {
+                Log.audio.failure("startVoiceOver", error)
                 voiceOver = nil
                 alert = AlertMessage(title: "Recording couldn't start", message: error.localizedDescription)
             }
@@ -374,7 +378,7 @@ enum FontLibrary {
     /// Copies and registers the fonts; returns the family names that were added.
     @discardableResult
     static func importFonts(_ urls: [URL]) -> [String] {
-        try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        Log.file.attempt("Making the fonts folder") { try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true) }
         var families: [String] = []
         for url in urls {
             _ = url.startAccessingSecurityScopedResource()
@@ -382,7 +386,7 @@ enum FontLibrary {
             guard let descriptors = CTFontManagerCreateFontDescriptorsFromURL(url as CFURL) as? [CTFontDescriptor], !descriptors.isEmpty else { continue }
             let destination = folder.appending(path: url.lastPathComponent)
             try? FileManager.default.removeItem(at: destination)
-            guard (try? FileManager.default.copyItem(at: url, to: destination)) != nil else { continue }
+            guard Log.file.attempt("Copying a font", { try FileManager.default.copyItem(at: url, to: destination) }) != nil else { continue }
             CTFontManagerRegisterFontURLs([destination] as CFArray, .process, true, nil)
             families += descriptors.compactMap { CTFontDescriptorCopyAttribute($0, kCTFontFamilyNameAttribute) as? String }
         }

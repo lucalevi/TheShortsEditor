@@ -145,6 +145,7 @@ extension EditorModel {
                         Task { @MainActor in if self.smoothing[item.clip] != nil { self.smoothing[item.clip] = fraction } }
                     }
                 } catch {
+                    Log.audio.failure("prepareMissingSmoothSlowMotion", error)
                     unsmoothable.insert(FrameInterpolator.copyURL(for: item.url, recipe: item.recipe))
                     alert = AlertMessage(title: "The slow motion couldn't be smoothed", message: error.localizedDescription)
                 }

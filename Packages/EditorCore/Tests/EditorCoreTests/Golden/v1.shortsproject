@@ -1,0 +1,167 @@
+{
+  "bookmarks" : [
+    "A5F6000A-A492-4453-8EBE-245331EB382E",
+    "AQID"
+  ],
+  "project" : {
+    "assets" : [
+      {
+        "displaySize" : [
+          1080,
+          1920
+        ],
+        "duration" : {
+          "timescale" : 1,
+          "value" : 10
+        },
+        "hasAudio" : true,
+        "hasVideo" : true,
+        "id" : "A5F6000A-A492-4453-8EBE-245331EB382E",
+        "name" : "talk.mov",
+        "url" : "file:\/\/\/golden\/talk.mov"
+      },
+      {
+        "displaySize" : [
+          0,
+          0
+        ],
+        "duration" : {
+          "timescale" : 1,
+          "value" : 60
+        },
+        "hasAudio" : true,
+        "hasVideo" : false,
+        "id" : "50E60ABC-9616-40DB-84F0-37ED2A4D010B",
+        "name" : "song.m4a",
+        "url" : "file:\/\/\/golden\/song.m4a"
+      },
+      {
+        "displaySize" : [
+          1080,
+          1920
+        ],
+        "duration" : {
+          "timescale" : 1,
+          "value" : 5
+        },
+        "hasAudio" : true,
+        "hasVideo" : true,
+        "id" : "8890BE56-8B5E-48AC-B17E-945C2EFBD1D6",
+        "name" : "unused.mov",
+        "url" : "file:\/\/\/golden\/unused.mov"
+      }
+    ],
+    "captions" : {
+      "isVisible" : true,
+      "style" : "highlight",
+      "verticalPosition" : 0.66
+    },
+    "music" : {
+      "assetID" : "50E60ABC-9616-40DB-84F0-37ED2A4D010B",
+      "fadesIn" : true,
+      "fadesOut" : true,
+      "lowersUnderSpeech" : true,
+      "sourceStart" : {
+        "timescale" : 30,
+        "value" : 150
+      },
+      "volume" : 0.5
+    },
+    "timeline" : {
+      "clips" : [
+        {
+          "assetID" : "A5F6000A-A492-4453-8EBE-245331EB382E",
+          "duration" : {
+            "timescale" : 30,
+            "value" : 120
+          },
+          "framing" : "fit",
+          "id" : "62C4CF7D-898F-4729-AB77-5045237AF22B",
+          "isMuted" : false,
+          "sourceStart" : {
+            "timescale" : 1,
+            "value" : 0
+          },
+          "volume" : 1
+        },
+        {
+          "assetID" : "A5F6000A-A492-4453-8EBE-245331EB382E",
+          "duration" : {
+            "timescale" : 30,
+            "value" : 180
+          },
+          "framing" : "fill",
+          "id" : "A96BBEE6-0A04-4AAC-B802-76062E527A2F",
+          "isMuted" : false,
+          "sourceStart" : {
+            "timescale" : 30,
+            "value" : 120
+          },
+          "volume" : 1.4
+        }
+      ]
+    },
+    "titles" : [
+      {
+        "duration" : {
+          "timescale" : 30,
+          "value" : 90
+        },
+        "entrance" : "pop",
+        "id" : "9F6F26B8-11CA-4881-84B4-CC5FDF9B9A6D",
+        "start" : {
+          "timescale" : 30,
+          "value" : 0
+        },
+        "style" : "bold",
+        "text" : "Hook\nline two",
+        "verticalPosition" : 0.24
+      }
+    ],
+    "transcripts" : [
+      "A5F6000A-A492-4453-8EBE-245331EB382E",
+      {
+        "language" : "it",
+        "words" : [
+          {
+            "duration" : {
+              "timescale" : 30,
+              "value" : 15
+            },
+            "id" : "B6164F1B-C764-4A28-AF27-100931BF56EE",
+            "start" : {
+              "timescale" : 1,
+              "value" : 0
+            },
+            "text" : "Ciao"
+          },
+          {
+            "duration" : {
+              "timescale" : 30,
+              "value" : 6
+            },
+            "id" : "80850A4C-13CE-48C0-9450-32AEA059F438",
+            "start" : {
+              "timescale" : 30,
+              "value" : 15
+            },
+            "text" : "a"
+          },
+          {
+            "duration" : {
+              "timescale" : 30,
+              "value" : 12
+            },
+            "id" : "2510F85D-64E6-42BA-A9FC-7B156B609070",
+            "start" : {
+              "timescale" : 30,
+              "value" : 21
+            },
+            "text" : "tutti"
+          }
+        ]
+      }
+    ]
+  },
+  "version" : 1
+}

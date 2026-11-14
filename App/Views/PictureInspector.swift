@@ -125,7 +125,7 @@ struct PictureSection: View {
 
     private func slider(
         _ title: String, value: Double, range: ClosedRange<Double>, format: @escaping (Double) -> String,
-        onChange: @escaping (Double) -> Void, onEnd: @escaping () -> Void
+        onChange: @escaping @MainActor (Double) -> Void, onEnd: @escaping () -> Void
     ) -> some View {
         HStack {
             Text(title).frame(width: 40, alignment: .leading)

@@ -38,6 +38,7 @@ extension EditorModel {
             hasUnsavedChanges = false
             didReportSaveError = false
         } catch {
+            Log.file.failure("Saving the open Short", error)
             // Say it once; keep trying with the next change.
             if !didReportSaveError {
                 didReportSaveError = true
@@ -74,6 +75,7 @@ extension EditorModel {
         do {
             try ProjectStore.write(project, to: url, name: openShortName, created: openShortCreated)
         } catch {
+            Log.file.failure("Saving a copy of the Short", error)
             alert = AlertMessage(title: "The copy couldn't be saved", message: error.localizedDescription)
         }
     }
@@ -114,6 +116,7 @@ extension EditorModel {
         do {
             file = try ProjectStore.readFile(ProjectStore.fileURL(for: id))
         } catch {
+            Log.file.failure("openShort", error)
             alert = AlertMessage(title: "This Short can't be opened", message: error.localizedDescription)
             return
         }
@@ -141,6 +144,7 @@ extension EditorModel {
             refreshShorts()
             openShort(id)
         } catch {
+            Log.file.failure("openProject", error)
             alert = AlertMessage(title: "“\(url.deletingPathExtension().lastPathComponent)” can't be opened", message: error.localizedDescription)
         }
     }
@@ -154,6 +158,7 @@ extension EditorModel {
         do {
             try ProjectStore.rename(id, to: name)
         } catch {
+            Log.file.failure("renameShort", error)
             alert = AlertMessage(title: "The Short couldn't be renamed", message: error.localizedDescription)
         }
         refreshShorts()
@@ -173,6 +178,7 @@ extension EditorModel {
         do {
             _ = try ProjectStore.duplicate(id, as: ShortsLibrary.copyName(of: entry.name, existing: shorts.map(\.name)))
         } catch {
+            Log.file.failure("duplicateShort", error)
             alert = AlertMessage(title: "The Short couldn't be copied", message: error.localizedDescription)
         }
         refreshShorts()

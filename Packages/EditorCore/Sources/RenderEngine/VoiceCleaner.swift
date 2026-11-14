@@ -71,7 +71,7 @@ public nonisolated enum VoiceCleaner {
             wetDry.value = 100
         }
         try engine.start()
-        player.scheduleFile(input, at: nil, completionHandler: nil)
+        OfflinePlayback.schedule(input, on: player)
         player.play()
 
         // The unit runs a little late: skip that much at the start and render that much more at the end.

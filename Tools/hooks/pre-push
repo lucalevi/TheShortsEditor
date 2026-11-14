@@ -1,0 +1,13 @@
+#!/bin/zsh
+# Runs `make check` before every push and stops the push if anything fails: formatting, lint,
+# tests, or a warning in the Debug or Release build. Installed with `make hooks`.
+# In an emergency, `git push --no-verify` skips it; then run `make check` straight after.
+set -e
+cd "$(git rev-parse --show-toplevel)"
+echo "pre-push: make check (format, lint, tests, Debug and Release builds)…"
+if ! make check >/tmp/shorts-pre-push.log 2>&1; then
+  tail -40 /tmp/shorts-pre-push.log
+  echo "\npre-push: make check failed, push stopped. Full log: /tmp/shorts-pre-push.log"
+  exit 1
+fi
+echo "pre-push: all checks passed."

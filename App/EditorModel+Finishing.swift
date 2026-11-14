@@ -148,6 +148,7 @@ extension EditorModel {
                 try FrameExport.write(image, to: url, format: format)
                 NSWorkspace.shared.activateFileViewerSelecting([url])
             } catch {
+                Log.export.failure("saveFrame", error)
                 alert = AlertMessage(title: "The frame couldn't be saved", message: error.localizedDescription)
             }
         }

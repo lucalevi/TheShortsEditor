@@ -69,6 +69,7 @@ extension EditorModel {
                 player.play()
             } catch is CancellationError {
             } catch {
+                Log.render.failure("followInVideo", error)
                 alert = AlertMessage(title: "It couldn't follow anything there", message: error.localizedDescription)
             }
         }
@@ -123,6 +124,7 @@ extension EditorModel {
                 loadPreviewsIfNeeded(media)
                 if !project.transcripts.isEmpty { makeCaptions(quietly: true) }
             } catch {
+                Log.render.failure("makeSpeech", error)
                 alert = AlertMessage(title: "The voice couldn't be made", message: error.localizedDescription)
             }
         }

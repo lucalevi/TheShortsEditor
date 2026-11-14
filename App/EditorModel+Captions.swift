@@ -82,6 +82,7 @@ extension EditorModel {
         do {
             try text.write(to: url, atomically: true, encoding: .utf8)
         } catch {
+            Log.captions.failure("exportCaptionsFile", error)
             alert = AlertMessage(title: "The captions couldn't be saved", message: error.localizedDescription)
         }
     }
@@ -118,6 +119,7 @@ extension EditorModel {
                 )
             }
         } catch {
+            Log.captions.failure("importCaptionsFile", error)
             alert = AlertMessage(title: "The subtitle file couldn't be read", message: error.localizedDescription)
         }
     }
@@ -181,6 +183,7 @@ extension EditorModel {
             }
         } catch is CancellationError {
         } catch {
+            Log.captions.failure("runTranslation", error)
             alert = AlertMessage(title: "The captions couldn't be translated", message: error.localizedDescription)
         }
     }
@@ -266,6 +269,7 @@ extension EditorModel {
                     alert = AlertMessage(title: "No other fillers found", message: "Apple Intelligence didn't find words like “like” or “tipo” used as fillers.")
                 }
             } catch {
+                Log.captions.failure("findMoreFillers", error)
                 alert = AlertMessage(title: "Fillers couldn't be found", message: error.localizedDescription)
             }
         }

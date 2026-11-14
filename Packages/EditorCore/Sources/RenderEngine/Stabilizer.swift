@@ -105,8 +105,10 @@ public enum ShakeCache {
         if let path = path(for: url) { return path }
         let path = try await Stabilizer.analyse(url, progress: progress)
         known[url] = path
-        try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        if let data = try? JSONEncoder().encode(path) { try? data.write(to: fileURL(for: url), options: .atomic) }
+        Log.render.attempt("Keeping a measured shake path") {
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            try JSONEncoder().encode(path).write(to: fileURL(for: url), options: .atomic)
+        }
         return path
     }
 }

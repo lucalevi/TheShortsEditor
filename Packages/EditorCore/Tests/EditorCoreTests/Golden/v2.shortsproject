@@ -1,0 +1,307 @@
+{
+  "bookmarks" : [
+    "617D9142-5004-40D5-8AA9-48D8096EA9D1",
+    "AQID"
+  ],
+  "project" : {
+    "assets" : [
+      {
+        "displaySize" : [
+          1080,
+          1920
+        ],
+        "duration" : {
+          "timescale" : 1,
+          "value" : 10
+        },
+        "hasAudio" : true,
+        "hasVideo" : true,
+        "id" : "617D9142-5004-40D5-8AA9-48D8096EA9D1",
+        "isImage" : false,
+        "name" : "talk.mov",
+        "url" : "file:\/\/\/golden\/talk.mov"
+      },
+      {
+        "displaySize" : [
+          0,
+          0
+        ],
+        "duration" : {
+          "timescale" : 1,
+          "value" : 60
+        },
+        "hasAudio" : true,
+        "hasVideo" : false,
+        "id" : "D7046FDC-A796-4E3A-A388-43F59EFC60B9",
+        "isImage" : false,
+        "name" : "song.m4a",
+        "url" : "file:\/\/\/golden\/song.m4a"
+      },
+      {
+        "displaySize" : [
+          1080,
+          1920
+        ],
+        "duration" : {
+          "timescale" : 1,
+          "value" : 5
+        },
+        "hasAudio" : true,
+        "hasVideo" : true,
+        "id" : "56D4631B-7CBB-4967-B4EC-62363E76A4CF",
+        "isImage" : false,
+        "name" : "unused.mov",
+        "url" : "file:\/\/\/golden\/unused.mov"
+      },
+      {
+        "displaySize" : [
+          3000,
+          4000
+        ],
+        "duration" : {
+          "timescale" : 1,
+          "value" : 3600
+        },
+        "hasAudio" : false,
+        "hasVideo" : true,
+        "id" : "5D107260-DB39-4003-9251-296878F46CBF",
+        "isImage" : true,
+        "name" : "photo.jpg",
+        "url" : "file:\/\/\/golden\/photo.jpg"
+      },
+      {
+        "displaySize" : [
+          1080,
+          1920
+        ],
+        "duration" : {
+          "timescale" : 1,
+          "value" : 8
+        },
+        "hasAudio" : true,
+        "hasVideo" : true,
+        "id" : "64EA695B-AF7A-49C0-A379-4AB04FCB1FB2",
+        "isImage" : false,
+        "name" : "broll.mov",
+        "url" : "file:\/\/\/golden\/broll.mov"
+      }
+    ],
+    "captions" : {
+      "isVisible" : true,
+      "style" : "highlight",
+      "verticalPosition" : 0.66
+    },
+    "music" : {
+      "assetID" : "D7046FDC-A796-4E3A-A388-43F59EFC60B9",
+      "fadesIn" : true,
+      "fadesOut" : true,
+      "lowersUnderSpeech" : true,
+      "sourceStart" : {
+        "timescale" : 30,
+        "value" : 150
+      },
+      "volume" : 0.5
+    },
+    "overlays" : [
+      {
+        "clip" : {
+          "assetID" : "64EA695B-AF7A-49C0-A379-4AB04FCB1FB2",
+          "background" : "blur",
+          "duration" : {
+            "timescale" : 30,
+            "value" : 120
+          },
+          "framing" : "fill",
+          "id" : "A9534F8D-7310-4256-AA4D-8741EDFCF713",
+          "isMuted" : true,
+          "keyframes" : [
+
+          ],
+          "placement" : {
+            "offsetX" : 0,
+            "offsetY" : 0,
+            "rotation" : 0,
+            "scale" : 1
+          },
+          "sourceStart" : {
+            "timescale" : 1,
+            "value" : 0
+          },
+          "volume" : 1
+        },
+        "start" : {
+          "timescale" : 30,
+          "value" : 30
+        }
+      }
+    ],
+    "timeline" : {
+      "clips" : [
+        {
+          "assetID" : "617D9142-5004-40D5-8AA9-48D8096EA9D1",
+          "background" : "blur",
+          "duration" : {
+            "timescale" : 30,
+            "value" : 120
+          },
+          "framing" : "fit",
+          "id" : "33DCFAD7-A2E2-42A0-B5F8-FD99C36FC029",
+          "isMuted" : false,
+          "keyframes" : [
+            {
+              "easing" : "smooth",
+              "id" : "CFF05FF8-CEA4-40AD-BB4E-FCEAA67EB0B7",
+              "placement" : {
+                "offsetX" : 0,
+                "offsetY" : 0,
+                "rotation" : 0,
+                "scale" : 1
+              },
+              "time" : {
+                "timescale" : 1,
+                "value" : 0
+              }
+            },
+            {
+              "easing" : "smooth",
+              "id" : "FCE53352-9350-4DE8-B044-51E47790BD14",
+              "placement" : {
+                "offsetX" : 0,
+                "offsetY" : 0,
+                "rotation" : 0,
+                "scale" : 1.5
+              },
+              "time" : {
+                "timescale" : 1,
+                "value" : 2
+              }
+            }
+          ],
+          "placement" : {
+            "offsetX" : 0.1,
+            "offsetY" : -0.05,
+            "rotation" : 5,
+            "scale" : 1.3
+          },
+          "sourceStart" : {
+            "timescale" : 1,
+            "value" : 0
+          },
+          "volume" : 1
+        },
+        {
+          "assetID" : "617D9142-5004-40D5-8AA9-48D8096EA9D1",
+          "background" : "blur",
+          "duration" : {
+            "timescale" : 30,
+            "value" : 180
+          },
+          "framing" : "fill",
+          "id" : "7C7EC880-A3A1-43A0-ABDB-82B83ED9FF41",
+          "isMuted" : false,
+          "keyframes" : [
+
+          ],
+          "placement" : {
+            "offsetX" : 0,
+            "offsetY" : 0,
+            "rotation" : 0,
+            "scale" : 1
+          },
+          "sourceStart" : {
+            "timescale" : 30,
+            "value" : 120
+          },
+          "volume" : 1.4
+        },
+        {
+          "assetID" : "5D107260-DB39-4003-9251-296878F46CBF",
+          "background" : "blur",
+          "duration" : {
+            "timescale" : 1,
+            "value" : 3
+          },
+          "framing" : "fill",
+          "id" : "964BC44C-4218-41FD-9DD2-BBDB973DDA84",
+          "isMuted" : false,
+          "keyframes" : [
+
+          ],
+          "placement" : {
+            "offsetX" : 0,
+            "offsetY" : 0,
+            "rotation" : 0,
+            "scale" : 1
+          },
+          "sourceStart" : {
+            "timescale" : 1,
+            "value" : 0
+          },
+          "volume" : 1
+        }
+      ]
+    },
+    "titles" : [
+      {
+        "duration" : {
+          "timescale" : 30,
+          "value" : 90
+        },
+        "entrance" : "pop",
+        "id" : "57CEFAE7-0E26-4E87-A729-EDDE6539110C",
+        "start" : {
+          "timescale" : 30,
+          "value" : 0
+        },
+        "style" : "bold",
+        "text" : "Hook\nline two",
+        "verticalPosition" : 0.24
+      }
+    ],
+    "transcripts" : [
+      "617D9142-5004-40D5-8AA9-48D8096EA9D1",
+      {
+        "language" : "it",
+        "words" : [
+          {
+            "duration" : {
+              "timescale" : 30,
+              "value" : 15
+            },
+            "id" : "0053C062-82C0-430D-8332-DA87BD65F1C2",
+            "start" : {
+              "timescale" : 1,
+              "value" : 0
+            },
+            "text" : "Ciao"
+          },
+          {
+            "duration" : {
+              "timescale" : 30,
+              "value" : 6
+            },
+            "id" : "67EF7232-4761-4C78-BD9B-5E2EFA2ECC5A",
+            "start" : {
+              "timescale" : 30,
+              "value" : 15
+            },
+            "text" : "a"
+          },
+          {
+            "duration" : {
+              "timescale" : 30,
+              "value" : 12
+            },
+            "id" : "FC28A32A-2BDE-4659-A0C5-6CDD3136F883",
+            "start" : {
+              "timescale" : 30,
+              "value" : 21
+            },
+            "text" : "tutti"
+          }
+        ]
+      }
+    ]
+  },
+  "version" : 2
+}

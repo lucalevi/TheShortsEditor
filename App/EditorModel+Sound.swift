@@ -132,6 +132,7 @@ extension EditorModel {
         } catch is CancellationError {
             return false
         } catch {
+            Log.audio.failure("makeProcessedSound", error)
             alert = AlertMessage(title: "The sound effect couldn't be made", message: error.localizedDescription)
             return false
         }

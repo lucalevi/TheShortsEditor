@@ -24,13 +24,13 @@ extension EditorModel {
             // The music first, so the Short comes in one step with its beat.
             let music = await styleMusic(template.style.music)
             if !(screen == .editor && project.timeline.clips.isEmpty) { newShort() }
-            importFiles(urls, to: .media, actionName: "Fill \(template.displayName)") { [weak self] project, ids in
+            importFiles(urls, to: .media, actionName: "Fill \(template.displayName)") { project, ids in
                 let order = urls.compactMap { url in project.assets.first { $0.url.standardizedFileURL == url.standardizedFileURL }?.id }
                 project.fillTemplate(template, with: order.isEmpty ? ids : order)
                 project.applyStyle(template.style, music: music)
                 // The style's motion is the style's, not the user's (see `apply`); back to normal after this edit.
-                self?.isRestyling = true
-                Task { @MainActor in self?.isRestyling = false }
+                self.isRestyling = true
+                Task { @MainActor in self.isRestyling = false }
             }
             if let music { loadPreviewsIfNeeded(music) }
             sidebar = .storyboard
@@ -101,6 +101,7 @@ extension EditorModel {
                 let image = try await ProjectPoster.cover(of: project, cover)
                 try FrameExport.write(image, to: url, format: .jpeg)
             } catch {
+                Log.render.failure("saveCover", error)
                 alert = AlertMessage(title: "The cover couldn't be saved", message: error.localizedDescription)
             }
         }

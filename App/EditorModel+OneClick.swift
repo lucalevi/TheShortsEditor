@@ -155,12 +155,15 @@ extension EditorModel {
                         try Task.checkCancellation()
                         show(assets.count == 1 ? "Listening to your clip…" : "Listening to clip \(index + 1) of \(assets.count)…",
                              Double(index) / Double(assets.count))
-                        transcripts[asset.id] = try? await Transcriber.transcribe(asset.url, name: asset.name, language: language)
+                        transcripts[asset.id] = await Log.captions.attempt("Listening to a clip for Magic Short") {
+                            try await Transcriber.transcribe(asset.url, name: asset.name, language: language)
+                        }
                     }
                 } catch is CancellationError {
                     return
                 } catch {
                     // No speech model: carry on without captions.
+                    Log.captions.failure("Getting ready to listen for Magic Short", error)
                 }
             }
             // 2. How loud each moment is: for finding the pauses.

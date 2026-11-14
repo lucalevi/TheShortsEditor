@@ -134,12 +134,14 @@ public enum Exporter {
             throw CancellationError()
         }
         if reader.status == .failed {
+            if let error = reader.error { Log.export.failure("Reading the Short for export", error) }
             writer.cancelWriting()
             try? FileManager.default.removeItem(at: url)
             throw ExportError.failed(reader.error?.localizedDescription ?? "")
         }
         await writer.finishWriting()
         guard writer.status == .completed else {
+            if let error = writer.error { Log.export.failure("Writing the exported file", error) }
             try? FileManager.default.removeItem(at: url)
             throw ExportError.failed(writer.error?.localizedDescription ?? "")
         }

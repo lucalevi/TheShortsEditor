@@ -271,7 +271,7 @@ public nonisolated enum SoundEffect: String, CaseIterable, Identifiable, Sendabl
             return Double(noiseState) / Double(UInt32.max) * 2 - 1
         }
         var out = [Double](repeating: 0, count: count)
-        var low = 0.0, low2 = 0.0, phase = 0.0, phase2 = 0.0
+        var low = 0.0, low2 = 0.0, phase = 0.0
         /// One step of a one-pole low-pass filter at `cutoff` Hz.
         func lowPass(_ x: Double, _ state: inout Double, _ cutoff: Double) -> Double {
             state += (1 - exp(-2 * .pi * cutoff / rate)) * (x - state)

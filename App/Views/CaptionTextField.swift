@@ -30,7 +30,10 @@ struct CaptionTextField: NSViewRepresentable {
     static func endEditingOnClickOutside(_ event: NSEvent) {
         guard let window = event.window,
               let editor = window.firstResponder as? NSTextView,
-              let field = editor.delegate as? Field
+              // The field editor's delegate is the field. Cast through AnyObject: the SDK doesn't
+              // declare NSTextField a text view delegate, so a direct cast "always fails" and an
+              // optimised build may drop it.
+              let field = (editor.delegate as AnyObject?) as? Field
         else { return }
         let point = field.convert(event.locationInWindow, from: nil)
         if !field.bounds.contains(point) { window.makeFirstResponder(nil) }
@@ -40,7 +43,7 @@ struct CaptionTextField: NSViewRepresentable {
         guard event.keyCode == 36 || event.keyCode == 76,
               event.modifierFlags.intersection([.command, .control, .option, .shift]) == .command,
               let editor = event.window?.firstResponder as? NSTextView,
-              editor.delegate is Field
+              (editor.delegate as AnyObject?) is Field
         else { return false }
         editor.insertText("\n", replacementRange: editor.selectedRange())
         // insertText doesn't always tell the delegate; make sure the row grows.

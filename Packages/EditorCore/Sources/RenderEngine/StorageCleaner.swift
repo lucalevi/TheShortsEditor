@@ -79,7 +79,7 @@ public enum StorageCleaner {
         let cutoff = now.addingTimeInterval(-days * 24 * 3600)
         let stale = unusedFiles(in: cacheFolders, inUse: filesInUse(by: projects), before: cutoff) + oldMusicFolders
         let bytes = size(of: stale)
-        for file in stale { try? FileManager.default.removeItem(at: file) }
+        for file in stale { Log.storage.attempt("Removing an unused copy") { try FileManager.default.removeItem(at: file) } }
         return bytes
     }
 }

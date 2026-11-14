@@ -20,7 +20,7 @@ extension ProjectStore {
         var opened: [URL] = []
         defer { for url in opened { url.stopAccessingSecurityScopedResource() } }
         let projects = files.filter { $0.pathExtension == ProjectFile.fileExtension }.compactMap { url -> Project? in
-            guard let data = try? Data(contentsOf: url), let file = try? ProjectFile.decode(data) else { return nil }
+            guard let file = Log.file.attempt("Reading a Short for clean-up", { try ProjectFile.decode(Data(contentsOf: url)) }) else { return nil }
             var project = file.project
             for asset in project.assets {
                 var stale = false
@@ -37,7 +37,7 @@ extension ProjectStore {
     /// At launch, before a Short is open: removes made copies no Short has used for a week.
     static func removeUnusedCopies() {
         let freed = withLibraryProjects { StorageCleaner.removeUnusedCopies(keepingFor: $0) }
-        if freed > 0 { print("Removed \(ByteCountFormatter.string(fromByteCount: freed, countStyle: .file)) of unused copies") }
+        if freed > 0 { Log.storage.info("Removed \(ByteCountFormatter.string(fromByteCount: freed, countStyle: .file), privacy: .public) of unused copies") }
     }
 
     /// Media the app made that no Short in the library uses.

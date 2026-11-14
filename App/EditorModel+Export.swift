@@ -21,6 +21,7 @@ extension EditorModel {
             do {
                 peak = try await AudioProbe.peak(of: project, in: firstSecond)
             } catch {
+                Log.export.failure("beginExport", error)
                 peak = 1  // Couldn't measure: skip that check rather than claim silence.
             }
             guard exportPhase == .checking else { return }
@@ -41,6 +42,7 @@ extension EditorModel {
             } catch is CancellationError {
                 exportPhase = nil
             } catch {
+                Log.export.failure("export", error)
                 exportPhase = .failed(error.localizedDescription)
             }
         }
@@ -126,6 +128,7 @@ extension EditorModel {
                     }
                     if let levels = await LevelCache.levels(of: cleaned) { voiceLevels[asset.id] = levels }
                 } catch {
+                    Log.audio.failure("setPausesListenToVoiceOnly", error)
                     // That file keeps its own levels.
                 }
                 guard silenceSession != nil else { return }

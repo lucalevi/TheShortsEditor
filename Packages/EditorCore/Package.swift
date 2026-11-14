@@ -23,7 +23,8 @@ let package = Package(
         .target(name: "RenderEngine", dependencies: ["EditorCore"], swiftSettings: mainActorByDefault),
         // On-device speech to text (Apple's SpeechAnalyzer), for captions.
         .target(name: "Transcription", dependencies: ["EditorCore"], swiftSettings: mainActorByDefault),
-        .testTarget(name: "EditorCoreTests", dependencies: ["EditorCore"]),
+        // Golden/: project files saved by every earlier format version (see GoldenFileTests).
+        .testTarget(name: "EditorCoreTests", dependencies: ["EditorCore"], resources: [.copy("Golden")]),
         .testTarget(name: "RenderEngineTests", dependencies: ["RenderEngine"], swiftSettings: mainActorByDefault),
         .testTarget(name: "TranscriptionTests", dependencies: ["Transcription"], swiftSettings: mainActorByDefault),
     ]

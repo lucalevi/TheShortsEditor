@@ -272,6 +272,7 @@ extension EditorModel {
                         Task { @MainActor in if self.steadying[id] != nil { self.steadying[id] = fraction } }
                     }
                 } catch {
+                    Log.render.failure("prepareMissingSteadiness", error)
                     unsteadiable.insert(id)
                     alert = AlertMessage(title: "The clip couldn't be steadied", message: error.localizedDescription)
                 }

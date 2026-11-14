@@ -213,6 +213,7 @@ extension EditorModel {
         } catch is CancellationError {
             return nil
         } catch {
+            Log.render.failure("makeBackwardsCopy", error)
             alert = AlertMessage(title: "The clip couldn't be turned round", message: error.localizedDescription)
             return nil
         }

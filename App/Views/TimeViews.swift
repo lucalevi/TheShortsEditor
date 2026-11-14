@@ -265,7 +265,7 @@ struct SeeThroughSection: View {
     }
 
     private func row(_ title: String, value: Double, range: ClosedRange<Double>, label: @escaping (Double) -> String,
-                     onChange: @escaping (Double) -> Void, onEnd: @escaping () -> Void) -> some View {
+                     onChange: @escaping @MainActor (Double) -> Void, onEnd: @escaping () -> Void) -> some View {
         HStack {
             Text(title).frame(width: 56, alignment: .leading)
             Slider(value: Binding(get: { min(max(value, range.lowerBound), range.upperBound) }, set: onChange), in: range) { editing in

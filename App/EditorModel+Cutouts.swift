@@ -53,6 +53,7 @@ extension EditorModel {
                     }
                 } catch is CancellationError {
                 } catch {
+                    Log.render.failure("prepareMissingCutouts", error)
                     uncuttable.insert(job)
                     alert = AlertMessage(title: "The background couldn't be removed", message: error.localizedDescription)
                 }

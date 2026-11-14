@@ -1,0 +1,29 @@
+# Runs `make check` on a self-hosted runner (this Mac: GitHub's hosted runners don't have Xcode 27).
+# Off until the repository variable SELF_HOSTED_RUNNER is "true" (Settings ▸ Secrets and variables
+# ▸ Actions ▸ Variables), so pushes don't queue jobs no runner will take. See Tools/ci/README.md.
+#
+# Only pushes and manual runs, never pull requests: the repository is public, and a pull request
+# from a fork must never run its code on this Mac.
+name: Check
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    if: vars.SELF_HOSTED_RUNNER == 'true'
+    runs-on: [self-hosted, macOS, ARM64]
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - name: Format, lint, tests, Debug and Release builds
+        run: make check

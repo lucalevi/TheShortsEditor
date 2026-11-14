@@ -1,4 +1,5 @@
 @preconcurrency import AVFoundation
+import EditorCore
 import Foundation
 
 /// Text to speech with the Mac's own voices (and the user's Personal Voice, when they allow it),
@@ -104,8 +105,12 @@ public enum SpeechMaker {
 
         func append(_ buffer: AVAudioPCMBuffer) {
             lock.lock(); defer { lock.unlock() }
-            if file == nil { file = try? AVAudioFile(forWriting: url, settings: buffer.format.settings, commonFormat: buffer.format.commonFormat, interleaved: buffer.format.isInterleaved) }
-            try? file?.write(from: buffer)
+            if file == nil {
+                file = Log.audio.attempt("Making the spoken voice's file") {
+                    try AVAudioFile(forWriting: url, settings: buffer.format.settings, commonFormat: buffer.format.commonFormat, interleaved: buffer.format.isInterleaved)
+                }
+            }
+            if let file { Log.audio.attempt("Writing the spoken voice") { try file.write(from: buffer) } }
             wrote = true
         }
 

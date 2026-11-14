@@ -95,7 +95,7 @@ public nonisolated enum SoundProcessor {
         engine.connect(previous, to: engine.mainMixerNode, format: format)
         try engine.enableManualRenderingMode(.offline, format: format, maximumFrameCount: 4096)
         try engine.start()
-        player.scheduleFile(input, at: nil, completionHandler: nil)
+        OfflinePlayback.schedule(input, on: player)
         player.play()
 
         var dsp = SampleShaper(effect: recipe.effect, sampleRate: format.sampleRate, channels: Int(format.channelCount))
@@ -252,5 +252,15 @@ nonisolated struct SampleShaper {
                 for i in 0..<count { samples[i] = tanhf(samples[i] * drive) / norm * 0.9 }
             }
         }
+    }
+}
+
+/// Rendering a file offline through an audio engine.
+nonisolated enum OfflinePlayback {
+    /// Queues the whole file on the player. Not async on purpose: nothing waits for the file to finish
+    /// playing (the engine is pulled frame by frame), and in an async function the compiler asks for
+    /// the async form of `scheduleFile`, which would wait for the end.
+    static func schedule(_ file: AVAudioFile, on player: AVAudioPlayerNode) {
+        player.scheduleFile(file, at: nil, completionHandler: nil)
     }
 }
