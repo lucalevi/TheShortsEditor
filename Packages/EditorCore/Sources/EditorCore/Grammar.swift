@@ -38,7 +38,7 @@ public enum DropAction: String, CaseIterable, Identifiable, Sendable {
     }
 
     /// Whether it works on main-storyline clips (as opposed to adding a clip over them).
-    public var replacesOrInserts: Bool {
+    var replacesOrInserts: Bool {
         switch self {
         case .replace, .replaceFromStart, .replaceFromEnd, .insert: true
         default: false
@@ -46,7 +46,7 @@ public enum DropAction: String, CaseIterable, Identifiable, Sendable {
     }
 }
 
-public extension Project {
+extension Project {
     /// A new clip of `assetID`: the whole file (a picture for a few seconds), or `part` of it.
     func makeClip(of assetID: MediaAsset.ID, part: CMTimeRange? = nil) -> Clip? {
         guard let asset = asset(id: assetID), asset.hasVideo, asset.duration > .zero else { return nil }
@@ -72,7 +72,7 @@ public extension Project {
 
     /// Adds `part` of a file (or all of it) to the end of the storyline (iMovie's E).
     @discardableResult
-    mutating func appendClip(of assetID: MediaAsset.ID, part: CMTimeRange?) -> Clip.ID? {
+    public mutating func appendClip(of assetID: MediaAsset.ID, part: CMTimeRange?) -> Clip.ID? {
         guard let clip = makeClip(of: assetID, part: part) else { return nil }
         timeline.clips.append(clip)
         return clip.id
@@ -82,7 +82,7 @@ public extension Project {
     /// there is cut in two and the new one goes in between. On a cut it goes in before the clip
     /// that starts there; after the end, it is added at the end.
     @discardableResult
-    mutating func insertClip(of assetID: MediaAsset.ID, part: CMTimeRange? = nil, at time: CMTime) -> Clip.ID? {
+    public mutating func insertClip(of assetID: MediaAsset.ID, part: CMTimeRange? = nil, at time: CMTime) -> Clip.ID? {
         guard let clip = makeClip(of: assetID, part: part) else { return nil }
         let time = time.snappedToFrame()
         timeline.split(at: time)
@@ -93,7 +93,7 @@ public extension Project {
 
     /// Puts a file in a main clip's place (see `DropAction`). Returns the new clip's id.
     @discardableResult
-    mutating func replaceClip(_ id: Clip.ID, with assetID: MediaAsset.ID, part: CMTimeRange? = nil, mode: DropAction) -> Clip.ID? {
+    public mutating func replaceClip(_ id: Clip.ID, with assetID: MediaAsset.ID, part: CMTimeRange? = nil, mode: DropAction) -> Clip.ID? {
         guard let index = timeline.index(of: id), let asset = asset(id: assetID), var clip = makeClip(of: assetID, part: part) else { return nil }
         let old = timeline.clips[index]
         switch mode {
@@ -119,7 +119,7 @@ public extension Project {
 
     /// A file dropped at `time` over the clips: B-roll, split screen or picture-in-picture.
     @discardableResult
-    mutating func addOverlay(of assetID: MediaAsset.ID, part: CMTimeRange?, at time: CMTime, as action: DropAction) -> Clip.ID? {
+    public mutating func addOverlay(of assetID: MediaAsset.ID, part: CMTimeRange?, at time: CMTime, as action: DropAction) -> Clip.ID? {
         guard let id = addOverlay(of: assetID, at: time) else { return nil }
         let isImage = asset(id: assetID)?.isImage == true
         let size = asset(id: assetID)?.displaySize ?? Project.canvasSize
@@ -143,7 +143,7 @@ public extension Project {
 
     /// The parts of a file used anywhere in the Short (clips, B-roll, sounds, music), in the
     /// file's own time and merged where they overlap. Shown as the "used" mark in Media.
-    func usedParts(of assetID: MediaAsset.ID) -> [CMTimeRange] {
+    public func usedParts(of assetID: MediaAsset.ID) -> [CMTimeRange] {
         guard let asset = asset(id: assetID) else { return [] }
         if asset.isImage { return usageCount(of: assetID) > 0 ? [CMTimeRange(start: .zero, duration: asset.duration)] : [] }
         var ranges = (timeline.clips + overlays.map(\.clip) + sounds.map(\.clip))
@@ -177,7 +177,7 @@ public extension Project {
     }
 
     /// The edit point before (or after) `time`.
-    func editPoint(from time: CMTime, forward: Bool) -> CMTime? {
+    public func editPoint(from time: CMTime, forward: Bool) -> CMTime? {
         let time = time.snappedToFrame()
         return forward ? editPoints.first { $0 > time } : editPoints.last { $0 < time }
     }
@@ -185,7 +185,7 @@ public extension Project {
 
 // MARK: - Ranges
 
-public extension Project {
+extension Project {
     /// Cuts the storyline at both ends of `range` and returns the clips now inside it, in order.
     @discardableResult
     mutating func isolate(_ range: CMTimeRange) -> [Clip.ID] {
@@ -204,14 +204,14 @@ public extension Project {
     }
 
     /// Takes a stretch out of the storyline; what comes after closes up.
-    mutating func removeRange(_ range: CMTimeRange) {
+    public mutating func removeRange(_ range: CMTimeRange) {
         let ids = Set(isolate(range))
         timeline.clips.removeAll { ids.contains($0.id) }
     }
 
     /// Keeps only the part of the touched clips that is inside `range` (iMovie's Trim to Selection):
     /// the clips the range touches lose what is outside it; other clips stay.
-    mutating func trimToRange(_ range: CMTimeRange) {
+    public mutating func trimToRange(_ range: CMTimeRange) {
         let range = Self.frameRange(range, within: duration)
         guard range.duration > .zero else { return }
         // Cutting doesn't move anything, so the touched clips' places tell what to take off after.
@@ -236,13 +236,13 @@ public extension Project {
     }
 
     /// Changes the speed of only the part of the storyline inside `range`.
-    mutating func setSpeed(_ speed: Double, in range: CMTimeRange) {
+    public mutating func setSpeed(_ speed: Double, in range: CMTimeRange) {
         for id in isolate(range) { setSpeed(speed, for: id) }
     }
 
     /// Changes the volume of only the part of the storyline inside `range`. The sound changes
     /// smoothly at the range's edges (see `Clip.continues(_:)`).
-    mutating func setVolume(_ volume: Double, muted: Bool = false, in range: CMTimeRange) {
+    public mutating func setVolume(_ volume: Double, muted: Bool = false, in range: CMTimeRange) {
         for id in isolate(range) {
             updateAnyClip(id) { clip in
                 clip.volume = min(max(volume, 0), Clip.maxVolume)
@@ -252,19 +252,19 @@ public extension Project {
     }
 
     /// The main clip under `time` as a range (iMovie's X).
-    func clipRange(at time: CMTime) -> CMTimeRange? {
+    public func clipRange(at time: CMTime) -> CMTimeRange? {
         timeline.locate(time.snappedToFrame()).flatMap { timeline.range(of: timeline.clips[$0.index].id) }
     }
 
     /// `range` on whole frames and inside 0…`end`.
-    static func frameRange(_ range: CMTimeRange, within end: CMTime) -> CMTimeRange {
+    public static func frameRange(_ range: CMTimeRange, within end: CMTime) -> CMTimeRange {
         let start = range.start.snappedToFrame().clamped(.zero, end)
         let stop = range.end.snappedToFrame().clamped(start, end)
         return CMTimeRange(start: start, end: stop)
     }
 }
 
-public extension Clip {
+extension Clip {
     /// Whether this clip carries straight on from `previous` in the same file (the two were one
     /// clip, cut apart), so a change of volume between them should be a quick fade, not a jump.
     func continues(_ previous: Clip) -> Bool {
@@ -277,7 +277,7 @@ public extension Clip {
 /// Titles, B-roll and sounds are pinned to the main clip under their start, like iMovie's
 /// connected clips: moving, trimming, speeding up or removing pauses from that clip carries them
 /// along. Turned off (`followsClip`), an item stays at its time on the timeline instead.
-public extension Project {
+extension Project {
     /// The main clip under an item's start, the one it is pinned to. Nil after the end.
     func anchorClip(at start: CMTime) -> Clip.ID? {
         timeline.locate(start.snappedToFrame()).map { timeline.clips[$0.index].id }
@@ -286,7 +286,7 @@ public extension Project {
     /// Moves the pinned items after an edit of the storyline, so each stays with the moment of
     /// its clip it was on in `old`. Items the edit itself moved, new items, and items whose clip
     /// is gone keep their time.
-    mutating func followClips(from old: Project) {
+    public mutating func followClips(from old: Project) {
         guard timeline != old.timeline else { return }
         let oldIDs = Set(old.timeline.clips.map(\.id))
         var starts: [CMTime] = []
@@ -349,7 +349,7 @@ public extension Project {
     }
 
     /// Whether an item moves with its clip.
-    func followsClip(_ item: TimelineItem) -> Bool {
+    public func followsClip(_ item: TimelineItem) -> Bool {
         switch item {
         case .title(let id): title(id: id)?.followsClip ?? false
         case .overlay(let id): overlay(id: id)?.followsClip ?? false
@@ -358,7 +358,7 @@ public extension Project {
         }
     }
 
-    mutating func setFollowsClip(_ follows: Bool, for item: TimelineItem) {
+    public mutating func setFollowsClip(_ follows: Bool, for item: TimelineItem) {
         switch item {
         case .title(let id): updateTitle(id) { $0.followsClip = follows }
         case .overlay(let id): updateOverlay(id) { $0.followsClip = follows }
@@ -368,7 +368,7 @@ public extension Project {
     }
 
     /// Where an item starts on the timeline (titles, B-roll, sounds).
-    func start(of item: TimelineItem) -> CMTime? {
+    public func start(of item: TimelineItem) -> CMTime? {
         switch item {
         case .title(let id): title(id: id)?.start
         case .overlay(let id): overlay(id: id)?.start
@@ -408,10 +408,10 @@ public enum SettingsKind: String, CaseIterable, Identifiable, Sendable {
     }
 }
 
-public extension Project {
+extension Project {
     /// Gives clip `id` the `kinds` of settings `source` has. Motion is moved to the same place
     /// in the new clip (counted from its start); speed changes the clip's length, as usual.
-    mutating func pasteSettings(_ kinds: Set<SettingsKind>, from source: Clip, to id: Clip.ID) {
+    public mutating func pasteSettings(_ kinds: Set<SettingsKind>, from source: Clip, to id: Clip.ID) {
         guard let target = anyClip(id: id) else { return }
         let targetIsImage = asset(id: target.assetID)?.isImage == true
         if kinds.contains(.speed), !targetIsImage, asset(id: source.assetID)?.isImage != true, target.speed != source.speed {
@@ -459,7 +459,7 @@ public extension Project {
     }
 
     /// Puts the `kinds` of settings of clip `id` back as they are for a newly added clip.
-    mutating func resetSettings(_ kinds: Set<SettingsKind>, of id: Clip.ID) {
+    public mutating func resetSettings(_ kinds: Set<SettingsKind>, of id: Clip.ID) {
         guard let clip = anyClip(id: id), let media = asset(id: clip.assetID) else { return }
         let isMain = timeline.index(of: id) != nil
         let isSound = sound(id: id) != nil
@@ -490,7 +490,7 @@ public extension Project {
     }
 
     /// Which `kinds` of a clip differ from how a new clip starts, so Reset has something to do.
-    func changedSettings(of id: Clip.ID) -> Set<SettingsKind> {
+    public func changedSettings(of id: Clip.ID) -> Set<SettingsKind> {
         guard let clip = anyClip(id: id), let media = asset(id: clip.assetID) else { return [] }
         let isMain = timeline.index(of: id) != nil
         var kinds: Set<SettingsKind> = []
@@ -507,7 +507,7 @@ public extension Project {
     }
 
     /// Gives title `id` the look, entrance and position of `source` (its words stay).
-    mutating func pasteTitleDesign(from source: TextOverlay, to id: TextOverlay.ID) {
+    public mutating func pasteTitleDesign(from source: TextOverlay, to id: TextOverlay.ID) {
         updateTitle(id) { title in
             title.style = source.style
             title.look = source.look

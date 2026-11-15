@@ -35,14 +35,14 @@ public enum Exporter {
     /// (−14 LUFS), without letting peaks clip. `range` makes an ordinary or an HDR file.
     public static func export(
         _ project: Project, to url: URL, evenOutLoudness: Bool = true, range: DynamicRange = .standard,
-        progress: @escaping @MainActor (Double) -> Void = { _ in }
+        analysis: MediaAnalysis = MediaAnalysis(), progress: @escaping @MainActor (Double) -> Void = { _ in }
     ) async throws {
         var gain = 1.0
-        if evenOutLoudness, let meter = try await AudioProbe.loudness(of: project) {
+        if evenOutLoudness, let meter = try await AudioProbe.loudness(of: project, analysis: analysis) {
             gain = meter.normalizingGain()
         }
         try Task.checkCancellation()
-        let built = try await CompositionBuilder.build(project, gain: gain, range: range)
+        let built = try await CompositionBuilder.build(project, gain: gain, range: range, analysis: analysis)
         let composition = built.composition
         let duration = composition.duration
 

@@ -26,6 +26,16 @@ struct TheShortsEditorApp: App {
             UndoCommands()
         }
 
+        // Window ▸ Background Tasks (⌘9): every long job, its progress and a Stop button.
+        Window("Background Tasks", id: BackgroundTasksView.windowID) {
+            BackgroundTasksView()
+                .environment(model.tasks)
+        }
+        .defaultSize(width: 420, height: 320)
+        .restorationBehavior(.disabled)
+        // Its menu item and ⌘9 are in EditorCommands, like every other shortcut.
+        .commandsRemoved()
+
         Settings {
             SettingsView(model: model)
         }

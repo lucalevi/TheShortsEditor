@@ -50,7 +50,7 @@ public struct ColorKey: Codable, Equatable, Hashable, Sendable {
 
     /// A typical green screen, and blue screen, as cameras see them.
     public static let green = RGBA(0.2, 0.75, 0.3)
-    public static let blue = RGBA(0.15, 0.3, 0.85)
+    static let blue = RGBA(0.15, 0.3, 0.85)
 
     /// A pixel's colour without its brightness (a point near 0, 0 is grey).
     static func chroma(_ r: Double, _ g: Double, _ b: Double) -> (cb: Double, cr: Double) {
@@ -65,7 +65,7 @@ public struct ColorKey: Codable, Equatable, Hashable, Sendable {
     }
 
     /// The colour and see-through-ness (alpha 0…1, not premultiplied) a pixel has once keyed.
-    public func keyed(_ r: Double, _ g: Double, _ b: Double) -> (red: Double, green: Double, blue: Double, alpha: Double) {
+    package func keyed(_ r: Double, _ g: Double, _ b: Double) -> (red: Double, green: Double, blue: Double, alpha: Double) {
         let key = Self.chroma(color.red, color.green, color.blue)
         let pixel = Self.chroma(r, g, b)
         let distance = hypot(pixel.cb - key.cb, pixel.cr - key.cr)
@@ -181,11 +181,11 @@ public struct ClipMask: Codable, Equatable, Hashable, Sendable {
         self.inverted = inverted
     }
 
-    public static let stretchRange: ClosedRange<Double> = 0.25...4
+    static let stretchRange: ClosedRange<Double> = 0.25...4
     public static let sizeRange: ClosedRange<Double> = 0.05...2
 
     /// Width and height of the shape, in pixels of a picture of `pictureSize`.
-    public func shapeSize(in pictureSize: CGSize) -> CGSize {
+    package func shapeSize(in pictureSize: CGSize) -> CGSize {
         let side = min(pictureSize.width, pictureSize.height) * size
         guard shape.stretches else { return CGSize(width: side, height: side) }
         let s = stretch.clamped(Self.stretchRange.lowerBound, Self.stretchRange.upperBound)
@@ -193,13 +193,13 @@ public struct ClipMask: Codable, Equatable, Hashable, Sendable {
     }
 
     /// Width of the soft edge, in pixels of a picture of `pictureSize`.
-    public func featherWidth(in pictureSize: CGSize) -> Double {
+    package func featherWidth(in pictureSize: CGSize) -> Double {
         feather.clamped(0, 1) * 0.25 * min(pictureSize.width, pictureSize.height)
     }
 
     /// How much of the picture shows at `point` (pixels of a picture of `pictureSize`, origin top
     /// left), 0…1. The renderer draws the same shapes with Core Image; this is the reference.
-    public func visibility(at point: CGPoint, in pictureSize: CGSize) -> Double {
+    func visibility(at point: CGPoint, in pictureSize: CGSize) -> Double {
         // Into the shape's own frame: its middle at 0, 0, not turned.
         let dx = point.x - centerX * pictureSize.width, dy = point.y - centerY * pictureSize.height
         let angle = -rotation * .pi / 180
@@ -287,7 +287,7 @@ public struct ClipCutout: Codable, Equatable, Hashable, Sendable {
         self.blend = blend
     }
 
-    public var isEmpty: Bool { removeBackground == nil && key == nil && mask == nil && blend == .normal }
+    var isEmpty: Bool { removeBackground == nil && key == nil && mask == nil && blend == .normal }
     /// Whether some of the picture may be see-through.
     public var isSeeThrough: Bool { removeBackground != nil || key != nil || mask != nil }
 
@@ -310,7 +310,7 @@ public struct ClipCutout: Codable, Equatable, Hashable, Sendable {
     }
 }
 
-public extension RGBA {
+extension RGBA {
     /// The hue of a colour, 0…1 (red 0, green ⅓, blue ⅔).
     static func hue(_ r: Double, _ g: Double, _ b: Double) -> Double {
         let high = max(r, g, b), low = min(r, g, b), range = high - low
@@ -322,9 +322,9 @@ public extension RGBA {
     }
 }
 
-public extension Project {
+extension Project {
     /// Changes the cut-out settings of clip `id` (main clip, B-roll or not).
-    mutating func updateCutout(of id: Clip.ID, _ change: (inout ClipCutout) -> Void) {
+    public mutating func updateCutout(of id: Clip.ID, _ change: (inout ClipCutout) -> Void) {
         updateAnyClip(id) { change(&$0.cutout) }
     }
 

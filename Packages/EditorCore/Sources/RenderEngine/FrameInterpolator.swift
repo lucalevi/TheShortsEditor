@@ -60,11 +60,7 @@ public nonisolated enum FrameInterpolator {
 
     /// Where the copy of `source` for `recipe` is kept.
     public static func copyURL(for source: URL, recipe: Recipe) -> URL {
-        let values = try? source.resourceValues(forKeys: [.fileSizeKey, .contentModificationDateKey])
-        let key =
-            "\(source.path)|\(values?.fileSize ?? 0)|\(values?.contentModificationDate?.timeIntervalSince1970 ?? 0)|"
-            + "\(recipe.range.start.seconds)|\(recipe.range.duration.seconds)|\(recipe.factor)|v2"
-        let digest = SHA256.hash(data: Data(key.utf8)).prefix(12).map { String(format: "%02x", $0) }.joined()
+        let digest = FileIdentity.key(of: source, extra: "\(recipe.range.start.seconds)|\(recipe.range.duration.seconds)|\(recipe.factor)|v2")
         return folder.appending(path: "\(digest).mov")
     }
 

@@ -34,7 +34,7 @@ struct EffectsSection: View {
     }
 
     private var previewKey: String {
-        let time = model.project.sourceTime(ofClip: clip.id, at: model.currentTime)?.seconds ?? 0
+        let time = model.project.sourceTime(ofClip: clip.id, at: model.playback.currentTime)?.seconds ?? 0
         return "\(clip.id)|\(clip.assetID)|\((time * 2).rounded())|\(clip.look.hashValue)"
     }
 

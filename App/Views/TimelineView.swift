@@ -207,10 +207,10 @@ struct TimelineView: View {
         .onChange(of: model.project.timeline.clips.isEmpty, initial: true) {
             if !model.project.timeline.clips.isEmpty { model.showTip(.skimming) }
         }
-        .onChange(of: model.currentTime) {
+        .onChange(of: model.playback.currentTime) {
             // Keep the playhead in view while playing.
-            let playheadX = x(for: model.currentTime)
-            if model.isPlaying, !(visibleRect.minX...visibleRect.maxX).contains(playheadX) {
+            let playheadX = x(for: model.playback.currentTime)
+            if model.playback.isPlaying, !(visibleRect.minX...visibleRect.maxX).contains(playheadX) {
                 scrollPosition.scrollTo(point: CGPoint(x: max(0, playheadX - 40), y: visibleRect.minY))
             }
         }
@@ -225,8 +225,8 @@ struct TimelineView: View {
             let modifiers = NSEvent.modifierFlags
             select(nil, modifiers)
             guard modifiers.isDisjoint(with: [.command, .shift]) else { return }
-            model.pause()
-            model.seek(to: time(at: value.location.x))
+            model.playback.pause()
+            model.playback.seek(to: time(at: value.location.x))
         }
     }
 
@@ -265,7 +265,7 @@ struct TimelineView: View {
             .onChanged { value in
                 if rangeAnchor != nil || (marquee == nil && model.isRangeKeyDown && abs(value.translation.width) > 3) {
                     if rangeAnchor == nil {
-                        model.pause()
+                        model.playback.pause()
                         rangeAnchor = time(at: value.startLocation.x)
                     }
                     model.setTimelineRange(from: rangeAnchor!, to: time(at: value.location.x))
@@ -293,8 +293,8 @@ struct TimelineView: View {
                     model.selection = nil // a plain click on empty space
                     model.selectedAssetID = nil
                     model.timelineRange = nil
-                    model.pause() // ...also moves the playhead there
-                    model.seek(to: time(at: value.location.x))
+                    model.playback.pause() // ...also moves the playhead there
+                    model.playback.seek(to: time(at: value.location.x))
                 }
                 marquee = nil
                 marqueeBase = nil
@@ -348,8 +348,8 @@ struct TimelineView: View {
         .contentShape(Rectangle())
         .gesture(
             DragGesture(minimumDistance: 0).onChanged { value in
-                model.pause()
-                model.seek(to: time(at: value.location.x))
+                model.playback.pause()
+                model.playback.seek(to: time(at: value.location.x))
             }
         )
         .help("Click or drag to move the playhead")
@@ -393,7 +393,7 @@ struct TimelineView: View {
                 .foregroundStyle(.red)
             Rectangle().fill(.red).frame(width: 2)
         }
-        .offset(x: x(for: model.currentTime) - 5, y: rulerHeight - 10)
+        .offset(x: x(for: model.playback.currentTime) - 5, y: rulerHeight - 10)
         .allowsHitTesting(false)
         .accessibilityHidden(true)
     }
@@ -403,7 +403,7 @@ struct TimelineView: View {
     /// The white line under the pointer while skimming.
     @ViewBuilder
     var skimmer: some View {
-        if let skim = model.skimTime, !model.isPlaying, reorder == nil, clipTrim == nil, blockDrag == nil, rangeAnchor == nil {
+        if let skim = model.playback.skimTime, !model.playback.isPlaying, reorder == nil, clipTrim == nil, blockDrag == nil, rangeAnchor == nil {
             Rectangle()
                 .fill(Color.white)
                 .frame(width: 1)
@@ -702,7 +702,7 @@ struct TimelineView: View {
             pointsPerSecond: pointsPerSecond,
             isSelected: model.isSelected(.clip(clip.id)),
             isReversed: asset?.reversedFrom != nil,
-            progress: model.reversing[clip.id]
+            progress: model.tasks.progress(.backwards(clip.id))
         )
         .equatable()
         .overlay(alignment: .bottom) {
@@ -740,8 +740,8 @@ struct TimelineView: View {
             // ⌘/⇧-clicks only change the selection; a plain click also moves the playhead.
             guard modifiers.isDisjoint(with: [.command, .shift]) else { return }
             let start = model.project.timeline.startTime(ofClipAt: index)
-            model.pause()
-            model.seek(to: start + seconds(location.x))
+            model.playback.pause()
+            model.playback.seek(to: start + seconds(location.x))
         }
         .gesture(
             DragGesture(minimumDistance: 4, coordinateSpace: .named(Self.contentSpace))
@@ -749,14 +749,14 @@ struct TimelineView: View {
                     // With R held, dragging picks a range instead of moving the clip.
                     if rangeAnchor != nil || (reorder == nil && model.isRangeKeyDown) {
                         if rangeAnchor == nil {
-                            model.pause()
+                            model.playback.pause()
                             rangeAnchor = time(at: value.startLocation.x)
                         }
                         model.setTimelineRange(from: rangeAnchor!, to: time(at: value.location.x))
                         return
                     }
                     if reorder == nil {
-                        model.pause()
+                        model.playback.pause()
                         if !model.isSelected(.clip(clip.id)) { model.selectedClipID = clip.id }
                     }
                     reorder = Reorder(id: clip.id, dx: value.translation.width, destination: destination(for: clip, index: index, dx: value.translation.width))
@@ -835,7 +835,7 @@ struct TimelineView: View {
     }
 
     func updateClipTrim(_ clip: Clip, edge: ClipEdge, points: CGFloat) {
-        model.pause()
+        model.playback.pause()
         if !model.isSelected(.clip(clip.id)) { model.selectedClipID = clip.id }
         guard let range = model.project.timeline.range(of: clip.id),
             let limits = model.project.trimLimits(for: clip, edge: edge)

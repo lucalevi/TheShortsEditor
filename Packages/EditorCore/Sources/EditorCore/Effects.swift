@@ -63,14 +63,14 @@ public enum EffectKind: String, Codable, CaseIterable, Identifiable, Sendable {
     }
 
     /// Where it plays when first added: flashes and blurs at the start, the rest all through.
-    public var defaultPart: EffectPart {
+    var defaultPart: EffectPart {
         switch self {
         case .flash, .blur: .start
         default: .wholeClip
         }
     }
 
-    public var defaultLength: CMTime {
+    var defaultLength: CMTime {
         switch self {
         case .flash: CMTime(value: 2, timescale: 5)
         default: CMTime(value: 4, timescale: 5)
@@ -136,14 +136,14 @@ public struct ClipEffect: Codable, Equatable, Hashable, Identifiable, Sendable {
 }
 
 /// An effect at one moment: how far into it (seconds) and through it (0…1).
-public struct EffectMoment: Equatable, Sendable {
-    public var effect: ClipEffect
-    public var seconds: Double
-    public var progress: Double
+package struct EffectMoment: Equatable, Sendable {
+    package var effect: ClipEffect
+    package var seconds: Double
+    package var progress: Double
     /// The frame number on the timeline, for effects that change at random from frame to frame.
-    public var frame: Int
+    package var frame: Int
 
-    public init(effect: ClipEffect, seconds: Double, progress: Double, frame: Int) {
+    package init(effect: ClipEffect, seconds: Double, progress: Double, frame: Int) {
         self.effect = effect
         self.seconds = seconds
         self.progress = progress
@@ -151,9 +151,9 @@ public struct EffectMoment: Equatable, Sendable {
     }
 }
 
-public extension Clip {
+extension Clip {
     /// The effects playing `offset` into the clip (which starts at `clipStart` on the timeline).
-    func activeEffects(atOffset offset: CMTime, clipStart: CMTime = .zero) -> [EffectMoment] {
+    package func activeEffects(atOffset offset: CMTime, clipStart: CMTime = .zero) -> [EffectMoment] {
         guard !effects.isEmpty, offset >= .zero, offset < duration else { return [] }
         let t = offset.seconds + 0.5 / Double(Project.frameRate)
         let frame = (clipStart + offset).convertScale(Project.frameRate, method: .roundTowardNegativeInfinity).value
@@ -174,10 +174,10 @@ public extension Clip {
     }
 }
 
-public extension Project {
+extension Project {
     /// Adds an effect to clips (main or B-roll), at its usual place and strength. One of each
     /// kind per clip: adding a kind it already has does nothing.
-    mutating func addEffect(_ kind: EffectKind, to ids: [Clip.ID]) {
+    public mutating func addEffect(_ kind: EffectKind, to ids: [Clip.ID]) {
         for id in ids where anyClip(id: id) != nil && sound(id: id) == nil {
             updateAnyClip(id) { clip in
                 guard !clip.effects.contains(where: { $0.kind == kind }) else { return }
@@ -186,7 +186,7 @@ public extension Project {
         }
     }
 
-    mutating func updateEffect(_ effectID: ClipEffect.ID, on clipID: Clip.ID, _ change: (inout ClipEffect) -> Void) {
+    public mutating func updateEffect(_ effectID: ClipEffect.ID, on clipID: Clip.ID, _ change: (inout ClipEffect) -> Void) {
         updateAnyClip(clipID) { clip in
             guard let index = clip.effects.firstIndex(where: { $0.id == effectID }) else { return }
             change(&clip.effects[index])
@@ -196,7 +196,7 @@ public extension Project {
         }
     }
 
-    mutating func removeEffect(_ effectID: ClipEffect.ID, from clipID: Clip.ID) {
+    public mutating func removeEffect(_ effectID: ClipEffect.ID, from clipID: Clip.ID) {
         updateAnyClip(clipID) { $0.effects.removeAll { $0.id == effectID } }
     }
 }

@@ -31,10 +31,16 @@ extension EditorModel {
             restyle(nil, music: nil, actionName: "Remove Style")
             return
         }
-        styleBeingMade = style
+        let making = tasks.start(.style(style), title: "Making the music of “\(style.displayName)”") { _ in
+            await self.styleMusic(style.music)
+        }
         Task {
-            defer { styleBeingMade = nil }
-            let music = await styleMusic(style.music)
+            let music: MediaAsset?
+            do {
+                music = try await making.value
+            } catch {
+                return // Stopped.
+            }
             restyle(style, music: music, actionName: "Style: \(style.displayName)")
         }
     }
@@ -91,9 +97,9 @@ extension EditorModel {
     /// Opens the Magic Short sheet for the clips on the timeline.
     func beginMagic() {
         guard magic == nil else { return }
-        player.pause()
+        playback.player.pause()
         let style = project.style ?? MagicShort.lastStyle
-        magic = MagicSession(options: MagicOptions(style: style, length: MagicShort.lastLength), language: captionLanguage)
+        magic = MagicSession(options: MagicOptions(style: style, length: MagicShort.lastLength), language: captioning.spokenLanguage)
         prepareMusic(style.music)
     }
 
@@ -136,7 +142,7 @@ extension EditorModel {
         guard let session = magic, session.phase == .choosing, !project.timeline.clips.isEmpty else { return }
         let options = session.options
         let language = session.language
-        captionLanguage = language
+        captioning.spokenLanguage = language
         MagicShort.lastStyle = options.style
         MagicShort.lastLength = options.length
         magicTask = Task {
@@ -171,7 +177,7 @@ extension EditorModel {
             // 2. How loud each moment is: for finding the pauses.
             show("Finding the pauses…")
             for asset in Set(project.timeline.clips.map(\.assetID)).compactMap(project.asset(id:)) where asset.hasAudio && audioLevels[asset.id] == nil {
-                if let levels = await LevelCache.levels(of: asset.url) { setAudioLevels(levels, for: asset.id) }
+                if let levels = await analysis.levels(of: asset.url) { setAudioLevels(levels, for: asset.id) }
             }
             // 3. The style's music.
             var music: MediaAsset?
@@ -203,7 +209,7 @@ extension EditorModel {
             isRestyling = false
             if let music { loadPreviewsIfNeeded(music) }
             selection = nil
-            seek(to: .zero)
+            playback.seek(to: .zero)
             magic?.phase = .done(report)
         }
     }
@@ -222,8 +228,8 @@ extension EditorModel {
             selectTitle(id)
             wantsTitleTextFocus = true
         } else if play {
-            seek(to: .zero)
-            player.play()
+            playback.seek(to: .zero)
+            playback.player.play()
         }
     }
 
@@ -256,7 +262,7 @@ extension EditorModel {
         }
         if let clipID, let range = project.timeline.range(of: clipID) {
             selection = .clip(clipID)
-            seek(to: range.start)
+            playback.seek(to: range.start)
         }
     }
 
@@ -302,7 +308,7 @@ extension EditorModel {
     func showShot(_ slot: Storyboard.Slot) {
         guard let clip = project.clip(filling: slot), let range = project.timeline.range(of: clip.id) else { return }
         selection = .clip(clip.id)
-        seek(to: range.start)
+        playback.seek(to: range.start)
     }
 }
 

@@ -60,10 +60,12 @@ struct PhotosView: View {
             ScrollView {
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 92), spacing: 4)], spacing: 4) {
                     ForEach(items, id: \.localIdentifier) { asset in
-                        PhotoTile(asset: asset, isSelected: selection.contains(asset.localIdentifier), progress: model.photoDownloads[asset.localIdentifier])
-                            .onTapGesture(count: 2) { model.importFromPhotos([asset], to: .timelineEnd) }
-                            .onTapGesture { select(asset) }
-                            .contextMenu { menu(for: selection.contains(asset.localIdentifier) ? selectedAssets : [asset]) }
+                        PhotoTile(
+                            asset: asset, isSelected: selection.contains(asset.localIdentifier), progress: model.tasks.progress(.photo(asset.localIdentifier))
+                        )
+                        .onTapGesture(count: 2) { model.importFromPhotos([asset], to: .timelineEnd) }
+                        .onTapGesture { select(asset) }
+                        .contextMenu { menu(for: selection.contains(asset.localIdentifier) ? selectedAssets : [asset]) }
                     }
                 }
                 .padding(.horizontal, 8)
@@ -81,7 +83,7 @@ struct PhotosView: View {
             HStack {
                 Button("Add to End") { model.importFromPhotos(selectedAssets, to: .timelineEnd) }
                     .help("Put the selected items at the end of your Short (double-click does the same)")
-                Button("Over Clips") { model.importFromPhotos(selectedAssets, to: .overlay(at: model.currentTime)) }
+                Button("Over Clips") { model.importFromPhotos(selectedAssets, to: .overlay(at: model.playback.currentTime)) }
                     .disabled(model.project.timeline.clips.isEmpty)
                     .help("Show the selected items over your clips from the playhead (B-roll)")
                 Spacer()
@@ -116,7 +118,7 @@ struct PhotosView: View {
     @ViewBuilder
     private func menu(for assets: [PHAsset]) -> some View {
         Button("Add to End") { model.importFromPhotos(assets, to: .timelineEnd) }
-        Button("Add Over Clips at Playhead") { model.importFromPhotos(assets, to: .overlay(at: model.currentTime)) }
+        Button("Add Over Clips at Playhead") { model.importFromPhotos(assets, to: .overlay(at: model.playback.currentTime)) }
             .disabled(model.project.timeline.clips.isEmpty)
         Button("Add to Media") { model.importFromPhotos(assets, to: .media) }
     }
@@ -377,8 +379,8 @@ struct TimelineMarkers: View {
             model.markerBeingRenamed = marker.id
         }
         .onTapGesture {
-            model.pause()
-            model.seek(to: marker.time)
+            model.playback.pause()
+            model.playback.seek(to: marker.time)
         }
         .gesture(
             DragGesture(minimumDistance: 3).onChanged { value in
@@ -394,7 +396,7 @@ struct TimelineMarkers: View {
                 name = marker.name
                 model.markerBeingRenamed = marker.id
             }
-            Button("Go to Marker") { model.seek(to: marker.time) }
+            Button("Go to Marker") { model.playback.seek(to: marker.time) }
             Divider()
             Button("Delete Marker", role: .destructive) { model.deleteMarker(marker.id) }
         }

@@ -36,7 +36,7 @@ public enum MusicMood: String, Codable, CaseIterable, Identifiable, Sendable {
     }
 
     /// Beats a minute.
-    public var tempo: Double {
+    package var tempo: Double {
         switch self {
         case .upbeat: 118
         case .chill: 84
@@ -48,10 +48,10 @@ public enum MusicMood: String, Codable, CaseIterable, Identifiable, Sendable {
     }
 
     /// One bar (four beats), the unit the music is built in.
-    public var barLength: CMTime { CMTime(seconds: 240 / tempo, preferredTimescale: 48_000) }
+    var barLength: CMTime { CMTime(seconds: 240 / tempo, preferredTimescale: 48_000) }
 
     /// How loud it plays under the Short. Busy music sits lower so the voice stays clear.
-    public var volume: Double {
+    var volume: Double {
         switch self {
         case .upbeat, .playful: 0.4
         case .dramatic: 0.45
@@ -61,15 +61,15 @@ public enum MusicMood: String, Codable, CaseIterable, Identifiable, Sendable {
     }
 }
 
-public extension BackgroundMusic {
+extension BackgroundMusic {
     /// Music the app made for a style. It fits itself to the Short's end (`Project.fitMoodMusic()`).
     var isMoodMusic: Bool { mood != nil }
 }
 
-public extension Project {
+extension Project {
     /// Starts the app-made music so its last moment lands on the end of a bar: the Short then ends
     /// on the beat and loops back cleanly instead of fading out. Done after every edit.
-    mutating func fitMoodMusic() {
+    public mutating func fitMoodMusic() {
         guard var music, let mood = music.mood, duration > .zero else { return }
         let bar = mood.barLength.seconds
         let length = (duration - music.start).seconds
@@ -136,7 +136,7 @@ public enum ShortStyle: String, Codable, CaseIterable, Identifiable, Sendable {
     }
 
     /// The ready-made title style it is closest to.
-    public var titleStyle: TitleStyle {
+    var titleStyle: TitleStyle {
         switch self {
         case .clean: .simple
         case .bold: .bold
@@ -166,7 +166,7 @@ public enum ShortStyle: String, Codable, CaseIterable, Identifiable, Sendable {
         return look
     }
 
-    public var titleEntrance: TitleEntrance {
+    var titleEntrance: TitleEntrance {
         switch self {
         case .clean: .fade
         case .bold: .pop
@@ -177,7 +177,7 @@ public enum ShortStyle: String, Codable, CaseIterable, Identifiable, Sendable {
         }
     }
 
-    public var captionStyle: CaptionStyle {
+    var captionStyle: CaptionStyle {
         switch self {
         case .clean: .minimal
         case .bold: .bold
@@ -189,7 +189,7 @@ public enum ShortStyle: String, Codable, CaseIterable, Identifiable, Sendable {
     }
 
     /// The colour of the word being spoken and of key words (nil: the caption style's own).
-    public var captionAccent: RGBA? {
+    var captionAccent: RGBA? {
         switch self {
         case .pop: RGBA(1, 0.4, 0.75)
         case .explainer: RGBA(0.2, 0.55, 1)
@@ -240,9 +240,9 @@ public enum ShortStyle: String, Codable, CaseIterable, Identifiable, Sendable {
     }
 
     /// Whether key words are coloured in the captions.
-    public var highlightsKeywords: Bool { self == .bold || self == .pop || self == .explainer }
+    var highlightsKeywords: Bool { self == .bold || self == .pop || self == .explainer }
     /// Whether emoji are shown with the captions.
-    public var showsEmoji: Bool { self == .pop || self == .vlog }
+    var showsEmoji: Bool { self == .pop || self == .vlog }
 }
 
 extension TextOverlay {
@@ -257,12 +257,12 @@ extension TextOverlay {
     }
 }
 
-public extension Project {
+extension Project {
     /// Gives the whole Short a style, or takes it away (nil). Every title and the captions take
     /// its look; every cut to another recording gets its transition (other cuts become plain); clips without motion of their own get its motion;
     /// the whole Short gets its filter unless another filter was chosen; and `music` (the style's
     /// music file, made by the app) replaces any app-made music. The user's own song stays.
-    mutating func applyStyle(_ newStyle: ShortStyle?, music musicAsset: MediaAsset? = nil) {
+    public mutating func applyStyle(_ newStyle: ShortStyle?, music musicAsset: MediaAsset? = nil) {
         let old = style
         style = newStyle
 
@@ -302,7 +302,7 @@ public extension Project {
     /// Uses the app's own music for `mood` (its file, `asset`) as the Short's music, in place of any
     /// song. Like a style's music, it fits itself to the Short's end; earlier app-made music no longer
     /// used leaves Media.
-    mutating func setMoodMusic(_ asset: MediaAsset, mood: MusicMood) {
+    public mutating func setMoodMusic(_ asset: MediaAsset, mood: MusicMood) {
         let oldMusic = music
         let id = addAsset(asset)
         if oldMusic?.assetID == id, oldMusic?.mood == mood { return }
@@ -314,7 +314,7 @@ public extension Project {
     }
 
     /// Uses `asset` (the style's music file) as the music, when the Short has a style and no music yet.
-    mutating func addStyleMusic(_ asset: MediaAsset) {
+    public mutating func addStyleMusic(_ asset: MediaAsset) {
         guard let style, music == nil else { return }
         let id = addAsset(asset)
         music = BackgroundMusic(assetID: id, volume: style.music.volume, mood: style.music)
@@ -323,7 +323,7 @@ public extension Project {
 
     /// Clips whose style-given placement or motion was changed by hand in this edit become the
     /// user's own, so a later style leaves them alone. Called after every edit but a style's.
-    mutating func claimHandMadeMotion(from old: Project) {
+    public mutating func claimHandMadeMotion(from old: Project) {
         let before = Dictionary(old.timeline.clips.map { ($0.id, $0) }) { a, _ in a }
         for index in timeline.clips.indices where timeline.clips[index].styledMotion {
             guard let was = before[timeline.clips[index].id], was.styledMotion else { continue }

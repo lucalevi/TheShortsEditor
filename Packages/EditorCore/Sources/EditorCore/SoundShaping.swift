@@ -66,7 +66,7 @@ public enum SoundEQ: String, Codable, CaseIterable, Identifiable, Sendable {
 /// picture's keyframes, so points stay on the same sound when the clip is split or trimmed.
 public struct VolumeKey: Identifiable, Codable, Equatable, Sendable {
     public var id: UUID
-    public var time: CMTime
+    var time: CMTime
     public var level: Double
 
     public init(id: UUID = UUID(), time: CMTime, level: Double) {
@@ -92,9 +92,9 @@ public struct VolumeKey: Identifiable, Codable, Equatable, Sendable {
     }
 }
 
-public extension Clip {
+extension Clip {
     /// The longest fade a handle can make.
-    static let maxFade = CMTime(value: 5, timescale: 1)
+    public static let maxFade = CMTime(value: 5, timescale: 1)
     /// How long the sound takes to change where a volume set on part of a recording begins.
     static let continuityFade = CMTime(value: 1, timescale: 5)
 
@@ -104,10 +104,10 @@ public extension Clip {
     }
 
     /// Whether the sound plays through a processed copy of the file (see `SoundProcessor`).
-    var needsProcessedSound: Bool { voiceEffect != nil || equalizer != nil }
+    public var needsProcessedSound: Bool { voiceEffect != nil || equalizer != nil }
 
     /// The fades as they are heard: each at most the clip's length, and together no longer than it.
-    var heardFades: (in: CMTime, out: CMTime) {
+    public var heardFades: (in: CMTime, out: CMTime) {
         let fadeIn = max(fadeIn, .zero), fadeOut = max(fadeOut, .zero)
         let total = fadeIn + fadeOut
         guard total > duration, total > .zero else { return (min(fadeIn, duration), min(fadeOut, duration)) }
@@ -116,7 +116,7 @@ public extension Clip {
     }
 
     /// The volume-line points inside the clip, as (offset into the clip, level), in order.
-    var visibleVolumeKeys: [(key: VolumeKey, offset: CMTime)] {
+    public var visibleVolumeKeys: [(key: VolumeKey, offset: CMTime)] {
         volumeKeys
             .map { ($0, timelineOffset(ofSourceTime: $0.time)) }
             .filter { $0.1 >= .zero && $0.1 <= duration }
@@ -130,7 +130,7 @@ public extension Clip {
     }
 
     /// How loud the clip plays at `offset` into it: volume × line × fades (0 when muted or detached).
-    func soundLevel(atOffset offset: CMTime) -> Double {
+    public func soundLevel(atOffset offset: CMTime) -> Double {
         guard effectiveVolume > 0 else { return 0 }
         let fades = heardFades
         var fade = 1.0
@@ -141,7 +141,7 @@ public extension Clip {
 
     /// The clip's volume over its own length (offsets from its start), as straight lines between
     /// points. Fades are drawn with a few steps so a fade over a sloping line stays close.
-    func soundEnvelope() -> [VolumePoint] {
+    public func soundEnvelope() -> [VolumePoint] {
         guard duration > .zero else { return [] }
         let fades = heardFades
         var times: [CMTime] = [.zero, duration]
@@ -157,7 +157,7 @@ public extension Clip {
     /// there. The first point also pins the line at the clip's start and end, so moving it makes
     /// a dip or a bump rather than moving the whole line. Returns its id.
     @discardableResult
-    mutating func addVolumeKey(atOffset offset: CMTime, level: Double? = nil) -> VolumeKey.ID {
+    public mutating func addVolumeKey(atOffset offset: CMTime, level: Double? = nil) -> VolumeKey.ID {
         let offset = offset.clamped(.zero, duration)
         let level = level ?? keyLevel(atOffset: offset)
         if volumeKeys.isEmpty {
@@ -174,7 +174,7 @@ public extension Clip {
         return key.id
     }
 
-    static func clampedLevel(_ level: Double) -> Double { min(max(level, 0), Clip.maxVolume) }
+    public static func clampedLevel(_ level: Double) -> Double { min(max(level, 0), Clip.maxVolume) }
 
     /// The fades and line of a clip cut in two at `offset`: the first part keeps the fade in, the second the fade out.
     mutating func keepFades(isFirst: Bool, isLast: Bool) {
@@ -202,14 +202,14 @@ public extension Clip {
     }
 }
 
-public extension AudioMix {
+extension AudioMix {
     /// The volume of the main clips' sound over the whole storyline. Where a clip continues the
     /// same recording at another volume (a range had its volume changed), the sound moves to it
     /// over `Clip.continuityFade` instead of jumping.
     ///
     /// Across each of `crossfades` the clip going out fades to half by the cut and the clip coming
     /// in rises from half after it; the other half of each is heard on a track of its own.
-    static func storylineEnvelope(_ clips: [Clip], crossfades: [SoundCrossfade] = []) -> [VolumePoint] {
+    package static func storylineEnvelope(_ clips: [Clip], crossfades: [SoundCrossfade] = []) -> [VolumePoint] {
         var points = plainStorylineEnvelope(clips)
         for fade in crossfades {
             let range = fade.span.range
@@ -255,7 +255,7 @@ public extension AudioMix {
 
     /// Where the sound may distort: the file's loudness (dBFS, per frame) with the clip's volume
     /// applied is above `limit`. In timeline offsets from the clip's start.
-    static func tooLoudRanges(of clip: Clip, levels: AudioLevels, limit: Float = AudioMix.distortionLevel) -> [CMTimeRange] {
+    public static func tooLoudRanges(of clip: Clip, levels: AudioLevels, limit: Float = AudioMix.distortionLevel) -> [CMTimeRange] {
         guard clip.effectiveVolume > 0 else { return [] }
         let frames = clip.duration.convertScale(Project.frameRate, method: .roundHalfAwayFromZero).value
         var ranges: [CMTimeRange] = []
@@ -281,19 +281,19 @@ public extension AudioMix {
 
     /// Steady loudness (RMS, dBFS) above which the peaks of ordinary speech or music are
     /// likely to hit full scale and crackle.
-    static let distortionLevel: Float = -6
+    public static let distortionLevel: Float = -6
     /// Getting close: shown as a warning before it distorts.
     static let loudLevel: Float = -10
 }
 
 // MARK: - Detaching the sound
 
-public extension Project {
+extension Project {
     /// Puts a main clip's sound on the sound row as its own item, so it can be trimmed and moved
     /// on its own (to start before the picture, or carry on after it). The clip itself goes
     /// silent. Returns the new sound's id, or nil when the clip has no sound or is already detached.
     @discardableResult
-    mutating func detachSound(of clipID: Clip.ID) -> Clip.ID? {
+    public mutating func detachSound(of clipID: Clip.ID) -> Clip.ID? {
         guard let index = timeline.index(of: clipID) else { return nil }
         let clip = timeline.clips[index]
         guard !clip.soundDetached, let media = asset(id: clip.assetID), media.hasAudio, !media.isImage else { return nil }
@@ -309,7 +309,7 @@ public extension Project {
     }
 
     /// Gives a detached clip its own sound back and removes the sound items made from it.
-    mutating func reattachSound(of clipID: Clip.ID) {
+    public mutating func reattachSound(of clipID: Clip.ID) {
         guard let index = timeline.index(of: clipID), timeline.clips[index].soundDetached else { return }
         sounds.removeAll { $0.detachedFrom == clipID }
         timeline.clips[index].soundDetached = false
@@ -319,22 +319,22 @@ public extension Project {
 /// The sound across a transition: both clips are heard, the old one fading out as the new one
 /// fades in. The old clip's sound goes on past the cut and the new one's starts before it, from
 /// more of their files (like the picture), on a track of their own.
-public struct SoundCrossfade: Equatable, Sendable {
-    public let span: TransitionSpan
+package struct SoundCrossfade: Equatable, Sendable {
+    package let span: TransitionSpan
     /// The part of the incoming clip's file heard in the half before the cut.
-    public let incomingSource: CMTimeRange
+    package let incomingSource: CMTimeRange
     /// The part of the outgoing clip's file heard in the half after the cut.
-    public let outgoingSource: CMTimeRange
+    package let outgoingSource: CMTimeRange
     /// How loud each clip plays where it meets the cut (volume, line), before the crossfade.
-    public let incomingLevel: Double
-    public let outgoingLevel: Double
+    package let incomingLevel: Double
+    package let outgoingLevel: Double
 }
 
-public extension Project {
+extension Project {
     /// The transitions whose sound crossfades. Only where both clips play their own sound at an
     /// even speed, without a fade of their own at the cut, and their files have the sound to
     /// borrow; elsewhere the sound simply cuts.
-    var soundCrossfades: [SoundCrossfade] {
+    package var soundCrossfades: [SoundCrossfade] {
         let clips = timeline.clips
         return timeline.transitionSpans.compactMap { span in
             guard let out = clips.first(where: { $0.id == span.from }), let into = clips.first(where: { $0.id == span.to }),

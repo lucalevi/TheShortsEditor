@@ -122,24 +122,23 @@ extension EditorModel {
     /// Copies library items in (from iCloud when needed, with progress on their tiles), then adds
     /// them like files: to Media, the end of the timeline, or over the clips at the playhead.
     func importFromPhotos(_ assets: [PHAsset], to destination: ImportDestination) {
-        let fresh = assets.filter { photoDownloads[$0.localIdentifier] == nil }
+        let fresh = assets.filter { !tasks.isRunning(.photo($0.localIdentifier)) }
         guard !fresh.isEmpty else { return }
-        for asset in fresh { photoDownloads[asset.localIdentifier] = 0 }
         Task {
             var urls: [URL] = []
             var failed: [String] = []
             for asset in fresh {
                 let id = asset.localIdentifier
                 do {
-                    let url = try await PhotosLibrary.file(for: asset) { fraction in
-                        Task { @MainActor in if self.photoDownloads[id] != nil { self.photoDownloads[id] = fraction } }
+                    let url = try await tasks.run(.photo(id), title: "Copying an item from Photos") { progress in
+                        try await PhotosLibrary.file(for: asset) { progress($0) }
                     }
                     urls.append(url)
+                } catch is CancellationError {
                 } catch {
                     Log.media.failure("importFromPhotos", error)
                     failed.append(error.localizedDescription)
                 }
-                photoDownloads[id] = nil
             }
             if !urls.isEmpty { importFiles(urls, to: destination) }
             if !failed.isEmpty {

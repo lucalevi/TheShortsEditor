@@ -102,9 +102,9 @@ struct LayerTests {
 
     @Test func livePreviewIsDrawnWithoutRebuilding() async throws {
         let (project, id) = try await redOverBlue()
-        let built = try await CompositionBuilder.build(project)
-        LivePreview.set(Placement(offsetY: 0.25), for: id)
-        defer { LivePreview.set(nil, for: id) }
+        let live = LivePreview()
+        let built = try await CompositionBuilder.build(project, live: live)
+        live.set(Placement(offsetY: 0.25), for: id)
         #expect(isRed(Fixture.pixel(try await frame(of: built, at: 0.5), x: 540, y: 1100)))
     }
 

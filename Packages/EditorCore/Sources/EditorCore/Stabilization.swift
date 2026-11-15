@@ -10,10 +10,10 @@ import Foundation
 /// picture's width and height in the file's stored orientation, with y going down.
 public struct ShakePath: Codable, Equatable, Sendable {
     /// Seconds between two positions (one per frame of the file).
-    public var interval: Double
+    package var interval: Double
     /// The file time of the first position, in seconds.
-    public var start: Double
-    public var positions: [CGPoint]
+    var start: Double
+    package var positions: [CGPoint]
 
     public init(interval: Double, start: Double = 0, positions: [CGPoint]) {
         self.interval = interval
@@ -22,14 +22,14 @@ public struct ShakePath: Codable, Equatable, Sendable {
     }
 
     /// The most a clip is zoomed in to hide moved edges; beyond it, some shake is left.
-    public static let maxZoom = 1.25
+    static let maxZoom = 1.25
 
     /// How long the smoothing looks around a moment, in seconds, for a steadiness of 0…1.
     static func window(for steadiness: Double) -> Double { 0.15 + 0.85 * steadiness.clamped(0, 1) }
 
     /// Where the content is in the frame on screen at `seconds` of the file: the last one that
     /// starts at or before then (a frame stays on screen until the next one).
-    public func position(at seconds: Double) -> CGPoint {
+    func position(at seconds: Double) -> CGPoint {
         guard !positions.isEmpty, interval > 0 else { return .zero }
         // A little leeway, so a time that is a frame's start up to rounding finds that frame.
         let index = Int(((seconds - start) / interval + 0.01).rounded(.down))
@@ -37,7 +37,7 @@ public struct ShakePath: Codable, Equatable, Sendable {
     }
 
     /// The smoothed path at `seconds`: a Gaussian average around it (a still camera wouldn't move at all).
-    public func smoothed(at seconds: Double, steadiness: Double) -> CGPoint {
+    func smoothed(at seconds: Double, steadiness: Double) -> CGPoint {
         guard positions.count > 1, interval > 0 else { return position(at: seconds) }
         let sigma = Self.window(for: steadiness)
         let reach = Int((3 * sigma / interval).rounded(.up))
@@ -57,14 +57,14 @@ public struct ShakePath: Codable, Equatable, Sendable {
 
     /// How far to move the frame at `seconds` (fractions of the picture, y down) to put its
     /// content on the smooth path.
-    public func correction(at seconds: Double, steadiness: Double) -> CGVector {
+    func correction(at seconds: Double, steadiness: Double) -> CGVector {
         let raw = position(at: seconds), smooth = smoothed(at: seconds, steadiness: steadiness)
         return CGVector(dx: smooth.x - raw.x, dy: smooth.y - raw.y)
     }
 
     /// How much to zoom in over a stretch of the file so the moved frames still cover the picture,
     /// at most `maxZoom`.
-    public func zoom(over range: ClosedRange<Double>, steadiness: Double) -> Double {
+    func zoom(over range: ClosedRange<Double>, steadiness: Double) -> Double {
         guard positions.count > 1, interval > 0, steadiness > 0 else { return 1 }
         var worst = 0.0
         var t = range.lowerBound
@@ -80,12 +80,12 @@ public struct ShakePath: Codable, Equatable, Sendable {
 
 /// What the compositor needs to steady one clip: its file's path, how strongly, and a zoom that
 /// stays the same for the whole clip.
-public struct Steadying: Sendable, Equatable {
-    public let path: ShakePath
-    public let steadiness: Double
-    public let zoom: Double
+package struct Steadying: Sendable, Equatable {
+    let path: ShakePath
+    let steadiness: Double
+    let zoom: Double
 
-    public init(path: ShakePath, clip: Clip) {
+    package init(path: ShakePath, clip: Clip) {
         self.path = path
         steadiness = clip.steadiness
         let start = clip.sourceStart.seconds, end = clip.sourceRange.end.seconds
@@ -93,7 +93,7 @@ public struct Steadying: Sendable, Equatable {
     }
 
     /// The move (as fractions of the picture, y down) and zoom for the frame at `sourceTime`.
-    public func adjustment(atSourceTime sourceTime: CMTime) -> (shift: CGVector, zoom: Double) {
+    func adjustment(atSourceTime sourceTime: CMTime) -> (shift: CGVector, zoom: Double) {
         var shift = path.correction(at: sourceTime.seconds, steadiness: steadiness)
         // What is left over after zooming is clamped, so no edge ever shows.
         let room = (zoom - 1) / 2
@@ -103,7 +103,7 @@ public struct Steadying: Sendable, Equatable {
     }
 
     /// The same as a transform of the file's picture (stored orientation, top-left origin, pixels).
-    public func transform(atSourceTime sourceTime: CMTime, naturalSize: CGSize) -> CGAffineTransform {
+    package func transform(atSourceTime sourceTime: CMTime, naturalSize: CGSize) -> CGAffineTransform {
         let (shift, zoom) = adjustment(atSourceTime: sourceTime)
         let w = naturalSize.width, h = naturalSize.height
         // Zoomed around the middle first, then moved, so the move is exactly `shift` of the picture.
@@ -114,10 +114,10 @@ public struct Steadying: Sendable, Equatable {
 }
 
 extension CGFloat {
-    func clamped(_ low: CGFloat, _ high: CGFloat) -> CGFloat { Swift.min(Swift.max(self, low), high) }
+    public func clamped(_ low: CGFloat, _ high: CGFloat) -> CGFloat { Swift.min(Swift.max(self, low), high) }
 }
 
-public extension Clip {
+extension Clip {
     /// Steadiness 0…1 offered when Stabilize is switched on.
-    static let defaultSteadiness = 0.5
+    public static let defaultSteadiness = 0.5
 }

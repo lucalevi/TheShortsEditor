@@ -27,13 +27,13 @@ public enum SubjectTracker {
     /// `range` of `project`'s timeline. Where it is lost, the path stops (the item then stays
     /// where it was last).
     public static func track(
-        project: Project, at point: (x: Double, y: Double), during range: CMTimeRange,
+        project: Project, at point: (x: Double, y: Double), during range: CMTimeRange, analysis: MediaAnalysis = MediaAnalysis(),
         progress: @escaping @Sendable (Double) -> Void = { _ in }
     ) async throws -> [TrackPoint] {
         var plain = project
         plain.titles = []
         plain.captions.isVisible = false
-        let built = try await CompositionBuilder.build(plain)
+        let built = try await CompositionBuilder.build(plain, analysis: analysis)
         let generator = AVAssetImageGenerator(asset: built.composition)
         generator.videoComposition = built.videoComposition
         generator.maximumSize = CGSize(width: width, height: height)

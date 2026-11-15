@@ -9,21 +9,10 @@ import UniformTypeIdentifiers
 extension EditorModel {
     // MARK: Skimming
 
-    /// The pointer is over the timeline at `time` (nil: it left). The viewer shows that moment;
-    /// the playhead stays where it is. Ignored while playing.
+    /// The pointer is over the timeline at `time` (nil: it left): the viewer shows that moment.
     func skim(to time: CMTime?) {
-        guard let time else {
-            guard skimTime != nil else { return }
-            skimTime = nil
-            stopSkimBlip()
-            chaseSeek(to: currentTime)
-            return
-        }
-        guard skimsTimeline, !isPlaying || isSkimBlip, voiceOver == nil, !project.timeline.clips.isEmpty else { return }
-        let frame = time.snappedToFrame().clamped(.zero, max(.zero, duration - .oneFrame))
-        guard frame != skimTime else { return }
-        skimTime = frame
-        chaseSeek(to: frame)
+        playback.blocksSkimming = voiceOver != nil
+        playback.skim(to: time)
     }
 
     /// While an edge of a main clip is dragged by `delta`: the viewer shows the frame at that
@@ -39,45 +28,9 @@ extension EditorModel {
         skimMedia(clip.assetID, at: clip.sourceTime(atOffset: offset))
     }
 
-    /// Seeks the player to `time`, dropping in-between targets while a seek is under way, so
-    /// skimming stays smooth however fast the pointer moves.
-    func chaseSeek(to time: CMTime) {
-        chaseTarget = time
-        guard !isChasing, player.currentItem != nil else { return }
-        isChasing = true
-        Task {
-            while let target = chaseTarget {
-                chaseTarget = nil
-                if isSkimBlip { player.pause() }
-                _ = await player.seek(to: target, toleranceBefore: .zero, toleranceAfter: .zero)
-            }
-            isChasing = false
-            if skimsAudio, skimTime != nil { playSkimBlip() }
-        }
-    }
-
-    /// A tenth of a second of sound at the skimmer.
-    private func playSkimBlip() {
-        skimBlipTask?.cancel()
-        isSkimBlip = true
-        player.rate = 1
-        skimBlipTask = Task {
-            try? await Task.sleep(for: .milliseconds(110))
-            guard !Task.isCancelled else { return }
-            stopSkimBlip()
-        }
-    }
-
-    private func stopSkimBlip() {
-        skimBlipTask?.cancel()
-        guard isSkimBlip else { return }
-        player.pause()
-        isSkimBlip = false
-    }
-
     /// The pointer is over a file in Media at `time` of it (nil: it left): the viewer shows it.
     func skimMedia(_ assetID: MediaAsset.ID, at time: CMTime?) {
-        guard let time, skimsTimeline, !isPlaying, let asset = project.asset(id: assetID) else {
+        guard let time, playback.skimsTimeline, !playback.isPlaying, let asset = project.asset(id: assetID) else {
             mediaSkim = nil
             mediaSkimImage = nil
             mediaSkimTarget = nil
@@ -113,7 +66,7 @@ extension EditorModel {
 
     /// X: the whole clip under the skimmer (or the playhead) becomes the range.
     func selectClipRange() {
-        timelineRange = project.clipRange(at: skimTime ?? currentTime)
+        timelineRange = project.clipRange(at: playback.skimTime ?? currentTime)
     }
 
     func clearRanges() {
@@ -123,19 +76,19 @@ extension EditorModel {
 
     func deleteRange() {
         guard let range = timelineRange else { return }
-        player.pause()
+        playback.player.pause()
         apply("Delete Range") { $0.removeRange(range) }
-        seek(to: range.start)
+        playback.seek(to: range.start)
         selection = nil
     }
 
     /// Keeps only the range of the clips it touches (Trim to Range, ⌥/).
     func trimToRange() {
         guard let range = timelineRange else { return }
-        player.pause()
+        playback.player.pause()
         apply("Trim to Range") { $0.trimToRange(range) }
         // The kept part starts where the first touched clip used to start.
-        seek(to: project.clipRange(at: range.start)?.start ?? range.start)
+        playback.seek(to: project.clipRange(at: range.start)?.start ?? range.start)
     }
 
     func setSpeedInRange(_ speed: Double) {
@@ -173,12 +126,12 @@ extension EditorModel {
     /// W: the selected file goes into the storyline at the playhead, cutting the clip there.
     func insertSelectedMedia() {
         guard let id = selectedAssetID, let asset = project.asset(id: id), asset.hasVideo else { NSSound.beep(); return }
-        player.pause()
+        playback.player.pause()
         let part = mediaPart(of: id)
         let time = currentTime
         var newID: Clip.ID?
         apply("Insert Clip") { newID = $0.insertClip(of: id, part: part, at: time) }
-        if let newID, let range = project.timeline.range(of: newID) { seek(to: range.end) } else { NSSound.beep() }
+        if let newID, let range = project.timeline.range(of: newID) { playback.seek(to: range.end) } else { NSSound.beep() }
     }
 
     /// Files dropped on main clip `clipID` at `time`, doing what the user picked from the menu.
@@ -330,23 +283,6 @@ extension EditorModel {
 
     // MARK: Playback
 
-    func playerReachedEnd() {
-        guard loopsPlayback, playRange == nil, player.currentItem != nil else { return }
-        seek(to: .zero)
-        player.play()
-    }
-
-    /// Reached the end of the stretch being played: again from its start (loop), or stop there.
-    func playRangeEnded(_ range: CMTimeRange) {
-        if loopsPlayback {
-            seek(to: range.start)
-        } else {
-            player.pause()
-            playRange = nil
-            seek(to: range.end)
-        }
-    }
-
     /// /: plays the range, or the selected item, once (or over and over with loop on).
     func playSelection() {
         let range: CMTimeRange? =
@@ -361,24 +297,13 @@ extension EditorModel {
                 }
             }()
         guard let range, range.duration > .zero else { NSSound.beep(); return }
-        skimTime = nil
-        seek(to: range.start)
-        playRange = range
-        player.play()
-    }
-
-    /// \: plays from the start of the Short.
-    func playFromStart() {
-        skimTime = nil
-        playRange = nil
-        seek(to: .zero)
-        player.play()
+        playback.play(range)
     }
 
     /// ; and ': the playhead to the previous or next cut or item edge.
     func goToEdit(forward: Bool) {
-        player.pause()
-        if let time = project.editPoint(from: currentTime, forward: forward) { seek(to: time) } else { NSSound.beep() }
+        playback.player.pause()
+        if let time = project.editPoint(from: currentTime, forward: forward) { playback.seek(to: time) } else { NSSound.beep() }
     }
 
     /// ⇧⌘F: the Short full screen inside a phone, as it will look on YouTube.
@@ -389,11 +314,11 @@ extension EditorModel {
         if isFullScreenPreview {
             windowWasFullScreen = window?.styleMask.contains(.fullScreen) == true
             if !windowWasFullScreen { window?.toggleFullScreen(nil) }
-            skimTime = nil
-            if currentTime >= duration - .oneFrame { seek(to: .zero) }
-            player.play()
+            playback.endSkimming()
+            if currentTime >= duration - .oneFrame { playback.seek(to: .zero) }
+            playback.player.play()
         } else {
-            player.pause()
+            playback.player.pause()
             if !windowWasFullScreen, window?.styleMask.contains(.fullScreen) == true { window?.toggleFullScreen(nil) }
         }
     }

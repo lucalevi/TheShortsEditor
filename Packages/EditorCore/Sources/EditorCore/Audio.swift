@@ -41,12 +41,12 @@ public struct BackgroundMusic: Codable, Equatable, Sendable {
     /// Songs are mastered much louder than speech is recorded, so they start well below full.
     public static let defaultVolume = 0.5
     /// Under speech the song drops to this fraction of its volume (about −14 dB).
-    public static let loweredFraction = 0.2
-    public static let fadeInDuration = CMTime(value: 1, timescale: 1)
-    public static let fadeOutDuration = CMTime(value: 2, timescale: 1)
+    package static let loweredFraction = 0.2
+    static let fadeInDuration = CMTime(value: 1, timescale: 1)
+    static let fadeOutDuration = CMTime(value: 2, timescale: 1)
     /// How long the song takes to go down before speech, and back up after it.
-    public static let lowerDuration = CMTime(value: 1, timescale: 4)
-    public static let raiseDuration = CMTime(value: 6, timescale: 10)
+    static let lowerDuration = CMTime(value: 1, timescale: 4)
+    static let raiseDuration = CMTime(value: 6, timescale: 10)
 }
 
 /// A point of a volume curve: the volume at `time`, with straight lines between points.
@@ -60,26 +60,26 @@ public struct VolumePoint: Equatable, Sendable {
     }
 }
 
-public extension Project {
+extension Project {
     /// Uses `assetID` (a sound file, or a video's sound) as the background song, starting at its beginning.
-    mutating func setMusic(_ assetID: MediaAsset.ID) {
+    public mutating func setMusic(_ assetID: MediaAsset.ID) {
         guard let asset = asset(id: assetID), asset.hasAudio else { return }
         if music?.assetID == assetID { return }
         music = BackgroundMusic(assetID: assetID)
     }
 
     /// Chooses where in the song to begin, on a whole frame and leaving at least a second to play.
-    mutating func setMusicStart(_ start: CMTime) {
+    public mutating func setMusicStart(_ start: CMTime) {
         guard let track = music, let song = asset(id: track.assetID) else { return }
         let latest = max(.zero, song.duration - CMTime(value: 1, timescale: 1))
         music?.sourceStart = CMTimeClampToRange(start.snappedToFrame(), range: CMTimeRange(start: .zero, end: latest)).snappedToFrame()
     }
 
     /// Where the song plays on the timeline, or nil without music (or with nothing to play under).
-    var musicRange: CMTimeRange? { musicRange(through: duration) }
+    public var musicRange: CMTimeRange? { musicRange(through: duration) }
 
     /// Where the song would play if the Short lasted until `end`.
-    func musicRange(through end: CMTime) -> CMTimeRange? {
+    public func musicRange(through end: CMTime) -> CMTimeRange? {
         guard let track = music, let song = asset(id: track.assetID), track.start < end else { return nil }
         let room = end - track.start
         let length = track.loops && song.duration > .zero ? room : min(room, song.duration - track.sourceStart)
@@ -87,7 +87,7 @@ public extension Project {
     }
 
     /// Whether the song stops before the Short does.
-    var musicEndsEarly: Bool {
+    public var musicEndsEarly: Bool {
         guard let range = musicRange else { return false }
         return range.end < duration
     }
@@ -96,15 +96,15 @@ public extension Project {
 /// Works out how the sound is mixed: where people talk, and the song's volume over time.
 public enum AudioMix {
     /// Gaps between words shorter than this don't let the song come back up, so it doesn't pump.
-    public static let bridgedGap = CMTime(value: 1, timescale: 2)
+    static let bridgedGap = CMTime(value: 1, timescale: 2)
     /// Shorter bursts of sound (a cough, a click) don't lower the song.
-    public static let shortestSpeech = CMTime(value: 6, timescale: 30)
+    static let shortestSpeech = CMTime(value: 6, timescale: 30)
     /// Quieter than this (dBFS) is never speech, even in a file that is quiet throughout.
-    public static let quietestSpeech: Float = -45
+    static let quietestSpeech: Float = -45
 
     /// Where on the timeline the clips have someone talking (or other clear sound), from the
     /// loudness of their files. A muted clip has none. Ranges are in order and don't overlap.
-    public static func speechRanges(in project: Project, levels: [MediaAsset.ID: AudioLevels]) -> [CMTimeRange] {
+    package static func speechRanges(in project: Project, levels: [MediaAsset.ID: AudioLevels]) -> [CMTimeRange] {
         var frames: [Int64] = [] // timeline frame numbers with sound
         // The main clips, and the sound detached from them (it is still the clips' own sound).
         var placed: [(clip: Clip, start: CMTime)] = []
@@ -165,7 +165,7 @@ public enum AudioMix {
 
     /// The song's volume over the timeline: its own volume, faded in and out, and lowered around
     /// `speech`. Empty without music.
-    public static func musicEnvelope(for project: Project, speech: [CMTimeRange]) -> [VolumePoint] {
+    package static func musicEnvelope(for project: Project, speech: [CMTimeRange]) -> [VolumePoint] {
         guard let track = project.music, let range = project.musicRange else { return [] }
         let speech = track.lowersUnderSpeech ? speech.compactMap { range.intersection($0).duration > .zero ? $0 : nil } : []
         let down = BackgroundMusic.lowerDuration, up = BackgroundMusic.raiseDuration
@@ -200,7 +200,7 @@ public enum AudioMix {
 
     /// How much a sound that lowers under speech is turned down at `time` (1: not at all, down
     /// to `BackgroundMusic.loweredFraction`), going down just before speech and back up after it.
-    public static func loweredFactor(at t: CMTime, speech: [CMTimeRange]) -> Double {
+    static func loweredFactor(at t: CMTime, speech: [CMTimeRange]) -> Double {
         let down = BackgroundMusic.lowerDuration, up = BackgroundMusic.raiseDuration
         var factor = 1.0
         for r in speech {
@@ -221,7 +221,7 @@ public enum AudioMix {
 
     /// A sound's own volume curve (times from its start, which is at `start` on the timeline),
     /// lowered around `speech` (timeline times) like the song.
-    public static func lowered(_ envelope: [VolumePoint], startingAt start: CMTime, speech: [CMTimeRange]) -> [VolumePoint] {
+    package static func lowered(_ envelope: [VolumePoint], startingAt start: CMTime, speech: [CMTimeRange]) -> [VolumePoint] {
         guard let first = envelope.first?.time, let last = envelope.last?.time, !speech.isEmpty else { return envelope }
         let down = BackgroundMusic.lowerDuration, up = BackgroundMusic.raiseDuration
         var times = envelope.map(\.time)
@@ -233,7 +233,7 @@ public enum AudioMix {
     }
 
     /// The volume a curve has at `time` (straight lines between points, flat outside them).
-    public static func volume(at time: CMTime, in envelope: [VolumePoint]) -> Double {
+    package static func volume(at time: CMTime, in envelope: [VolumePoint]) -> Double {
         guard let first = envelope.first, let last = envelope.last else { return 0 }
         if time <= first.time { return first.volume }
         if time >= last.time { return last.volume }
@@ -249,13 +249,13 @@ public enum AudioMix {
 /// in 400 ms blocks, with quiet blocks left out. Feed it 48 kHz stereo, in any number of pieces.
 public struct LoudnessMeter: Sendable {
     /// What YouTube plays Shorts at. Louder uploads are turned down; quieter ones are not turned up.
-    public static let youTubeTarget = -14.0
+    package static let youTubeTarget = -14.0
     /// Peaks are kept at least this far below full scale (dBFS) so the AAC encoder doesn't clip them.
-    public static let peakCeiling = -1.0
+    static let peakCeiling = -1.0
     /// Never turn quiet sound up by more than this (dB), so a near-silent Short doesn't become all hiss.
-    public static let maximumBoost = 20.0
+    static let maximumBoost = 20.0
 
-    public static let sampleRate = 48_000
+    package static let sampleRate = 48_000
 
     private struct Biquad: Sendable {
         let b0, b1, b2, a1, a2: Double
@@ -278,12 +278,12 @@ public struct LoudnessMeter: Sendable {
     private var steps: [Double] = []
     private var current = 0.0
     private var inCurrent = 0
-    public private(set) var peak: Float = 0
+    private(set) var peak: Float = 0
 
     public init() {}
 
     /// Adds interleaved stereo samples.
-    public mutating func add(interleaved samples: UnsafeBufferPointer<Float>) {
+    package mutating func add(interleaved samples: UnsafeBufferPointer<Float>) {
         let stepLength = Self.sampleRate / 10
         var index = 0
         while index + 1 < samples.count {
@@ -305,12 +305,12 @@ public struct LoudnessMeter: Sendable {
         }
     }
 
-    public mutating func add(interleaved samples: [Float]) {
+    package mutating func add(interleaved samples: [Float]) {
         samples.withUnsafeBufferPointer { add(interleaved: $0) }
     }
 
     /// Integrated loudness in LUFS, or nil when there was no sound loud enough to measure.
-    public var integratedLoudness: Double? {
+    package var integratedLoudness: Double? {
         let stepLength = Double(Self.sampleRate / 10)
         guard steps.count >= 4 else { return nil }
         // 400 ms blocks overlapping by 75%: four 100 ms steps each.
@@ -326,7 +326,7 @@ public struct LoudnessMeter: Sendable {
 
     /// The gain (a factor, 1 = unchanged) that brings the sound to `target` LUFS without pushing
     /// peaks over `peakCeiling` or boosting by more than `maximumBoost`.
-    public func normalizingGain(target: Double = LoudnessMeter.youTubeTarget) -> Double {
+    package func normalizingGain(target: Double = LoudnessMeter.youTubeTarget) -> Double {
         guard let loudness = integratedLoudness, peak > 0 else { return 1 }
         let wanted = min(target - loudness, Self.maximumBoost)
         let headroom = Self.peakCeiling - 20 * log10(Double(peak))

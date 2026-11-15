@@ -8,22 +8,22 @@ import Foundation
 /// clips automatically when they are split, deleted or moved.
 public struct Word: Identifiable, Codable, Equatable, Sendable {
     public let id: UUID
-    public var text: String
-    public var start: CMTime
-    public var duration: CMTime
+    package var text: String
+    package var start: CMTime
+    package var duration: CMTime
     /// Shown in the accent colour wherever it is on screen, to make it stand out.
     public var isKeyword: Bool
     /// An emoji shown with the caption this word is in, or nil.
     public var emoji: String?
     /// A caption break the user made before this word (split or merge), or nil to let the layout decide.
-    public var captionBreak: CaptionBreak?
+    var captionBreak: CaptionBreak?
     /// The caption goes on a new line after this word (⌘↩ while editing it).
-    public var lineBreakAfter: Bool = false
+    var lineBreakAfter: Bool = false
     /// When this word ends a caption, the caption ends with it instead of staying a moment to be
     /// read. Set when the user drags the caption's end on the timeline.
-    public var endsExactly: Bool = false
+    var endsExactly: Bool = false
     /// The caption this word starts, in another language, shown as a second line.
-    public var translation: CaptionTranslation?
+    var translation: CaptionTranslation?
 
     public init(
         id: UUID = UUID(), text: String, start: CMTime, duration: CMTime, isKeyword: Bool = false, emoji: String? = nil,
@@ -40,8 +40,8 @@ public struct Word: Identifiable, Codable, Equatable, Sendable {
         self.endsExactly = endsExactly
     }
 
-    public var end: CMTime { start + duration }
-    public var range: CMTimeRange { CMTimeRange(start: start, duration: duration) }
+    var end: CMTime { start + duration }
+    var range: CMTimeRange { CMTimeRange(start: start, duration: duration) }
 }
 
 /// A caption break the user chose, which the automatic layout keeps.
@@ -54,23 +54,18 @@ public enum CaptionBreak: String, Codable, Sendable {
 
 /// A caption in a second language. It is kept only while the caption still reads `source`, so
 /// editing the words or the caption breaks hides an out-of-date translation.
-public struct CaptionTranslation: Codable, Equatable, Hashable, Sendable {
-    public var source: String
-    public var text: String
-
-    public init(source: String, text: String) {
-        self.source = source
-        self.text = text
-    }
+struct CaptionTranslation: Codable, Equatable, Hashable, Sendable {
+    var source: String
+    var text: String
 }
 
 /// What was said in one source file.
 public struct Transcript: Codable, Equatable, Sendable {
-    public var language: CaptionLanguage
+    var language: CaptionLanguage
     /// In time order, never overlapping.
     public var words: [Word]
     /// Typed or imported rather than heard (an SRT file): shown even where the clip is muted.
-    public var isTyped: Bool
+    var isTyped: Bool
 
     public init(language: CaptionLanguage, words: [Word], isTyped: Bool = false) {
         self.language = language
@@ -143,7 +138,7 @@ public enum CaptionLanguageChoice: Hashable, Identifiable, Sendable {
         }
     }
 
-    public static var allCases: [CaptionLanguageChoice] { [.automatic] + CaptionLanguage.allCases.map { .language($0) } }
+    static var allCases: [CaptionLanguageChoice] { [.automatic] + CaptionLanguage.allCases.map { .language($0) } }
 }
 
 /// How the captions look. Each look is complete and tested, with its own word animation,
@@ -191,7 +186,7 @@ public enum CaptionStyle: String, Codable, CaseIterable, Identifiable, Sendable 
     }
 
     /// The most characters on screen at once. Short pages are easier to read on a phone.
-    public var maxCharacters: Int {
+    var maxCharacters: Int {
         switch self {
         case .oneWord: 0
         case .bold, .highlight, .bounce, .glow, .outline: 16
@@ -203,9 +198,9 @@ public enum CaptionStyle: String, Codable, CaseIterable, Identifiable, Sendable 
     }
 
     /// The most words on screen at once, when the style limits them.
-    public var maxWords: Int? { self == .phrase ? 4 : nil }
+    var maxWords: Int? { self == .phrase ? 4 : nil }
 
-    public var isUppercase: Bool {
+    package var isUppercase: Bool {
         switch self {
         case .bold, .oneWord, .highlight, .bounce, .glow, .outline: true
         case .phrase, .karaoke, .typewriter, .classic, .minimal: false
@@ -213,7 +208,7 @@ public enum CaptionStyle: String, Codable, CaseIterable, Identifiable, Sendable 
     }
 
     /// Whether the word being spoken looks different from the others.
-    public var highlightsCurrentWord: Bool {
+    package var highlightsCurrentWord: Bool {
         switch self {
         case .bold, .highlight, .karaoke, .glow, .bounce, .outline: true
         case .oneWord, .phrase, .typewriter, .classic, .minimal: false
@@ -302,7 +297,7 @@ public enum CaptionPlacement: String, CaseIterable, Identifiable, Sendable {
 /// One word as it appears on the timeline.
 public struct TimedWord: Equatable, Sendable {
     public var wordID: Word.ID
-    public var assetID: MediaAsset.ID
+    var assetID: MediaAsset.ID
     public var clipID: Clip.ID
     public var text: String
     /// Timeline range, cut to the clip it plays in.
@@ -311,10 +306,10 @@ public struct TimedWord: Equatable, Sendable {
     public var emoji: String?
     /// Where the word is heard.
     public var source: CaptionSource = .clip
-    public var captionBreak: CaptionBreak?
-    public var lineBreakAfter = false
-    public var endsExactly = false
-    public var translation: CaptionTranslation?
+    var captionBreak: CaptionBreak?
+    var lineBreakAfter = false
+    var endsExactly = false
+    var translation: CaptionTranslation?
 }
 
 /// Where a caption's words are heard: the main clips, a B-roll clip's own sound, or a sound
@@ -345,7 +340,7 @@ public struct CaptionPage: Identifiable, Equatable, Sendable {
     public var plainText: String { words.map(\.text).joined(separator: " ") }
 
     /// The indices of words followed by a line break.
-    public var lineBreaks: Set<Int> { Set(words.indices.filter { words[$0].lineBreakAfter && $0 < words.count - 1 }) }
+    package var lineBreaks: Set<Int> { Set(words.indices.filter { words[$0].lineBreakAfter && $0 < words.count - 1 }) }
 
     /// The translation of this caption, when one was made for the words it has now.
     public var translation: String? {
@@ -358,7 +353,7 @@ public struct CaptionPage: Identifiable, Equatable, Sendable {
     public var clipID: Clip.ID { words[0].clipID }
 
     /// The emoji shown with this caption: the first one any of its words has.
-    public var emoji: String? { words.lazy.compactMap(\.emoji).first }
+    package var emoji: String? { words.lazy.compactMap(\.emoji).first }
 
     /// The first whole frame on which the page is on screen, for jumping to it.
     public var firstFrame: CMTime {
@@ -368,14 +363,14 @@ public struct CaptionPage: Identifiable, Equatable, Sendable {
 
     /// The word being spoken at `time`: the last one that has started. Between words the
     /// previous one stays highlighted, which looks calmer than flickering back to none.
-    public func wordIndex(at time: CMTime) -> Int {
+    package func wordIndex(at time: CMTime) -> Int {
         words.lastIndex { $0.range.start <= time } ?? 0
     }
 }
 
-public extension SafeZone {
+extension SafeZone {
     /// The range `CaptionSettings.verticalPosition` is kept in: between the covered top and bottom.
-    static var captionRange: ClosedRange<Double> {
+    public static var captionRange: ClosedRange<Double> {
         let height = Double(Project.canvasSize.height)
         return (Double(top) + 120) / height...(height - Double(bottom) - 120) / height
     }
@@ -383,16 +378,16 @@ public extension SafeZone {
 
 public enum CaptionLayout {
     /// A gap this long between words starts a new page.
-    public static let pauseBreak = CMTime(value: 7, timescale: 10)
+    static let pauseBreak = CMTime(value: 7, timescale: 10)
     /// How long a page may stay after its last word when nothing follows straight away.
-    public static let linger = CMTime(value: 1, timescale: 2)
+    static let linger = CMTime(value: 1, timescale: 2)
 
     /// Every word heard in the Short, in order. A word belongs to a clip when its middle is
     /// inside it. Captions are what you hear: the main clips, then B-roll with its sound on, then
     /// sound items (voice-overs first). Where two of them talk at once, the voice-over wins, then
     /// other sounds, then the main clips, then B-roll. Muted clips have no captions, unless their
     /// captions were typed or imported.
-    public static func timelineWords(in project: Project) -> [TimedWord] {
+    static func timelineWords(in project: Project) -> [TimedWord] {
         var kept: [TimedWord] = []
         func add(_ words: [TimedWord]) {
             guard !words.isEmpty else { return }
@@ -522,13 +517,13 @@ public enum CaptionLayout {
     }
 }
 
-public extension Project {
+extension Project {
     /// Replaces the words of a caption page with `newText`, for fixing what the transcription got
     /// wrong. The new words share the old words' time in proportion to their length; when the
     /// number of words is unchanged, each keeps its own timing. Empty text removes the words.
     /// A new line in the text is kept as a line break in the caption. Returns the new words' ids.
     @discardableResult
-    mutating func replaceWords(_ wordIDs: [Word.ID], in assetID: MediaAsset.ID, with newText: String) -> [Word.ID] {
+    public mutating func replaceWords(_ wordIDs: [Word.ID], in assetID: MediaAsset.ID, with newText: String) -> [Word.ID] {
         guard var transcript = transcripts[assetID] else { return [] }
         let indices = transcript.words.indices.filter { wordIDs.contains(transcript.words[$0].id) }
         guard let first = indices.first, let last = indices.last else { return [] }
@@ -585,13 +580,13 @@ public extension Project {
 
     /// The assets heard in the Short (main clips, B-roll with sound, sound items) whose sound
     /// hasn't been transcribed in `language` yet. Voice-overs come first.
-    func assetsNeedingTranscription(in language: CaptionLanguage) -> [MediaAsset] {
+    public func assetsNeedingTranscription(in language: CaptionLanguage) -> [MediaAsset] {
         assetsHeard().filter { transcripts[$0.id]?.language != language && transcripts[$0.id]?.isTyped != true }
     }
 
     /// Every asset whose sound is heard in the Short, once each: voice-overs, other sound items,
     /// the main clips, then B-roll with its sound on.
-    func assetsHeard() -> [MediaAsset] {
+    public func assetsHeard() -> [MediaAsset] {
         var seen = Set<MediaAsset.ID>()
         let clips = sounds.sorted { $0.isVoiceOver && !$1.isVoiceOver }.map(\.clip) + timeline.clips + overlays.map(\.clip)
         return clips.compactMap { clip in
@@ -603,13 +598,13 @@ public extension Project {
     }
 
     /// Whether the Short has any captions.
-    var hasCaptions: Bool {
+    public var hasCaptions: Bool {
         !CaptionLayout.timelineWords(in: self).isEmpty
     }
 
     /// The clip with this id, wherever it is (main clips, B-roll or sounds), and where it starts
     /// on the timeline.
-    func anyClip(_ id: Clip.ID) -> (clip: Clip, start: CMTime)? {
+    public func anyClip(_ id: Clip.ID) -> (clip: Clip, start: CMTime)? {
         if let index = timeline.index(of: id) { return (timeline.clips[index], timeline.startTime(ofClipAt: index)) }
         if let overlay = overlay(id: id) { return (overlay.clip, overlay.start) }
         if let sound = sound(id: id) { return (sound.clip, sound.start) }
@@ -617,7 +612,7 @@ public extension Project {
     }
 }
 
-public extension MediaAsset {
+extension MediaAsset {
     /// One of the app's own sound effects, which have no words in them.
     var isBuiltInSound: Bool { url.path.contains("/Shorts Editor/Sound Effects/") }
 }

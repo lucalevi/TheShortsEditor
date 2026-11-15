@@ -35,7 +35,7 @@ extension EditorModel {
             ProjectStore.removeFromLibrary(id)
             return
         }
-        ProjectStore.save(project, id: id, name: openShortName, created: openShortCreated) { [weak self] error in
+        ProjectStore.save(ProjectStore.file(for: project, name: openShortName, created: openShortCreated, media: media), id: id) { [weak self] error in
             guard let self else { return }
             guard let error else {
                 didReportSaveError = false
@@ -61,7 +61,7 @@ extension EditorModel {
         saveNow()
         let reverted: ProjectFile
         do {
-            reverted = try ProjectStore.readFile(backup.url)
+            reverted = try ProjectStore.readFile(backup.url, media: media)
         } catch {
             Log.file.failure("Reading a backup", error)
             alert = AlertMessage(title: "This backup can't be opened", message: error.localizedDescription)
@@ -101,7 +101,7 @@ extension EditorModel {
         panel.message = "Save a copy of this Short as a file. Open it on another Mac with File ▸ Open…"
         guard panel.runModal() == .OK, let url = panel.url else { return }
         do {
-            try ProjectStore.write(project, to: url, name: openShortName, created: openShortCreated)
+            try ProjectStore.write(project, to: url, name: openShortName, created: openShortCreated, media: media)
         } catch {
             Log.file.failure("Saving a copy of the Short", error)
             alert = AlertMessage(title: "The copy couldn't be saved", message: error.localizedDescription)
@@ -119,7 +119,7 @@ extension EditorModel {
 
     /// Back to the home window (the "All Shorts" button): the open Short is saved first.
     func showHome() {
-        player.pause()
+        playback.player.pause()
         saveNow()
         if let id = openShortID, !isWorthKeeping {
             // A Short left empty isn't kept.
@@ -128,22 +128,23 @@ extension EditorModel {
         openShortID = nil
         load(Project(), name: "", created: .now)
         screen = .home
-        refreshShorts()
+        library.refresh()
     }
 
     /// File ▸ New Short, or the New Short tile: an empty Short, open in the editor.
     func newShort() {
         if screen == .editor { showHome() }
         openShortID = UUID()
-        load(Project(), name: ShortsLibrary.newName(existing: shorts.map(\.name)), created: .now)
+        load(Project(), name: ShortsLibrary.newName(existing: library.names), created: .now)
         screen = .editor
     }
 
     /// Opens a Short from the home window.
     func openShort(_ id: UUID) {
         let file: ProjectFile
+        let access = MediaAccess()
         do {
-            file = try ProjectStore.readFile(ProjectStore.fileURL(for: id))
+            file = try ProjectStore.readFile(ProjectStore.fileURL(for: id), media: access)
         } catch {
             Log.file.failure("openShort", error)
             alert = AlertMessage(title: "This Short can't be opened", message: error.localizedDescription)
@@ -151,7 +152,7 @@ extension EditorModel {
         }
         if screen == .editor { showHome() }
         openShortID = id
-        load(file.project, name: file.name ?? ShortsLibrary.defaultName, created: file.created ?? .now)
+        load(file.project, name: file.name ?? ShortsLibrary.defaultName, created: file.created ?? .now, media: access)
         screen = .editor
         // How it was before this session, for File ▸ Revert To.
         backups = ProjectStore.backups(for: id)
@@ -175,8 +176,8 @@ extension EditorModel {
     func openProject(_ url: URL) {
         if screen == .editor { showHome() }
         do {
-            let id = try ProjectStore.importProject(at: url, existingNames: shorts.map(\.name))
-            refreshShorts()
+            let id = try ProjectStore.importProject(at: url, existingNames: library.names)
+            library.refresh()
             openShort(id)
         } catch {
             Log.file.failure("openProject", error)
@@ -188,15 +189,9 @@ extension EditorModel {
         guard let name = ShortsLibrary.cleanedName(typed) else { return }
         if id == openShortID {
             renameOpenShort(to: name)
-            return
+        } else {
+            library.rename(id, to: name)
         }
-        do {
-            try ProjectStore.rename(id, to: name)
-        } catch {
-            Log.file.failure("renameShort", error)
-            alert = AlertMessage(title: "The Short couldn't be renamed", message: error.localizedDescription)
-        }
-        refreshShorts()
     }
 
     private func renameOpenShort(to typed: String) {
@@ -205,88 +200,6 @@ extension EditorModel {
         if isWorthKeeping {
             hasUnsavedChanges = true
             saveNow()
-        }
-    }
-
-    func duplicateShort(_ id: UUID) {
-        guard let entry = shorts.first(where: { $0.id == id }) else { return }
-        do {
-            _ = try ProjectStore.duplicate(id, as: ShortsLibrary.copyName(of: entry.name, existing: shorts.map(\.name)))
-        } catch {
-            Log.file.failure("duplicateShort", error)
-            alert = AlertMessage(title: "The Short couldn't be copied", message: error.localizedDescription)
-        }
-        refreshShorts()
-    }
-
-    /// Asks first, then moves the Shorts to the Trash.
-    func deleteShorts(_ ids: Set<UUID>) {
-        let names = shorts.filter { ids.contains($0.id) }.map(\.name)
-        guard !names.isEmpty else { return }
-        let alert = NSAlert()
-        alert.messageText = names.count == 1 ? "Delete “\(names[0])”?" : "Delete \(names.count) Shorts?"
-        alert.informativeText = "Your videos, pictures and sounds stay where they are. Only the edit is deleted."
-        alert.addButton(withTitle: "Delete").hasDestructiveAction = true
-        alert.addButton(withTitle: "Cancel")
-        guard alert.runModal() == .alertFirstButtonReturn else { return }
-        let deleted = ids.compactMap { ProjectStore.delete($0) }
-        refreshShorts()
-        guard !deleted.isEmpty else { return }
-        let actionName = deleted.count == 1 ? "Delete Short" : "Delete \(deleted.count) Shorts"
-        // Registered on the next turn of the main run loop: straight after the alert's modal run
-        // loop, the undo manager's automatic grouping didn't close the step, so Undo stayed disabled.
-        Task { @MainActor in
-            undoManager?.registerUndo(withTarget: self) { model in
-                MainActor.assumeIsolated { model.restoreShorts(deleted, actionName: actionName) }
-            }
-            undoManager?.setActionName(actionName)
-        }
-    }
-
-    /// Undo of deleting Shorts on the home window: they come back, and Redo deletes them again.
-    private func restoreShorts(_ deleted: [ProjectStore.DeletedShort], actionName: String) {
-        for short in deleted {
-            Log.file.attempt("Putting a deleted Short back") { try ProjectStore.restore(short) }
-        }
-        refreshShorts()
-        undoManager?.registerUndo(withTarget: self) { model in
-            MainActor.assumeIsolated {
-                let again = deleted.compactMap { ProjectStore.delete($0.id) }
-                model.refreshShorts()
-                model.undoManager?.registerUndo(withTarget: model) { model in
-                    MainActor.assumeIsolated { model.restoreShorts(again, actionName: actionName) }
-                }
-                model.undoManager?.setActionName(actionName)
-            }
-        }
-        undoManager?.setActionName(actionName)
-    }
-
-    /// Reads the library again, and makes posters for Shorts that changed since theirs.
-    func refreshShorts() {
-        posterTask?.cancel()
-        posterTask = Task {
-            // Read off the main thread, after any save still being written.
-            let entries = await ProjectStore.loadLibrary()
-            guard !Task.isCancelled else { return }
-            shorts = entries
-            for entry in entries {
-                guard !Task.isCancelled else { return }
-                if posters[entry.id] == nil, let url = ProjectStore.freshPoster(for: entry),
-                    let source = CGImageSourceCreateWithURL(url as CFURL, nil),
-                    let image = CGImageSourceCreateImageAtIndex(source, 0, nil)
-                {
-                    posters[entry.id] = image
-                    continue
-                }
-                guard ProjectStore.freshPoster(for: entry) == nil, entry.clipCount > 0,
-                    let project = try? ProjectStore.read(ProjectStore.fileURL(for: entry.id)),
-                    let image = try? await ProjectPoster.image(of: project)
-                else { continue }
-                guard !Task.isCancelled else { return }
-                ProjectStore.writePoster(image, for: entry.id)
-                posters[entry.id] = image
-            }
         }
     }
 
@@ -312,8 +225,8 @@ extension EditorModel {
             ? "Where is “\(first.url.lastPathComponent)” now? Choose the file, or the folder it is in."
             : "Where are the \(missing.count) missing files now? Choose the folder they are in, or one of the files."
         guard panel.runModal() == .OK, let chosen = panel.url else { return }
-        // Kept for as long as the app runs, so the files (and the bookmarks saved for them) work.
-        _ = chosen.startAccessingSecurityScopedResource()
+        // Kept while the Short is open, so the files (and the bookmarks saved for them) work.
+        media.open(chosen)
 
         var candidates: [MediaAsset.ID: URL] = [:]
         if (try? chosen.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true {

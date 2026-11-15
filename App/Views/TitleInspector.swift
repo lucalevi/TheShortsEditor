@@ -140,7 +140,7 @@ struct TitleInspector: View {
             } onDecrement: {
                 model.setTitleDuration(title.id, title.duration - CMTime(value: 1, timescale: 2))
             }
-            Button("Start at Playhead") { model.moveTitle(title.id, to: model.currentTime) }
+            Button("Start at Playhead") { model.moveTitle(title.id, to: model.playback.currentTime) }
                 .help("Make it appear where the playhead is")
             Text("You can also drag it on the timeline, or drag its right edge to change how long it stays.")
                 .font(.caption)

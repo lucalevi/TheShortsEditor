@@ -79,16 +79,6 @@ final class EditorModel {
 
     // MARK: State for iMovie's grammar (EditorModel+Grammar.swift)
 
-    /// Hovering over the timeline shows that moment in the viewer (iMovie's skimming).
-    var skimsTimeline = UserDefaults.standard.object(forKey: "skimming") as? Bool ?? true {
-        didSet { UserDefaults.standard.set(skimsTimeline, forKey: "skimming"); if !skimsTimeline { skim(to: nil) } }
-    }
-    /// Skimming also plays a moment of sound (⇧S).
-    var skimsAudio = UserDefaults.standard.bool(forKey: "audioSkimming") {
-        didSet { UserDefaults.standard.set(skimsAudio, forKey: "audioSkimming") }
-    }
-    /// Where the pointer is skimming on the timeline (the white line), nil when it isn't.
-    var skimTime: CMTime?
     /// A file in Media being skimmed: which one and where, with the frame shown in the viewer.
     var mediaSkim: (assetID: MediaAsset.ID, time: CMTime)?
     var mediaSkimImage: CGImage?
@@ -98,12 +88,6 @@ final class EditorModel {
     var mediaRange: (assetID: MediaAsset.ID, range: CMTimeRange)?
     /// R is held down: dragging across clips picks a range instead of moving them.
     @ObservationIgnored var isRangeKeyDown = false
-    /// Playing starts again from the beginning (or the range) at the end (⌘L).
-    var loopsPlayback = UserDefaults.standard.bool(forKey: "loopPlayback") {
-        didSet { UserDefaults.standard.set(loopsPlayback, forKey: "loopPlayback") }
-    }
-    /// Playing only this stretch (/), stopping or looping at its end.
-    @ObservationIgnored var playRange: CMTimeRange?
     /// The Short shown full screen in a phone, with YouTube's buttons drawn over it (⇧⌘F).
     var isFullScreenPreview = false
     /// Settings copied with Copy Settings (⌥⌘C), for pasting onto other clips or titles.
@@ -112,23 +96,17 @@ final class EditorModel {
     /// A one-time hint shown at the right moment.
     var tip: EditorTip?
     @ObservationIgnored var tipTask: Task<Void, Never>?
-    @ObservationIgnored var chaseTarget: CMTime?
-    @ObservationIgnored var isChasing = false
-    /// A moment of sound playing while skimming: the player runs, but nothing should react.
-    @ObservationIgnored var isSkimBlip = false
-    @ObservationIgnored var skimBlipTask: Task<Void, Never>?
     @ObservationIgnored var mediaSkimTask: Task<Void, Never>?
     @ObservationIgnored var mediaSkimTarget: (assetID: MediaAsset.ID, time: CMTime)?
     @ObservationIgnored var windowWasFullScreen = false
     var showsSafeZone = true
     /// Timeline zoom, in points per second.
     var timelineZoom: CGFloat = 60
-    private(set) var currentTime: CMTime = .zero
-    private(set) var isPlaying = false
     private(set) var thumbnails: [MediaAsset.ID: CGImage] = [:]
     /// Stills along each file, drawn on its clips.
     private(set) var filmstrips: [MediaAsset.ID: Filmstrip] = [:]
-    private(set) var isImporting = false
+    /// Files being read to be added.
+    var isImporting: Bool { tasks.isRunning(kind: .importing) }
     /// Edges dragged on the timeline stick to cuts, other items and the playhead (S).
     var snapsToEdges = UserDefaults.standard.object(forKey: "snapsToEdges") as? Bool ?? true {
         didSet { UserDefaults.standard.set(snapsToEdges, forKey: "snapsToEdges") }
@@ -141,62 +119,32 @@ final class EditorModel {
     var savedTextStyles: [SavedTextStyle] = TextStyleStore.load() {
         didSet { TextStyleStore.save(savedTextStyles) }
     }
-    /// Files whose voice is being cleaned up, with how far it has got (0…1).
-    var voiceCleaning: [MediaAsset.ID: Double] = [:]
-    /// Clips whose voice effect or EQ is being made, with how far it has got (0…1).
-    var soundProcessing: [Clip.ID: Double] = [:]
-    /// Clips being turned round: how far the backwards copy of their file is (0…1).
-    var reversing: [Clip.ID: Double] = [:]
     /// The cut whose transition is being chosen (the clip before it), for the picker on the timeline.
     var transitionPickerCut: Clip.ID?
-    /// Processed sounds being made in the background (`prepareMissingProcessedSounds`).
-    @ObservationIgnored var preparingSounds: Set<String> = []
-    /// A clip whose subject is being found for reframing, with how far it has got.
-    var reframing: (clipID: Clip.ID, progress: Double)?
     /// Waiting for a click in the viewer to pick white or skin for a clip (see `EditorModel+Look`).
     var colorPick: ColorPick?
     /// Before/after: while on, the viewer shows every picture without its colour and filters.
     var showsOriginalLook = false {
         didSet {
-            LivePreview.showsOriginal = showsOriginalLook
+            livePreview.showsOriginal = showsOriginalLook
             // A seek to the same time doesn't always draw the paused frame again; a fresh item does.
             refreshPlayback()
         }
     }
-    /// Files whose shake is being measured for Stabilize, with how far it has got (0…1).
-    var steadying: [MediaAsset.ID: Double] = [:]
-    /// Files whose shake couldn't be measured, so it isn't tried again after every rebuild.
-    @ObservationIgnored var unsteadiable: Set<MediaAsset.ID> = []
-    /// See-through copies being made for Remove Background (by file and subject), with how far they have got.
-    var cuttingOut: [String: Double] = [:]
-    /// Copies that couldn't be made, so they aren't tried again after every rebuild.
-    @ObservationIgnored var uncuttable: Set<String> = []
-    /// Clips being looked at for Enhance or Match Color.
-    var analysingLook: Set<Clip.ID> = []
-    /// Listening to the music for its beats.
-    var findingBeats = false
-    /// A title or sticker learning to follow something in the video, with how far it has got.
-    var tracking: (id: TextOverlay.ID, progress: Double)?
     /// The sticker and ready-made text picker is open.
     var showsStickerPicker = false
     /// The text-to-speech sheet, when open.
     var speechRequest: SpeechRequest?
-    /// Making a voice from text.
-    var makingSpeech = false
-    /// Smooth slow-motion copies being made, by clip, with how far they have got (0…1).
-    var smoothing: [Clip.ID: Double] = [:]
-    /// Copies that couldn't be made, so they aren't tried again after every rebuild.
-    @ObservationIgnored var unsmoothable: Set<URL> = []
     /// The marker whose name is being typed (its pop-up on the ruler is open).
     var markerBeingRenamed: Marker.ID?
     /// The clip shown in the clip trimmer (⌘\), if it is open.
     var trimmerClipID: Clip.ID?
-    /// Photos library items being copied in (downloaded from iCloud first if needed), by local identifier.
-    var photoDownloads: [String: Double] = [:]
     /// While recording a voice-over: counting down, then recording from a time.
     var voiceOver: VoiceOverState?
     /// The style whose music is being made, while it is.
-    var styleBeingMade: ShortStyle?
+    var styleBeingMade: ShortStyle? {
+        tasks.jobs.lazy.compactMap { job -> ShortStyle? in if case .style(let style) = job.key { style } else { nil } }.first
+    }
     /// The Magic Short sheet, when it is open.
     var magic: MagicSession?
     /// The storyboard chooser sheet is open.
@@ -210,38 +158,6 @@ final class EditorModel {
     @ObservationIgnored var effectPlayer: AVAudioPlayer?
     @ObservationIgnored var recorder: AVAudioRecorder?
     @ObservationIgnored var voiceOverURL: URL?
-    var captionLanguage = CaptionLanguage.preferred()
-    /// The spoken language is found by listening, rather than chosen.
-    var findsCaptionLanguage = true
-    /// What the language picker shows.
-    var captionLanguageChoice: CaptionLanguageChoice {
-        get { findsCaptionLanguage ? .automatic : .language(captionLanguage) }
-        set {
-            switch newValue {
-            case .automatic: findsCaptionLanguage = true
-            case .language(let language):
-                findsCaptionLanguage = false
-                captionLanguage = language
-            }
-        }
-    }
-    /// What the caption maker is doing, while it works.
-    private(set) var captionJob: CaptionJob?
-    /// The captions as they appear on the timeline. Updated with every edit.
-    private(set) var captionPages: [CaptionPage] = []
-    /// The caption the user last clicked on the timeline, so the Captions list can show it.
-    var focusedCaptionID: CaptionPage.ID?
-    /// A caption whose words should start being edited (after splitting one in two).
-    var captionToEdit: CaptionPage.ID?
-    /// Where the cursor goes in that caption, in characters.
-    var captionEditCursor = 0
-    /// What Apple Intelligence is reading the script for, while it works.
-    var wordModelJob: WordModel.Task?
-    /// Real words used as fillers ("like", "tipo"), found by Apple Intelligence in the Script panel.
-    var modelFillers: Set<Word.ID> = []
-    /// Set to start translating the captions (run by the editor's `translationTask`).
-    var translationRequest: TranslationSession.Configuration?
-    var isTranslating = false
     /// Set while the Export sheet is open.
     var exportPhase: ExportPhase?
     /// Set while the user is choosing which pauses to remove.
@@ -253,7 +169,15 @@ final class EditorModel {
     /// Where a preview skip is heading, so it isn't started again while the seek lands.
     @ObservationIgnored private var skipTarget: CMTime?
 
-    let player = AVPlayer()
+    /// The open Short's access to its media files (and their bookmarks), closed with it.
+    @ObservationIgnored private(set) var media = MediaAccess()
+    /// The player, the playhead and skimming.
+    let playback = PlaybackController()
+    /// What the viewer shows while something is dragged, before the edit is made. Only this
+    /// editor's player sees it (not exports or thumbnails).
+    let livePreview = LivePreview()
+    /// Every long job running in the background (Window ▸ Background Tasks).
+    let tasks = BackgroundTasks()
     /// The editor window, set by the main view whenever its window becomes active. Undo goes to
     /// that window's undo manager, the one Edit ▸ Undo and ⌘Z use. (Opening files from Finder can
     /// briefly create a second window that then closes, so the first window seen isn't reliable,
@@ -279,10 +203,7 @@ final class EditorModel {
     @ObservationIgnored var magicTask: Task<Void, Never>?
     /// Music files made for styles, ready to use without waiting.
     @ObservationIgnored var preparedMusic: [MusicMood: MediaAsset] = [:]
-    @ObservationIgnored private var captionTask: Task<Void, Never>?
     @ObservationIgnored var exportTask: Task<Void, Never>?
-    @ObservationIgnored private var timeObserver: Any?
-    @ObservationIgnored private var statusObservation: NSKeyValueObservation?
 
     static let zoomRange: ClosedRange<CGFloat> = 15...400
 
@@ -322,15 +243,6 @@ final class EditorModel {
         var separating: Double?
     }
 
-    enum CaptionJob: Equatable {
-        /// Listening to the start of the sound to find the language spoken.
-        case detecting
-        /// Downloading the language's speech model, the first time it is used.
-        case downloading(Double)
-        /// Listening to file `index` of `count`.
-        case listening(index: Int, count: Int)
-    }
-
     struct AlertMessage: Identifiable {
         let id = UUID()
         let title: String
@@ -338,21 +250,13 @@ final class EditorModel {
     }
 
     init() {
+        let analysis = MediaAnalysis()
+        self.analysis = analysis
+        library = LibraryModel(analysis: analysis)
         FontLibrary.registerImportedFonts()
-        player.actionAtItemEnd = .pause
-        timeObserver = player.addPeriodicTimeObserver(forInterval: .oneFrame, queue: .main) { [weak self] time in
-            MainActor.assumeIsolated { self?.playheadMoved(to: time) }
-        }
-        statusObservation = player.observe(\.timeControlStatus) { [weak self] player, _ in
-            let playing = player.timeControlStatus != .paused
-            Task { @MainActor in
-                guard let self, !self.isSkimBlip else { return }
-                self.isPlaying = playing
-            }
-        }
-        NotificationCenter.default.addObserver(forName: AVPlayerItem.didPlayToEndTimeNotification, object: nil, queue: .main) { [weak self] _ in
-            MainActor.assumeIsolated { self?.playerReachedEnd() }
-        }
+        playback.onPlayheadMove = { [weak self] time in self?.playheadMoved(to: time) }
+        library.onProblem = { [weak self] title, message in self?.alert = AlertMessage(title: title, message: message) }
+        library.undoManager = { [weak self] in self?.undoManager }
     }
 
     // MARK: Lookups
@@ -427,13 +331,14 @@ final class EditorModel {
         guard !urls.isEmpty else { return }
         // Media opened or dropped on the home window starts a new Short with it.
         if screen == .home { newShort() }
-        isImporting = true
-        Task {
+        let reading = tasks.start(.importing, title: urls.count == 1 ? "Adding “\(urls[0].lastPathComponent)”" : "Adding \(urls.count) files") {
+            [self] progress in
             var probed: [MediaAsset] = []
             var failures: [String] = []
-            for url in urls {
-                // Keep access to files the user handed us for as long as the app runs.
-                _ = url.startAccessingSecurityScopedResource()
+            for (index, url) in urls.enumerated() {
+                progress(Double(index) / Double(urls.count))
+                // Keep access to files the user handed us while the Short is open.
+                media.open(url)
                 if let existing = project.assets.first(where: { $0.url.standardizedFileURL == url.standardizedFileURL }) {
                     probed.append(existing)
                     continue
@@ -445,7 +350,10 @@ final class EditorModel {
                     failures.append(url.lastPathComponent)
                 }
             }
-            isImporting = false
+            return (probed, failures)
+        }
+        Task {
+            guard let (probed, failures) = try? await reading.value else { return }
 
             let songs = probed.filter { !$0.hasVideo }
             var overlayIDs: [Clip.ID] = []
@@ -628,7 +536,7 @@ final class EditorModel {
     /// Adds a title at the playhead, selects it and puts the cursor in its text.
     func addTitle() {
         guard !project.timeline.clips.isEmpty else { return }
-        player.pause()
+        playback.player.pause()
         var id: TextOverlay.ID?
         apply("Add Title") { id = $0.addTitle(at: currentTime, text: "Your title") }
         guard let id else { return }
@@ -640,9 +548,9 @@ final class EditorModel {
     func selectTitle(_ id: TextOverlay.ID) {
         selectedTitleID = id
         guard let title = project.title(id: id), let range = title.visibleRange(in: project) else { return }
-        player.pause()
+        playback.player.pause()
         let settled = range.start + min(CMTime(value: 1, timescale: 2), CMTimeMultiplyByRatio(range.duration, multiplier: 1, divisor: 2))
-        if !range.containsTime(currentTime) || currentTime < settled { seek(to: settled) }
+        if !range.containsTime(currentTime) || currentTime < settled { playback.seek(to: settled) }
     }
 
     func editTitle(_ id: TextOverlay.ID, _ actionName: String, _ change: @escaping (inout TextOverlay) -> Void) {
@@ -651,7 +559,7 @@ final class EditorModel {
 
     /// Shows a title's text in the viewer while it is typed, before it is saved (nil: its own).
     func previewTitleText(_ text: String?, for id: TextOverlay.ID) {
-        LivePreview.setTitleText(text, for: id)
+        livePreview.setTitleText(text, for: id)
         typedTitle = text.map { (id, $0) }
         redrawCurrentFrame()
     }
@@ -674,65 +582,6 @@ final class EditorModel {
 
     // MARK: Captions
 
-    /// Transcribes what is heard in the Short (clips, B-roll with sound, voice-overs) that doesn't
-    /// have captions in the chosen language yet, then shows the captions. The result is one
-    /// undoable step. With "Find automatically", the language is the one the Short's captions are
-    /// already in, or found by listening. `quietly` keeps the panel and doesn't complain when
-    /// nothing is heard (used after recording a voice-over).
-    func makeCaptions(quietly: Bool = false) {
-        guard captionJob == nil, !project.timeline.clips.isEmpty else { return }
-        if !quietly { sidebar = .captions }
-        if findsCaptionLanguage, let inUse = project.captionLanguageInUse { captionLanguage = inUse }
-        let detects = findsCaptionLanguage && project.captionLanguageInUse == nil
-        guard detects || !project.assetsNeedingTranscription(in: captionLanguage).isEmpty else {
-            if !quietly { apply("Show Captions") { $0.captions.isVisible = true } }
-            return
-        }
-        captionJob = detects ? .detecting : .downloading(0)
-        captionTask = Task {
-            defer { captionJob = nil }
-            do {
-                var language = captionLanguage
-                if detects, let first = project.assetsHeard().first {
-                    language = try await Transcriber.detectLanguage(of: first.url, name: first.name, fallback: captionLanguage)
-                    captionLanguage = language
-                }
-                captionJob = .downloading(0)
-                try await Transcriber.prepare(language) { fraction in
-                    if case .downloading = self.captionJob { self.captionJob = .downloading(fraction) }
-                }
-                let assets = project.assetsNeedingTranscription(in: language)
-                var transcripts: [MediaAsset.ID: Transcript] = [:]
-                for (index, asset) in assets.enumerated() {
-                    try Task.checkCancellation()
-                    captionJob = .listening(index: index + 1, count: assets.count)
-                    transcripts[asset.id] = try await Transcriber.transcribe(asset.url, name: asset.name, language: language)
-                }
-                try Task.checkCancellation()
-                apply(quietly ? "Make Voice-Over Captions" : "Make Captions") { project in
-                    project.transcripts.merge(transcripts) { $1 }
-                    project.captions.isVisible = true
-                }
-                if !project.hasCaptions, !quietly {
-                    alert = AlertMessage(
-                        title: "No speech found",
-                        message:
-                            "No words in \(language.displayName) were heard in your Short. Check the language, or that the clips or voice-overs have someone talking."
-                    )
-                }
-            } catch is CancellationError {
-                // The user stopped it; nothing changes.
-            } catch {
-                Log.captions.failure("Making captions", error)
-                if !quietly { alert = AlertMessage(title: "Captions couldn't be made", message: error.localizedDescription) }
-            }
-        }
-    }
-
-    func cancelCaptions() {
-        captionTask?.cancel()
-    }
-
     func setCaptionsVisible(_ visible: Bool) {
         apply(visible ? "Show Captions" : "Hide Captions") { $0.captions.isVisible = visible }
     }
@@ -753,73 +602,28 @@ final class EditorModel {
 
     /// The caption on screen at the playhead.
     var currentCaption: CaptionPage? {
-        CaptionLayout.page(at: currentTime, in: captionPages)
+        CaptionLayout.page(at: currentTime, in: captioning.pages)
     }
 
     // MARK: Playback
 
+    /// The current time, for the many edits made at the playhead.
+    var currentTime: CMTime { playback.currentTime }
+
+    /// While playing: stops a voice-over at the end, and jumps over the pauses being previewed.
     private func playheadMoved(to time: CMTime) {
-        // While skimming, the player shows the skimmer's moment; the playhead stays put.
-        if isSkimBlip || (skimTime != nil && !isPlaying) || isChasing { return }
-        currentTime = time
-        if let range = playRange, player.rate > 0, time.snappedToFrame() >= range.end {
-            playRangeEnded(range)
-            return
-        }
         if case .recording = voiceOver, time >= duration - .oneFrame { stopVoiceOver() }
-        // While previewing pause removal, jump over the parts that would be cut.
         // Compare whole frames: the player reports nanoseconds, and 3.233333333 s is a hair before
         // a cut ending at 97/30 s, which would otherwise jump to the same place forever.
         let frame = time.snappedToFrame()
         if let target = skipTarget, frame < target { return }
         skipTarget = nil
-        if let cuts = silenceSession?.plan.timelineCuts, player.rate > 0,
+        if let cuts = silenceSession?.plan.timelineCuts, playback.player.rate > 0,
             let cut = cuts.first(where: { $0.containsTime(frame) })
         {
             skipTarget = cut.end
-            seek(to: cut.end)
+            playback.seek(to: cut.end)
         }
-    }
-
-    func togglePlayback() {
-        if isPlaying {
-            player.pause()
-            playRange = nil
-        } else if let skim = skimTime {
-            // Space while skimming plays from the skimmer, as in iMovie.
-            skimTime = nil
-            seek(to: skim)
-            player.play()
-        } else {
-            if currentTime >= duration - .oneFrame { seek(to: .zero) }
-            player.play()
-        }
-    }
-
-    /// J/K/L shuttle: each press of L (or J) doubles the speed forwards (or backwards).
-    func shuttle(forward: Bool) {
-        let rate = player.rate
-        if forward {
-            player.rate = rate > 0 ? min(rate * 2, 8) : 1
-        } else {
-            player.rate = rate < 0 ? max(rate * 2, -8) : -1
-        }
-    }
-
-    func pause() {
-        player.pause()
-        playRange = nil
-    }
-
-    func step(frames: Int) {
-        player.pause()
-        seek(to: currentTime + CMTime(value: Int64(frames), timescale: Project.frameRate))
-    }
-
-    func seek(to time: CMTime) {
-        let clamped = CMTimeClampToRange(time.snappedToFrame(), range: CMTimeRange(start: .zero, duration: duration))
-        currentTime = clamped
-        player.seek(to: clamped, toleranceBefore: .zero, toleranceAfter: .zero)
     }
 
     // MARK: Timeline zoom
@@ -835,37 +639,44 @@ final class EditorModel {
     /// The home window with every Short, or the editor with one of them.
     var screen: Screen = .home
 
-    /// Every Short in the library, for the home window, newest change first.
-    var shorts: [ShortEntry] = []
-    /// Posters of the Shorts, made from their first second.
-    var posters: [UUID: CGImage] = [:]
-    @ObservationIgnored var posterTask: Task<Void, Never>?
+    /// What has been measured about the media files (sound levels, shake), shared with the
+    /// library's posters and everything that builds the Short.
+    let analysis: MediaAnalysis
+    /// Every Short in the library, for the home window.
+    let library: LibraryModel
+    /// Making, laying out and translating captions.
+    @ObservationIgnored lazy var captioning = CaptionsModel(editor: self)
 
     // MARK: Opening a Short
 
     /// Replaces the whole Short (opening another one): not an edit, so undo starts afresh.
-    func load(_ opened: Project, name: String, created: Date) {
+    func load(_ opened: Project, name: String, created: Date, media: MediaAccess = MediaAccess()) {
         autosaveTask?.cancel()
         hasUnsavedChanges = false
-        captionTask?.cancel()
+        captioning.cancel()
         silenceSession = nil
-        player.pause()
+        playback.reset()
+        // The Short closed gives up its media; the one opened brings its own.
+        if media !== self.media {
+            self.media.close()
+            self.media = media
+        }
         project = opened
         openShortName = name
         openShortCreated = created
-        if let id = openShortID { posters[id] = nil }
+        if let id = openShortID { library.forgetPoster(of: id) }
         selection = nil
         selectedAssetID = nil
-        focusedCaptionID = nil
+        captioning.focusedID = nil
         thumbnails = [:]
         filmstrips = [:]
         audioLevels = [:]
         voiceLevels = [:]
-        LivePreview.clearAll()
+        livePreview.clearAll()
         typedTitle = nil
         missingAssets = []
         backups = []
-        currentTime = .zero
+        tasks.forgetFailures()
         undoManager?.removeAllActions()
         for asset in project.assets { loadPreviews(for: asset) }
         sidebar = project.storyboard != nil ? .storyboard : sidebar == .storyboard ? .media : sidebar
@@ -878,30 +689,29 @@ final class EditorModel {
     /// saves the change a moment later.
     private func projectDidChange(autosave: Bool = true) {
         if autosave { scheduleAutosave() }
-        captionPages = CaptionLayout.pages(in: project)
+        captioning.update(for: project)
         timelineSelection.prune(to: project)
         if let settings = silenceSession?.settings { updateSilenceSettings(settings) }
         rebuildTask?.cancel()
+        // Seeks made before the rebuild lands already reach the new end.
+        playback.duration = project.timeline.clips.isEmpty ? .zero : project.duration
         let project = project
         rebuildTask = Task {
             guard !project.timeline.clips.isEmpty else {
-                player.replaceCurrentItem(with: nil)
-                currentTime = .zero
+                playback.show(nil, duration: .zero)
                 musicEnvelope = []
                 missingAssets = []
                 return
             }
             do {
-                let built = try await CompositionBuilder.build(project)
+                let built = try await CompositionBuilder.build(project, live: livePreview, analysis: analysis)
                 guard !Task.isCancelled else { return }
-                let time = min(currentTime, project.duration)
                 musicEnvelope = built.musicEnvelope
                 missingAssets = built.missingAssets
-                player.replaceCurrentItem(with: built.makePlayerItem())
+                playback.show(built.makePlayerItem(), duration: project.duration)
                 // The edit a drag in the viewer showed live is now in the composition itself.
-                LivePreview.clearAll()
+                livePreview.clearAll()
                 typedTitle = nil
-                seek(to: time)
                 prepareMissingProcessedSounds()
                 prepareMissingSteadiness()
                 prepareMissingCutouts()
@@ -957,7 +767,7 @@ final class EditorModel {
             if asset.hasVideo, filmstrips[asset.id] == nil, let strip = try? await MediaProbe.filmstrip(for: asset) {
                 filmstrips[asset.id] = strip
             }
-            if asset.hasAudio, audioLevels[asset.id] == nil, let levels = await LevelCache.levels(of: asset.url) {
+            if asset.hasAudio, audioLevels[asset.id] == nil, let levels = await analysis.levels(of: asset.url) {
                 audioLevels[asset.id] = levels
             }
         }

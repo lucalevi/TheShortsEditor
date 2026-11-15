@@ -43,39 +43,19 @@ public enum AudioProbe {
     }
 
     /// The loudest sample (0…1) in `range` of the Short, or nil when it has no sound at all.
-    public static func peak(of project: Project, in range: CMTimeRange) async throws -> Float? {
+    public static func peak(of project: Project, in range: CMTimeRange, analysis: MediaAnalysis = MediaAnalysis()) async throws -> Float? {
         var peak: Float = 0
-        let hasSound = try await readMix(of: CompositionBuilder.build(project), in: range) { samples in
+        let hasSound = try await readMix(of: CompositionBuilder.build(project, analysis: analysis), in: range) { samples in
             for x in samples { peak = max(peak, abs(x)) }
         }
         return hasSound ? peak : nil
     }
 
     /// The loudness of the whole Short as mixed (clip volumes, music), or nil when it has no sound.
-    public static func loudness(of project: Project) async throws -> LoudnessMeter? {
+    public static func loudness(of project: Project, analysis: MediaAnalysis = MediaAnalysis()) async throws -> LoudnessMeter? {
         var meter = LoudnessMeter()
-        let hasSound = try await readMix(of: CompositionBuilder.build(project)) { meter.add(interleaved: $0) }
+        let hasSound = try await readMix(of: CompositionBuilder.build(project, analysis: analysis)) { meter.add(interleaved: $0) }
         return hasSound ? meter : nil
-    }
-}
-
-/// Sound levels of files, measured once each and shared by everything that needs them
-/// (lowering music under speech, removing pauses).
-@MainActor
-public enum LevelCache {
-    private static var measured: [URL: AudioLevels?] = [:]
-    private static var running: [URL: Task<AudioLevels?, Never>] = [:]
-
-    /// The file's levels, measuring them the first time. Nil when it has no sound or can't be read.
-    public static func levels(of url: URL) async -> AudioLevels? {
-        if let known = measured[url] { return known }
-        if let task = running[url] { return await task.value }
-        let task = Task { try? await AudioProbe.levels(of: url) }
-        running[url] = task
-        let result = await task.value
-        running[url] = nil
-        measured[url] = result
-        return result
     }
 }
 

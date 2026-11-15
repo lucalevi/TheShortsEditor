@@ -26,7 +26,7 @@ struct MediaBrowserView: View {
                 }
                 .disabled(model.project.timeline.clips.isEmpty)
                 Button("Add Over Clips at Playhead") {
-                    model.importFiles(assets.filter(\.hasVideo).map(\.url), to: .overlay(at: model.currentTime))
+                    model.importFiles(assets.filter(\.hasVideo).map(\.url), to: .overlay(at: model.playback.currentTime))
                 }
                 .disabled(model.project.timeline.clips.isEmpty)
             }

@@ -24,14 +24,14 @@ extension EditorModel {
     /// Opens the Export sheet and runs the checks.
     func beginExport() {
         guard !project.timeline.clips.isEmpty, exportPhase == nil else { return }
-        player.pause()
+        playback.player.pause()
         exportPhase = .checking
         let project = project
         exportTask = Task {
             let firstSecond = CMTimeRange(start: .zero, duration: min(CMTime(value: 1, timescale: 1), project.duration))
             let peak: Float?
             do {
-                peak = try await AudioProbe.peak(of: project, in: firstSecond)
+                peak = try await AudioProbe.peak(of: project, in: firstSecond, analysis: analysis)
             } catch {
                 Log.export.failure("beginExport", error)
                 peak = 1 // Couldn't measure: skip that check rather than claim silence.
@@ -49,8 +49,12 @@ extension EditorModel {
         exportTask = Task {
             do {
                 let options = exportOptions
-                try await Exporter.export(project, to: url, evenOutLoudness: options.evensOutLoudness, range: options.range) { fraction in
-                    if case .exporting = self.exportPhase { self.exportPhase = .exporting(fraction) }
+                try await tasks.run(.export, title: "Exporting “\(url.lastPathComponent)”") { progress in
+                    try await Exporter.export(project, to: url, evenOutLoudness: options.evensOutLoudness, range: options.range, analysis: self.analysis) {
+                        fraction in
+                        progress(fraction)
+                        if case .exporting = self.exportPhase { self.exportPhase = .exporting(fraction) }
+                    }
                 }
                 exportPhase = .finished(url)
             } catch is CancellationError {
@@ -93,12 +97,12 @@ extension EditorModel {
     /// the cuts with settings suggested from the sound itself. Nothing changes until `applySilenceRemoval`.
     func beginRemovingSilences() {
         guard silenceSession == nil, !project.timeline.clips.isEmpty else { return }
-        player.pause()
+        playback.player.pause()
         silenceSession = SilenceSession()
         let assets = Dictionary(project.timeline.clips.compactMap { project.asset(id: $0.assetID) }.map { ($0.id, $0) }) { a, _ in a }
         Task {
             for asset in assets.values where asset.hasAudio && audioLevels[asset.id] == nil {
-                if let levels = await LevelCache.levels(of: asset.url) {
+                if let levels = await analysis.levels(of: asset.url) {
                     audioLevels[asset.id] = levels
                 }
             }
@@ -140,23 +144,28 @@ extension EditorModel {
             return
         }
         silenceSession?.separating = 0
-        Task {
+        let separating = tasks.start(.voiceSeparation, title: "Separating the voice to find pauses") { progress in
             for (number, asset) in missing.enumerated() {
                 do {
                     let cleaned = try await VoiceCleaner.clean(asset.url) { fraction in
+                        let overall = (Double(number) + fraction) / Double(missing.count)
+                        progress(overall)
                         Task { @MainActor in
-                            if self.silenceSession?.separating != nil {
-                                self.silenceSession?.separating = (Double(number) + fraction) / Double(missing.count)
-                            }
+                            if self.silenceSession?.separating != nil { self.silenceSession?.separating = overall }
                         }
                     }
-                    if let levels = await LevelCache.levels(of: cleaned) { voiceLevels[asset.id] = levels }
+                    if let levels = await self.analysis.levels(of: cleaned) { self.voiceLevels[asset.id] = levels }
+                } catch is CancellationError {
+                    throw CancellationError()
                 } catch {
                     Log.audio.failure("setPausesListenToVoiceOnly", error)
                     // That file keeps its own levels.
                 }
-                guard silenceSession != nil else { return }
+                guard self.silenceSession != nil else { return }
             }
+        }
+        Task {
+            _ = try? await separating.value
             silenceSession?.separating = nil
             suggestPauseSettings(from: pauseVoiceLevels)
         }
@@ -183,7 +192,7 @@ extension EditorModel {
 
     /// Plays from the start, skipping the parts that would be cut.
     func previewSilenceRemoval() {
-        seek(to: .zero)
-        player.play()
+        playback.seek(to: .zero)
+        playback.player.play()
     }
 }

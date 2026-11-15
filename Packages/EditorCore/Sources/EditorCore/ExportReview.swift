@@ -15,7 +15,7 @@ public struct ExportIssue: Identifiable, Equatable, Sendable {
         case tip
     }
 
-    public let kind: Kind
+    let kind: Kind
     public let severity: Severity
     public let title: String
     public let detail: String
@@ -25,7 +25,7 @@ public struct ExportIssue: Identifiable, Equatable, Sendable {
 /// The checks run before export. None of them blocks exporting: the user decides.
 public enum ExportReview {
     /// Below this peak level (about −40 dBFS) the opening counts as silent.
-    public static let silenceThreshold: Float = 0.01
+    package static let silenceThreshold: Float = 0.01
 
     /// `openingPeak` is the loudest sample in the first second (0…1), or nil when the Short has
     /// no sound at all. `titleFrames` is where each title is drawn, in canvas pixels with the

@@ -19,15 +19,15 @@ public struct RGB: Equatable, Hashable, Sendable, Codable {
     public init(gray: Double) { self.init(gray, gray, gray) }
 
     /// Brightness as the eye sees it (Rec. 709 weights).
-    public var luma: Double { 0.2126 * r + 0.7152 * g + 0.0722 * b }
+    package var luma: Double { 0.2126 * r + 0.7152 * g + 0.0722 * b }
 
     /// How colourful it is: 0 for grey, up to 1.
-    public var saturation: Double {
+    var saturation: Double {
         let high = max(r, g, b), low = min(r, g, b)
         return high <= 0.0001 ? 0 : (high - low) / high
     }
 
-    public var clamped: RGB { RGB(r.clamped(0, 1), g.clamped(0, 1), b.clamped(0, 1)) }
+    var clamped: RGB { RGB(r.clamped(0, 1), g.clamped(0, 1), b.clamped(0, 1)) }
 
     func map(_ f: (Double) -> Double) -> RGB { RGB(f(r), f(g), f(b)) }
     static func * (c: RGB, k: Double) -> RGB { RGB(c.r * k, c.g * k, c.b * k) }
@@ -47,7 +47,7 @@ public struct RGB: Equatable, Hashable, Sendable, Codable {
 }
 
 extension Double {
-    func clamped(_ low: Double, _ high: Double) -> Double { Swift.min(Swift.max(self, low), high) }
+    public func clamped(_ low: Double, _ high: Double) -> Double { Swift.min(Swift.max(self, low), high) }
 }
 
 // MARK: - Colour adjustments
@@ -100,13 +100,13 @@ public struct ColorAdjustments: Codable, Equatable, Hashable, Sendable {
     static let exposureStops = 0.8
 
     /// What each channel is multiplied by for the warmth and tint, keeping the brightness of grey.
-    public var channelGains: RGB {
+    var channelGains: RGB {
         let raw = RGB(exp(Self.warmthStrength * warmth), exp(-Self.tintStrength * tint), exp(-Self.warmthStrength * warmth))
         return raw * (1 / raw.luma)
     }
 
     /// The colour `input` becomes.
-    public func apply(_ input: RGB) -> RGB {
+    func apply(_ input: RGB) -> RGB {
         if isNeutral { return input }
         var c = input * channelGains
         if exposure != 0 { c = c * pow(2, exposure * Self.exposureStops) }
@@ -138,7 +138,7 @@ public struct ColorAdjustments: Codable, Equatable, Hashable, Sendable {
         /// Someone's skin: it becomes a natural skin colour.
         case skin
 
-        public var color: RGB {
+        var color: RGB {
             switch self {
             case .white: RGB(gray: 0.7)
             case .skin: RGB(0.85, 0.64, 0.52)
@@ -221,13 +221,13 @@ public struct ColorAdjustments: Codable, Equatable, Hashable, Sendable {
 /// What a picture is like, measured on a small copy of it: for Enhance and Match Color.
 public struct FrameStats: Equatable, Sendable {
     /// The average colour.
-    public var mean: RGB
+    package var mean: RGB
     /// Brightness that 2% of the picture is darker than, half of it, and 98% of it.
-    public var dark: Double
-    public var median: Double
-    public var bright: Double
+    var dark: Double
+    var median: Double
+    var bright: Double
     /// How colourful it is on average.
-    public var saturation: Double
+    var saturation: Double
 
     public init(mean: RGB, dark: Double, median: Double, bright: Double, saturation: Double) {
         self.mean = mean
@@ -281,7 +281,7 @@ public enum LookFilter: String, Codable, CaseIterable, Identifiable, Sendable {
     }
 
     /// The colour `c` becomes with the whole filter.
-    public func apply(_ c: RGB) -> RGB {
+    func apply(_ c: RGB) -> RGB {
         switch self {
         case .vivid:
             // More colour where there is little, so skin doesn't go orange.
@@ -318,7 +318,7 @@ public enum LookFilter: String, Codable, CaseIterable, Identifiable, Sendable {
     }
 
     /// How much the corners darken with the whole filter (0: not at all).
-    public var vignette: Double {
+    var vignette: Double {
         switch self {
         case .vintage: 0.55
         case .moody, .noir: 0.45
@@ -328,7 +328,7 @@ public enum LookFilter: String, Codable, CaseIterable, Identifiable, Sendable {
     }
 
     /// How much bright parts glow softly with the whole filter (0: not at all).
-    public var glow: Double {
+    var glow: Double {
         self == .dreamy ? 0.6 : 0
     }
 }
@@ -343,12 +343,12 @@ public struct FilterChoice: Codable, Equatable, Hashable, Sendable {
         self.strength = strength.clamped(0, 1)
     }
 
-    public func apply(_ c: RGB) -> RGB {
+    package func apply(_ c: RGB) -> RGB {
         strength >= 1 ? filter.apply(c) : c.mixed(with: filter.apply(c), strength)
     }
 
-    public var vignette: Double { filter.vignette * strength }
-    public var glow: Double { filter.glow * strength }
+    package var vignette: Double { filter.vignette * strength }
+    package var glow: Double { filter.glow * strength }
 }
 
 /// Everything about a clip's colour: the sliders first, then the filter on top.
@@ -368,25 +368,25 @@ public struct ClipLook: Codable, Equatable, Hashable, Sendable {
         return filter?.apply(adjusted) ?? adjusted
     }
 
-    public var vignette: Double { filter?.vignette ?? 0 }
-    public var glow: Double { filter?.glow ?? 0 }
+    package var vignette: Double { filter?.vignette ?? 0 }
+    package var glow: Double { filter?.glow ?? 0 }
 }
 
 // MARK: - On the project
 
-public extension Project {
+extension Project {
     /// Every clip on the timeline (main and over the others) whose picture can be coloured.
     var colorableClipIDs: [Clip.ID] {
         (timeline.clips + overlays.map(\.clip)).filter { asset(id: $0.assetID)?.hasVideo == true }.map(\.id)
     }
 
     /// Changes the look of clip `id`.
-    mutating func updateLook(of id: Clip.ID, _ change: (inout ClipLook) -> Void) {
+    public mutating func updateLook(of id: Clip.ID, _ change: (inout ClipLook) -> Void) {
         updateAnyClip(id) { change(&$0.look) }
     }
 
     /// Gives every main clip and every clip over them the same filter (nil removes them all).
-    mutating func setFilterOnEveryClip(_ choice: FilterChoice?) {
+    public mutating func setFilterOnEveryClip(_ choice: FilterChoice?) {
         for id in colorableClipIDs { updateLook(of: id) { $0.filter = choice } }
     }
 }

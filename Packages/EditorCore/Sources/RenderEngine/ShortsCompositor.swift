@@ -68,11 +68,14 @@ nonisolated final class ShortsInstruction: NSObject, AVVideoCompositionInstructi
     let transition: TransitionDrawing?
     /// The filter over the whole Short, drawn over the clips (not the titles and captions).
     let look: FilterChoice?
+    /// What the editor shows before its edits are made (the player's composition only).
+    let live: LivePreview?
 
     init(
         timeRange: CMTimeRange, layers: [CompositorLayer], captions: CaptionTrack, titles: TitleTrack, transition: TransitionDrawing? = nil,
-        look: FilterChoice? = nil
+        look: FilterChoice? = nil, live: LivePreview? = nil
     ) {
+        self.live = live
         self.timeRange = timeRange
         self.layers = layers
         self.captions = captions
@@ -86,16 +89,33 @@ nonisolated final class ShortsInstruction: NSObject, AVVideoCompositionInstructi
     }
 }
 
-/// While a picture is being dragged in the viewer, the placement it would have, drawn straight
-/// away without rebuilding the composition. Cleared when the drag ends and the edit is made.
-public nonisolated enum LivePreview {
-    private static let placements = Mutex<[Clip.ID: Placement]>([:])
+/// What the viewer shows before an edit is made, so a drag or a slider is seen at once without
+/// rebuilding the composition: the placement of a picture being dragged, the look of colour
+/// sliders being dragged, a title's text while it is typed, cut-out sliders, and before/after.
+/// Cleared when the drag ends and the edit is made.
+///
+/// One belongs to each editor and reaches the compositor through the instructions of the
+/// player's composition (`CompositionBuilder.build(…, live:)`), so exports, thumbnails and other
+/// editors never see it.
+public nonisolated final class LivePreview: Sendable {
+    private let placements = Mutex<[Clip.ID: Placement]>([:])
+    // A title's text while it is being typed, shown before it is saved.
+    private let titleTexts = Mutex<[TextOverlay.ID: String]>([:])
+    // Cut-out sliders being dragged (green screen, mask, blend).
+    private let cutouts = Mutex<[Clip.ID: ClipCutout]>([:])
+    // Colour sliders being dragged: the look they would give, shown at once.
+    private let looks = Mutex<[Clip.ID: ClipLook]>([:])
+    private let shortLook = Mutex<FilterChoice??>(nil)
+    private let original = Mutex(false)
 
-    public static func set(_ placement: Placement?, for clipID: Clip.ID) {
+    public init() {}
+
+    public func set(_ placement: Placement?, for clipID: Clip.ID) {
         placements.withLock { $0[clipID] = placement }
     }
 
-    public static func clearAll() {
+    /// Forgets everything shown live (the edit is now in the composition), except before/after.
+    public func clearAll() {
         placements.withLock { $0.removeAll() }
         looks.withLock { $0.removeAll() }
         shortLook.withLock { $0 = nil }
@@ -103,54 +123,43 @@ public nonisolated enum LivePreview {
         titleTexts.withLock { $0.removeAll() }
     }
 
-    // A title's text while it is being typed, shown before it is saved.
-    private static let titleTexts = Mutex<[TextOverlay.ID: String]>([:])
-
-    public static func setTitleText(_ text: String?, for titleID: TextOverlay.ID) {
+    public func setTitleText(_ text: String?, for titleID: TextOverlay.ID) {
         titleTexts.withLock { $0[titleID] = text }
     }
 
-    static func titleText(for titleID: TextOverlay.ID) -> String? {
+    func titleText(for titleID: TextOverlay.ID) -> String? {
         titleTexts.withLock { $0[titleID] }
     }
 
-    // Cut-out sliders being dragged (green screen, mask, blend).
-    private static let cutouts = Mutex<[Clip.ID: ClipCutout]>([:])
-
-    public static func setCutout(_ cutout: ClipCutout?, for clipID: Clip.ID) {
+    public func setCutout(_ cutout: ClipCutout?, for clipID: Clip.ID) {
         cutouts.withLock { $0[clipID] = cutout }
     }
 
-    static func cutout(for clipID: Clip.ID) -> ClipCutout? {
+    func cutout(for clipID: Clip.ID) -> ClipCutout? {
         cutouts.withLock { $0[clipID] }
     }
 
-    static func placement(for clipID: Clip.ID) -> Placement? {
+    func placement(for clipID: Clip.ID) -> Placement? {
         placements.withLock { $0[clipID] }
     }
 
-    // Colour sliders being dragged: the look they would give, shown at once.
-    private static let looks = Mutex<[Clip.ID: ClipLook]>([:])
-    private static let shortLook = Mutex<FilterChoice??>(nil)
-    private static let original = Mutex(false)
-
-    public static func setLook(_ look: ClipLook?, for clipID: Clip.ID) {
+    public func setLook(_ look: ClipLook?, for clipID: Clip.ID) {
         looks.withLock { $0[clipID] = look }
     }
 
-    static func look(for clipID: Clip.ID) -> ClipLook? {
+    func look(for clipID: Clip.ID) -> ClipLook? {
         looks.withLock { $0[clipID] }
     }
 
     /// The whole Short's filter while its strength slider is dragged (`.some(nil)`: no filter).
-    public static func setShortLook(_ choice: FilterChoice??) {
+    public func setShortLook(_ choice: FilterChoice??) {
         shortLook.withLock { $0 = choice }
     }
 
-    static var shortLookOverride: FilterChoice?? { shortLook.withLock { $0 } }
+    var shortLookOverride: FilterChoice?? { shortLook.withLock { $0 } }
 
     /// Before/after: while true, every picture is drawn without its look (colour and filters).
-    public static var showsOriginal: Bool {
+    public var showsOriginal: Bool {
         get { original.withLock { $0 } }
         set { original.withLock { $0 = newValue } }
     }
@@ -212,6 +221,7 @@ nonisolated class ShortsCompositor: NSObject, AVVideoCompositing, @unchecked Sen
             return
         }
         let time = request.compositionTime
+        let live = instruction.live
         let canvas = CGRect(origin: .zero, size: Project.canvasSize)
         var image = CIImage(color: .black).cropped(to: canvas)
 
@@ -219,8 +229,8 @@ nonisolated class ShortsCompositor: NSObject, AVVideoCompositing, @unchecked Sen
         if let transition = instruction.transition, let main = layers.first, main.isMain {
             // Both clips drawn whole, then mixed; B-roll, titles and captions go on top as usual.
             let black = CIImage(color: .black).cropped(to: canvas)
-            let mainImage = draw(main, at: time, request: request, over: black)
-            let otherImage = draw(transition.other, at: time, request: request, over: black)
+            let mainImage = draw(main, at: time, request: request, live: live, over: black)
+            let otherImage = draw(transition.other, at: time, request: request, live: live, over: black)
             let region = main.region
             let ciRegion = CGRect(x: region.minX, y: canvas.height - region.maxY, width: region.width, height: region.height)
             // Counted from the middle of each frame, so the first and last frames are equally far in.
@@ -233,14 +243,14 @@ nonisolated class ShortsCompositor: NSObject, AVVideoCompositing, @unchecked Sen
             layers = layers.dropFirst()
         }
         for layer in layers {
-            image = draw(layer, at: time, request: request, over: image)
+            image = draw(layer, at: time, request: request, live: live, over: image)
         }
-        if !LivePreview.showsOriginal, let look = LivePreview.shortLookOverride ?? instruction.look {
+        if live?.showsOriginal != true, let look = live?.shortLookOverride ?? instruction.look {
             image = LookRenderer.apply(look, to: image.cropped(to: canvas))
         }
 
         for state in instruction.titles.states(at: time) {
-            guard state.opacity > 0, let title = titleImage(state) else { continue }
+            guard state.opacity > 0, let title = titleImage(state, live: live) else { continue }
             let over = title.composited(over: image)
             // Fading: blend between the frame without and with the title.
             image =
@@ -261,23 +271,25 @@ nonisolated class ShortsCompositor: NSObject, AVVideoCompositing, @unchecked Sen
     /// Draws one layer over `image`. While the clip comes in or goes out with an animation, the
     /// layer (with its background, for a main clip) is drawn on its own first, then moved, sized,
     /// turned, blurred and faded as one picture.
-    private func draw(_ layer: CompositorLayer, at time: CMTime, request: AVAsynchronousVideoCompositionRequest, over image: CIImage) -> CIImage {
+    private func draw(
+        _ layer: CompositorLayer, at time: CMTime, request: AVAsynchronousVideoCompositionRequest, live: LivePreview?, over image: CIImage
+    ) -> CIImage {
         let offset = time - layer.timelineStart
-        let effects = LivePreview.showsOriginal ? [] : layer.clip.activeEffects(atOffset: offset, clipStart: layer.timelineStart)
+        let effects = live?.showsOriginal == true ? [] : layer.clip.activeEffects(atOffset: offset, clipStart: layer.timelineStart)
         let animation = layer.clip.animationState(atOffset: offset).flatMap { $0.isIdentity ? nil : $0 }
         guard !effects.isEmpty || animation != nil else {
-            return drawPlain(layer, at: time, request: request, over: image)
+            return drawPlain(layer, at: time, request: request, live: live, over: image)
         }
         let canvas = CGRect(origin: .zero, size: Project.canvasSize)
         let region = layer.region
         let ciRegion = CGRect(x: region.minX, y: canvas.height - region.maxY, width: region.width, height: region.height)
-        var picture = drawPlain(layer, at: time, request: request, over: CIImage(color: .clear).cropped(to: ciRegion))
+        var picture = drawPlain(layer, at: time, request: request, live: live, over: CIImage(color: .clear).cropped(to: ciRegion))
         if !effects.isEmpty {
             // Effects work on the picture as placed; a main clip's black shows where it moves away.
             let base = layer.isMain ? CIImage(color: .black).cropped(to: ciRegion) : CIImage(color: .clear).cropped(to: ciRegion)
             picture = EffectRenderer.apply(effects, to: picture, in: ciRegion).composited(over: base)
         }
-        guard let state = animation else { return Self.composite(picture, of: layer, over: image) }
+        guard let state = animation else { return Self.composite(picture, of: layer, live: live, over: image) }
         if state.blur > 0.5 {
             picture = picture.clampedToExtent().applyingGaussianBlur(sigma: state.blur / 2).cropped(to: picture.extent)
         }
@@ -292,18 +304,20 @@ nonisolated class ShortsCompositor: NSObject, AVVideoCompositing, @unchecked Sen
         if state.opacity < 1 {
             picture = picture.applyingFilter("CIColorMatrix", parameters: ["inputAVector": CIVector(x: 0, y: 0, z: 0, w: state.opacity)])
         }
-        return Self.composite(picture, of: layer, over: image)
+        return Self.composite(picture, of: layer, live: live, over: image)
     }
 
     /// A layer's picture over what is under it: covering it, or mixed in by its blend mode (B-roll).
-    private static func composite(_ picture: CIImage, of layer: CompositorLayer, over image: CIImage) -> CIImage {
-        let blend = layer.isMain ? .normal : (LivePreview.cutout(for: layer.clip.id) ?? layer.clip.cutout).blend
+    private static func composite(_ picture: CIImage, of layer: CompositorLayer, live: LivePreview?, over image: CIImage) -> CIImage {
+        let blend = layer.isMain ? .normal : (live?.cutout(for: layer.clip.id) ?? layer.clip.cutout).blend
         return CutoutRenderer.blend(picture, over: image, mode: blend)
     }
 
     /// Draws one layer over `image`: its picture framed and placed in its region (over a blurred
     /// copy of itself or black for a main clip), see-through as far as its opacity and fades say.
-    private func drawPlain(_ layer: CompositorLayer, at time: CMTime, request: AVAsynchronousVideoCompositionRequest, over image: CIImage) -> CIImage {
+    private func drawPlain(
+        _ layer: CompositorLayer, at time: CMTime, request: AVAsynchronousVideoCompositionRequest, live: LivePreview?, over image: CIImage
+    ) -> CIImage {
         let canvas = CGRect(origin: .zero, size: Project.canvasSize)
         let region = layer.region
         // Core Image's origin is at the bottom left.
@@ -311,17 +325,17 @@ nonisolated class ShortsCompositor: NSObject, AVVideoCompositing, @unchecked Sen
         guard var source = sourceImage(for: layer, request: request) else {
             return layer.isMain ? CIImage(color: .black).cropped(to: ciRegion).composited(over: image) : image
         }
-        if !LivePreview.showsOriginal {
-            source = LookRenderer.apply(LivePreview.look(for: layer.clip.id) ?? layer.clip.look, to: source)
+        if live?.showsOriginal != true {
+            source = LookRenderer.apply(live?.look(for: layer.clip.id) ?? layer.clip.look, to: source)
         }
         // Green screen: keyed on the picture as it looks (after its colours), so a picked colour matches.
-        let cutout = LivePreview.cutout(for: layer.clip.id) ?? layer.clip.cutout
+        let cutout = live?.cutout(for: layer.clip.id) ?? layer.clip.cutout
         let unkeyed = source
         if let key = cutout.key { source = CutoutRenderer.keyed(source, by: key) }
         var image = image
         let offset = time - layer.timelineStart
         let sourceTime = layer.clip.sourceTime(atOffset: offset)
-        let placement = LivePreview.placement(for: layer.clip.id) ?? layer.clip.placement(atSourceTime: sourceTime)
+        let placement = live?.placement(for: layer.clip.id) ?? layer.clip.placement(atSourceTime: sourceTime)
         // Steadied (moved against the shake and zoomed in a little), then framed to the region's
         // size, then moved, resized and turned around its middle, then put in place.
         let steady = layer.steadying?.transform(atSourceTime: sourceTime, naturalSize: layer.naturalSize) ?? .identity
@@ -358,7 +372,7 @@ nonisolated class ShortsCompositor: NSObject, AVVideoCompositing, @unchecked Sen
         if opacity < 1 {
             placed = placed.applyingFilter("CIColorMatrix", parameters: ["inputAVector": CIVector(x: 0, y: 0, z: 0, w: opacity)])
         }
-        return Self.composite(placed, of: layer, over: image)
+        return Self.composite(placed, of: layer, live: live, over: image)
     }
 
     private func sourceImage(for layer: CompositorLayer, request: AVAsynchronousVideoCompositionRequest) -> CIImage? {
@@ -452,10 +466,10 @@ nonisolated class ShortsCompositor: NSObject, AVVideoCompositing, @unchecked Sen
         return made
     }
 
-    private func titleImage(_ state: TitleTrack.State) -> CIImage? {
+    private func titleImage(_ state: TitleTrack.State, live: LivePreview?) -> CIImage? {
         var title = state.title
         let scale = state.scale
-        if let typed = LivePreview.titleText(for: title.id) { title.text = typed }
+        if let typed = live?.titleText(for: title.id) { title.text = typed }
         let key = title.sticker.map { "sticker|\($0.hashValue)" } ?? "title|\(title.look.hashValue)|\(title.text)|\(state.visibleCharacters ?? -1)"
         guard let placement = TitleRenderer.placement(of: title),
             let cgImage = cachedImage(key, make: { TitleRenderer.image(of: title, visibleCharacters: state.visibleCharacters) })

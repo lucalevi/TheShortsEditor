@@ -8,9 +8,9 @@ import Foundation
 
 /// One beat of a song, in the song's own time.
 public struct Beat: Codable, Equatable, Hashable, Sendable {
-    public var time: CMTime
+    package var time: CMTime
     /// The first beat of a bar (a stronger beat).
-    public var isBarStart: Bool
+    package var isBarStart: Bool
 
     public init(time: CMTime, isBarStart: Bool = false) {
         self.time = time
@@ -37,7 +37,7 @@ public struct TimelineBeat: Equatable, Sendable {
     public var time: CMTime
     public var isBarStart: Bool
     /// Which beat of its bar it is (0 is the bar's first).
-    public var indexInBar: Int
+    var indexInBar: Int
 }
 
 /// Which beats Cut to the Beat cuts on.
@@ -63,7 +63,7 @@ public enum BeatSpacing: String, CaseIterable, Identifiable, Sendable {
     }
 }
 
-public extension MusicMood {
+extension MusicMood {
     /// The beats of the app's music for this mood (it is built bar by bar from time 0, four beats a bar).
     func beats(upTo length: CMTime) -> [Beat] {
         let interval = 60 / tempo
@@ -77,12 +77,12 @@ public extension MusicMood {
 /// Finds the beats of a song from how strongly new sounds start over time (its "onsets"):
 /// the steadiest pulse between 70 and 180 beats a minute, then where its bars begin. Most
 /// music has one tempo, so the beats are an even grid.
-public enum BeatFinder {
-    public static let tempoRange: ClosedRange<Double> = 70...180
+package enum BeatFinder {
+    static let tempoRange: ClosedRange<Double> = 70...180
 
     /// `onsets` and `bass` (onsets of the low notes, for where bars begin) are measured `rate`
     /// times a second from the start of the song. Empty when there is no clear pulse.
-    public static func beats(onsets: [Float], bass: [Float], rate: Double, length: CMTime) -> [Beat] {
+    package static func beats(onsets: [Float], bass: [Float], rate: Double, length: CMTime) -> [Beat] {
         let count = onsets.count
         guard count > Int(rate * 3), let loudest = onsets.max(), loudest > 0 else { return [] }
         let envelope = onsets.map { Double($0 / loudest) }
@@ -187,7 +187,7 @@ public enum BeatFinder {
 
 // MARK: - The music on the timeline
 
-public extension Project {
+extension Project {
     /// The song's beats in its own time: found or set by hand, else the app's music's own.
     var songBeats: [Beat] {
         guard let music, let song = asset(id: music.assetID) else { return [] }
@@ -196,7 +196,7 @@ public extension Project {
     }
 
     /// Whether the song's beats are known (found, set by hand or the app's own music).
-    var hasBeats: Bool { !songBeats.isEmpty }
+    public var hasBeats: Bool { !songBeats.isEmpty }
 
     /// The time in the song playing at timeline `time` (nil outside the music).
     func songTime(atTimeline time: CMTime) -> CMTime? {
@@ -211,10 +211,10 @@ public extension Project {
     }
 
     /// Where each pass of the song plays: (timeline start, song part). One pass unless it loops.
-    var musicPasses: [(start: CMTime, source: CMTimeRange)] { musicPasses(through: duration) }
+    package var musicPasses: [(start: CMTime, source: CMTimeRange)] { musicPasses(through: duration) }
 
     /// The same if the Short lasted until `end`.
-    func musicPasses(through end: CMTime) -> [(start: CMTime, source: CMTimeRange)] {
+    package func musicPasses(through end: CMTime) -> [(start: CMTime, source: CMTimeRange)] {
         guard let music, let range = musicRange(through: end), let song = asset(id: music.assetID) else { return [] }
         var passes: [(start: CMTime, source: CMTimeRange)] = []
         var at = range.start
@@ -231,10 +231,10 @@ public extension Project {
     }
 
     /// The song's beats where they play on the timeline, in order.
-    var timelineBeats: [TimelineBeat] { timelineBeats(through: duration) }
+    public var timelineBeats: [TimelineBeat] { timelineBeats(through: duration) }
 
     /// The same if the Short lasted until `end` (where it could grow to).
-    func timelineBeats(through end: CMTime) -> [TimelineBeat] {
+    public func timelineBeats(through end: CMTime) -> [TimelineBeat] {
         let beats = songBeats
         guard !beats.isEmpty else { return [] }
         var placed: [(time: CMTime, isBarStart: Bool)] = []
@@ -256,7 +256,7 @@ public extension Project {
 
     /// Moves the music on the timeline so it starts at `start` (a whole frame; at least a second
     /// before the end of the Short).
-    mutating func setMusicTimelineStart(_ start: CMTime) {
+    public mutating func setMusicTimelineStart(_ start: CMTime) {
         guard music != nil else { return }
         let latest = max(.zero, duration - CMTime(value: 1, timescale: 1))
         music?.start = start.snappedToFrame().clamped(.zero, latest).snappedToFrame()
@@ -264,7 +264,7 @@ public extension Project {
 
     /// Adds a beat by hand where the music plays at timeline `time`. False outside the music.
     @discardableResult
-    mutating func addBeat(atTimeline time: CMTime) -> Bool {
+    public mutating func addBeat(atTimeline time: CMTime) -> Bool {
         guard let songTime = songTime(atTimeline: time.snappedToFrame()) else { return false }
         var beats = songBeats
         let tolerance = 0.5 / Double(Project.frameRate)
@@ -278,7 +278,7 @@ public extension Project {
 
     /// Removes the beat nearest timeline `time`, if one is within `tolerance`. False when none is.
     @discardableResult
-    mutating func removeBeat(nearTimeline time: CMTime, tolerance: CMTime = CMTime(value: 4, timescale: Project.frameRate)) -> Bool {
+    public mutating func removeBeat(nearTimeline time: CMTime, tolerance: CMTime = CMTime(value: 4, timescale: Project.frameRate)) -> Bool {
         guard let nearest = timelineBeats.min(by: { abs(($0.time - time).seconds) < abs(($1.time - time).seconds) }),
             abs((nearest.time - time).seconds) <= tolerance.seconds,
             let songTime = songTime(atTimeline: nearest.time)
@@ -291,20 +291,20 @@ public extension Project {
     }
 
     /// Forgets beats set by hand or found, going back to none (or the app's music's own).
-    mutating func resetBeats() {
+    public mutating func resetBeats() {
         music?.beats = nil
     }
 }
 
 // MARK: - Cut to the Beat
 
-public extension Project {
+extension Project {
     /// Trims the main clips so every cut, and the end of the Short, lands on a beat of the
     /// music (`spacing` picks which beats). Each cut goes to the beat nearest where it is, as
     /// far as the clip's footage allows and never shorter than a clip may be; a cut with no
     /// beat near it (outside the music) stays. Returns how many cuts moved.
     @discardableResult
-    mutating func cutToBeat(_ spacing: BeatSpacing) -> Int {
+    public mutating func cutToBeat(_ spacing: BeatSpacing) -> Int {
         // The end of the Short may move past where it ends now.
         let beats = timelineBeats(through: Project.maxDuration).filter { spacing.includes($0) }.map { $0.time.snappedToFrame() }
         guard beats.count >= 2 else { return 0 }

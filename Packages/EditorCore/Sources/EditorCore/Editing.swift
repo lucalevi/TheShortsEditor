@@ -8,7 +8,7 @@ public enum ClipEdge: Sendable {
 
 // MARK: - Trimming the main clips
 
-public extension Project {
+extension Project {
     /// Moves one edge of a main clip by `delta` (positive is to the right), on whole frames.
     ///
     /// The storyline is magnetic, so the clips after it close up or make room. The start edge
@@ -16,7 +16,7 @@ public extension Project {
     /// go past the start or end of its file; a picture can be up to `MediaAsset.imageDuration`.
     /// Returns false when nothing could change.
     @discardableResult
-    mutating func trimClip(_ id: Clip.ID, edge: ClipEdge, by delta: CMTime) -> Bool {
+    public mutating func trimClip(_ id: Clip.ID, edge: ClipEdge, by delta: CMTime) -> Bool {
         guard let index = timeline.index(of: id) else { return false }
         var clip = timeline.clips[index]
         guard let limits = trimLimits(for: clip, edge: edge) else { return false }
@@ -34,7 +34,7 @@ public extension Project {
     }
 
     /// How far an edge of `clip` may move, as a range of deltas.
-    func trimLimits(for clip: Clip, edge: ClipEdge) -> CMTimeRange? {
+    public func trimLimits(for clip: Clip, edge: ClipEdge) -> CMTimeRange? {
         guard let asset = asset(id: clip.assetID) else { return nil }
         let shortest = clip.duration - Clip.minimumDuration
         // A freeze frame is one picture, so it can be any length, like a picture file.
@@ -55,7 +55,7 @@ public extension Project {
     /// after it (`.end`, W). Returns where the playhead should go: where the cut was made, which
     /// for `.start` is now the clip's beginning. Nil when `time` is on a cut or outside the Short.
     @discardableResult
-    mutating func trimMainClip(at time: CMTime, removing edge: ClipEdge) -> CMTime? {
+    public mutating func trimMainClip(at time: CMTime, removing edge: ClipEdge) -> CMTime? {
         let time = time.snappedToFrame()
         guard let (index, offset) = timeline.locate(time), offset > .zero else { return nil }
         let clip = timeline.clips[index]
@@ -133,13 +133,13 @@ public struct Overlay: Identifiable, Codable, Equatable, Sendable {
     }
 }
 
-public extension Overlay {
+extension Overlay {
     /// The longest a video is when added over the clips: B-roll is usually a few seconds.
     static let defaultVideoDuration = CMTime(value: 4, timescale: 1)
 }
 
-public extension Project {
-    func overlay(id: Clip.ID) -> Overlay? {
+extension Project {
+    public func overlay(id: Clip.ID) -> Overlay? {
         overlays.first { $0.id == id }
     }
 
@@ -147,7 +147,7 @@ public extension Project {
     /// sound (B-roll usually plays under the voice). Near the end it starts earlier, so it isn't
     /// cut short. Returns nil for media that has no picture.
     @discardableResult
-    mutating func addOverlay(of assetID: MediaAsset.ID, at time: CMTime) -> Clip.ID? {
+    public mutating func addOverlay(of assetID: MediaAsset.ID, at time: CMTime) -> Clip.ID? {
         guard let asset = asset(id: assetID), asset.hasVideo else { return nil }
         let wanted = asset.isImage ? NewClipSettings.current.pictureLength : min(asset.duration, Overlay.defaultVideoDuration)
         let length = duration > .zero ? duration : wanted
@@ -158,17 +158,17 @@ public extension Project {
         return clip.id
     }
 
-    mutating func updateOverlay(_ id: Clip.ID, _ change: (inout Overlay) -> Void) {
+    public mutating func updateOverlay(_ id: Clip.ID, _ change: (inout Overlay) -> Void) {
         guard let index = overlays.firstIndex(where: { $0.id == id }) else { return }
         change(&overlays[index])
     }
 
-    mutating func removeOverlay(_ id: Clip.ID) {
+    public mutating func removeOverlay(_ id: Clip.ID) {
         overlays.removeAll { $0.id == id }
     }
 
     /// Moves an overlay so it starts at `start`, keeping its length, on a whole frame and inside the Short.
-    mutating func moveOverlay(_ id: Clip.ID, to start: CMTime) {
+    public mutating func moveOverlay(_ id: Clip.ID, to start: CMTime) {
         let end = duration
         updateOverlay(id) { overlay in
             let latest = max(.zero, end - overlay.duration)
@@ -178,7 +178,7 @@ public extension Project {
 
     /// Moves one edge of an overlay by `delta`. Its other edge stays where it is on the timeline.
     @discardableResult
-    mutating func trimOverlay(_ id: Clip.ID, edge: ClipEdge, by delta: CMTime) -> Bool {
+    public mutating func trimOverlay(_ id: Clip.ID, edge: ClipEdge, by delta: CMTime) -> Bool {
         guard let overlay = overlay(id: id), let limits = trimLimits(for: overlay.clip, edge: edge) else { return false }
         var range = limits
         if edge == .start {
@@ -205,7 +205,7 @@ public extension Project {
     /// Cuts an overlay in two at `time`. Returns the id of the second half, or nil when `time`
     /// isn't inside it (with room for both halves).
     @discardableResult
-    mutating func splitOverlay(_ id: Clip.ID, at time: CMTime) -> Clip.ID? {
+    public mutating func splitOverlay(_ id: Clip.ID, at time: CMTime) -> Clip.ID? {
         let time = time.snappedToFrame()
         guard let index = overlays.firstIndex(where: { $0.id == id }) else { return nil }
         let overlay = overlays[index]
@@ -222,12 +222,12 @@ public extension Project {
     }
 
     /// The overlays on screen at `time`, in drawing order (bottom first).
-    func overlaysOnScreen(at time: CMTime) -> [Overlay] {
+    public func overlaysOnScreen(at time: CMTime) -> [Overlay] {
         overlays.filter { $0.visibleRange(in: self)?.containsTime(time) == true }
     }
 
     /// Changes a clip wherever it is: on the main storyline or over it.
-    mutating func updateAnyClip(_ id: Clip.ID, _ change: (inout Clip) -> Void) {
+    public mutating func updateAnyClip(_ id: Clip.ID, _ change: (inout Clip) -> Void) {
         if let index = timeline.index(of: id) {
             change(&timeline.clips[index])
         } else if overlay(id: id) != nil {
@@ -238,18 +238,18 @@ public extension Project {
     }
 
     /// A clip by id, on the main storyline, over it, or a sound.
-    func anyClip(id: Clip.ID) -> Clip? {
+    public func anyClip(id: Clip.ID) -> Clip? {
         timeline.clips.first { $0.id == id } ?? overlay(id: id)?.clip ?? sound(id: id)?.clip
     }
 
     /// Where a clip (main, overlay or sound) starts on the timeline.
-    func timelineStart(ofClip id: Clip.ID) -> CMTime? {
+    public func timelineStart(ofClip id: Clip.ID) -> CMTime? {
         if let index = timeline.index(of: id) { return timeline.startTime(ofClipAt: index) }
         return overlay(id: id)?.start ?? sound(id: id)?.start
     }
 
     /// The source time a clip (main or overlay) shows at timeline `time`, clamped to the clip.
-    func sourceTime(ofClip id: Clip.ID, at time: CMTime) -> CMTime? {
+    public func sourceTime(ofClip id: Clip.ID, at time: CMTime) -> CMTime? {
         guard let clip = anyClip(id: id), let start = timelineStart(ofClip: id) else { return nil }
         let offset = (time - start).clamped(.zero, clip.duration)
         return clip.sourceTime(atOffset: offset)
@@ -257,7 +257,7 @@ public extension Project {
 
     /// Changes how fast a clip (main or B-roll) plays. It keeps showing the same part of its
     /// source, so it gets shorter when faster and longer when slower. Pictures have no speed.
-    mutating func setSpeed(_ speed: Double, for id: Clip.ID) {
+    public mutating func setSpeed(_ speed: Double, for id: Clip.ID) {
         guard let clip = anyClip(id: id), asset(id: clip.assetID)?.isImage != true, !clip.isFrozen else { return }
         let speed = min(max(speed, Clip.speedRange.lowerBound), Clip.speedRange.upperBound)
         let source = clip.sourceDuration
@@ -413,15 +413,15 @@ public struct SoundClip: Identifiable, Codable, Equatable, Sendable {
     }
 }
 
-public extension Project {
-    func sound(id: Clip.ID) -> SoundClip? {
+extension Project {
+    public func sound(id: Clip.ID) -> SoundClip? {
         sounds.first { $0.id == id }
     }
 
     /// Adds a sound file at `time`, whole (up to the end of the Short). Returns nil for media
     /// without sound.
     @discardableResult
-    mutating func addSound(of assetID: MediaAsset.ID, at time: CMTime, isVoiceOver: Bool = false) -> Clip.ID? {
+    public mutating func addSound(of assetID: MediaAsset.ID, at time: CMTime, isVoiceOver: Bool = false) -> Clip.ID? {
         guard let asset = asset(id: assetID), asset.hasAudio, !asset.isImage, asset.duration > .zero else { return nil }
         let start = time.snappedToFrame().clamped(.zero, max(duration - .oneFrame, .zero))
         let length = max(min(asset.duration, max(duration - start, Clip.minimumDuration)), Clip.minimumDuration).snappedToFrame()
@@ -432,16 +432,16 @@ public extension Project {
         return clip.id
     }
 
-    mutating func updateSound(_ id: Clip.ID, _ change: (inout SoundClip) -> Void) {
+    public mutating func updateSound(_ id: Clip.ID, _ change: (inout SoundClip) -> Void) {
         guard let index = sounds.firstIndex(where: { $0.id == id }) else { return }
         change(&sounds[index])
     }
 
-    mutating func removeSound(_ id: Clip.ID) {
+    public mutating func removeSound(_ id: Clip.ID) {
         sounds.removeAll { $0.id == id }
     }
 
-    mutating func moveSound(_ id: Clip.ID, to start: CMTime) {
+    public mutating func moveSound(_ id: Clip.ID, to start: CMTime) {
         let end = duration
         updateSound(id) { sound in
             sound.start = start.snappedToFrame().clamped(.zero, max(.zero, end - .oneFrame)).snappedToFrame()
@@ -450,7 +450,7 @@ public extension Project {
 
     /// Moves one edge of a sound by `delta`; its other edge stays where it is on the timeline.
     @discardableResult
-    mutating func trimSound(_ id: Clip.ID, edge: ClipEdge, by delta: CMTime) -> Bool {
+    public mutating func trimSound(_ id: Clip.ID, edge: ClipEdge, by delta: CMTime) -> Bool {
         guard let sound = sound(id: id), let limits = trimLimits(for: sound.clip, edge: edge) else { return false }
         var range = limits
         if edge == .start, range.start < -sound.start { range = CMTimeRange(start: -sound.start, end: max(range.end, -sound.start)) }
@@ -471,7 +471,7 @@ public extension Project {
 
     /// Cuts a sound in two at `time`. Returns the id of the second half.
     @discardableResult
-    mutating func splitSound(_ id: Clip.ID, at time: CMTime) -> Clip.ID? {
+    public mutating func splitSound(_ id: Clip.ID, at time: CMTime) -> Clip.ID? {
         let time = time.snappedToFrame()
         guard let index = sounds.firstIndex(where: { $0.id == id }) else { return nil }
         let sound = sounds[index]

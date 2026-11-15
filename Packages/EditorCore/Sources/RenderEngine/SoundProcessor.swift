@@ -38,10 +38,7 @@ public nonisolated enum SoundProcessor {
 
     /// Where the processed sound of `source` is kept (named after the file and the recipe).
     public static func processedURL(for source: URL, recipe: Recipe) -> URL {
-        let values = try? source.resourceValues(forKeys: [.fileSizeKey, .contentModificationDateKey])
-        let key = "\(source.path)|\(values?.fileSize ?? 0)|\(values?.contentModificationDate?.timeIntervalSince1970 ?? 0)|\(recipe.key)"
-        let digest = SHA256.hash(data: Data(key.utf8)).prefix(12).map { String(format: "%02x", $0) }.joined()
-        return folder.appending(path: "\(digest).m4a")
+        folder.appending(path: "\(FileIdentity.key(of: source, extra: recipe.key)).m4a")
     }
 
     public static func existingProcessedURL(for source: URL, recipe: Recipe) -> URL? {

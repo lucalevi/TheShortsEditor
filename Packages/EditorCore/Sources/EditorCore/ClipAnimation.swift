@@ -41,7 +41,7 @@ public enum MotionAnimation: String, Codable, CaseIterable, Identifiable, Sendab
 
     /// The picture's state `progress` (0…1) through the movement. Coming in, 0 is the first
     /// frame (furthest away) and 1 is in place; going out, 0 is in place and 1 is gone.
-    public func state(progress: Double, entering: Bool) -> AnimationState {
+    func state(progress: Double, entering: Bool) -> AnimationState {
         let p = min(max(progress, 0), 1)
         // Coming in slows down into place; going out speeds up away from it.
         let away = entering ? pow(1 - p, 3) : p * p
@@ -84,19 +84,19 @@ public enum MotionAnimation: String, Codable, CaseIterable, Identifiable, Sendab
 }
 
 /// How a picture is changed at one moment of an animation, around the middle of where it is drawn.
-public struct AnimationState: Equatable, Sendable {
-    public var scale = 1.0
+package struct AnimationState: Equatable, Sendable {
+    package var scale = 1.0
     /// Moved by fractions of the width and height of where it is drawn (positive: right, down).
-    public var offsetX = 0.0
-    public var offsetY = 0.0
+    package var offsetX = 0.0
+    package var offsetY = 0.0
     /// Degrees, clockwise.
-    public var rotation = 0.0
-    public var opacity = 1.0
+    package var rotation = 0.0
+    package var opacity = 1.0
     /// Blur radius in canvas pixels.
-    public var blur = 0.0
+    package var blur = 0.0
 
-    public static let identity = AnimationState()
-    public var isIdentity: Bool { self == .identity }
+    static let identity = AnimationState()
+    package var isIdentity: Bool { self == .identity }
 }
 
 /// A clip's way in or out: the movement and how long it takes.
@@ -127,7 +127,7 @@ public struct ClipAnimation: Codable, Equatable, Hashable, Sendable {
     }
 }
 
-public extension Clip {
+extension Clip {
     /// How long the way in and the way out really last: each as asked, but together never more
     /// than the clip (they share it in proportion).
     var animationLengths: (in: CMTime, out: CMTime) {
@@ -139,7 +139,7 @@ public extension Clip {
     }
 
     /// The picture's animation state `offset` into the clip, or nil when it is simply in place.
-    func animationState(atOffset offset: CMTime) -> AnimationState? {
+    package func animationState(atOffset offset: CMTime) -> AnimationState? {
         guard animationIn != nil || animationOut != nil else { return nil }
         let lengths = animationLengths
         // Measured from the middle of the frame, so the first frame already moves a little.
@@ -155,9 +155,9 @@ public extension Clip {
     }
 }
 
-public extension Project {
+extension Project {
     /// Sets how a clip (main or B-roll) comes in (`entering`) or goes out; nil for none.
-    mutating func setAnimation(_ animation: ClipAnimation?, entering: Bool, for id: Clip.ID) {
+    public mutating func setAnimation(_ animation: ClipAnimation?, entering: Bool, for id: Clip.ID) {
         guard anyClip(id: id) != nil, sound(id: id) == nil else { return }
         var animation = animation
         if let seconds = animation?.duration.seconds {

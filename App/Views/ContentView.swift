@@ -50,6 +50,10 @@ struct ContentView: View {
         .alert(item: $model.alert) { alert in
             Alert(title: Text(alert.title), message: Text(alert.message))
         }
+        // Views that need only part of the editor take it from here (sheets too).
+        .environment(model.playback)
+        .environment(model.library)
+        .environment(model.tasks)
     }
 }
 
@@ -74,8 +78,8 @@ struct EditorView: View {
                 .frame(minHeight: 230, idealHeight: 255, maxHeight: 330)
         }
         // Captions in a second language, translated on this Mac (it asks to download languages once).
-        .translationTask(model.translationRequest) { session in
-            await model.runTranslation(session)
+        .translationTask(model.captioning.translationRequest) { session in
+            await model.captioning.runTranslation(session)
         }
         .toolbar {
             ToolbarItem(placement: .navigation) {

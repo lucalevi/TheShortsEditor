@@ -33,6 +33,8 @@ final class EditorKeys {
     private static func handle(_ event: NSEvent, _ model: EditorModel) -> Bool {
         // The home window has no timeline: its keys go to its own views.
         guard model.screen == .editor else { return false }
+        // Other windows (Background Tasks, Settings) keep their keys.
+        if let window = event.window, let editor = model.window, window !== editor { return false }
         if CaptionTextField.handleCommandReturn(event) { return true }
         // ⌘A outside a text field selects everything on the timeline (Edit ▸ Select All).
         if event.modifierFlags.intersection([.command, .control, .option, .shift]) == .command,
@@ -63,7 +65,7 @@ final class EditorKeys {
         if model.isFullScreenPreview {
             switch event.keyCode {
             case 53: model.toggleFullScreenPreview()
-            case 49: model.togglePlayback()
+            case 49: model.playback.togglePlayback()
             default: return false
             }
             return true
@@ -72,7 +74,7 @@ final class EditorKeys {
         // keyboards (Italian, German, French…) they need ⇧ or sit elsewhere.
         switch event.characters {
         case "/": model.playSelection(); return true
-        case "\\": model.playFromStart(); return true
+        case "\\": model.playback.playFromStart(); return true
         case ";": model.goToEdit(forward: false); return true
         case "'": model.goToEdit(forward: true); return true
         default: break
@@ -80,7 +82,7 @@ final class EditorKeys {
         // ⇧S: hear the sound while skimming.
         if event.modifierFlags.contains(.shift) {
             guard event.keyCode == 1 else { return false }
-            model.skimsAudio.toggle()
+            model.playback.skimsAudio.toggle()
             return true
         }
         // While recording a voice-over, Space (or Escape) stops it.
@@ -122,10 +124,10 @@ final class EditorKeys {
             return true
         }
         switch event.keyCode {
-        case 49: model.togglePlayback() // Space
-        case 38: model.shuttle(forward: false) // J
-        case 40: model.pause() // K
-        case 37: model.shuttle(forward: true) // L
+        case 49: model.playback.togglePlayback() // Space
+        case 38: model.playback.shuttle(forward: false) // J
+        case 40: model.playback.pause() // K
+        case 37: model.playback.shuttle(forward: true) // L
         case 11: model.splitAtPlayhead() // B
         case 12: model.trimToPlayhead(removing: .start) // Q
         case 13: model.trimToPlayhead(removing: .end) // W
@@ -134,11 +136,11 @@ final class EditorKeys {
         case 7: model.selectClipRange() // X
         case 46: model.addMarker() // M
         case 14: break // E without a file selected
-        case 123: model.step(frames: -1) // ←
-        case 124: model.step(frames: 1) // →
+        case 123: model.playback.step(frames: -1) // ←
+        case 124: model.playback.step(frames: 1) // →
         case 51, 117: model.deleteSelection() // ⌫, ⌦
-        case 115: model.seek(to: .zero) // Home
-        case 119: model.seek(to: model.duration) // End
+        case 115: model.playback.seek(to: .zero) // Home
+        case 119: model.playback.seek(to: model.duration) // End
         default: return false
         }
         return true

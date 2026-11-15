@@ -120,7 +120,7 @@ public enum ShortTemplate: String, Codable, CaseIterable, Identifiable, Sendable
     }
 
     /// How long a beat of the template's music is.
-    public var beatLength: Double { 60 / style.music.tempo }
+    var beatLength: Double { 60 / style.music.tempo }
 
     /// The shots' lengths on whole frames, worked out from where each cut falls, so rounding
     /// never adds up: every cut is within half a frame of its beat.
@@ -143,12 +143,12 @@ public enum ShortTemplate: String, Codable, CaseIterable, Identifiable, Sendable
 public struct TemplateShot: Equatable, Sendable {
     public var name: String
     public var direction: String
-    public var beats: Int
+    var beats: Int
     public var title: String?
     /// How it changes to the next shot.
     public var transition: TransitionKind?
     /// How the first shot comes in.
-    public var animation: MotionAnimation?
+    var animation: MotionAnimation?
 
     public init(
         _ name: String, _ direction: String, beats: Int, title: String? = nil,
@@ -163,9 +163,9 @@ public struct TemplateShot: Equatable, Sendable {
     }
 }
 
-public extension Storyboard {
+extension Storyboard {
     /// A storyboard to fill from a template: its shots, timed to the beat.
-    init(template: ShortTemplate) {
+    public init(template: ShortTemplate) {
         kind = .story
         self.template = template
         slots = zip(template.shots, template.shotLengths).enumerated().map { index, pair in
@@ -180,10 +180,10 @@ public extension Storyboard {
     }
 }
 
-public extension Project {
+extension Project {
     /// Makes a Short from a template: its storyboard, filled in order with `assetIDs` (used again
     /// from a different part when there are fewer files than shots).
-    mutating func fillTemplate(_ template: ShortTemplate, with assetIDs: [MediaAsset.ID]) {
+    public mutating func fillTemplate(_ template: ShortTemplate, with assetIDs: [MediaAsset.ID]) {
         let board = Storyboard(template: template)
         storyboard = board
         guard !assetIDs.isEmpty else { return }

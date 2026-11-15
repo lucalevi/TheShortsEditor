@@ -78,7 +78,7 @@ extension EditorModel {
     /// Opens the cover sheet, starting from the Short's cover or a suggested one.
     func beginCover() {
         guard !project.timeline.clips.isEmpty else { return }
-        player.pause()
+        playback.player.pause()
         coverDraft = project.cover ?? project.suggestedCover
     }
 
@@ -101,7 +101,7 @@ extension EditorModel {
         let project = project
         Task {
             do {
-                let image = try await ProjectPoster.cover(of: project, cover)
+                let image = try await ProjectPoster.cover(of: project, cover, analysis: analysis)
                 try FrameExport.write(image, to: url, format: .jpeg)
             } catch {
                 Log.render.failure("saveCover", error)

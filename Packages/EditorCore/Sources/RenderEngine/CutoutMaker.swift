@@ -211,10 +211,7 @@ public enum CutoutCache {
 
     /// Where the copy of the file at `url` keeping `subject` goes.
     public static func copyURL(for url: URL, subject: CutoutSubject, isImage: Bool) -> URL {
-        let values = try? url.resourceValues(forKeys: [.fileSizeKey, .contentModificationDateKey])
-        let key = "\(url.path)|\(values?.fileSize ?? 0)|\(values?.contentModificationDate?.timeIntervalSince1970 ?? 0)"
-        let digest = SHA256.hash(data: Data(key.utf8)).prefix(12).map { String(format: "%02x", $0) }.joined()
-        return folder.appending(path: "\(digest)-\(subject.rawValue).\(isImage ? "png" : "mov")")
+        folder.appending(path: "\(FileIdentity.key(of: url))-\(subject.rawValue).\(isImage ? "png" : "mov")")
     }
 
     /// The copy, if it has been made.

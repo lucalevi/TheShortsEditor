@@ -3,8 +3,8 @@ import Foundation
 
 /// A word as it is on the timeline: which clip plays it, and which word of its file it is.
 public struct WordRef: Hashable, Sendable {
-    public var clipID: Clip.ID
-    public var wordID: Word.ID
+    var clipID: Clip.ID
+    var wordID: Word.ID
 
     public init(clipID: Clip.ID, wordID: Word.ID) {
         self.clipID = clipID
@@ -12,8 +12,8 @@ public struct WordRef: Hashable, Sendable {
     }
 }
 
-public extension TimedWord {
-    var ref: WordRef { WordRef(clipID: clipID, wordID: wordID) }
+extension TimedWord {
+    public var ref: WordRef { WordRef(clipID: clipID, wordID: wordID) }
 }
 
 /// Words compared without case, accents or punctuation ("Ciao," and "ciao" are the same).
@@ -26,27 +26,27 @@ enum WordText {
 
 // MARK: - Filler words and repeats
 
-public enum FillerWords {
+enum FillerWords {
     /// Sounds that are never real words, in all four caption languages.
     static let sounds: Set<String> = [
         "um", "umm", "uh", "uhm", "uhh", "er", "erm", "hmm", "mm", "mmm", "ah", "eh", "ehm", "ehh",
         "äh", "ah", "ähm", "ahm", "öh", "euh", "heu", "bah", "beh", "boh",
     ]
 
-    public static func isFiller(_ text: String) -> Bool {
+    static func isFiller(_ text: String) -> Bool {
         let word = WordText.normalized(text)
         return !word.isEmpty && (sounds.contains(word) || sounds.contains(text.lowercased().trimmingCharacters(in: .punctuationCharacters)))
     }
 }
 
-public extension Project {
+extension Project {
     /// Every word on the timeline, in order (the script).
-    var script: [TimedWord] { CaptionLayout.timelineWords(in: self) }
+    public var script: [TimedWord] { CaptionLayout.timelineWords(in: self) }
 
     /// The filler sounds ("um", "eh"…) on the timeline, words said twice in a row ("I I
     /// think", "so so"), keeping the second time, and the words in `fillers` (real words used as
     /// fillers, found by the language model). Only words of the main clips, which can be cut.
-    func fillerAndRepeatedWords(also fillers: Set<Word.ID> = []) -> [WordRef] {
+    public func fillerAndRepeatedWords(also fillers: Set<Word.ID> = []) -> [WordRef] {
         let words = script.filter { $0.source == .clip }
         var found: [WordRef] = []
         var index = 0
@@ -81,7 +81,7 @@ public extension Project {
 
     /// What cutting `words` out of the Short removes: each word and the pause after it (up to
     /// the next word, when that comes within a second). Ready for `apply(_:)`, like Remove Pauses.
-    func cutPlan(removing words: Set<WordRef>) -> SilencePlan {
+    public func cutPlan(removing words: Set<WordRef>) -> SilencePlan {
         let all = script
         var sourceWords: [Word.ID: Word] = [:]
         for transcript in transcripts.values { for word in transcript.words { sourceWords[word.id] = word } }
@@ -124,7 +124,7 @@ public extension Project {
     }
 
     /// Changes the words of the transcripts, wherever they are.
-    mutating func updateWords(_ ids: Set<Word.ID>, _ change: (inout Word) -> Void) {
+    public mutating func updateWords(_ ids: Set<Word.ID>, _ change: (inout Word) -> Void) {
         for (assetID, var transcript) in transcripts {
             var changed = false
             for index in transcript.words.indices where ids.contains(transcript.words[index].id) {
@@ -138,7 +138,7 @@ public extension Project {
 
 // MARK: - Key words
 
-public enum Keywords {
+enum Keywords {
     /// Small words that are never worth highlighting.
     static let common: Set<String> = [
         // English
@@ -170,7 +170,7 @@ public enum Keywords {
     }
 
     /// Picks about one key word in every `every` words: the one that stands out most in each stretch.
-    public static func pick(from words: [Word], every: Int = 7) -> Set<Word.ID> {
+    static func pick(from words: [Word], every: Int = 7) -> Set<Word.ID> {
         var picked: Set<Word.ID> = []
         var start = 0
         while start < words.count {
@@ -190,10 +190,10 @@ public enum Keywords {
     }
 }
 
-public extension Project {
+extension Project {
     /// Marks the key words in every transcript, replacing earlier picks. Returns how many.
     @discardableResult
-    mutating func pickKeywords() -> Int {
+    public mutating func pickKeywords() -> Int {
         var count = 0
         for (assetID, var transcript) in transcripts {
             let picked = Keywords.pick(from: transcript.words)
@@ -269,11 +269,11 @@ public enum EmojiSuggestions {
     }
 }
 
-public extension Project {
+extension Project {
     /// Gives words that call for one an emoji, at most one in each caption, replacing earlier
     /// suggestions. `choose` gives a word's emoji (the built-in table unless given). Returns how many.
     @discardableResult
-    mutating func suggestEmoji(_ choose: (TimedWord) -> String? = { EmojiSuggestions.emoji(for: $0.text) }) -> Int {
+    public mutating func suggestEmoji(_ choose: (TimedWord) -> String? = { EmojiSuggestions.emoji(for: $0.text) }) -> Int {
         let pages = CaptionLayout.pages(in: self)
         var chosen: Set<Word.ID> = []
         var emojis: [Word.ID: String] = [:]

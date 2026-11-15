@@ -123,11 +123,10 @@ extension EditorModel {
         guard media.hasAudio, !media.isImage, !recipe.isEmpty,
             SoundProcessor.existingProcessedURL(for: base, recipe: recipe) == nil
         else { return true }
-        soundProcessing[clip.id] = 0
-        defer { soundProcessing[clip.id] = nil }
+        guard !tasks.isRunning(.processedSound(clip.id)) else { return false }
         do {
-            _ = try await SoundProcessor.process(base, recipe: recipe) { fraction in
-                Task { @MainActor in if self.soundProcessing[clip.id] != nil { self.soundProcessing[clip.id] = fraction } }
+            _ = try await tasks.run(.processedSound(clip.id), title: "Making the sound of “\(media.name)”") { progress in
+                try await SoundProcessor.process(base, recipe: recipe) { progress($0) }
             }
             return true
         } catch is CancellationError {
@@ -149,16 +148,74 @@ extension EditorModel {
             let recipe = SoundProcessor.Recipe(clip)
             guard SoundProcessor.existingProcessedURL(for: base, recipe: recipe) == nil else { continue }
             let key = SoundProcessor.processedURL(for: base, recipe: recipe).path
-            if !preparingSounds.contains(key) { needed[key] = (clip, media) }
+            if tasks.mayStart(.processedSound(clip.id)) { needed[key] = (clip, media) }
         }
         guard !needed.isEmpty else { return }
-        preparingSounds.formUnion(needed.keys)
         Task {
-            for (key, (clip, media)) in needed {
+            for (clip, media) in needed.values {
                 await makeProcessedSound(for: clip, media: media)
-                preparingSounds.remove(key)
             }
             refreshPlayback()
         }
+    }
+
+    // MARK: Sounds
+
+    /// Puts a built-in sound effect at the playhead.
+    func addSoundEffect(_ effect: SoundEffect) {
+        guard !project.timeline.clips.isEmpty else { return }
+        Task {
+            do {
+                let url = try effect.fileURL()
+                var media = project.assets.first { $0.url.standardizedFileURL == url.standardizedFileURL }
+                if media == nil { media = try await MediaProbe.probe(url) }
+                guard let media else { return }
+                var id: Clip.ID?
+                apply("Add \(effect.displayName)") { project in
+                    let assetID = project.addAsset(media)
+                    id = project.addSound(of: assetID, at: currentTime)
+                }
+                if let id { selection = .sound(id) }
+                loadPreviewsIfNeeded(media)
+            } catch {
+                Log.audio.failure("addSoundEffect", error)
+                alert = AlertMessage(title: "The sound couldn't be made", message: error.localizedDescription)
+            }
+        }
+    }
+
+    /// Puts a sound file from Media at the playhead, as a sound effect.
+    func addSound(_ assetID: MediaAsset.ID) {
+        guard !project.timeline.clips.isEmpty else { return }
+        var id: Clip.ID?
+        apply("Add Sound") { id = $0.addSound(of: assetID, at: currentTime) }
+        if let id { selection = .sound(id) }
+    }
+
+    func previewSoundEffect(_ effect: SoundEffect) {
+        guard let url = try? effect.fileURL() else { return }
+        effectPlayer = try? AVAudioPlayer(contentsOf: url)
+        effectPlayer?.play()
+    }
+
+    func moveSound(_ id: Clip.ID, to start: CMTime) {
+        apply("Move Sound") { $0.moveSound(id, to: start) }
+    }
+
+    func trimSound(_ id: Clip.ID, edge: ClipEdge, by delta: CMTime) {
+        apply("Trim Sound") { $0.trimSound(id, edge: edge, by: delta) }
+    }
+
+    func selectSound(_ id: Clip.ID) {
+        selection = .sound(id)
+        guard let sound = project.sound(id: id), let range = sound.audibleRange(in: project) else { return }
+        if !range.containsTime(currentTime) {
+            playback.player.pause()
+            playback.seek(to: range.start)
+        }
+    }
+
+    var selectedSound: SoundClip? {
+        if case .sound(let id)? = selection { project.sound(id: id) } else { nil }
     }
 }

@@ -357,7 +357,7 @@ private struct OverlayInspector: View {
             ClipSettingsButtons(model: model, clipID: overlay.id)
 
             HStack {
-                Button("Start at Playhead") { model.moveOverlay(overlay.id, to: model.currentTime) }
+                Button("Start at Playhead") { model.moveOverlay(overlay.id, to: model.playback.currentTime) }
                 Button("Delete", systemImage: "trash", role: .destructive) { model.deleteSelection() }
             }
             .controlSize(.small)

@@ -46,7 +46,7 @@ extension EditorModel {
 
     /// Shows `look` on a clip straight away while a slider is dragged (nil: back to its own).
     func previewLook(_ look: ClipLook?, for clipID: Clip.ID) {
-        LivePreview.setLook(look, for: clipID)
+        livePreview.setLook(look, for: clipID)
         redrawCurrentFrame()
     }
 
@@ -105,9 +105,9 @@ extension EditorModel {
     func previewShortFilterStrength(_ strength: Double?) {
         if let strength, var choice = project.look {
             choice.strength = strength
-            LivePreview.setShortLook(.some(choice))
+            livePreview.setShortLook(.some(choice))
         } else {
-            LivePreview.setShortLook(nil)
+            livePreview.setShortLook(nil)
         }
         redrawCurrentFrame()
     }
@@ -138,12 +138,13 @@ extension EditorModel {
             NSSound.beep()
             return
         }
-        analysingLook.formUnion(clipIDs)
         Task {
-            defer { analysingLook.subtract(clipIDs) }
             var results: [Clip.ID: ColorAdjustments] = [:]
             for clip in clips {
-                guard let image = await lookFrame(of: clip), let stats = FrameStats(pixels: LookRenderer.pixels(of: image)) else { continue }
+                let stats = try? await tasks.run(.lookAnalysis(clip.id), title: "Looking at a clip to enhance it") { _ in
+                    await self.lookFrame(of: clip).flatMap { FrameStats(pixels: LookRenderer.pixels(of: $0)) }
+                }
+                guard let stats = stats.flatMap(\.self) else { continue }
                 results[clip.id] = ColorAdjustments.auto(for: stats)
             }
             guard !results.isEmpty else {
@@ -160,11 +161,12 @@ extension EditorModel {
     /// Gives a clip the colours of another (its average colour, brightness, contrast and colourfulness).
     func matchColor(of clipID: Clip.ID, to referenceID: Clip.ID) {
         guard let clip = project.anyClip(id: clipID), let reference = project.anyClip(id: referenceID) else { return }
-        analysingLook.insert(clipID)
         Task {
-            defer { analysingLook.remove(clipID) }
             // The reference as it looks now (its own sliders and filter included).
-            guard let referenceImage = await lookFrame(of: reference), let image = await lookFrame(of: clip) else {
+            let frames = try? await tasks.run(.lookAnalysis(clipID), title: "Matching colours") { _ in
+                (await self.lookFrame(of: reference), await self.lookFrame(of: clip))
+            }
+            guard let referenceImage = frames?.0, let image = frames?.1 else {
                 alert = AlertMessage(title: "Colours couldn't be matched", message: "The picture of one of the clips couldn't be read.")
                 return
             }
@@ -197,10 +199,10 @@ extension EditorModel {
             colorPick = nil
             return
         }
-        player.pause()
+        playback.player.pause()
         // The spot is read where the clip is on screen.
         if let range = project.timeline.range(of: clipID) ?? project.overlay(id: clipID)?.visibleRange(in: project), !range.containsTime(currentTime) {
-            seek(to: range.start)
+            playback.seek(to: range.start)
         }
         colorPick = ColorPick(clipID: clipID, target: target)
     }
@@ -219,7 +221,7 @@ extension EditorModel {
         plain.look = nil
         let time = currentTime
         Task {
-            guard let image = try? await ProjectPoster.frame(of: plain, at: time),
+            guard let image = try? await ProjectPoster.frame(of: plain, at: time, analysis: analysis),
                 let sample = LookRenderer.sample(
                     image,
                     at: CGPoint(
@@ -263,27 +265,25 @@ extension EditorModel {
     /// the background, with progress on the clips), then rebuilds so it shows.
     func prepareMissingSteadiness() {
         let clips = project.timeline.clips + project.overlays.map(\.clip)
-        var needed: [MediaAsset.ID: URL] = [:]
-        for clip in clips where clip.steadiness > 0 && steadying[clip.assetID] == nil && !unsteadiable.contains(clip.assetID) {
+        var needed: [MediaAsset.ID: (url: URL, name: String)] = [:]
+        for clip in clips where clip.steadiness > 0 && tasks.mayStart(.steadying(clip.assetID)) {
             guard let media = project.asset(id: clip.assetID), canStabilize(clip), !missingAssets.contains(media.id),
-                ShakeCache.path(for: media.url) == nil
+                analysis.shakePath(for: media.url) == nil
             else { continue }
-            needed[media.id] = media.url
+            needed[media.id] = (media.url, media.name)
         }
         guard !needed.isEmpty else { return }
-        for id in needed.keys { steadying[id] = 0 }
         Task {
-            for (id, url) in needed {
+            for (id, file) in needed where !tasks.isRunning(.steadying(id)) {
                 do {
-                    _ = try await ShakeCache.measure(url) { fraction in
-                        Task { @MainActor in if self.steadying[id] != nil { self.steadying[id] = fraction } }
+                    _ = try await tasks.run(.steadying(id), title: "Measuring the shake of “\(file.name)”") { progress in
+                        try await self.analysis.measureShake(file.url) { progress($0) }
                     }
+                } catch is CancellationError {
                 } catch {
                     Log.render.failure("prepareMissingSteadiness", error)
-                    unsteadiable.insert(id)
                     alert = AlertMessage(title: "The clip couldn't be steadied", message: error.localizedDescription)
                 }
-                steadying[id] = nil
             }
             refreshPlayback()
         }

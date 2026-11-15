@@ -49,11 +49,11 @@ public struct Placement: Codable, Equatable, Hashable, Sendable {
 
     public static let identity = Placement()
     /// The smallest and biggest a picture can be made.
-    public static let scaleRange: ClosedRange<Double> = 0.1...5
+    static let scaleRange: ClosedRange<Double> = 0.1...5
     /// The zoom used for a punch-in: enough to hide a jump cut, not so much the picture gets soft.
     public static let punchInScale = 1.2
 
-    public var isIdentity: Bool { self == .identity }
+    var isIdentity: Bool { self == .identity }
 
     /// The same placement with the scale kept in range and the rotation in -180…180.
     public var normalized: Placement {
@@ -68,7 +68,7 @@ public struct Placement: Codable, Equatable, Hashable, Sendable {
 
     /// The transform applied after the framing, in canvas coordinates with the origin at the top
     /// left: scale and turn around the middle of the canvas, then move.
-    public func transform(canvas: CGSize = Project.canvasSize) -> CGAffineTransform {
+    package func transform(canvas: CGSize = Project.canvasSize) -> CGAffineTransform {
         let cx = canvas.width / 2, cy = canvas.height / 2
         return CGAffineTransform(translationX: -cx, y: -cy)
             .concatenating(CGAffineTransform(scaleX: scale, y: scale))
@@ -78,7 +78,7 @@ public struct Placement: Codable, Equatable, Hashable, Sendable {
 
     /// The placement a `fraction` of the way from `self` to `other`. Size changes evenly in
     /// proportion (a zoom from 1 to 2 is at 1.41 half way), which looks steady to the eye.
-    public func interpolated(to other: Placement, fraction: Double) -> Placement {
+    func interpolated(to other: Placement, fraction: Double) -> Placement {
         let f = min(max(fraction, 0), 1)
         func mix(_ a: Double, _ b: Double) -> Double { a + (b - a) * f }
         let scale = self.scale > 0 && other.scale > 0 ? exp(mix(log(self.scale), log(other.scale))) : mix(self.scale, other.scale)
@@ -98,7 +98,7 @@ public struct PlacedFrame: Equatable, Sendable {
     public var rotation: Double
 
     /// Whether the picture covers the whole canvas, so nothing behind it can be seen.
-    public func covers(_ canvas: CGSize = Project.canvasSize) -> Bool {
+    package func covers(_ canvas: CGSize = Project.canvasSize) -> Bool {
         let corners = [CGPoint.zero, CGPoint(x: canvas.width, y: 0), CGPoint(x: 0, y: canvas.height), CGPoint(x: canvas.width, y: canvas.height)]
         let angle = -rotation * .pi / 180
         return corners.allSatisfy { corner in
@@ -110,7 +110,7 @@ public struct PlacedFrame: Equatable, Sendable {
     }
 }
 
-public extension Framing {
+extension Framing {
     /// The size of a picture of `displaySize` after framing, before any placement.
     func framedSize(of displaySize: CGSize, canvas: CGSize = Project.canvasSize) -> CGSize {
         guard displaySize.width > 0, displaySize.height > 0 else { return canvas }
@@ -120,7 +120,7 @@ public extension Framing {
     }
 
     /// Where a picture of `displaySize` ends up with this framing and `placement`.
-    func placedFrame(of displaySize: CGSize, placement: Placement, canvas: CGSize = Project.canvasSize) -> PlacedFrame {
+    public func placedFrame(of displaySize: CGSize, placement: Placement, canvas: CGSize = Project.canvasSize) -> PlacedFrame {
         let size = framedSize(of: displaySize, canvas: canvas)
         return PlacedFrame(
             center: CGPoint(x: canvas.width / 2 + placement.offsetX * canvas.width, y: canvas.height / 2 + placement.offsetY * canvas.height),
@@ -172,7 +172,7 @@ public struct Keyframe: Identifiable, Codable, Equatable, Sendable {
     public let id: UUID
     public var time: CMTime
     public var placement: Placement
-    public var easing: Easing
+    var easing: Easing
 
     public init(id: UUID = UUID(), time: CMTime, placement: Placement, easing: Easing = .smooth) {
         self.id = id
@@ -241,13 +241,13 @@ public enum MotionPreset: String, CaseIterable, Identifiable, Sendable {
     static let quickZoomLength = CMTime(value: 8, timescale: Project.frameRate)
 }
 
-public extension Clip {
+extension Clip {
     /// Whether the picture moves over time.
-    var hasMotion: Bool { !keyframes.isEmpty }
+    public var hasMotion: Bool { !keyframes.isEmpty }
 
     /// The placement at `sourceTime` (a time in the source file): the keyframes' motion, or the
     /// clip's fixed placement when it has none. Before the first and after the last keyframe it holds.
-    func placement(atSourceTime sourceTime: CMTime) -> Placement {
+    public func placement(atSourceTime sourceTime: CMTime) -> Placement {
         guard let first = keyframes.first, let last = keyframes.last else { return placement }
         if sourceTime <= first.time { return first.placement }
         if sourceTime >= last.time { return last.placement }
@@ -261,7 +261,7 @@ public extension Clip {
 
     /// Sets the placement at `sourceTime`. Without keyframes it is the clip's fixed placement; with
     /// them, the keyframe at that time is changed (or one is added there).
-    mutating func setPlacement(_ newValue: Placement, atSourceTime sourceTime: CMTime) {
+    public mutating func setPlacement(_ newValue: Placement, atSourceTime sourceTime: CMTime) {
         let newValue = newValue.normalized
         guard hasMotion else {
             placement = newValue
@@ -272,7 +272,7 @@ public extension Clip {
 
     /// Adds a keyframe at `sourceTime` (snapped to a frame) with `placement`, or the placement the
     /// clip has there now. A keyframe already within half a frame of it is changed instead.
-    mutating func addKeyframe(at sourceTime: CMTime, placement: Placement? = nil) {
+    public mutating func addKeyframe(at sourceTime: CMTime, placement: Placement? = nil) {
         let time = sourceTime.snappedToFrame()
         let value = (placement ?? self.placement(atSourceTime: time)).normalized
         if let index = keyframes.firstIndex(where: { abs(($0.time - time).seconds) < 0.5 / Double(Project.frameRate) }) {
@@ -283,7 +283,7 @@ public extension Clip {
         }
     }
 
-    mutating func removeKeyframe(_ id: Keyframe.ID) {
+    public mutating func removeKeyframe(_ id: Keyframe.ID) {
         guard let index = keyframes.firstIndex(where: { $0.id == id }) else { return }
         let removed = keyframes.remove(at: index)
         // The last one gone: the picture stays where that keyframe had it.
@@ -291,19 +291,19 @@ public extension Clip {
     }
 
     /// Stops the motion, keeping the picture as it is at `sourceTime`.
-    mutating func removeMotion(keepingPlacementAt sourceTime: CMTime) {
+    public mutating func removeMotion(keepingPlacementAt sourceTime: CMTime) {
         placement = placement(atSourceTime: sourceTime)
         keyframes = []
     }
 
     /// The keyframes inside this clip's part of the source.
-    var visibleKeyframes: [Keyframe] {
+    public var visibleKeyframes: [Keyframe] {
         keyframes.filter { $0.time >= sourceStart && $0.time <= sourceRange.end }
     }
 
     /// Replaces the motion with a preset, starting from the placement at `playheadSource` (a time
     /// in the source; it is also where a zoom at the playhead happens).
-    mutating func applyMotion(_ preset: MotionPreset, playheadSource: CMTime) {
+    public mutating func applyMotion(_ preset: MotionPreset, playheadSource: CMTime) {
         let start = sourceStart, end = (sourceRange.end - .oneFrame).snappedToFrame()
         let base = placement(atSourceTime: playheadSource)
         func scaled(_ factor: Double) -> Placement {
@@ -343,11 +343,11 @@ public extension Clip {
     }
 }
 
-public extension Project {
+extension Project {
     /// Zooms in on every other clip of the same recording, so jump cuts between them look like a
     /// change of camera. Applies to `clipIDs` in timeline order (all clips when nil). A clip from a
     /// different file starts again without zoom. Clips that move (keyframes) are left alone.
-    mutating func punchInOnAlternateCuts(_ clipIDs: Set<Clip.ID>? = nil) {
+    public mutating func punchInOnAlternateCuts(_ clipIDs: Set<Clip.ID>? = nil) {
         var previousAsset: MediaAsset.ID?
         var zoomed = false
         for index in timeline.clips.indices {

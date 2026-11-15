@@ -15,7 +15,7 @@ public struct Sticker: Codable, Equatable, Hashable, Sendable {
         case symbol(String)
     }
 
-    public var kind: Kind
+    package var kind: Kind
     /// The symbol's colour (emoji have their own).
     public var color: RGBA
     /// The longest side in canvas pixels.
@@ -99,7 +99,7 @@ public enum StickerCatalog {
             ]),
     ]
 
-    public static var symbols: [Symbol] { groups.flatMap(\.symbols) }
+    static var symbols: [Symbol] { groups.flatMap(\.symbols) }
 }
 
 // MARK: - Loops
@@ -124,7 +124,7 @@ public enum TitleLoop: String, Codable, CaseIterable, Identifiable, Sendable {
 
     /// The state `seconds` after it appeared (moves are in canvas pixels for titles: `offsetY`
     /// here is a fraction of the canvas height).
-    public func state(seconds t: Double) -> AnimationState {
+    func state(seconds t: Double) -> AnimationState {
         var state = AnimationState.identity
         let tau = 2 * Double.pi
         switch self {
@@ -148,13 +148,13 @@ public enum TitleLoop: String, Codable, CaseIterable, Identifiable, Sendable {
     }
 }
 
-public extension TextOverlay {
+extension TextOverlay {
     /// How long a title takes to leave by default.
-    static let exitDuration = CMTime(value: 2, timescale: 5)
+    public static let exitDuration = CMTime(value: 2, timescale: 5)
 
     /// The exit's and the loop's effect `offset` into the title (on top of its entrance, which the
     /// renderer draws). Moves are fractions of the canvas. Nil when neither applies.
-    func motionState(atOffset offset: CMTime) -> AnimationState? {
+    package func motionState(atOffset offset: CMTime) -> AnimationState? {
         var state = loop?.state(seconds: offset.seconds)
         if let exit {
             let length = min(exit.duration, CMTimeMultiplyByRatio(duration, multiplier: 1, divisor: 2))
@@ -181,9 +181,9 @@ public extension TextOverlay {
 /// Where the thing a title or sticker follows was, `offset` after the title appears, as a
 /// fraction of the canvas (0…1 across and down).
 public struct TrackPoint: Codable, Equatable, Hashable, Sendable {
-    public var offset: CMTime
-    public var x: Double
-    public var y: Double
+    var offset: CMTime
+    package var x: Double
+    package var y: Double
 
     public init(offset: CMTime, x: Double, y: Double) {
         self.offset = offset
@@ -208,10 +208,10 @@ public struct TrackPoint: Codable, Equatable, Hashable, Sendable {
     }
 }
 
-public extension TextOverlay {
+extension TextOverlay {
     /// How far (fractions of the canvas) what it follows has moved since it appeared, `offset` in;
     /// straight lines between the measured points, held after the last.
-    func trackShift(atOffset offset: CMTime) -> (x: Double, y: Double) {
+    package func trackShift(atOffset offset: CMTime) -> (x: Double, y: Double) {
         guard let track, let first = track.first else { return (0, 0) }
         let t = offset.seconds
         guard let after = track.firstIndex(where: { $0.offset.seconds >= t }) else {
@@ -231,17 +231,17 @@ public extension TextOverlay {
         return (horizontalPosition + shift.x, verticalPosition + shift.y)
     }
 
-    var isSticker: Bool { sticker != nil }
+    public var isSticker: Bool { sticker != nil }
 }
 
 // MARK: - Adding stickers and templates
 
-public extension Project {
+extension Project {
     static let stickerDuration = CMTime(value: 2, timescale: 1)
 
     /// Adds a sticker at `time` (the playhead), in the middle of the screen, popping in. Returns its id.
     @discardableResult
-    mutating func addSticker(_ sticker: Sticker, at time: CMTime, x: Double = 0.5, y: Double = 0.45) -> TextOverlay.ID {
+    public mutating func addSticker(_ sticker: Sticker, at time: CMTime, x: Double = 0.5, y: Double = 0.45) -> TextOverlay.ID {
         let length = duration > .zero ? duration : Self.stickerDuration
         let wanted = min(Self.stickerDuration, length)
         var start = time.snappedToFrame().clamped(.zero, length)
@@ -285,7 +285,7 @@ public enum TextTemplate: String, CaseIterable, Identifiable, Sendable {
     }
 
     /// The items it adds, timed from 0 (all as long as the template).
-    public func items() -> [TextOverlay] {
+    func items() -> [TextOverlay] {
         let length = CMTime(value: 3, timescale: 1)
         func title(
             _ text: String, _ style: TitleStyle, y: Double, x: Double = 0.5, size: Double? = nil, entrance: TitleEntrance = .pop,
@@ -334,11 +334,11 @@ public enum TextTemplate: String, CaseIterable, Identifiable, Sendable {
     }
 }
 
-public extension Project {
+extension Project {
     /// Adds a text template at `time` (the playhead); near the end it starts earlier so it is
     /// seen whole. Returns the ids of what it added, the main text first.
     @discardableResult
-    mutating func addTextTemplate(_ template: TextTemplate, at time: CMTime) -> [TextOverlay.ID] {
+    public mutating func addTextTemplate(_ template: TextTemplate, at time: CMTime) -> [TextOverlay.ID] {
         let items = template.items()
         guard let length = items.map(\.duration).max() else { return [] }
         let total = duration > .zero ? duration : length
@@ -355,14 +355,14 @@ public extension Project {
     }
 
     /// Sets (or clears, with nil) the path a title or sticker follows.
-    mutating func setTrack(_ track: [TrackPoint]?, for id: TextOverlay.ID) {
+    public mutating func setTrack(_ track: [TrackPoint]?, for id: TextOverlay.ID) {
         updateTitle(id) { $0.track = track?.isEmpty == true ? nil : track }
     }
 }
 
 extension TextOverlay {
     /// The same item with a new id, start and length.
-    init(copying other: TextOverlay, start: CMTime, duration: CMTime) {
+    public init(copying other: TextOverlay, start: CMTime, duration: CMTime) {
         self = TextOverlay(
             id: UUID(), text: other.text, style: other.style, look: other.look, entrance: other.entrance,
             start: start, duration: duration, verticalPosition: other.verticalPosition, horizontalPosition: other.horizontalPosition)
@@ -378,13 +378,13 @@ extension TextOverlay {
 // MARK: - Following by matching a patch
 
 /// A picture in shades of grey, for following something from frame to frame.
-public struct GrayFrame: Sendable {
-    public let width: Int
-    public let height: Int
+package struct GrayFrame: Sendable {
+    package let width: Int
+    package let height: Int
     /// Row by row from the top, 0…255.
-    public var pixels: [Float]
+    var pixels: [Float]
 
-    public init(width: Int, height: Int, pixels: [Float]) {
+    package init(width: Int, height: Int, pixels: [Float]) {
         self.width = width
         self.height = height
         self.pixels = pixels
@@ -399,10 +399,10 @@ public struct GrayFrame: Sendable {
 /// where the patch was for the place that matches it best (normalized cross-correlation, first
 /// on a coarse grid, then pixel by pixel), and slowly updates the patch so a turning or growing
 /// subject is still found. Stops when nothing matches well.
-public struct PatchTracker: Sendable {
+package struct PatchTracker: Sendable {
     /// Where the middle of the patch is, in pixels.
-    public private(set) var x: Double
-    public private(set) var y: Double
+    package private(set) var x: Double
+    package private(set) var y: Double
     let radius: Int
     /// How far it looks from where the patch was, in pixels.
     let reach: Int
@@ -410,9 +410,9 @@ public struct PatchTracker: Sendable {
     private var template: [Float]
     private let offsets: [(dx: Int, dy: Int)]
     /// Below this match (−1…1) the subject is lost.
-    public static let lostBelow: Float = 0.5
+    static let lostBelow: Float = 0.5
 
-    public init(frame: GrayFrame, x: Double, y: Double, radius: Int, reach: Int) {
+    package init(frame: GrayFrame, x: Double, y: Double, radius: Int, reach: Int) {
         self.x = x
         self.y = y
         self.radius = radius
@@ -443,7 +443,7 @@ public struct PatchTracker: Sendable {
 
     /// Finds the patch in the next frame. Returns how well it matched, or nil when it was lost
     /// (the position then stays where it was).
-    public mutating func next(_ frame: GrayFrame) -> Float? {
+    package mutating func next(_ frame: GrayFrame) -> Float? {
         let px = Int(x.rounded()), py = Int(y.rounded())
         var best: (x: Int, y: Int, score: Float) = (px, py, -2)
         let coarse = max(2, reach / 8)

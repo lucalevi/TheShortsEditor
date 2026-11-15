@@ -55,7 +55,7 @@ public enum StoryboardKind: String, Codable, CaseIterable, Identifiable, Sendabl
         }
     }
 
-    public var shots: [Shot] {
+    var shots: [Shot] {
         func s(_ name: String, _ direction: String, _ seconds: Int64, title: String? = nil, talking: Bool = false) -> Shot {
             Shot(name: name, direction: direction, length: CMTime(value: seconds, timescale: 1), title: title, isTalking: talking)
         }
@@ -129,14 +129,14 @@ public struct Shot: Codable, Equatable, Sendable {
     public var title: String?
     /// Someone talking: the whole clip is kept, as cutting a sentence short would spoil it. Other
     /// shots are trimmed to their length.
-    public var isTalking: Bool
+    var isTalking: Bool
     /// How its clip changes into the next (templates).
     public var transition: TransitionKind? = nil
     /// How its clip comes in (templates).
     public var entrance: MotionAnimation? = nil
     /// The clip is made exactly this long, slowed down if it is shorter, and its title stays
     /// for the whole shot (templates: the cuts fall on the beat).
-    public var fitsExactly = false
+    var fitsExactly = false
 
     public init(
         name: String, direction: String, length: CMTime, title: String? = nil, isTalking: Bool = false,
@@ -186,9 +186,9 @@ public struct Storyboard: Codable, Equatable, Sendable {
         public var id: UUID
         public var shot: Shot
         /// The main clip filling it, if any. A clip that was deleted leaves the shot empty again.
-        public var clipID: Clip.ID?
+        var clipID: Clip.ID?
         /// The shot's title, added when it was filled.
-        public var titleID: TextOverlay.ID?
+        var titleID: TextOverlay.ID?
 
         public init(id: UUID = UUID(), shot: Shot, clipID: Clip.ID? = nil, titleID: TextOverlay.ID? = nil) {
             self.id = id
@@ -215,14 +215,14 @@ public struct Storyboard: Codable, Equatable, Sendable {
     public var plannedLength: CMTime { slots.reduce(.zero) { $0 + $1.shot.length } }
 }
 
-public extension Project {
+extension Project {
     /// Starts filming from a storyboard (replacing any earlier one).
-    mutating func startStoryboard(_ kind: StoryboardKind) {
+    public mutating func startStoryboard(_ kind: StoryboardKind) {
         storyboard = Storyboard(kind: kind)
     }
 
     /// The clip filling a storyboard shot, when it is still on the timeline.
-    func clip(filling slot: Storyboard.Slot) -> Clip? {
+    public func clip(filling slot: Storyboard.Slot) -> Clip? {
         slot.clipID.flatMap { id in timeline.clips.first { $0.id == id } }
     }
 
@@ -243,7 +243,7 @@ public extension Project {
     /// Shots that aren't talking are trimmed to their planned length (from the middle of a
     /// longer clip, where the action usually is). Returns the new clip's id.
     @discardableResult
-    mutating func fill(_ slotID: Storyboard.Slot.ID, with assetID: MediaAsset.ID, part: CMTimeRange? = nil) -> Clip.ID? {
+    public mutating func fill(_ slotID: Storyboard.Slot.ID, with assetID: MediaAsset.ID, part: CMTimeRange? = nil) -> Clip.ID? {
         guard var board = storyboard, let slotIndex = board.slots.firstIndex(where: { $0.id == slotID }),
             var clip = makeClip(of: assetID, part: part), let asset = asset(id: assetID)
         else { return nil }
@@ -301,7 +301,7 @@ public extension Project {
     }
 
     /// Takes a shot's clip (and its title) out of the Short, leaving the shot empty.
-    mutating func empty(_ slotID: Storyboard.Slot.ID) {
+    public mutating func empty(_ slotID: Storyboard.Slot.ID) {
         guard var board = storyboard, let index = board.slots.firstIndex(where: { $0.id == slotID }) else { return }
         if let clipID = board.slots[index].clipID { timeline.remove(clipID) }
         if let titleID = board.slots[index].titleID { removeTitle(titleID) }

@@ -1,12 +1,12 @@
 import CoreGraphics
 
-public extension Framing {
+extension Framing {
     /// The transform that places a video track's frames on the canvas.
     ///
     /// `preferredTransform` is the track's own orientation (e.g. a 90° rotation for footage shot
     /// in portrait on an iPhone). It is applied first, then the upright picture is scaled to fill
     /// or fit the canvas and centred.
-    func transform(naturalSize: CGSize, preferredTransform: CGAffineTransform, canvas: CGSize = Project.canvasSize) -> CGAffineTransform {
+    package func transform(naturalSize: CGSize, preferredTransform: CGAffineTransform, canvas: CGSize = Project.canvasSize) -> CGAffineTransform {
         let oriented = CGRect(origin: .zero, size: naturalSize).applying(preferredTransform)
         guard oriented.width > 0, oriented.height > 0 else { return preferredTransform }
         let scaleX = canvas.width / oriented.width
@@ -28,7 +28,7 @@ public extension Framing {
 /// The figures are approximate: guides disagree and no official overlay was found (see
 /// research/shorts-editor-research.md §2). Values are in canvas pixels (1080×1920).
 public enum SafeZone {
-    public static let top: CGFloat = 200
+    package static let top: CGFloat = 200
     public static let bottom: CGFloat = 480
     /// The column of like/comment/share buttons on the right…
     public static let right: CGFloat = 140

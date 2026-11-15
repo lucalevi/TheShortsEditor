@@ -22,7 +22,7 @@ public struct ShortCover: Codable, Equatable, Sendable {
     }
 
     /// The letter size of the cover text: big, as a cover is seen small.
-    public static let textSize = 150.0
+    static let textSize = 150.0
 
     private enum CodingKeys: String, CodingKey { case time, text, textPosition, showsCaptions }
 
@@ -43,10 +43,10 @@ public struct ShortCover: Codable, Equatable, Sendable {
     }
 }
 
-public extension Project {
+extension Project {
     /// A cover to start from: a frame a second in (past the opening fade), with the hook title's
     /// words when there is one at the start.
-    var suggestedCover: ShortCover {
+    public var suggestedCover: ShortCover {
         let second = CMTime(value: 1, timescale: 1)
         let time = duration > second + second ? second : CMTimeMultiplyByRatio(duration, multiplier: 1, divisor: 2).snappedToFrame()
         let hook = titles.first { $0.sticker == nil && $0.start < CMTime(value: 3, timescale: 1) }?.text ?? ""
@@ -55,7 +55,7 @@ public extension Project {
 
     /// The Short as the cover is drawn from it: titles on screen at that moment give way to the
     /// cover's text (made big, in the Short's style), captions only if asked.
-    func coverProject(_ cover: ShortCover) -> Project {
+    package func coverProject(_ cover: ShortCover) -> Project {
         var project = self
         let time = cover.time.clamped(.zero, max(.zero, duration - .oneFrame))
         if !cover.showsCaptions { project.captions.isVisible = false }
@@ -77,5 +77,5 @@ public extension Project {
     }
 
     /// When the home window's picture of the Short is taken: its cover's moment when it has one.
-    var posterTime: CMTime? { cover.map { $0.time.clamped(.zero, max(.zero, duration - .oneFrame)) } }
+    package var posterTime: CMTime? { cover.map { $0.time.clamped(.zero, max(.zero, duration - .oneFrame)) } }
 }

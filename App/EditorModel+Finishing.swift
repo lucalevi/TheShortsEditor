@@ -11,6 +11,10 @@ enum SettingsKey {
     static let slowMotionAutomatically = "slowMotionAutomatically"
     /// Already used by transitions (`EditorModel.preferredTransition`).
     static let transitionFrames = "transitionFrames"
+    /// Playback (`PlaybackController`): loop, skimming, audio skimming.
+    static let loopPlayback = "loopPlayback"
+    static let skimming = "skimming"
+    static let audioSkimming = "audioSkimming"
 }
 
 /// Media and finishing: settings for new clips, markers, the clip trimmer, saving a frame,
@@ -35,7 +39,7 @@ extension EditorModel {
             NSSound.beep()
             return
         }
-        let time = skimTime ?? currentTime
+        let time = playback.skimTime ?? currentTime
         apply("Add Marker") { $0.addMarker(at: time) }
         showTip(.markers)
     }
@@ -63,9 +67,9 @@ extension EditorModel {
             NSSound.beep()
             return
         }
-        pause()
-        skimTime = nil
-        seek(to: marker.time)
+        playback.pause()
+        playback.endSkimming()
+        playback.seek(to: marker.time)
     }
 
     /// Where a marker being dragged lands: on a whole frame, sticking to cuts and edges when snapping is on.
@@ -101,7 +105,7 @@ extension EditorModel {
             NSSound.beep()
             return
         }
-        pause()
+        playback.pause()
         trimmerClipID = clip.id
     }
 
@@ -130,7 +134,7 @@ extension EditorModel {
             NSSound.beep()
             return
         }
-        pause()
+        playback.pause()
         let time = currentTime
         let panel = NSSavePanel()
         panel.allowedContentTypes = [.jpeg, .png]
@@ -146,7 +150,7 @@ extension EditorModel {
         let project = project
         Task {
             do {
-                let image = try await FrameExport.frame(of: project, at: time)
+                let image = try await FrameExport.frame(of: project, at: time, analysis: analysis)
                 try FrameExport.write(image, to: url, format: format)
                 NSWorkspace.shared.activateFileViewerSelecting([url])
             } catch {

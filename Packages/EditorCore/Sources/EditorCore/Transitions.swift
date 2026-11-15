@@ -112,26 +112,26 @@ public struct ClipTransition: Codable, Equatable, Sendable {
 public struct TransitionSpan: Equatable, Sendable {
     /// The clip going out and the clip coming in.
     public let from: Clip.ID
-    public let to: Clip.ID
+    package let to: Clip.ID
     public let kind: TransitionKind
     /// The cut it sits on.
     public let cut: CMTime
     /// When it plays: the same length before and after the cut.
     public let range: CMTimeRange
 
-    public var half: CMTime { cut - range.start }
+    package var half: CMTime { cut - range.start }
 
     /// How far through it is at `time`, 0…1.
-    public func progress(at time: CMTime) -> Double {
+    func progress(at time: CMTime) -> Double {
         guard range.duration > .zero else { return 1 }
         return min(max((time - range.start).seconds / range.duration.seconds, 0), 1)
     }
 }
 
-public extension Timeline {
+extension Timeline {
     /// The transitions that play, in order. Each takes at most half of the clips on either side,
     /// so two transitions never meet inside a short clip; one squeezed under two frames is left out.
-    var transitionSpans: [TransitionSpan] {
+    public var transitionSpans: [TransitionSpan] {
         var spans: [TransitionSpan] = []
         var cut = CMTime.zero
         for (index, clip) in clips.enumerated() {
@@ -168,7 +168,7 @@ public extension Timeline {
     }
 
     /// The clip before the cut nearest `time` (nil with fewer than two clips).
-    func clipBeforeCut(nearest time: CMTime) -> Clip.ID? {
+    public func clipBeforeCut(nearest time: CMTime) -> Clip.ID? {
         cuts.min { abs(($0.time - time).seconds) < abs(($1.time - time).seconds) }?.before
     }
 
@@ -178,9 +178,9 @@ public extension Timeline {
     }
 }
 
-public extension Project {
+extension Project {
     /// The transition after main clip `id`, if it has one and a clip follows it.
-    func transition(after id: Clip.ID) -> ClipTransition? {
+    public func transition(after id: Clip.ID) -> ClipTransition? {
         guard let index = timeline.index(of: id), index + 1 < timeline.clips.count else { return nil }
         return timeline.clips[index].transitionOut
     }
@@ -188,27 +188,27 @@ public extension Project {
     /// Puts a transition on the cut after main clip `id` (nil takes it away). False when no clip
     /// follows it.
     @discardableResult
-    mutating func setTransition(_ transition: ClipTransition?, after id: Clip.ID) -> Bool {
+    public mutating func setTransition(_ transition: ClipTransition?, after id: Clip.ID) -> Bool {
         guard let index = timeline.index(of: id), index + 1 < timeline.clips.count else { return false }
         timeline.clips[index].transitionOut = transition
         return true
     }
 
     /// The same transition on every cut (nil removes them all).
-    mutating func setTransitionOnEveryCut(_ transition: ClipTransition?) {
+    public mutating func setTransitionOnEveryCut(_ transition: ClipTransition?) {
         for index in timeline.clips.indices.dropLast() { timeline.clips[index].transitionOut = transition }
         if let last = timeline.clips.indices.last { timeline.clips[last].transitionOut = nil }
     }
 
     /// How many cuts have a transition.
-    var transitionCount: Int {
+    public var transitionCount: Int {
         timeline.clips.dropLast().filter { $0.transitionOut != nil }.count
     }
 }
 
 // MARK: - See-through pictures and picture fades
 
-public extension Clip {
+extension Clip {
     /// The picture's fades as they are seen: together no longer than the clip.
     var seenPictureFades: (in: CMTime, out: CMTime) {
         let fadeIn = max(pictureFadeIn, .zero), fadeOut = max(pictureFadeOut, .zero)
@@ -220,7 +220,7 @@ public extension Clip {
 
     /// How much of the picture's fades shows at `offset` into the clip: 0 at its very start with a
     /// fade in, 1 once it is fully there. `length` is the clip's length when it is cut short.
-    func pictureFade(atOffset offset: CMTime, length: CMTime? = nil) -> Double {
+    package func pictureFade(atOffset offset: CMTime, length: CMTime? = nil) -> Double {
         let fades = seenPictureFades
         let length = length ?? duration
         var fade = 1.0
@@ -232,5 +232,5 @@ public extension Clip {
     }
 
     /// Whether the picture is see-through or fades at some point.
-    var hasPictureFades: Bool { pictureFadeIn > .zero || pictureFadeOut > .zero }
+    public var hasPictureFades: Bool { pictureFadeIn > .zero || pictureFadeOut > .zero }
 }

@@ -21,45 +21,39 @@ extension EditorModel {
         }
     }
 
-    /// The key under which a file's copy is being made.
-    func cutoutJob(_ assetID: MediaAsset.ID, _ subject: CutoutSubject) -> String { "\(assetID.uuidString)|\(subject.rawValue)" }
-
     /// How far the see-through copy for `clip` has got (0…1), while it is being made.
     func cutoutProgress(of clip: Clip) -> Double? {
         guard let subject = clip.cutout.removeBackground else { return nil }
-        return cuttingOut[cutoutJob(clip.assetID, subject)]
+        return tasks.progress(.cutout(clip.assetID, subject))
     }
 
     /// Makes the see-through copy of every file a clip removes the background of that hasn't
     /// been made yet (in the background, with progress in the inspector), then rebuilds.
     func prepareMissingCutouts() {
         let clips = project.timeline.clips + project.overlays.map(\.clip)
-        var needed: [String: (url: URL, subject: CutoutSubject, isImage: Bool)] = [:]
+        var needed: [BackgroundTasks.Key: (url: URL, name: String, subject: CutoutSubject, isImage: Bool)] = [:]
         for clip in clips {
             guard let subject = clip.cutout.removeBackground, let media = project.asset(id: clip.assetID), media.hasVideo,
                 !missingAssets.contains(media.id)
             else { continue }
-            let job = cutoutJob(media.id, subject)
-            guard cuttingOut[job] == nil, !uncuttable.contains(job),
+            let job = BackgroundTasks.Key.cutout(media.id, subject)
+            guard tasks.mayStart(job),
                 CutoutCache.existingCopy(of: media.url, subject: subject, isImage: media.isImage) == nil
             else { continue }
-            needed[job] = (media.url, subject, media.isImage)
+            needed[job] = (media.url, media.name, subject, media.isImage)
         }
         guard !needed.isEmpty else { return }
-        for job in needed.keys { cuttingOut[job] = 0 }
         Task {
-            for (job, item) in needed {
+            for (job, item) in needed where !tasks.isRunning(job) {
                 do {
-                    _ = try await CutoutCache.make(item.url, subject: item.subject, isImage: item.isImage) { fraction in
-                        Task { @MainActor in if self.cuttingOut[job] != nil { self.cuttingOut[job] = fraction } }
+                    _ = try await tasks.run(job, title: "Removing the background of “\(item.name)”") { progress in
+                        try await CutoutCache.make(item.url, subject: item.subject, isImage: item.isImage) { progress($0) }
                     }
                 } catch is CancellationError {
                 } catch {
                     Log.render.failure("prepareMissingCutouts", error)
-                    uncuttable.insert(job)
                     alert = AlertMessage(title: "The background couldn't be removed", message: error.localizedDescription)
                 }
-                cuttingOut[job] = nil
             }
             refreshPlayback()
         }
@@ -92,9 +86,9 @@ extension EditorModel {
             colorPick = nil
             return
         }
-        player.pause()
+        playback.player.pause()
         if let range = project.timeline.range(of: clipID) ?? project.overlay(id: clipID)?.visibleRange(in: project), !range.containsTime(currentTime) {
-            seek(to: range.start)
+            playback.seek(to: range.start)
         }
         colorPick = pick
     }
@@ -114,7 +108,7 @@ extension EditorModel {
         }
         let time = currentTime
         Task {
-            guard let image = try? await ProjectPoster.frame(of: plain, at: time),
+            guard let image = try? await ProjectPoster.frame(of: plain, at: time, analysis: analysis),
                 let sample = LookRenderer.sample(
                     image,
                     at: CGPoint(
@@ -143,7 +137,7 @@ extension EditorModel {
 
     /// While a slider is dragged: shows the settings it would give straight away (nil stops).
     func previewCutout(_ cutout: ClipCutout?, for clipID: Clip.ID) {
-        LivePreview.setCutout(cutout, for: clipID)
+        livePreview.setCutout(cutout, for: clipID)
         redrawCurrentFrame()
     }
 

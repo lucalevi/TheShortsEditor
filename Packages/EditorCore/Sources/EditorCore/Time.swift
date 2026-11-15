@@ -1,14 +1,14 @@
 import CoreMedia
 
-public extension CMTime {
+extension CMTime {
     /// Rounds to the nearest frame at the project frame rate, so edits always land on whole frames.
-    func snappedToFrame(rate: Int32 = Project.frameRate) -> CMTime {
+    public func snappedToFrame(rate: Int32 = Project.frameRate) -> CMTime {
         guard isNumeric else { return self }
         return convertScale(rate, method: .roundHalfAwayFromZero)
     }
 
     /// Duration of a single frame at the project frame rate.
-    static var oneFrame: CMTime { CMTime(value: 1, timescale: Project.frameRate) }
+    public static var oneFrame: CMTime { CMTime(value: 1, timescale: Project.frameRate) }
 }
 
 public enum TimeFormat {
@@ -46,17 +46,17 @@ extension KeyedDecodingContainer {
     }
 }
 
-public extension CMTime {
+extension CMTime {
     /// The same length the other way, e.g. a move to the left.
-    static prefix func - (time: CMTime) -> CMTime {
+    public static prefix func - (time: CMTime) -> CMTime {
         CMTimeMultiply(time, multiplier: -1)
     }
 }
 
-public extension CMTime {
+extension CMTime {
     /// Kept between `lower` and `upper`. Unlike `CMTimeClampToRange`, an empty range (lower ==
     /// upper) gives that time rather than an invalid one.
-    func clamped(_ lower: CMTime, _ upper: CMTime) -> CMTime {
+    public func clamped(_ lower: CMTime, _ upper: CMTime) -> CMTime {
         Swift.min(Swift.max(self, lower), Swift.max(lower, upper))
     }
 }

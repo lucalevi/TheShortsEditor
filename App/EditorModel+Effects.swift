@@ -30,6 +30,6 @@ extension EditorModel {
             case .start: CMTimeRange(start: start, duration: min(clip.duration, length + CMTime(value: 1, timescale: 2)))
             case .end: CMTimeRange(start: max(start, start + clip.duration - length - CMTime(value: 1, timescale: 2)), end: start + clip.duration)
             }
-        play(range)
+        playback.play(range)
     }
 }

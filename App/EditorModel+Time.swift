@@ -96,10 +96,7 @@ extension EditorModel {
         guard let range = project.timeline.range(of: clipID) else { return }
         let second = CMTime(value: 1, timescale: 1)
         let around = CMTimeRange(start: max(.zero, range.end - second), end: min(duration, range.end + second))
-        skimTime = nil
-        seek(to: around.start)
-        playRange = around
-        player.play()
+        playback.play(around)
     }
 
     // MARK: Freeze frame and replay
@@ -144,7 +141,7 @@ extension EditorModel {
         apply("Instant Replay") { made = $0.addInstantReplay(of: range) }
         guard let first = made.first else { return }
         timelineSelection = TimelineSelection(Set(made.map { TimelineItem.clip($0) }))
-        if let start = project.timeline.range(of: first)?.start { seek(to: start) }
+        if let start = project.timeline.range(of: first)?.start { playback.seek(to: start) }
     }
 
     // MARK: Speed
@@ -169,7 +166,7 @@ extension EditorModel {
     /// Turns clips round. A clip plays backwards from a backwards copy of its file, which is made
     /// first (on this Mac, in the background) when there isn't one yet; turning back is at once.
     func toggleBackwards(for clipIDs: [Clip.ID]) {
-        let clips = clipIDs.compactMap { project.anyClip(id: $0) }.filter { project.canReverse($0) && reversing[$0.id] == nil }
+        let clips = clipIDs.compactMap { project.anyClip(id: $0) }.filter { project.canReverse($0) && !tasks.isRunning(.backwards($0.id)) }
         guard !clips.isEmpty else {
             NSSound.beep()
             return
@@ -202,12 +199,9 @@ extension EditorModel {
         let folder = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
             .appending(path: "Shorts Editor/Backwards", directoryHint: .isDirectory)
         let url = folder.appending(path: "\(UUID().uuidString).mov")
-        reversing[clip.id] = 0
-        defer { reversing[clip.id] = nil }
         do {
-            let id = clip.id
-            try await Reverser.reverse(media.url, range: part, to: url) { fraction in
-                Task { @MainActor in if self.reversing[id] != nil { self.reversing[id] = fraction } }
+            try await tasks.run(.backwards(clip.id), title: "Turning “\(media.name)” round") { progress in
+                try await Reverser.reverse(media.url, range: part, to: url) { progress($0) }
             }
             var copy = try await MediaProbe.probe(url)
             copy.name = "\(media.name) (backwards)"
@@ -231,6 +225,14 @@ extension EditorModel {
             project.updateAnyClip(clipID) { clip in
                 if edge == .start { clip.pictureFadeIn = length } else { clip.pictureFadeOut = length }
             }
+        }
+    }
+
+    // MARK: Speed
+
+    func setSpeed(_ speed: Double, for clipIDs: [Clip.ID]) {
+        apply(speed == 1 ? "Normal Speed" : "Change Speed") { project in
+            for id in clipIDs { project.setSpeed(speed, for: id) }
         }
     }
 }

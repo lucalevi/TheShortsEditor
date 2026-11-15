@@ -148,7 +148,7 @@ struct CoverSheet: View {
                         HStack {
                             Text(TimeFormat.string(cover.time)).monospacedDigit().font(.caption)
                             Spacer()
-                            Button("Use Playhead") { cover.time = model.currentTime.snappedToFrame() }
+                            Button("Use Playhead") { cover.time = model.playback.currentTime.snappedToFrame() }
                                 .controlSize(.small)
                                 .help("The frame the viewer shows")
                         }
@@ -196,7 +196,7 @@ struct CoverSheet: View {
             // Drawn a moment after the last change, so dragging the slider stays smooth.
             try? await Task.sleep(for: .milliseconds(150))
             guard !Task.isCancelled else { return }
-            preview = try? await ProjectPoster.cover(of: model.project, cover, maxSize: CGSize(width: 432, height: 768))
+            preview = try? await ProjectPoster.cover(of: model.project, cover, maxSize: CGSize(width: 432, height: 768), analysis: model.analysis)
         }
     }
 }

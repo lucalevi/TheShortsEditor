@@ -44,8 +44,13 @@ public enum CompositionBuilder {
 
     /// `gain` scales all sound, for bringing the export to YouTube's loudness.
     /// `range` says what the frames are made for: standard (preview, thumbnails, the usual export)
-    /// or HDR (an HDR export).
-    public static func build(_ project: Project, gain: Double = 1, range: DynamicRange = .standard) async throws -> PlayableComposition {
+    /// or HDR (an HDR export). `live` is the editor's live preview, for the player's composition
+    /// only: what is being dragged shows in it before the edit is made. `analysis` has what was
+    /// measured about the files (sound levels for lowering music under speech, shake paths).
+    public static func build(
+        _ project: Project, gain: Double = 1, range: DynamicRange = .standard, live: LivePreview? = nil,
+        analysis: MediaAnalysis = MediaAnalysis()
+    ) async throws -> PlayableComposition {
         guard !project.timeline.clips.isEmpty else { throw BuildError.emptyTimeline }
         let signpost = Signposts.render.beginInterval("Build")
         defer { Signposts.render.endInterval("Build", signpost) }
@@ -56,7 +61,7 @@ public enum CompositionBuilder {
             let audioTrack = composition.addMutableTrack(withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid)
         else { throw BuildError.unreadable("composition") }
 
-        var media = MediaSources(project: project)
+        var media = MediaSources(project: project, analysis: analysis)
         let captions = CaptionTrack(project: project)
         let titles = TitleTrack(project: project)
         let clipSound = AVMutableAudioMixInputParameters(track: audioTrack)
@@ -210,7 +215,7 @@ public enum CompositionBuilder {
         var soundTracks: [Int: (track: AVMutableCompositionTrack, parameters: AVMutableAudioMixInputParameters)] = [:]
         // A second song is lowered under speech like the main one (speech is measured only when needed).
         let lowersAny = audible.contains { $0.0.lowersUnderSpeech && $0.0.canLowerUnderSpeech }
-        let soundSpeech = lowersAny ? await speech(in: project) : []
+        let soundSpeech = lowersAny ? await speech(in: project, analysis: analysis) : []
         for (sound, range) in audible where sound.clip.effectiveVolume > 0 {
             guard let sourceAudio = try await media.audioTrack(for: sound.clip) else {
                 if project.asset(id: sound.clip.assetID) != nil { media.reportMissing(sound.clip.assetID) }
@@ -258,7 +263,7 @@ public enum CompositionBuilder {
             instructions.append(
                 ShortsInstruction(
                     timeRange: CMTimeRange(start: from, end: to), layers: [main.with(region: regions.main)] + over, captions: captions, titles: titles,
-                    transition: drawing, look: project.look
+                    transition: drawing, look: project.look, live: live
                 ))
         }
         var missing = media.missing
@@ -289,7 +294,7 @@ public enum CompositionBuilder {
                 inserted = true
             }
             if inserted {
-                let musicSpeech = track.lowersUnderSpeech ? (lowersAny ? soundSpeech : await speech(in: project)) : []
+                let musicSpeech = track.lowersUnderSpeech ? (lowersAny ? soundSpeech : await speech(in: project, analysis: analysis)) : []
                 envelope = AudioMix.musicEnvelope(for: project, speech: musicSpeech)
                 let parameters = AVMutableAudioMixInputParameters(track: musicTrack)
                 for (a, b) in zip(envelope, envelope.dropFirst()) where b.time > a.time {
@@ -329,11 +334,11 @@ public enum CompositionBuilder {
     }
 
     /// Where people talk in the Short, from the measured loudness of the clips' files.
-    private static func speech(in project: Project) async -> [CMTimeRange] {
+    private static func speech(in project: Project, analysis: MediaAnalysis) async -> [CMTimeRange] {
         var levels: [MediaAsset.ID: AudioLevels] = [:]
         for clip in project.timeline.clips + project.sounds.filter({ $0.detachedFrom != nil }).map(\.clip) where levels[clip.assetID] == nil {
             guard let asset = project.asset(id: clip.assetID), asset.hasAudio else { continue }
-            levels[clip.assetID] = await LevelCache.levels(of: asset.url)
+            levels[clip.assetID] = await analysis.levels(of: asset.url)
         }
         return AudioMix.speechRanges(in: project, levels: levels)
     }
@@ -413,13 +418,16 @@ extension SpeedSegment {
 @MainActor
 private struct MediaSources {
     let project: Project
+    /// What was measured about the files (shake paths for Stabilize).
+    let analysis: MediaAnalysis
     /// A track is only usable while its asset is alive, so they are kept for the whole build.
     private var assets: [MediaAsset.ID: AVURLAsset] = [:]
     /// Media whose files can't be read.
     private(set) var missing = Set<MediaAsset.ID>()
 
-    init(project: Project) {
+    init(project: Project, analysis: MediaAnalysis) {
         self.project = project
+        self.analysis = analysis
     }
 
     mutating func asset(_ media: MediaAsset) -> AVURLAsset {
@@ -524,7 +532,7 @@ private struct MediaSources {
             let (naturalSize, preferredTransform) = try await video.load(.naturalSize, .preferredTransform)
             var layer = make(.track(track.trackID), naturalSize, preferredTransform)
             // Stabilize: only once the file's shake has been measured (the app measures it, then rebuilds).
-            if clip.steadiness > 0, let path = ShakeCache.path(for: media.url) {
+            if clip.steadiness > 0, let path = analysis.shakePath(for: media.url) {
                 layer.steadying = Steadying(path: path, clip: clip)
             }
             return layer

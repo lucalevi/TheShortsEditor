@@ -17,20 +17,11 @@ extension ProjectStore {
     /// bookmarks for as long as `body` runs (so copies named after a file's size and date match).
     static func withLibraryProjects<T>(_ body: ([Project]) -> T) -> T {
         let files = (try? FileManager.default.contentsOfDirectory(at: libraryFolder, includingPropertiesForKeys: nil)) ?? []
-        var opened: [URL] = []
-        defer { for url in opened { url.stopAccessingSecurityScopedResource() } }
+        let media = MediaAccess()
+        defer { media.close() }
         let projects = files.filter { $0.pathExtension == ProjectFile.fileExtension }.compactMap { url -> Project? in
             guard let file = Log.file.attempt("Reading a Short for clean-up", { try ProjectFile.decode(Data(contentsOf: url)) }) else { return nil }
-            var project = file.project
-            for asset in project.assets {
-                var stale = false
-                guard let bookmark = file.bookmarks[asset.id],
-                    let resolved = try? URL(resolvingBookmarkData: bookmark, options: .withSecurityScope, relativeTo: nil, bookmarkDataIsStale: &stale)
-                else { continue }
-                if resolved.startAccessingSecurityScopedResource() { opened.append(resolved) }
-                if resolved.standardizedFileURL != asset.url.standardizedFileURL { project.relink(asset.id, to: resolved) }
-            }
-            return project
+            return media.resolve(file).project
         }
         return body(projects)
     }

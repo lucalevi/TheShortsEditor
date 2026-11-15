@@ -36,7 +36,7 @@ public struct Clip: Identifiable, Codable, Equatable, Sendable {
     /// so the clip itself is silent.
     public var soundDetached: Bool
     /// How this clip changes into the next main clip (nil: a plain cut). See `Transitions.swift`.
-    public var transitionOut: ClipTransition?
+    var transitionOut: ClipTransition?
     /// A freeze frame: the clip shows the one picture at `sourceStart` for its whole length, silent.
     public var isFrozen: Bool
     /// How long the picture takes to appear and to go (timeline time). Used for clips over the main ones.
@@ -50,7 +50,7 @@ public struct Clip: Identifiable, Codable, Equatable, Sendable {
     /// How strongly camera shake is smoothed out, 0…1 (0: Stabilize is off). See `Stabilization.swift`.
     public var steadiness: Double
     /// The placement and motion came from the Short's style, so another style may replace them.
-    public var styledMotion: Bool = false
+    var styledMotion: Bool = false
     /// Speeds up and slows down by itself in a named shape, on top of `speed` (see `SpeedCurves.swift`).
     public var speedCurve: SpeedCurve? = nil
     /// Slow motion made smooth: pictures in between are made up (see `FrameInterpolator`).
@@ -109,7 +109,7 @@ public struct Clip: Identifiable, Codable, Equatable, Sendable {
     }
 
     /// How much of the source the clip shows (nothing but one picture for a freeze frame).
-    public var sourceDuration: CMTime {
+    var sourceDuration: CMTime {
         if isFrozen { return .zero }
         if speedCurve != nil { return CMTime(seconds: curveSource(atOffset: duration.seconds), preferredTimescale: 90000) }
         return speed == 1 ? duration : CMTimeMultiplyByFloat64(duration, multiplier: speed).convertScale(600, method: .roundHalfAwayFromZero)
@@ -142,11 +142,11 @@ public struct Clip: Identifiable, Codable, Equatable, Sendable {
     }
 
     /// The volume actually played (before the volume line and fades).
-    public var effectiveVolume: Double { isMuted || soundDetached || isFrozen ? 0 : volume }
+    package var effectiveVolume: Double { isMuted || soundDetached || isFrozen ? 0 : volume }
 
     /// Another piece of the same source with the same settings (framing, sound, placement and
     /// motion), e.g. after a split.
-    public func piece(id: UUID = UUID(), sourceStart: CMTime, duration: CMTime) -> Clip {
+    func piece(id: UUID = UUID(), sourceStart: CMTime, duration: CMTime) -> Clip {
         var piece = self
         piece.id = id
         piece.sourceStart = sourceStart

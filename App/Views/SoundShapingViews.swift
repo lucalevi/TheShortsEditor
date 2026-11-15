@@ -94,7 +94,7 @@ struct SoundShapingSection: View {
                 ForEach(SoundEQ.allCases) { Text($0.displayName).tag(SoundEQ?.some($0)) }
             }
             .controlSize(.small)
-            .disabled(model.soundProcessing[clip.id] != nil)
+            .disabled(model.tasks.isRunning(.processedSound(clip.id)))
             Text(clip.equalizer?.hint ?? "Shape the tone: clearer speech, fuller music, or less rumble.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
@@ -154,8 +154,8 @@ struct VoiceEffectPicker: View {
                 button(nil, title: "None", image: "person.wave.2")
                 ForEach(VoiceEffect.allCases) { button($0, title: $0.displayName, image: $0.systemImage) }
             }
-            .disabled(model.soundProcessing[clip.id] != nil)
-            if let progress = model.soundProcessing[clip.id] {
+            .disabled(model.tasks.isRunning(.processedSound(clip.id)))
+            if let progress = model.tasks.progress(.processedSound(clip.id)) {
                 ProgressView(value: progress) { Text("Making the effect…").font(.caption) }
             }
         }

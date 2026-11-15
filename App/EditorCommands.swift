@@ -5,6 +5,7 @@ import SwiftUI
 /// Menu bar commands. Every keyboard shortcut lives here so it is also discoverable in a menu.
 struct EditorCommands: Commands {
     let model: EditorModel
+    @Environment(\.openWindow) private var openWindow
 
     var body: some Commands {
         CommandGroup(replacing: .newItem) {
@@ -190,7 +191,7 @@ struct EditorCommands: Commands {
                     Button(spacing.displayName) { model.cutToBeat(spacing) }
                 }
             }
-            .disabled(model.project.music == nil || model.project.timeline.clips.isEmpty || model.findingBeats)
+            .disabled(model.project.music == nil || model.project.timeline.clips.isEmpty || model.tasks.isRunning(.beats))
             Button("Add Freeze Frame") { model.addFreezeFrame() }
                 .keyboardShortcut("f", modifiers: .option)
                 .disabled(model.project.timeline.clips.isEmpty)
@@ -203,7 +204,7 @@ struct EditorCommands: Commands {
                     get: { !turnable.isEmpty && turnable.allSatisfy { model.project.isReversed($0) } },
                     set: { _ in model.toggleBackwards(for: turnable.map(\.id)) })
             )
-            .disabled(turnable.isEmpty || !model.reversing.isEmpty)
+            .disabled(turnable.isEmpty || model.tasks.isRunning(kind: .backwards))
             Menu("Transition") {
                 Button("Add \(model.preferredTransition.kind.displayName) at Nearest Cut") { model.addTransition() }
                     .keyboardShortcut("t", modifiers: .option)
@@ -263,7 +264,7 @@ struct EditorCommands: Commands {
             .disabled(cuttable.count != 1)
             Divider()
             Button("Follow the Subject") { if let clip = selectedClips.first { model.followSubject(clip.id) } }
-                .disabled(selectedClips.count != 1 || model.reframing != nil)
+                .disabled(selectedClips.count != 1 || model.tasks.isRunning(kind: .reframe))
             Menu("Motion") {
                 ForEach(MotionPreset.allCases) { preset in
                     Button(preset.displayName) { if let clip = model.adjustableClip { model.applyMotion(preset, to: clip.id) } }
@@ -312,13 +313,13 @@ struct EditorCommands: Commands {
             }
             .disabled(model.project.timeline.clips.isEmpty)
             Button("Follow Something in the Video") { if let id = model.selectedTitleID { model.followInVideo(id) } }
-                .disabled(model.selectedTitleID == nil || model.tracking != nil)
+                .disabled(model.selectedTitleID == nil || model.tasks.isRunning(kind: .tracking))
             Divider()
             Button("Speak Text…") { model.beginSpeech(for: model.selectedTitleID) }
                 .disabled(model.project.timeline.clips.isEmpty || model.speechRequest != nil)
             Divider()
-            Button("Make Captions") { model.makeCaptions() }
-                .disabled(model.project.timeline.clips.isEmpty || model.captionJob != nil)
+            Button("Make Captions") { model.captioning.make() }
+                .disabled(model.project.timeline.clips.isEmpty || model.captioning.job != nil)
             Toggle(
                 "Show Captions",
                 isOn: Binding(
@@ -364,12 +365,12 @@ struct EditorCommands: Commands {
             .disabled(model.project.music == nil)
             Toggle("Loop Music", isOn: Binding(get: { model.project.music?.loops ?? false }, set: { model.setMusicLoops($0) }))
                 .disabled(model.project.music == nil || model.project.music?.mood != nil)
-            Button("Start Music at Playhead") { model.setMusicTimelineStart(model.currentTime) }
-                .disabled(model.project.music == nil || model.currentTime >= model.duration)
+            Button("Start Music at Playhead") { model.setMusicTimelineStart(model.playback.currentTime) }
+                .disabled(model.project.music == nil || model.playback.currentTime >= model.duration)
             Toggle("Show Beats", isOn: Binding(get: { model.project.music?.showsBeats == true && model.project.hasBeats }, set: { model.setShowsBeats($0) }))
-                .disabled(model.project.music == nil || model.findingBeats)
+                .disabled(model.project.music == nil || model.tasks.isRunning(.beats))
             Button("Add Beat at Playhead") { model.addBeatAtPlayhead() }
-                .disabled(model.project.musicRange.map { !$0.containsTime(model.currentTime) } ?? true)
+                .disabled(model.project.musicRange.map { !$0.containsTime(model.playback.currentTime) } ?? true)
             Button("Remove Beat at Playhead") { model.removeBeatAtPlayhead() }
                 .disabled(!model.beatNearPlayhead)
             Divider()
@@ -385,7 +386,7 @@ struct EditorCommands: Commands {
                 .keyboardShortcut("b", modifiers: [.command, .option])
                 .disabled(model.detachableClips.isEmpty)
             Button("Add Volume Point at Playhead") { model.addVolumePointAtPlayhead() }
-                .disabled(model.project.timeline.locate(model.currentTime) == nil)
+                .disabled(model.project.timeline.locate(model.playback.currentTime) == nil)
             Menu("Voice Effect") {
                 Button("None") { model.setVoiceEffect(nil, for: model.selectedClips.map(\.id)) }
                 Divider()
@@ -397,23 +398,23 @@ struct EditorCommands: Commands {
         }
 
         CommandMenu("Playback") {
-            Button(model.isPlaying ? "Pause" : "Play") { model.togglePlayback() }
+            Button(model.playback.isPlaying ? "Pause" : "Play") { model.playback.togglePlayback() }
                 .keyboardShortcut(.space, modifiers: [])
             Divider()
-            Button("Play Backwards / Faster Backwards") { model.shuttle(forward: false) }
+            Button("Play Backwards / Faster Backwards") { model.playback.shuttle(forward: false) }
                 .keyboardShortcut("j", modifiers: [])
-            Button("Stop") { model.pause() }
+            Button("Stop") { model.playback.pause() }
                 .keyboardShortcut("k", modifiers: [])
-            Button("Play Forwards / Faster Forwards") { model.shuttle(forward: true) }
+            Button("Play Forwards / Faster Forwards") { model.playback.shuttle(forward: true) }
                 .keyboardShortcut("l", modifiers: [])
             Divider()
-            Button("Previous Frame") { model.step(frames: -1) }
+            Button("Previous Frame") { model.playback.step(frames: -1) }
                 .keyboardShortcut(.leftArrow, modifiers: [])
-            Button("Next Frame") { model.step(frames: 1) }
+            Button("Next Frame") { model.playback.step(frames: 1) }
                 .keyboardShortcut(.rightArrow, modifiers: [])
-            Button("Go to Start") { model.seek(to: .zero) }
+            Button("Go to Start") { model.playback.seek(to: .zero) }
                 .keyboardShortcut(.home, modifiers: [])
-            Button("Go to End") { model.seek(to: model.duration) }
+            Button("Go to End") { model.playback.seek(to: model.duration) }
                 .keyboardShortcut(.end, modifiers: [])
             Button("Previous Edit") { model.goToEdit(forward: false) }
                 .keyboardShortcut(";", modifiers: [])
@@ -436,13 +437,19 @@ struct EditorCommands: Commands {
             Divider()
             Button("Play Selection") { model.playSelection() }
                 .keyboardShortcut("/", modifiers: [])
-            Button("Play from Start") { model.playFromStart() }
+            Button("Play from Start") { model.playback.playFromStart() }
                 .keyboardShortcut("\\", modifiers: [])
-            Toggle("Loop Playback", isOn: Binding(get: { model.loopsPlayback }, set: { model.loopsPlayback = $0 }))
+            Toggle("Loop Playback", isOn: Binding(get: { model.playback.loopsPlayback }, set: { model.playback.loopsPlayback = $0 }))
                 .keyboardShortcut("l", modifiers: .command)
             Button(model.isFullScreenPreview ? "Leave Full Screen" : "Play Full Screen") { model.toggleFullScreenPreview() }
                 .keyboardShortcut("f", modifiers: [.command, .shift])
                 .disabled(model.project.timeline.clips.isEmpty)
+        }
+
+        CommandGroup(before: .windowList) {
+            Button("Background Tasks") { openWindow(id: BackgroundTasksView.windowID) }
+                .keyboardShortcut("9")
+            Divider()
         }
 
         CommandGroup(before: .toolbar) {
@@ -450,10 +457,10 @@ struct EditorCommands: Commands {
                 .keyboardShortcut("'", modifiers: .command)
             Toggle("Snapping", isOn: Binding(get: { model.snapsToEdges }, set: { model.snapsToEdges = $0 }))
                 .keyboardShortcut("s", modifiers: [])
-            Toggle("Skimming", isOn: Binding(get: { model.skimsTimeline }, set: { model.skimsTimeline = $0 }))
-            Toggle("Audio Skimming", isOn: Binding(get: { model.skimsAudio }, set: { model.skimsAudio = $0 }))
+            Toggle("Skimming", isOn: Binding(get: { model.playback.skimsTimeline }, set: { model.playback.skimsTimeline = $0 }))
+            Toggle("Audio Skimming", isOn: Binding(get: { model.playback.skimsAudio }, set: { model.playback.skimsAudio = $0 }))
                 .keyboardShortcut("s", modifiers: .shift)
-                .disabled(!model.skimsTimeline)
+                .disabled(!model.playback.skimsTimeline)
             Button("Zoom In Timeline") { model.zoom(by: 1.5) }
                 .keyboardShortcut("+", modifiers: .command)
             Button("Zoom Out Timeline") { model.zoom(by: 1 / 1.5) }
@@ -487,7 +494,7 @@ enum OverlayImportPanel {
         panel.prompt = "Add Over Clips"
         panel.message = "Choose B-roll or pictures to show over your clips, starting at the playhead"
         guard panel.runModal() == .OK else { return }
-        model.importFiles(panel.urls, to: .overlay(at: model.currentTime))
+        model.importFiles(panel.urls, to: .overlay(at: model.playback.currentTime))
     }
 }
 

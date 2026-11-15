@@ -22,8 +22,8 @@ public enum FrameExport {
     }
 
     /// The frame at `time` as it plays, at full size (1080 × 1920), with titles and captions.
-    public static func frame(of project: Project, at time: CMTime) async throws -> CGImage {
-        try await ProjectPoster.frame(of: project, at: time.clamped(.zero, max(.zero, project.duration - .oneFrame)))
+    public static func frame(of project: Project, at time: CMTime, analysis: MediaAnalysis = MediaAnalysis()) async throws -> CGImage {
+        try await ProjectPoster.frame(of: project, at: time.clamped(.zero, max(.zero, project.duration - .oneFrame)), analysis: analysis)
     }
 
     /// Writes `image` to `url` (replacing a file there). JPEG at high quality.

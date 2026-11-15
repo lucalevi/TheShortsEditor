@@ -92,7 +92,7 @@ public struct MediaAsset: Identifiable, Codable, Equatable, Sendable {
 
     /// The longest a picture can be shown. Pictures are given this as their length, so trimming
     /// treats them like a very long video.
-    public static let imageDuration = CMTime(value: 3600, timescale: 1)
+    static let imageDuration = CMTime(value: 3600, timescale: 1)
     /// How long a picture stays when it is added.
     public static let imageClipDuration = CMTime(value: 3, timescale: 1)
 
@@ -118,11 +118,11 @@ public struct MediaAsset: Identifiable, Codable, Equatable, Sendable {
     }
 
     /// How long a new clip of this media is: the whole video, or a few seconds of a picture.
-    public var defaultClipDuration: CMTime { isImage ? Self.imageClipDuration : duration }
+    var defaultClipDuration: CMTime { isImage ? Self.imageClipDuration : duration }
 
     /// The framing a newcomer most likely wants: vertical footage fills the screen, while
     /// horizontal footage is shown whole instead of losing two thirds of the picture.
-    public var defaultFraming: Framing {
+    var defaultFraming: Framing {
         guard displaySize.width > 0 else { return .fill }
         let aspect = displaySize.height / displaySize.width
         let vertical = Project.canvasSize.height / Project.canvasSize.width
@@ -138,11 +138,11 @@ public enum Framing: String, Codable, CaseIterable, Sendable {
     case fit
 }
 
-public extension Project {
+extension Project {
     /// Adds `asset` unless a file at the same location is already imported.
     /// Returns the id of the asset that is now in the project.
     @discardableResult
-    mutating func addAsset(_ asset: MediaAsset) -> MediaAsset.ID {
+    public mutating func addAsset(_ asset: MediaAsset) -> MediaAsset.ID {
         if let existing = assets.first(where: { $0.url.standardizedFileURL == asset.url.standardizedFileURL }) {
             return existing.id
         }
@@ -152,7 +152,7 @@ public extension Project {
 
     /// Appends a clip covering the whole of the asset to the end of the timeline.
     @discardableResult
-    mutating func appendClip(of assetID: MediaAsset.ID) -> Clip.ID? {
+    public mutating func appendClip(of assetID: MediaAsset.ID) -> Clip.ID? {
         appendClip(of: assetID, part: nil)
     }
 }

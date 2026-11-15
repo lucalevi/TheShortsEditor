@@ -6,6 +6,7 @@ import SwiftUI
 /// when it was last changed. Click a Short to edit it; everything is saved as you go.
 struct HomeView: View {
     @Bindable var model: EditorModel
+    @Environment(LibraryModel.self) private var library
     @State private var search = ""
     @State private var renamingID: UUID?
     @State private var isDropTargeted = false
@@ -14,7 +15,7 @@ struct HomeView: View {
     private let columns = [GridItem(.adaptive(minimum: tileWidth, maximum: tileWidth), spacing: 22, alignment: .top)]
 
     private var shown: [ShortEntry] {
-        model.shorts.filter { ShortsLibrary.matches($0.name, search: search) }
+        library.shorts.filter { ShortsLibrary.matches($0.name, search: search) }
     }
 
     var body: some View {
@@ -36,7 +37,7 @@ struct HomeView: View {
                             help: "Choose clips and get a Short cut on the beat, with text and transitions (montage, top 5, recipe…)"
                         ) { model.choosesTemplate = true }
                     }
-                    if model.shorts.isEmpty {
+                    if library.shorts.isEmpty {
                         Text(
                             "Start an empty Short, let Magic Short make a first cut from your clips, or follow a storyboard. Your Shorts will appear here. Each one is saved as you edit it, so you can come back to it any time."
                         )
@@ -84,10 +85,10 @@ struct HomeView: View {
     }
 
     private var subtitle: String {
-        switch model.shorts.count {
+        switch library.shorts.count {
         case 0: ""
         case 1: "1 Short"
-        default: "\(model.shorts.count) Shorts"
+        default: "\(library.shorts.count) Shorts"
         }
     }
 }
@@ -134,6 +135,7 @@ private struct NewShortTile: View {
 
 private struct ShortTile: View {
     @Bindable var model: EditorModel
+    @Environment(LibraryModel.self) private var library
     let entry: ShortEntry
     @Binding var renamingID: UUID?
     @State private var typedName = ""
@@ -150,7 +152,7 @@ private struct ShortTile: View {
             } label: {
                 Poster {
                     ZStack(alignment: .bottomTrailing) {
-                        if let poster = model.posters[entry.id] {
+                        if let poster = library.posters[entry.id] {
                             Image(decorative: poster, scale: 1)
                                 .resizable()
                                 .aspectRatio(contentMode: .fill)
@@ -227,9 +229,9 @@ private struct ShortTile: View {
     private var actions: some View {
         Button("Edit") { model.openShort(entry.id) }
         Button("Rename") { renamingID = entry.id }
-        Button("Duplicate") { model.duplicateShort(entry.id) }
+        Button("Duplicate") { library.duplicate(entry.id) }
         Divider()
-        Button("Delete…", role: .destructive) { model.deleteShorts([entry.id]) }
+        Button("Delete…", role: .destructive) { library.delete([entry.id]) }
     }
 
     private func finishRenaming() {

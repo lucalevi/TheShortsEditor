@@ -182,17 +182,17 @@ public enum TitlePlacement: String, CaseIterable, Identifiable, Sendable {
     }
 }
 
-public extension TextOverlay {
+extension TextOverlay {
     static let defaultDuration = CMTime(value: 3, timescale: 1)
     /// No title is shorter than this, so it can still be seen and grabbed on the timeline.
     static let minimumDuration = CMTime(value: 10, timescale: Project.frameRate)
 }
 
-public extension Project {
+extension Project {
     /// Adds a title at `time` (the playhead), lasting 3 seconds or until the end of the Short.
     /// Near the end it starts earlier instead, so it is never too short to see.
     @discardableResult
-    mutating func addTitle(at time: CMTime, text: String) -> TextOverlay.ID {
+    public mutating func addTitle(at time: CMTime, text: String) -> TextOverlay.ID {
         let length = duration > .zero ? duration : TextOverlay.defaultDuration
         let wanted = min(TextOverlay.defaultDuration, length)
         var start = time.snappedToFrame().clamped(.zero, length)
@@ -204,21 +204,21 @@ public extension Project {
         return title.id
     }
 
-    func title(id: TextOverlay.ID) -> TextOverlay? {
+    public func title(id: TextOverlay.ID) -> TextOverlay? {
         titles.first { $0.id == id }
     }
 
-    mutating func updateTitle(_ id: TextOverlay.ID, _ change: (inout TextOverlay) -> Void) {
+    public mutating func updateTitle(_ id: TextOverlay.ID, _ change: (inout TextOverlay) -> Void) {
         guard let index = titles.firstIndex(where: { $0.id == id }) else { return }
         change(&titles[index])
     }
 
-    mutating func removeTitle(_ id: TextOverlay.ID) {
+    public mutating func removeTitle(_ id: TextOverlay.ID) {
         titles.removeAll { $0.id == id }
     }
 
     /// Moves a title so it starts at `start`, keeping its length, on a whole frame and inside the Short.
-    mutating func moveTitle(_ id: TextOverlay.ID, to start: CMTime) {
+    public mutating func moveTitle(_ id: TextOverlay.ID, to start: CMTime) {
         let end = duration
         updateTitle(id) { title in
             let latest = max(.zero, end - title.duration)
@@ -227,7 +227,7 @@ public extension Project {
     }
 
     /// Changes how long a title stays, on a whole frame, at least `minimumDuration` and not past the end.
-    mutating func setTitleDuration(_ id: TextOverlay.ID, _ newDuration: CMTime) {
+    public mutating func setTitleDuration(_ id: TextOverlay.ID, _ newDuration: CMTime) {
         let end = duration
         updateTitle(id) { title in
             let longest = max(end - title.start, TextOverlay.minimumDuration)
@@ -236,7 +236,7 @@ public extension Project {
     }
 
     /// The titles on screen at `time`, in drawing order.
-    func titlesOnScreen(at time: CMTime) -> [TextOverlay] {
+    public func titlesOnScreen(at time: CMTime) -> [TextOverlay] {
         titles.filter { $0.visibleRange(in: self)?.containsTime(time) == true }
     }
 }

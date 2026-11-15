@@ -11,8 +11,8 @@ extension UTType {
 
 /// Reads and writes project files, and keeps the library of Shorts shown on the home window.
 ///
-/// The app is sandboxed: it may only open files the user handed it. To open media (and recent
-/// projects) again after a restart, it keeps security-scoped bookmarks, made while it had access.
+/// The app is sandboxed: it may only open files the user handed it. To open media again after a
+/// restart, a Short keeps security-scoped bookmarks, made while it had access (`MediaAccess`).
 @MainActor
 enum ProjectStore {
     /// The app's own folder in its container.
@@ -27,24 +27,16 @@ enum ProjectStore {
         appFolder.appending(path: "Untitled.\(ProjectFile.fileExtension)")
     }
 
-    /// Bookmarks already made or read, by file location, so saving doesn't remake them each time
-    /// and a missing file keeps the bookmark it had.
-    private static var bookmarks: [URL: Data] = [:]
-
     // MARK: Reading and writing
 
     /// The file for `project` as it would be saved, with a bookmark for each media file.
-    static func file(for project: Project, name: String?, created: Date?) -> ProjectFile {
-        var saved: [MediaAsset.ID: Data] = [:]
-        for asset in project.assets {
-            if let data = bookmark(for: asset.url) { saved[asset.id] = data }
-        }
-        return ProjectFile(project: project, bookmarks: saved, name: name, created: created)
+    static func file(for project: Project, name: String?, created: Date?, media: MediaAccess) -> ProjectFile {
+        ProjectFile(project: project, bookmarks: media.bookmarks(for: project), name: name, created: created)
     }
 
     /// Writes a Short to a file the user chose (Save a Copy), never leaving it half written.
-    static func write(_ project: Project, to url: URL, name: String? = nil, created: Date? = nil) throws {
-        let data = try file(for: project, name: name, created: created).encoded()
+    static func write(_ project: Project, to url: URL, name: String? = nil, created: Date? = nil, media: MediaAccess) throws {
+        let data = try file(for: project, name: name, created: created, media: media).encoded()
         let access = url.startAccessingSecurityScopedResource()
         defer { if access { url.stopAccessingSecurityScopedResource() } }
         try safelyWrite(data, to: url)
@@ -70,52 +62,16 @@ enum ProjectStore {
     }
 
     /// Reads a project, finding its media through the saved bookmarks (and following files that
-    /// were renamed or moved on the same disk).
-    static func read(_ url: URL) throws -> Project {
-        try readFile(url).project
+    /// were renamed or moved on the same disk). Access to the media lasts as long as `media`.
+    static func read(_ url: URL, media: MediaAccess) throws -> Project {
+        try readFile(url, media: media).project
     }
 
     /// Reads a project file with its name and date, its media found through the saved bookmarks.
-    static func readFile(_ url: URL) throws -> ProjectFile {
+    static func readFile(_ url: URL, media: MediaAccess) throws -> ProjectFile {
         let access = url.startAccessingSecurityScopedResource()
         defer { if access { url.stopAccessingSecurityScopedResource() } }
-        var file = try ProjectFile.decode(Data(contentsOf: url))
-        var project = file.project
-        for asset in project.assets {
-            guard let data = file.bookmarks[asset.id] else { continue }
-            var stale = false
-            guard
-                let resolved = Log.file.attempt(
-                    "Finding a Short's media file",
-                    {
-                        try URL(resolvingBookmarkData: data, options: .withSecurityScope, relativeTo: nil, bookmarkDataIsStale: &stale)
-                    })
-            else {
-                bookmarks[asset.url] = data
-                continue
-            }
-            // Keep access for as long as the app runs, like files imported in this session.
-            _ = resolved.startAccessingSecurityScopedResource()
-            if resolved.standardizedFileURL != asset.url.standardizedFileURL {
-                project.relink(asset.id, to: resolved)
-            }
-            if !stale { bookmarks[resolved] = data }
-        }
-        file.project = project
-        return file
-    }
-
-    private static func bookmark(for url: URL) -> Data? {
-        if let known = bookmarks[url] { return known }
-        guard
-            let data = Log.file.attempt(
-                "Making a bookmark for a media file",
-                {
-                    try url.bookmarkData(options: .withSecurityScope, includingResourceValuesForKeys: nil, relativeTo: nil)
-                })
-        else { return nil }
-        bookmarks[url] = data
-        return data
+        return media.resolve(try ProjectFile.decode(Data(contentsOf: url)))
     }
 
     // MARK: The library (every Short, shown on the home window)
@@ -170,9 +126,8 @@ enum ProjectStore {
 
     /// Saves a Short into the library in the background: the version on disk is backed up first
     /// when a backup is due. The snapshot is taken now, so later edits don't change what is written;
-    /// `done` is called on the main actor with the error, if any.
-    static func save(_ project: Project, id: UUID, name: String, created: Date, done: @escaping @MainActor (Error?) -> Void) {
-        let file = file(for: project, name: name, created: created)
+    /// `done` is called on the main actor with the error, if any. `file` comes from `file(for:…)`.
+    static func save(_ file: ProjectFile, id: UUID, done: @escaping @MainActor (Error?) -> Void) {
         let url = fileURL(for: id), backups = backupsFolder(for: id)
         saveQueue.async {
             var failure: Error?

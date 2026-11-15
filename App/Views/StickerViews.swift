@@ -207,8 +207,8 @@ struct FollowSubjectSection: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text("Follow something in the video").font(.subheadline.weight(.semibold))
-            if let tracking = model.tracking, tracking.id == title.id {
-                ProgressView(value: tracking.progress) { Text("Following…").font(.caption) }
+            if let progress = model.tasks.progress(.tracking(title.id)) {
+                ProgressView(value: progress) { Text("Following…").font(.caption) }
             } else if title.track != nil {
                 HStack {
                     Label("Follows what was under it", systemImage: "scope")
@@ -221,7 +221,7 @@ struct FollowSubjectSection: View {
                     .help("Follow what is under it now, at its first moment (after you moved it)")
             } else {
                 Button("Follow", systemImage: "scope") { model.followInVideo(title.id) }
-                    .disabled(model.tracking != nil || title.visibleRange(in: model.project) == nil)
+                    .disabled(model.tasks.isRunning(kind: .tracking) || title.visibleRange(in: model.project) == nil)
                 Text(
                     "Put it on a face or an object at its first moment, then click Follow: it moves with that for as long as it is on screen. Done on this Mac."
                 )
@@ -246,7 +246,7 @@ struct SpeechSheet: View {
         self.model = model
         _request = State(initialValue: request)
         // The language the Short's captions are in.
-        _language = State(initialValue: model.captionLanguage)
+        _language = State(initialValue: model.captioning.spokenLanguage)
     }
 
     private var voices: [SpeechMaker.Voice] {
@@ -302,7 +302,7 @@ struct SpeechSheet: View {
                 Button("Listen", systemImage: "speaker.wave.2") { SpeechMaker.preview(request.text, voice: voiceID, rate: rate) }
                     .disabled(request.text.trimmingCharacters(in: .whitespaces).isEmpty)
                 Spacer()
-                if model.makingSpeech { ProgressView().controlSize(.small) }
+                if model.tasks.isRunning(.speech) { ProgressView().controlSize(.small) }
                 Button("Cancel") {
                     SpeechMaker.stopPreview()
                     model.speechRequest = nil
@@ -313,7 +313,7 @@ struct SpeechSheet: View {
                     model.makeSpeech(request, voice: voiceID, rate: rate)
                 }
                 .keyboardShortcut(.defaultAction)
-                .disabled(request.text.trimmingCharacters(in: .whitespaces).isEmpty || model.makingSpeech)
+                .disabled(request.text.trimmingCharacters(in: .whitespaces).isEmpty || model.tasks.isRunning(.speech))
             }
         }
         .padding(20)

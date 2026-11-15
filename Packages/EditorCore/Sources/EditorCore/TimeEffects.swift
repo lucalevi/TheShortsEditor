@@ -6,14 +6,14 @@ import Foundation
 
 // MARK: - Freeze frame
 
-public extension Clip {
+extension Clip {
     /// How long a new freeze frame lasts.
-    static let freezeDuration = CMTime(value: 3, timescale: 1)
+    public static let freezeDuration = CMTime(value: 3, timescale: 1)
 }
 
-public extension Project {
+extension Project {
     /// Whether a clip is one still picture (a picture file or a freeze frame).
-    func isStill(_ clip: Clip) -> Bool {
+    public func isStill(_ clip: Clip) -> Bool {
         clip.isFrozen || asset(id: clip.assetID)?.isImage == true
     }
 
@@ -22,7 +22,7 @@ public extension Project {
     /// end of the Short it holds the last picture. Returns the freeze frame's id; nil on a picture
     /// or another freeze frame (they are still already).
     @discardableResult
-    mutating func addFreezeFrame(at time: CMTime, duration: CMTime = Clip.freezeDuration) -> Clip.ID? {
+    public mutating func addFreezeFrame(at time: CMTime, duration: CMTime = Clip.freezeDuration) -> Clip.ID? {
         let time = time.snappedToFrame()
         guard !timeline.clips.isEmpty else { return nil }
         let index: Int, offset: CMTime
@@ -69,14 +69,14 @@ public extension Project {
 
 // MARK: - Instant replay
 
-public extension Project {
+extension Project {
     /// How much slower a replay plays.
-    static let replaySpeed = 0.5
+    public static let replaySpeed = 0.5
 
     /// Shows the part of the storyline inside `range` once more straight after itself, slower.
     /// Returns the replay's clips.
     @discardableResult
-    mutating func addInstantReplay(of range: CMTimeRange, speed: Double = Project.replaySpeed) -> [Clip.ID] {
+    public mutating func addInstantReplay(of range: CMTimeRange, speed: Double = Project.replaySpeed) -> [Clip.ID] {
         let ids = isolate(range)
         guard let last = ids.last, let lastIndex = timeline.index(of: last) else { return [] }
         var copies = ids.compactMap { id in timeline.clips.first { $0.id == id } }.map { clip -> Clip in
@@ -96,26 +96,26 @@ public extension Project {
 // MARK: - Speed that changes gradually
 
 /// A stretch of a clip that plays at one speed: this much of the file in this much time.
-public struct SpeedSegment: Equatable, Sendable {
-    public let source: CMTimeRange
-    public let duration: CMTime
+package struct SpeedSegment: Equatable, Sendable {
+    package let source: CMTimeRange
+    package let duration: CMTime
 
-    public init(source: CMTimeRange, duration: CMTime) {
+    package init(source: CMTimeRange, duration: CMTime) {
         self.source = source
         self.duration = duration
     }
 
-    public var speed: Double { duration > .zero ? source.duration.seconds / duration.seconds : 1 }
+    var speed: Double { duration > .zero ? source.duration.seconds / duration.seconds : 1 }
 }
 
-public extension Clip {
+extension Clip {
     /// The longest a gradual speed change takes on each side of the cut.
     static let speedRampFrames: Int64 = 15
     /// The most steps of speed on each side of the cut.
     static let speedRampSteps: Int64 = 5
 }
 
-public extension Timeline {
+extension Timeline {
     /// How many frames on each side of the cut after clip `index` the speed takes to change, or 0
     /// when it changes at once: the two clips have to be one recording carrying straight on at two
     /// speeds, both with `smoothSpeed`, without a transition between them.
@@ -131,7 +131,7 @@ public extension Timeline {
     }
 
     /// Whether the speed changes gradually at either end of clip `index`.
-    func hasSpeedRamp(atClip index: Int) -> Bool {
+    public func hasSpeedRamp(atClip index: Int) -> Bool {
         speedRampFrames(afterClipAt: index - 1) > 0 || speedRampFrames(afterClipAt: index) > 0
     }
 
@@ -140,7 +140,7 @@ public extension Timeline {
     /// stretches fill the clip's time exactly and follow on from each other in the file; across
     /// the cut the two clips' steps together show exactly what the plain clips would, so nothing
     /// else on the timeline moves. (Nothing for a freeze frame.)
-    func speedSegments(forClipAt index: Int) -> [SpeedSegment] {
+    package func speedSegments(forClipAt index: Int) -> [SpeedSegment] {
         let clip = clips[index]
         guard !clip.isFrozen else { return [] }
         if clip.speedCurve != nil { return clip.curveSegments }
@@ -200,9 +200,9 @@ public extension Timeline {
 
 // MARK: - Footage filmed for slow motion
 
-public extension MediaAsset {
+extension MediaAsset {
     /// Filmed at a high frame rate (an iPhone's Slo-mo: 120 or 240 pictures a second).
-    var isSlowMotion: Bool { (frameRate ?? 0) >= 100 && !isImage }
+    package var isSlowMotion: Bool { (frameRate ?? 0) >= 100 && !isImage }
 
     /// The speed a new clip of this file starts at: slow-motion footage plays slowed down, as far
     /// as it stays smooth (a quarter speed at most).
@@ -212,7 +212,7 @@ public extension MediaAsset {
     }
 
     /// The slowest speed that still shows a new picture every frame.
-    var smoothestSlowSpeed: Double? {
+    public var smoothestSlowSpeed: Double? {
         guard let frameRate, frameRate > Double(Project.frameRate) * 1.5, !isImage else { return nil }
         return max(Double(Project.frameRate) / frameRate, Clip.speedRange.lowerBound)
     }
@@ -250,24 +250,24 @@ public struct ReversedSource: Codable, Equatable, Sendable {
 /// A clip plays backwards by pointing at a backwards copy of its file (made by the app, see
 /// `Reverser`), which is an ordinary media file to everything else: trimming, splitting, speed
 /// and motion work on it as on any clip.
-public extension Project {
+extension Project {
     /// Files up to this long are turned around whole; of longer ones, the clip's part and a little more.
     static let reverseWholeFileLimit = CMTime(value: 60, timescale: 1)
     static let reverseMargin = CMTime(value: 3, timescale: 1)
 
     /// Whether a clip is playing a backwards copy.
-    func isReversed(_ clip: Clip) -> Bool {
+    public func isReversed(_ clip: Clip) -> Bool {
         asset(id: clip.assetID)?.reversedFrom != nil
     }
 
     /// Whether a clip could play backwards at all (a video, not a picture or a freeze frame).
-    func canReverse(_ clip: Clip) -> Bool {
+    public func canReverse(_ clip: Clip) -> Bool {
         guard let media = asset(id: clip.assetID) else { return false }
         return media.hasVideo && !media.isImage && !clip.isFrozen
     }
 
     /// The part of the clip's file a backwards copy should hold.
-    func partToReverse(for clip: Clip) -> CMTimeRange? {
+    public func partToReverse(for clip: Clip) -> CMTimeRange? {
         guard canReverse(clip), let media = asset(id: clip.assetID) else { return nil }
         let whole = CMTimeRange(start: .zero, duration: media.duration)
         if media.duration <= Self.reverseWholeFileLimit { return whole }
@@ -278,7 +278,7 @@ public extension Project {
     /// The file that shows the clip's footage the other way round, when the project has one: the
     /// original for a clip that plays backwards, or a backwards copy that holds the clip's part.
     /// `pivot` turns a time in one into the time in the other (`pivot − time`).
-    func counterpart(for clip: Clip) -> (asset: MediaAsset, pivot: CMTime)? {
+    public func counterpart(for clip: Clip) -> (asset: MediaAsset, pivot: CMTime)? {
         guard let media = asset(id: clip.assetID) else { return nil }
         if let from = media.reversedFrom, let original = asset(id: from.assetID) {
             return (original, from.range.end)
@@ -297,7 +297,7 @@ public extension Project {
     /// same footage in the same time, the other way, and its motion and volume line turn with it.
     /// False when there is no such file yet.
     @discardableResult
-    mutating func flipDirection(of id: Clip.ID) -> Bool {
+    public mutating func flipDirection(of id: Clip.ID) -> Bool {
         guard let clip = anyClip(id: id), let (other, pivot) = counterpart(for: clip) else { return false }
         updateAnyClip(id) { clip in
             let length = clip.sourceDuration

@@ -111,7 +111,7 @@ struct SmoothSlowMotionToggle: View {
     var body: some View {
         let candidates = clips.filter { model.canSmooth($0) || $0.smoothSlowMotion }
         if !candidates.isEmpty {
-            let progress = candidates.compactMap { model.smoothing[$0.id] }.first
+            let progress = candidates.compactMap { model.tasks.progress(.smoothSlowMotion($0.id)) }.first
             VStack(alignment: .leading, spacing: 4) {
                 Toggle(
                     "Smooth slow motion",
@@ -213,8 +213,8 @@ struct MusicRhythmSection: View {
                 HStack {
                     Toggle("Show beats", isOn: Binding(get: { music.showsBeats && model.project.hasBeats }, set: { model.setShowsBeats($0) }))
                         .toggleStyle(.checkbox)
-                        .disabled(model.findingBeats)
-                    if model.findingBeats {
+                        .disabled(model.tasks.isRunning(.beats))
+                    if model.tasks.isRunning(.beats) {
                         ProgressView().controlSize(.small)
                         Text("Listening…").font(.caption).foregroundStyle(.secondary)
                     }
@@ -233,7 +233,7 @@ struct MusicRhythmSection: View {
                     }
                 }
                 .fixedSize()
-                .disabled(model.findingBeats)
+                .disabled(model.tasks.isRunning(.beats))
                 .help("Trim the clips so every cut lands on a beat of the music")
                 if music.showsBeats {
                     HStack {
@@ -244,7 +244,7 @@ struct MusicRhythmSection: View {
                             .help("Remove the beat at the playhead")
                         if music.mood == nil || music.beats != nil {
                             Button("Find Again") { model.findBeatsAgain() }
-                                .disabled(model.findingBeats)
+                                .disabled(model.tasks.isRunning(.beats))
                                 .help(music.mood == nil ? "Listen to the song again (forgets beats added by hand)" : "Back to the music's own beats")
                         }
                     }
@@ -268,8 +268,8 @@ struct MusicRhythmSection: View {
                         .frame(width: 48, alignment: .trailing)
                 }
                 HStack {
-                    Button("Start at Playhead") { model.setMusicTimelineStart(model.currentTime) }
-                        .disabled(model.currentTime >= model.duration)
+                    Button("Start at Playhead") { model.setMusicTimelineStart(model.playback.currentTime) }
+                        .disabled(model.playback.currentTime >= model.duration)
                     if music.start > .zero {
                         Button("Start with the Short") { model.setMusicTimelineStart(.zero) }
                     }

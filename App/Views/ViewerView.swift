@@ -20,7 +20,7 @@ struct ViewerView: View {
                 if model.project.timeline.clips.isEmpty {
                     emptyState
                 } else {
-                    PlayerView(player: model.player)
+                    PlayerView(player: model.playback.player)
                         .overlay { if model.showsSafeZone { SafeZoneOverlay() } }
                         .overlay { PictureHandles(model: model) }
                         .overlay { CaptionHandle(model: model) }
@@ -47,7 +47,7 @@ struct ViewerView: View {
             } isTargeted: {
                 isDropTargeted = $0
             }
-            TransportBar(model: model)
+            TransportBar(hasClips: !model.project.timeline.clips.isEmpty) { model.toggleFullScreenPreview() }
         }
     }
 
@@ -122,34 +122,37 @@ private struct MissingMediaBar: View {
 
 /// Play/pause, frame stepping and the time readout under the viewer.
 private struct TransportBar: View {
-    @Bindable var model: EditorModel
+    @Environment(PlaybackController.self) private var playback
+    let hasClips: Bool
+    let toggleFullScreen: () -> Void
 
     var body: some View {
+        @Bindable var playback = playback
         HStack(spacing: 14) {
-            Button("Go to Start", systemImage: "backward.end.fill") { model.seek(to: .zero) }
-            Button("Previous Frame", systemImage: "chevron.left") { model.step(frames: -1) }
-            Button(model.isPlaying ? "Pause" : "Play", systemImage: model.isPlaying ? "pause.fill" : "play.fill") {
-                model.togglePlayback()
+            Button("Go to Start", systemImage: "backward.end.fill") { playback.seek(to: .zero) }
+            Button("Previous Frame", systemImage: "chevron.left") { playback.step(frames: -1) }
+            Button(playback.isPlaying ? "Pause" : "Play", systemImage: playback.isPlaying ? "pause.fill" : "play.fill") {
+                playback.togglePlayback()
             }
             .font(.title2)
             .frame(width: 28)
-            Button("Next Frame", systemImage: "chevron.right") { model.step(frames: 1) }
-            Text("\(TimeFormat.string(model.skimTime ?? model.currentTime)) / \(TimeFormat.string(model.duration))")
+            Button("Next Frame", systemImage: "chevron.right") { playback.step(frames: 1) }
+            Text("\(TimeFormat.string(playback.skimTime ?? playback.currentTime)) / \(TimeFormat.string(playback.duration))")
                 .monospacedDigit()
                 .foregroundStyle(.secondary)
                 .frame(minWidth: 110, alignment: .leading)
-            Toggle("Loop", systemImage: "repeat", isOn: $model.loopsPlayback)
+            Toggle("Loop", systemImage: "repeat", isOn: $playback.loopsPlayback)
                 .toggleStyle(.button)
                 .help(
-                    model.loopsPlayback
+                    playback.loopsPlayback
                         ? "Loop is on: playing starts again at the end, as a Short does on YouTube (⌘L)" : "Play over and over, as a Short does on YouTube (⌘L)"
                 )
-            Button("Play Full Screen", systemImage: "arrow.up.left.and.arrow.down.right") { model.toggleFullScreenPreview() }
+            Button("Play Full Screen", systemImage: "arrow.up.left.and.arrow.down.right", action: toggleFullScreen)
                 .help("Watch it full screen on a phone, with YouTube's buttons over it (⇧⌘F)")
         }
         .labelStyle(.iconOnly)
         .buttonStyle(.borderless)
-        .disabled(model.project.timeline.clips.isEmpty)
+        .disabled(!hasClips)
         .padding(.vertical, 8)
         .frame(maxWidth: .infinity)
         .background(Theme.header)
@@ -273,7 +276,7 @@ private struct PictureHandles: View {
 
     private func begin(_ clip: Clip) -> Placement {
         if let dragged, dragged.clipID == clip.id { return dragged.start }
-        model.pause()
+        model.playback.pause()
         let start = model.placementAtPlayhead(of: clip)
         dragged = (clip.id, start, start)
         return start
@@ -288,7 +291,7 @@ private struct PictureHandles: View {
 
     /// Where the clip is drawn: the whole canvas, or its half of a split screen.
     private func region(of clip: Clip) -> CGRect {
-        model.project.regions(at: model.currentTime).region(for: clip.id, isMain: model.project.timeline.index(of: clip.id) != nil)
+        model.project.regions(at: model.playback.currentTime).region(for: clip.id, isMain: model.project.timeline.index(of: clip.id) != nil)
     }
 
     private func move(_ clip: Clip, by translation: CGSize, scale: CGFloat) {
@@ -352,7 +355,7 @@ private struct PictureHandles: View {
 
     /// Selects the topmost picture under `point` (canvas pixels): a B-roll clip, else the main clip.
     private func selectPicture(at point: CGPoint) {
-        let time = model.currentTime
+        let time = model.playback.currentTime
         for overlay in model.project.overlaysOnScreen(at: time).reversed() {
             guard let asset = model.project.asset(id: overlay.clip.assetID) else { continue }
             let placement = overlay.clip.placement(atSourceTime: overlay.sourceTime(at: time))
@@ -400,7 +403,7 @@ private struct CaptionHandle: View {
         GeometryReader { geometry in
             let scale = geometry.size.width / Project.canvasSize.width
             if model.project.captions.isVisible, model.currentCaption != nil,
-                let frame = CaptionPreview.frame(in: model.project, at: model.currentTime)
+                let frame = CaptionPreview.frame(in: model.project, at: model.playback.currentTime)
             {
                 let rect = frame.offsetBy(dx: 0, dy: (dy ?? 0) / scale)
                 RoundedRectangle(cornerRadius: 4)
@@ -413,7 +416,7 @@ private struct CaptionHandle: View {
                     .pointerStyle(.frameResize(position: .top, directions: [.inward, .outward]))
                     .gesture(
                         DragGesture(minimumDistance: 2).onChanged { value in
-                            model.pause()
+                            model.playback.pause()
                             dy = value.translation.height
                         }.onEnded { value in
                             dy = nil
@@ -474,7 +477,7 @@ private struct TitleHandles: View {
         GeometryReader { geometry in
             let scale = geometry.size.width / Project.canvasSize.width
             // The moment the viewer shows: the skimmed frame while skimming, else the playhead.
-            let time = model.skimTime ?? model.currentTime
+            let time = model.playback.skimTime ?? model.playback.currentTime
             ForEach(model.project.titlesOnScreen(at: time).map(model.withTypedText)) { title in
                 if let frame = TitlePreview.frame(of: title), let shown = TitlePreview.frame(of: title, at: time) {
                     let isSelected = model.selectedTitleID == title.id
@@ -496,7 +499,7 @@ private struct TitleHandles: View {
                         .onTapGesture { model.selectedTitleID = title.id }
                         .gesture(
                             DragGesture(minimumDistance: 2).onChanged { value in
-                                model.pause()
+                                model.playback.pause()
                                 if model.selectedTitleID != title.id { model.selectedTitleID = title.id }
                                 var translation = value.translation
                                 // Sticks to the middle across.

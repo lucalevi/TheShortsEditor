@@ -27,10 +27,7 @@ public nonisolated enum VoiceCleaner {
     /// Where the cleaned sound of `url` is kept: named after the file's path, size and date, so a
     /// changed file is cleaned again.
     public static func cleanedURL(for url: URL) -> URL {
-        let values = try? url.resourceValues(forKeys: [.fileSizeKey, .contentModificationDateKey])
-        let key = "\(url.path)|\(values?.fileSize ?? 0)|\(values?.contentModificationDate?.timeIntervalSince1970 ?? 0)"
-        let digest = SHA256.hash(data: Data(key.utf8)).prefix(12).map { String(format: "%02x", $0) }.joined()
-        return folder.appending(path: "\(digest).m4a")
+        folder.appending(path: "\(FileIdentity.key(of: url)).m4a")
     }
 
     /// The cleaned sound of `url`, when it has been made.

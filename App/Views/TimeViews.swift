@@ -195,7 +195,7 @@ struct TimeExtras: View {
         let turnable = clips.filter { model.project.canReverse($0) }
         VStack(alignment: .leading, spacing: 6) {
             if !turnable.isEmpty {
-                let progress = turnable.compactMap { model.reversing[$0.id] }.first
+                let progress = turnable.compactMap { model.tasks.progress(.backwards($0.id)) }.first
                 Toggle(
                     "Play backwards",
                     isOn: Binding(

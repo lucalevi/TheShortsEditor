@@ -14,10 +14,10 @@ public struct ProjectFile: Codable, Equatable, Sendable {
     /// 6: markers.
     /// 7: styles, app-made music, storyboards.
     /// 8: speed curves, clip animations, smooth slow motion, beats, music placed later or looped.
-    public static let currentVersion = 8
+    static let currentVersion = 8
     public static let fileExtension = "shortsproject"
 
-    public var version: Int
+    var version: Int
     public var project: Project
     /// Per asset, bookmark data for its file (missing when it couldn't be made).
     public var bookmarks: [MediaAsset.ID: Data]
@@ -28,7 +28,7 @@ public struct ProjectFile: Codable, Equatable, Sendable {
     public var created: Date?
     /// What the home window shows about the Short, so it can list Shorts without reading whole
     /// projects (`readListing`). Written with every save; files saved before 2026-11-14 have none.
-    public var summary: Summary?
+    var summary: Summary?
 
     public struct Summary: Codable, Equatable, Sendable {
         public var duration: CMTime
@@ -65,7 +65,7 @@ public struct ProjectFile: Codable, Equatable, Sendable {
 
     /// Why a file couldn't be opened. Nothing is ever written over a file that couldn't be read, so
     /// refusing to open it is always safe: the file stays as it was.
-    public enum ReadError: LocalizedError, Equatable {
+    enum ReadError: LocalizedError, Equatable {
         case newerVersion
         /// Not a Shorts Editor project at all (not JSON, or no version).
         case unreadable
@@ -75,7 +75,7 @@ public struct ProjectFile: Codable, Equatable, Sendable {
         /// A Shorts Editor project with a part missing or of the wrong kind. `detail` says where.
         case damaged(detail: String)
 
-        public var errorDescription: String? {
+        var errorDescription: String? {
             switch self {
             case .newerVersion: "This Short was saved by a newer version of Shorts Editor. Update the app to open it."
             case .unreadable: "This file isn't a Shorts Editor project, or it is damaged."
@@ -87,7 +87,7 @@ public struct ProjectFile: Codable, Equatable, Sendable {
         }
 
         /// Where in the file the problem is (e.g. "project.timeline.clips.3.look"), and what it is.
-        public var detail: String? {
+        var detail: String? {
             switch self {
             case .unknownValue(let detail), .damaged(let detail): detail
             case .newerVersion, .unreadable: nil
@@ -166,7 +166,7 @@ public struct ProjectFile: Codable, Equatable, Sendable {
     }
 }
 
-public extension Project {
+extension Project {
     /// The media the project uses (clips, overlays or music), in a stable order.
     var usedAssets: [MediaAsset] {
         var ids = Set(timeline.clips.map(\.assetID))
@@ -177,7 +177,7 @@ public extension Project {
     }
 
     /// Points an asset at a new file, e.g. after it was moved. Its edits (clips, captions) stay.
-    mutating func relink(_ assetID: MediaAsset.ID, to url: URL) {
+    public mutating func relink(_ assetID: MediaAsset.ID, to url: URL) {
         guard let index = assets.firstIndex(where: { $0.id == assetID }) else { return }
         assets[index].url = url
         assets[index].name = url.deletingPathExtension().lastPathComponent
@@ -185,7 +185,7 @@ public extension Project {
 
     /// For each missing asset, the file among `candidates` with the same name, if there is one.
     /// Used to find all the missing files in a folder the user points at.
-    func relinkMatches(for missing: Set<MediaAsset.ID>, in candidates: [URL]) -> [MediaAsset.ID: URL] {
+    public func relinkMatches(for missing: Set<MediaAsset.ID>, in candidates: [URL]) -> [MediaAsset.ID: URL] {
         var byName: [String: URL] = [:]
         for url in candidates { byName[url.lastPathComponent.lowercased()] = url }
         var matches: [MediaAsset.ID: URL] = [:]
@@ -197,7 +197,7 @@ public extension Project {
 
     /// Whether a file chosen to replace `asset` looks like the same media: same kind and about
     /// the same length. Clips are cut by time, so a different file would play the wrong parts.
-    static func isLikelySameMedia(_ asset: MediaAsset, as candidate: MediaAsset) -> Bool {
+    public static func isLikelySameMedia(_ asset: MediaAsset, as candidate: MediaAsset) -> Bool {
         guard asset.hasVideo == candidate.hasVideo, asset.isImage == candidate.isImage else { return false }
         if asset.isImage { return true }
         return abs(asset.duration.seconds - candidate.duration.seconds) <= 0.5

@@ -19,8 +19,8 @@ struct ScriptView: View {
             } description: {
                 Text("The script is what is said in your clips. Make captions first, and it appears here: cut words to cut the video.")
             } actions: {
-                Button("Make Captions") { model.makeCaptions() }
-                    .disabled(model.project.timeline.clips.isEmpty || model.captionJob != nil)
+                Button("Make Captions") { model.captioning.make() }
+                    .disabled(model.project.timeline.clips.isEmpty || model.captioning.job != nil)
             }
         } else {
             VStack(spacing: 0) {
@@ -47,12 +47,12 @@ struct ScriptView: View {
                 ) { model.removeFillerWords() }
                 .disabled(fillers.isEmpty)
                 .help("Cuts “um”, “eh”, words said twice in a row, and fillers Apple Intelligence found. Underlined with dots below.")
-                if model.canUseWordModel, words.contains(where: { $0.source == .clip }) {
-                    if model.wordModelJob == .fillers {
+                if model.captioning.canUseWordModel, words.contains(where: { $0.source == .clip }) {
+                    if model.captioning.wordModelJob == .fillers {
                         ProgressView().controlSize(.small)
                     } else {
-                        Button("Find More", systemImage: "apple.intelligence") { model.findMoreFillers() }
-                            .disabled(model.wordModelJob != nil)
+                        Button("Find More", systemImage: "apple.intelligence") { model.captioning.findMoreFillers() }
+                            .disabled(model.captioning.wordModelJob != nil)
                             .help("Apple Intelligence looks for words like “like”, “tipo” or “allora” said only as fillers, on this Mac")
                     }
                 }
@@ -105,7 +105,8 @@ struct ScriptView: View {
         var order: [Clip.ID] = []
         for word in words where !order.contains(word.clipID) { order.append(word.clipID) }
         let fillers = Set(model.fillerWords)
-        let current = words.last { $0.range.start <= model.currentTime && model.currentTime < $0.range.end + CMTime(value: 1, timescale: 5) }?.ref
+        let current = words.last { $0.range.start <= model.playback.currentTime && model.playback.currentTime < $0.range.end + CMTime(value: 1, timescale: 5) }?
+            .ref
         return VStack(alignment: .leading, spacing: 14) {
             ForEach(order, id: \.self) { clipID in
                 VStack(alignment: .leading, spacing: 4) {
@@ -141,8 +142,8 @@ struct ScriptView: View {
         } else {
             model.scriptSelection = [word.ref]
             anchor = word.ref
-            model.pause()
-            model.seek(to: word.range.start)
+            model.playback.pause()
+            model.playback.seek(to: word.range.start)
         }
     }
 }

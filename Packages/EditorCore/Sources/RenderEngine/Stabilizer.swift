@@ -76,42 +76,28 @@ public nonisolated enum Stabilizer {
     }
 }
 
-/// Measured shake paths, kept in memory and in Caches (named after the file's path, size and
-/// date, so a changed file is measured again).
+/// Measured shake paths, kept in Caches (named after the file's path, size and date, so a changed
+/// file is measured again). `MediaAnalysis` keeps the ones in use in memory.
 public enum ShakeCache {
-    private static var known: [URL: ShakePath] = [:]
-
     static var folder: URL {
         FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
             .appending(path: "Shorts Editor/Steady", directoryHint: .isDirectory)
     }
 
     static func fileURL(for url: URL) -> URL {
-        let values = try? url.resourceValues(forKeys: [.fileSizeKey, .contentModificationDateKey])
-        let key = "\(url.path)|\(values?.fileSize ?? 0)|\(values?.contentModificationDate?.timeIntervalSince1970 ?? 0)"
-        let digest = SHA256.hash(data: Data(key.utf8)).prefix(12).map { String(format: "%02x", $0) }.joined()
-        return folder.appending(path: "\(digest).json")
+        folder.appending(path: "\(FileIdentity.key(of: url)).json")
     }
 
-    /// The path of the file at `url`, if it has been measured.
-    public static func path(for url: URL) -> ShakePath? {
-        if let path = known[url] { return path }
-        guard let data = try? Data(contentsOf: fileURL(for: url)),
-            let path = try? JSONDecoder().decode(ShakePath.self, from: data)
-        else { return nil }
-        known[url] = path
-        return path
+    /// The path kept for the file at `url`, if it has been measured.
+    static func stored(for url: URL) -> ShakePath? {
+        guard let data = try? Data(contentsOf: fileURL(for: url)) else { return nil }
+        return try? JSONDecoder().decode(ShakePath.self, from: data)
     }
 
-    /// Measures the file at `url` unless that was done already.
-    public static func measure(_ url: URL, progress: @escaping @Sendable (Double) -> Void = { _ in }) async throws -> ShakePath {
-        if let path = path(for: url) { return path }
-        let path = try await Stabilizer.analyse(url, progress: progress)
-        known[url] = path
+    static func store(_ path: ShakePath, for url: URL) {
         Log.render.attempt("Keeping a measured shake path") {
             try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
             try JSONEncoder().encode(path).write(to: fileURL(for: url), options: .atomic)
         }
-        return path
     }
 }

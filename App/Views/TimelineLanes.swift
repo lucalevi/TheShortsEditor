@@ -88,7 +88,7 @@ extension TimelineView {
                 model.selection = item
                 model.splitAtPlayhead()
             }
-            Button("Start at Playhead") { model.moveOverlay(overlay.id, to: model.currentTime) }
+            Button("Start at Playhead") { model.moveOverlay(overlay.id, to: model.playback.currentTime) }
             Button(overlay.clip.isMuted ? "Turn Sound On" : "Turn Sound Off") { model.setClipMuted(overlay.id, !overlay.clip.isMuted) }
                 .disabled(asset?.hasAudio != true)
             Divider()
@@ -142,7 +142,7 @@ extension TimelineView {
                     }
                 )
                 .contextMenu {
-                    Button("Start at Playhead") { model.moveTitle(title.id, to: model.currentTime) }
+                    Button("Start at Playhead") { model.moveTitle(title.id, to: model.playback.currentTime) }
                     Divider()
                     Button("Copy Title Design") {
                         if !model.isSelected(item) { model.selection = item }
@@ -173,7 +173,7 @@ extension TimelineView {
     }
 
     func updateBlockDrag(_ item: TimelineItem, kind: BlockDrag.Kind, points: CGFloat, start: CMTime, duration: CMTime) {
-        model.pause()
+        model.playback.pause()
         if !model.isSelected(item) { model.selection = item }
         var delta = seconds(points)
         snapLine = nil
@@ -183,7 +183,7 @@ extension TimelineView {
             if let stuck = model.snappedStart(moved, duration: duration, excluding: item) {
                 delta = stuck - start
                 // Draw the line at whichever edge stuck.
-                let targets = Snapping.targets(in: model.project, playhead: model.currentTime, excluding: [item])
+                let targets = Snapping.targets(in: model.project, playhead: model.playback.currentTime, excluding: [item])
                 snapLine = targets.contains(stuck) ? stuck : stuck + duration
             }
             delta = max(delta, -start)
@@ -331,7 +331,7 @@ extension TimelineView {
                     model.selection = item
                     model.splitAtPlayhead()
                 }
-                Button("Start at Playhead") { model.moveSound(sound.id, to: model.currentTime) }
+                Button("Start at Playhead") { model.moveSound(sound.id, to: model.playback.currentTime) }
                 Divider()
                 deleteButton(for: item, single: "Delete")
             }
@@ -362,7 +362,7 @@ extension TimelineView {
     /// its left or right edge to change when it comes and goes.
     var captionLane: some View {
         ZStack(alignment: .topLeading) {
-            ForEach(model.captionPages) { page in
+            ForEach(model.captioning.pages) { page in
                 let isCurrent = model.currentCaption?.id == page.id
                 let range = shownRange(of: page)
                 Text(page.plainText)
@@ -384,10 +384,10 @@ extension TimelineView {
                     .overlay { captionEdges(page) }
                     .offset(x: x(for: range.start) + 1)
                     .onTapGesture {
-                        model.pause()
-                        model.seek(to: page.firstFrame)
+                        model.playback.pause()
+                        model.playback.seek(to: page.firstFrame)
                         model.sidebar = .captions
-                        model.focusedCaptionID = page.id
+                        model.captioning.focusedID = page.id
                     }
                     .help(page.text + "\nDrag an edge to change when it shows")
             }
@@ -424,8 +424,8 @@ extension TimelineView {
                         let base = edge == .start ? page.range.start : page.range.end
                         let time = max(base + seconds(value.translation.width), .zero).snappedToFrame()
                         captionEdgeDrag = (page.id, edge, time)
-                        model.pause()
-                        model.seek(to: time)
+                        model.playback.pause()
+                        model.playback.seek(to: time)
                     }
                     .onEnded { _ in
                         if let drag = captionEdgeDrag { model.moveCaptionEdge(page, drag.edge, to: drag.time) }
@@ -475,7 +475,7 @@ extension TimelineView {
                 .gesture(
                     DragGesture(minimumDistance: 3)
                         .onChanged { value in
-                            model.pause()
+                            model.playback.pause()
                             if !model.isSelected(.music) { model.selection = .music }
                             var start = max(.zero, range.start + seconds(value.translation.width))
                             snapLine = nil

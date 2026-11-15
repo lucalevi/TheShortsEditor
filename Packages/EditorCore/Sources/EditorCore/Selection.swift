@@ -23,7 +23,7 @@ public enum TimelineLane: Hashable, Sendable, CaseIterable {
 public struct TimelineSelection: Equatable, Sendable {
     public private(set) var items: Set<TimelineItem> = []
     /// Where a ⇧-click range starts: the item last clicked without ⇧.
-    public private(set) var anchor: TimelineItem?
+    private(set) var anchor: TimelineItem?
 
     public enum ClickKind: Sendable {
         /// Select only this item.
@@ -79,8 +79,8 @@ public struct TimelineSelection: Equatable, Sendable {
     }
 }
 
-public extension Project {
-    func contains(_ item: TimelineItem) -> Bool {
+extension Project {
+    public func contains(_ item: TimelineItem) -> Bool {
         switch item {
         case .clip(let id): timeline.index(of: id) != nil
         case .title(let id): title(id: id) != nil
@@ -91,7 +91,7 @@ public extension Project {
     }
 
     /// Every item on the timeline, for Select All.
-    var allTimelineItems: Set<TimelineItem> {
+    public var allTimelineItems: Set<TimelineItem> {
         var items = Set(timeline.clips.map { TimelineItem.clip($0.id) })
         items.formUnion(titles.map { .title($0.id) })
         items.formUnion(overlays.map { .overlay($0.id) })
@@ -101,7 +101,7 @@ public extension Project {
     }
 
     /// The items in the given lanes that overlap a stretch of time (a rectangle drawn on the timeline).
-    func timelineItems(overlapping range: CMTimeRange, in lanes: Set<TimelineLane>) -> Set<TimelineItem> {
+    public func timelineItems(overlapping range: CMTimeRange, in lanes: Set<TimelineLane>) -> Set<TimelineItem> {
         func overlaps(_ start: CMTime, _ end: CMTime) -> Bool { start < range.end && end > range.start }
         var items: Set<TimelineItem> = []
         if lanes.contains(.clips) {
@@ -128,7 +128,7 @@ public extension Project {
     }
 
     /// Removes clips (closing the gaps), overlays, titles and the music in one go.
-    mutating func remove(_ items: Set<TimelineItem>) {
+    public mutating func remove(_ items: Set<TimelineItem>) {
         for item in items {
             switch item {
             case .clip(let id): timeline.remove(id)

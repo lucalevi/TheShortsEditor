@@ -8,11 +8,11 @@ import Foundation
 /// Backups are small: the project file only, never media.
 public enum BackupPolicy {
     /// A Short being edited is backed up at most this often.
-    public static let interval: TimeInterval = 15 * 60
+    static let interval: TimeInterval = 15 * 60
     /// The newest backups are all kept…
-    public static let recentCount = 10
+    static let recentCount = 10
     /// …and, before them, the newest backup of each of the last days.
-    public static let dailyDays = 7
+    static let dailyDays = 7
     /// Backups of a Short that is no longer in the library are removed after this long.
     public static let orphanLifetime: TimeInterval = 30 * 24 * 3600
 

@@ -10,7 +10,7 @@ import os
 /// traced. File paths and error messages are logged as private (hidden in logs collected from
 /// another Mac); what was being done and the error's domain and code are public.
 public enum Log {
-    public static let subsystem = "com.lucalevi.TheShortsEditor"
+    static let subsystem = "com.lucalevi.TheShortsEditor"
 
     /// Saving and opening Shorts, the library, bookmarks.
     public static let file = Logger(subsystem: subsystem, category: "file")
@@ -28,9 +28,9 @@ public enum Log {
     public static let storage = Logger(subsystem: subsystem, category: "storage")
 }
 
-public extension Logger {
+extension Logger {
     /// Logs a failure the user can carry on from: what was being done, and the error.
-    func failure(_ action: String, _ error: any Error) {
+    public func failure(_ action: String, _ error: any Error) {
         let ns = error as NSError
         self.error(
             "\(action, privacy: .public) failed (\(ns.domain, privacy: .public) \(ns.code, privacy: .public)): \(error.localizedDescription, privacy: .private)"
@@ -40,7 +40,7 @@ public extension Logger {
     /// Runs `work`; when it throws, logs the failure and returns nil. For work whose failure
     /// doesn't stop what the user is doing (in place of `try?`, which forgets the error).
     @discardableResult
-    func attempt<T>(_ action: @autoclosure () -> String, _ work: () throws -> T) -> T? {
+    public func attempt<T>(_ action: @autoclosure () -> String, _ work: () throws -> T) -> T? {
         do {
             return try work()
         } catch {
@@ -51,7 +51,7 @@ public extension Logger {
 
     /// `attempt` for async work, run on the caller's actor. Cancelling isn't a failure and isn't logged.
     @discardableResult
-    nonisolated(nonsending) func attempt<T>(_ action: @autoclosure () -> String, _ work: () async throws -> T) async -> T? {
+    public nonisolated(nonsending) func attempt<T>(_ action: @autoclosure () -> String, _ work: () async throws -> T) async -> T? {
         do {
             return try await work()
         } catch is CancellationError {

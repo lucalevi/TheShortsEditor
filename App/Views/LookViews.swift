@@ -13,7 +13,7 @@ struct LookSection: View {
     @State private var showsColor = false
 
     private var color: ColorAdjustments { dragging ?? clip.look.color }
-    private var isBusy: Bool { model.analysingLook.contains(clip.id) }
+    private var isBusy: Bool { model.tasks.isRunning(.lookAnalysis(clip.id)) }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -195,7 +195,7 @@ struct FilterGrid: View {
     /// What the tiles depend on: the clip, where the playhead is in it, and its sliders.
     private var previewKey: String {
         guard let clip else { return "none" }
-        let time = model.project.sourceTime(ofClip: clip.id, at: model.currentTime)?.seconds ?? 0
+        let time = model.project.sourceTime(ofClip: clip.id, at: model.playback.currentTime)?.seconds ?? 0
         return "\(clip.id)|\(clip.assetID)|\((time * 2).rounded())|\(clip.look.color.hashValue)"
     }
 
@@ -254,7 +254,7 @@ struct SteadySection: View {
     let clip: Clip
     @State private var dragging: Double?
 
-    private var progress: Double? { model.steadying[clip.assetID] }
+    private var progress: Double? { model.tasks.progress(.steadying(clip.assetID)) }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -348,7 +348,7 @@ struct MultipleLookSection: View {
             Text("Look").font(.subheadline.weight(.semibold))
             HStack {
                 Button("Enhance All", systemImage: "wand.and.stars") { model.enhance(clips.map(\.id)) }
-                    .disabled(!model.analysingLook.isDisjoint(with: clips.map(\.id)))
+                    .disabled(clips.contains { model.tasks.isRunning(.lookAnalysis($0.id)) })
                 Menu("Filter") {
                     Button("None") { model.setFilter(nil, for: clips.map(\.id)) }
                     Divider()

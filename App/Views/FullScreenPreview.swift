@@ -21,12 +21,12 @@ struct FullScreenPreview: View {
                         .fill(Color(white: 0.12))
                         .overlay(RoundedRectangle(cornerRadius: 44).strokeBorder(Color(white: 0.35), lineWidth: 2))
                         .frame(width: screenWidth + 24, height: screenHeight + 24)
-                    PlayerView(player: model.player)
+                    PlayerView(player: model.playback.player)
                         .overlay { ShortsInterface(name: model.shortName, progress: progress) }
                         .frame(width: screenWidth, height: screenHeight)
                         .clipShape(RoundedRectangle(cornerRadius: 34))
                         .contentShape(Rectangle())
-                        .onTapGesture { model.togglePlayback() }
+                        .onTapGesture { model.playback.togglePlayback() }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
@@ -39,7 +39,7 @@ struct FullScreenPreview: View {
                 }
                 Spacer()
                 Text(
-                    model.loopsPlayback
+                    model.playback.loopsPlayback
                         ? "Click the video or press Space to play or pause. Loop is on (⌘L). Escape leaves."
                         : "Click the video or press Space to play or pause. Escape leaves."
                 )
@@ -53,7 +53,7 @@ struct FullScreenPreview: View {
     }
 
     private var progress: Double {
-        model.duration > .zero ? min(max(model.currentTime.seconds / model.duration.seconds, 0), 1) : 0
+        model.duration > .zero ? min(max(model.playback.currentTime.seconds / model.duration.seconds, 0), 1) : 0
     }
 }
 

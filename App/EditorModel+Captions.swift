@@ -9,12 +9,6 @@ import UniformTypeIdentifiers
 /// Stage G: captions edited like text, their timing, SRT files, a translated second line, and
 /// smarter key words, emoji and fillers with Apple Intelligence.
 extension EditorModel {
-    /// The language new captions are made in: the Short's own when the language is found
-    /// automatically and captions exist, else the chosen one.
-    var captionLanguageForNewCaptions: CaptionLanguage {
-        findsCaptionLanguage ? (project.captionLanguageInUse ?? captionLanguage) : captionLanguage
-    }
-
     // MARK: Editing like text
 
     /// Splits a caption at `offset` characters into `text` (↩ while editing it). Returns whether it
@@ -24,17 +18,17 @@ extension EditorModel {
         var newFirst: Word.ID?
         apply("Split Caption") { newFirst = $0.splitCaption(page.words.map(\.wordID), in: page.assetID, text: text, at: offset) }
         guard let newFirst else { return false }
-        let id = captionPages.first { $0.words.first?.wordID == newFirst }?.id
-        focusedCaptionID = id
-        captionEditCursor = 0
-        captionToEdit = id
+        let id = captioning.pages.first { $0.words.first?.wordID == newFirst }?.id
+        captioning.focusedID = id
+        captioning.editCursor = 0
+        captioning.toEdit = id
         return true
     }
 
     /// The caption before `page`, when the two can be joined (same clip).
     func captionBefore(_ page: CaptionPage) -> CaptionPage? {
-        guard let index = captionPages.firstIndex(where: { $0.id == page.id }), index > 0 else { return nil }
-        let previous = captionPages[index - 1]
+        guard let index = captioning.pages.firstIndex(where: { $0.id == page.id }), index > 0 else { return nil }
+        let previous = captioning.pages[index - 1]
         return previous.clipID == page.clipID ? previous : nil
     }
 
@@ -43,11 +37,11 @@ extension EditorModel {
     func mergeCaptionWithPrevious(_ page: CaptionPage, text: String) -> Bool {
         guard let previous = captionBefore(page) else { return false }
         apply("Join Captions") { $0.mergeCaptionWithPrevious(page.words.map(\.wordID), in: page.assetID, text: text, previousFirst: previous.words[0].wordID) }
-        let id = captionPages.first { $0.words.first?.wordID == previous.words.first?.wordID }?.id
-        focusedCaptionID = id
+        let id = captioning.pages.first { $0.words.first?.wordID == previous.words.first?.wordID }?.id
+        captioning.focusedID = id
         // The cursor where the two were joined.
-        captionEditCursor = previous.text.count + (text.isEmpty ? 0 : 1)
-        captionToEdit = id
+        captioning.editCursor = previous.text.count + (text.isEmpty ? 0 : 1)
+        captioning.toEdit = id
         return true
     }
 
@@ -61,14 +55,14 @@ extension EditorModel {
     }
 
     func removeAllCaptions() {
-        modelFillers = []
+        captioning.modelFillers = []
         apply("Delete Captions") { $0.removeAllCaptions() }
     }
 
     // MARK: SRT files
 
     func exportCaptionsFile() {
-        guard !captionPages.isEmpty else {
+        guard !captioning.pages.isEmpty else {
             NSSound.beep()
             return
         }
@@ -78,7 +72,7 @@ extension EditorModel {
         panel.nameFieldStringValue = "\(documentName.isEmpty ? "Short" : documentName).srt"
         panel.message = "Save the captions as a subtitle file (.srt), for YouTube or another editor."
         guard panel.runModal() == .OK, let url = panel.url else { return }
-        let text = SRT.text(for: captionPages)
+        let text = SRT.text(for: captioning.pages)
         do {
             try text.write(to: url, atomically: true, encoding: .utf8)
         } catch {
@@ -106,13 +100,13 @@ extension EditorModel {
             let text = String(data: data, encoding: .utf8) ?? String(data: data, encoding: .windowsCP1252) ?? ""
             let cues = try SRT.cues(from: text)
             var placed = 0
-            let language = findsCaptionLanguage ? (project.captionLanguageInUse ?? captionLanguage) : captionLanguage
+            let language = captioning.findsLanguage ? (project.captionLanguageInUse ?? captioning.spokenLanguage) : captioning.spokenLanguage
             apply("Import Captions") { project in
                 placed = project.importCaptions(cues, language: language)
                 project.captions.isVisible = true
             }
             sidebar = .captions
-            modelFillers = []
+            captioning.modelFillers = []
             if placed < cues.count {
                 alert = AlertMessage(
                     title: placed == 0 ? "No captions were placed" : "Some captions were left out",
@@ -146,134 +140,39 @@ extension EditorModel {
             project.captions.translationLanguage = code
             project.clearTranslations()
         }
-        if code != nil { translateCaptions() }
+        if code != nil { captioning.translate() }
     }
 
-    /// Translates the captions that have no up-to-date translation. Apple's Translation asks to
-    /// download the languages the first time.
-    func translateCaptions() {
-        guard let target = project.captions.translationLanguage, !isTranslating else { return }
-        let source = project.captionLanguageInUse.map { Locale.Language(identifier: $0.rawValue) }
-        translationRequest = TranslationSession.Configuration(source: source, target: Locale.Language(identifier: target))
+    // MARK: Caption looks, key words and emoji
+
+    func editCaptionLook(_ actionName: String, _ change: @escaping (inout CaptionSettings) -> Void) {
+        apply(actionName) { change(&$0.captions) }
     }
 
-    /// Run by the editor view's `translationTask` with a ready session.
-    func runTranslation(_ session: TranslationSession) async {
-        defer {
-            isTranslating = false
-            translationRequest = nil
-        }
-        // Whole sentences, so a short caption is translated with the words around it.
-        let sentences = project.sentencesNeedingTranslation()
-        guard !sentences.isEmpty, let target = project.captions.translationLanguage else { return }
-        isTranslating = true
-        do {
-            try await session.prepareTranslation()
-            let requests = sentences.map { ($0.map(\.plainText).joined(separator: " "), $0[0].words[0].wordID.uuidString) }
-            let responses = try await session.translations(from: Self.translationRequests(requests))
-            let byID = Dictionary(sentences.map { ($0[0].words[0].wordID, $0) }, uniquingKeysWith: { first, _ in first })
-            var translated: [(sentence: [CaptionPage], text: String)] = []
-            for response in responses {
-                guard let id = response.clientIdentifier.flatMap(UUID.init(uuidString:)), let sentence = byID[id] else { continue }
-                translated.append((sentence, response.targetText))
-            }
-            // Only if the user didn't pick another language meanwhile.
-            guard project.captions.translationLanguage == target else { return }
-            apply("Translate Captions") { project in
-                for (sentence, text) in translated { project.setTranslation(text, of: sentence) }
-            }
-        } catch is CancellationError {
-        } catch {
-            Log.captions.failure("runTranslation", error)
-            alert = AlertMessage(title: "The captions couldn't be translated", message: error.localizedDescription)
+    func clearKeywords() {
+        apply("Clear Key Words") { project in
+            let ids = Set(project.transcripts.values.flatMap(\.words).map(\.id))
+            project.updateWords(ids) { $0.isKeyword = false }
         }
     }
 
-    /// Made outside the main actor, so they can be handed to the translation session.
-    nonisolated private static func translationRequests(_ items: [(text: String, id: String)]) -> sending [TranslationSession.Request] {
-        items.map { TranslationSession.Request(sourceText: $0.text, clientIdentifier: $0.id) }
-    }
-
-    // MARK: Smarter words
-
-    /// Whether Apple Intelligence can read this Short's captions.
-    var canUseWordModel: Bool { WordModel.isAvailable(for: project.captionLanguageInUse) }
-
-    /// Picks key words: with Apple Intelligence when it is available, else by the rules (numbers,
-    /// names, long meaningful words).
-    func pickKeywords() {
-        let words = project.script
-        guard !words.isEmpty, wordModelJob == nil else { return }
-        guard canUseWordModel else { return pickKeywordsByRules() }
-        wordModelJob = .keywords
-        Task {
-            defer { wordModelJob = nil }
-            guard let picks = try? await WordModel.picks(for: words, language: project.captionLanguageInUse, task: .keywords),
-                !picks.keywords.isEmpty
-            else { return pickKeywordsByRules() }
-            apply("Highlight Key Words") { project in
-                project.setKeywords(picks.keywords)
-                project.captions.showsKeywords = true
-            }
+    func clearEmoji() {
+        apply("Remove Emoji") { project in
+            let ids = Set(project.transcripts.values.flatMap(\.words).map(\.id))
+            project.updateWords(ids) { $0.emoji = nil }
         }
     }
 
-    private func pickKeywordsByRules() {
-        var count = 0
-        apply("Highlight Key Words") { project in
-            count = project.pickKeywords()
-            project.captions.showsKeywords = true
-        }
-        if count == 0 { alert = AlertMessage(title: "No key words found", message: "Click a word in the Script panel to highlight it yourself.") }
+    func setKeyword(_ on: Bool, words: Set<Word.ID>) {
+        apply(on ? "Highlight Words" : "Remove Highlight") { $0.updateWords(words) { $0.isKeyword = on } }
     }
 
-    /// Adds emoji to captions whose words call for one: chosen by Apple Intelligence when it is
-    /// available, else from the built-in list.
-    func suggestEmoji() {
-        let words = project.script
-        guard !words.isEmpty, wordModelJob == nil else { return }
-        guard canUseWordModel else { return suggestEmojiByRules() }
-        wordModelJob = .emoji
-        Task {
-            defer { wordModelJob = nil }
-            guard let picks = try? await WordModel.picks(for: words, language: project.captionLanguageInUse, task: .emoji),
-                !picks.emoji.isEmpty
-            else { return suggestEmojiByRules() }
-            apply("Add Emoji") { project in
-                project.setEmoji(picks.emoji)
-                project.captions.showsEmoji = true
-            }
-        }
+    func setEmoji(_ emoji: String?, word: Word.ID) {
+        apply(emoji == nil ? "Remove Emoji" : "Add Emoji") { $0.updateWords([word]) { $0.emoji = emoji } }
     }
 
-    private func suggestEmojiByRules() {
-        var count = 0
-        apply("Add Emoji") { project in
-            count = project.suggestEmoji()
-            project.captions.showsEmoji = true
-        }
-        if count == 0 { alert = AlertMessage(title: "No emoji found", message: "None of the words call for one. Add one to a word in the Script panel.") }
-    }
-
-    /// Asks Apple Intelligence for real words used as fillers ("like", "tipo", "allora"); they join
-    /// the filler sounds in the Script panel, ready to remove.
-    func findMoreFillers() {
-        let words = project.script.filter { $0.source == .clip }
-        guard !words.isEmpty, wordModelJob == nil, canUseWordModel else { return }
-        wordModelJob = .fillers
-        Task {
-            defer { wordModelJob = nil }
-            do {
-                let picks = try await WordModel.picks(for: words, language: project.captionLanguageInUse, task: .fillers)
-                modelFillers = picks.fillers
-                if picks.fillers.isEmpty {
-                    alert = AlertMessage(
-                        title: "No other fillers found", message: "Apple Intelligence didn't find words like “like” or “tipo” used as fillers.")
-                }
-            } catch {
-                Log.captions.failure("findMoreFillers", error)
-                alert = AlertMessage(title: "Fillers couldn't be found", message: error.localizedDescription)
-            }
-        }
+    func setCaptionPositionByDragging(_ position: Double) {
+        let range = SafeZone.captionRange
+        apply("Move Captions") { $0.captions.verticalPosition = min(max(position, range.lowerBound), range.upperBound) }
     }
 }

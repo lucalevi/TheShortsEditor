@@ -46,7 +46,7 @@ public enum SpeedCurveShape: String, Codable, CaseIterable, Identifiable, Sendab
     }
 
     /// The shape: (position through the clip 0…1, speed factor), straight lines between points.
-    public var points: [(position: Double, factor: Double)] {
+    var points: [(position: Double, factor: Double)] {
         switch self {
         case .montage: [(0, 2.5), (0.2, 0.6), (0.4, 2.5), (0.6, 0.6), (0.8, 2.5), (1, 0.8)]
         case .hero: [(0, 1.8), (0.3, 1.8), (0.42, 0.3), (0.62, 0.3), (0.74, 1.8), (1, 1.8)]
@@ -73,8 +73,8 @@ public enum SpeedCurveShape: String, Codable, CaseIterable, Identifiable, Sendab
 /// split each half plays its own part, so the two together still play the whole shape.
 public struct SpeedCurve: Codable, Equatable, Hashable, Sendable {
     public var shape: SpeedCurveShape
-    public var from: Double
-    public var to: Double
+    var from: Double
+    var to: Double
 
     public init(_ shape: SpeedCurveShape, from: Double = 0, to: Double = 1) {
         self.shape = shape
@@ -83,12 +83,12 @@ public struct SpeedCurve: Codable, Equatable, Hashable, Sendable {
     }
 
     /// The factor `fraction` (0…1) of the way through the clip.
-    public func factor(atFraction fraction: Double) -> Double {
+    func factor(atFraction fraction: Double) -> Double {
         shape.factor(at: from + (to - from) * fraction)
     }
 
     /// The average factor over the clip's part of the shape.
-    public var averageFactor: Double {
+    var averageFactor: Double {
         let samples = 200
         var total = 0.0
         for i in 0..<samples { total += factor(atFraction: (Double(i) + 0.5) / Double(samples)) }
@@ -96,7 +96,7 @@ public struct SpeedCurve: Codable, Equatable, Hashable, Sendable {
     }
 }
 
-public extension Clip {
+extension Clip {
     /// How many frames each step of a speed curve lasts.
     static let curveStepFrames: Int64 = 3
     /// The slowest and fastest a speed curve may play (its shape times the clip's speed).
@@ -104,7 +104,7 @@ public extension Clip {
 
     /// The steps a clip with a speed curve plays in: this many frames at this speed, in order.
     /// Empty without a curve (and for a freeze frame).
-    var curveSteps: [(frames: Int64, speed: Double)] {
+    package var curveSteps: [(frames: Int64, speed: Double)] {
         guard let speedCurve, !isFrozen else { return [] }
         let total = max(duration.convertScale(Project.frameRate, method: .roundHalfAwayFromZero).value, 1)
         var steps: [(frames: Int64, speed: Double)] = []
@@ -120,7 +120,7 @@ public extension Clip {
     }
 
     /// The stretches of the file a clip with a speed curve plays, one per step.
-    var curveSegments: [SpeedSegment] {
+    package var curveSegments: [SpeedSegment] {
         var segments: [SpeedSegment] = []
         var from = sourceStart.seconds
         for step in curveSteps {
@@ -168,7 +168,7 @@ public extension Clip {
     }
 
     /// The speed playing `offset` into the clip (its speed curve's step there, else its speed).
-    func speed(atOffset offset: CMTime) -> Double {
+    public func speed(atOffset offset: CMTime) -> Double {
         guard speedCurve != nil, !isFrozen else { return speed }
         let steps = curveSteps
         var frame = offset.convertScale(Project.frameRate, method: .roundTowardNegativeInfinity).value
@@ -180,22 +180,22 @@ public extension Clip {
     }
 
     /// How much file a second of the clip shows on average (its speed, unless it has a curve).
-    var averageSpeed: Double {
+    public var averageSpeed: Double {
         guard speedCurve != nil, !isFrozen, duration > .zero else { return speed }
         return sourceDuration.seconds / duration.seconds
     }
 
     /// How long the clip lasts when it shows `source` of its file at its speed and curve.
-    func duration(showing source: CMTime) -> CMTime {
+    public func duration(showing source: CMTime) -> CMTime {
         let average = speed * (speedCurve?.averageFactor ?? 1)
         return max(CMTimeMultiplyByFloat64(source, multiplier: 1 / average).snappedToFrame(), Clip.minimumDuration)
     }
 }
 
-public extension Project {
+extension Project {
     /// Gives a main clip a speed curve (nil takes it away). It keeps showing the same part of its
     /// file, so its length changes. Pictures and freeze frames have no speed.
-    mutating func setSpeedCurve(_ shape: SpeedCurveShape?, for id: Clip.ID) {
+    public mutating func setSpeedCurve(_ shape: SpeedCurveShape?, for id: Clip.ID) {
         guard let index = timeline.index(of: id), !isStill(timeline.clips[index]),
             let media = asset(id: timeline.clips[index].assetID)
         else { return }

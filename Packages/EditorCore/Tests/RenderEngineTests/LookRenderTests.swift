@@ -19,8 +19,8 @@ struct LookRenderTests {
         return try await generator.image(at: CMTime(seconds: seconds, preferredTimescale: 600)).image
     }
 
-    private func middle(_ project: Project, at seconds: Double = 0.5) async throws -> Pixel {
-        Fixture.pixel(try await frame(of: try await CompositionBuilder.build(project), at: seconds), x: 540, y: 960)
+    private func middle(_ project: Project, at seconds: Double = 0.5, live: LivePreview? = nil) async throws -> Pixel {
+        Fixture.pixel(try await frame(of: try await CompositionBuilder.build(project, live: live), at: seconds), x: 540, y: 960)
     }
 
     /// One clip of a single colour (BGRA), filling the screen.
@@ -82,20 +82,30 @@ struct LookRenderTests {
         let original = try await middle(project)
         project.updateLook(of: project.timeline.clips[0].id) { $0.filter = FilterChoice(.noir) }
         project.look = FilterChoice(.cool)
-        LivePreview.showsOriginal = true
-        defer { LivePreview.showsOriginal = false }
-        let shown = try await middle(project)
+        let live = LivePreview()
+        live.showsOriginal = true
+        let shown = try await middle(project, live: live)
+        // Only the editor's own player shows it: an export (no live preview) keeps the looks.
+        let exported = try await middle(project)
+        #expect(abs(Int(exported.r) - Int(original.r)) > 10 || abs(Int(exported.b) - Int(original.b)) > 10)
         #expect(abs(Int(shown.r) - Int(original.r)) < 4 && abs(Int(shown.b) - Int(original.b)) < 4)
     }
 
     @Test func aLiveLookIsShownWithoutRebuilding() async throws {
         let project = try await clip((128, 128, 128, 255))
-        let built = try await CompositionBuilder.build(project)
+        let live = LivePreview()
+        let built = try await CompositionBuilder.build(project, live: live)
+        let other = try await CompositionBuilder.build(project)
         let plain = Fixture.pixel(try await frame(of: built, at: 0.5), x: 540, y: 960)
-        LivePreview.setLook(ClipLook(color: ColorAdjustments(exposure: 1)), for: project.timeline.clips[0].id)
-        defer { LivePreview.clearAll() }
+        live.setLook(ClipLook(color: ColorAdjustments(exposure: 1)), for: project.timeline.clips[0].id)
         let brighter = Fixture.pixel(try await frame(of: built, at: 0.5), x: 540, y: 960)
         #expect(Int(brighter.g) > Int(plain.g) + 40)
+        // A composition built without it (an export, a thumbnail, another Short) is unchanged.
+        let unchanged = Fixture.pixel(try await frame(of: other, at: 0.5), x: 540, y: 960)
+        #expect(abs(Int(unchanged.g) - Int(plain.g)) < 4)
+        live.clearAll()
+        let cleared = Fixture.pixel(try await frame(of: built, at: 0.5), x: 540, y: 960)
+        #expect(abs(Int(cleared.g) - Int(plain.g)) < 4)
     }
 
     @Test func measuringAndSampling() throws {
@@ -158,7 +168,7 @@ struct LookRenderTests {
         // Not measured yet: drawn as before.
         ShakeCacheTestHook.forget(url)
         #expect(abs(try await spread(project) - shaky) < 2)
-        _ = try await ShakeCache.measure(url)
+        _ = try await MediaAnalysis().measureShake(url)
         let steadied = try await spread(project)
         #expect(shaky > 40, "shaky \(shaky)")
         #expect(steadied < shaky / 5, "shaky \(shaky), steadied \(steadied)")

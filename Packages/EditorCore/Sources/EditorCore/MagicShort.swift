@@ -74,13 +74,13 @@ public struct MagicReport: Equatable, Sendable {
 public enum MagicShort {
     /// Clips with nobody talking are cut to this much (from their middle), so a pile of footage
     /// becomes a quick montage.
-    public static let quietClipLength = CMTime(value: 4, timescale: 1)
+    static let quietClipLength = CMTime(value: 4, timescale: 1)
     /// How long the hook title stays.
-    public static let hookLength = CMTime(value: 5, timescale: 2)
+    static let hookLength = CMTime(value: 5, timescale: 2)
     /// The most words a hook title takes from the first sentence.
-    public static let hookWords = 7
+    static let hookWords = 7
     /// How long the Short goes on after its last word, so the loop back to the start feels tight.
-    public static let endPadding = CMTime(value: 6, timescale: Project.frameRate)
+    static let endPadding = CMTime(value: 6, timescale: Project.frameRate)
     public static let placeholderHook = "Your hook here"
 
     /// Words that only lead into what is said ("Okay, did you know…"), in the caption languages.
@@ -104,7 +104,7 @@ public enum MagicShort {
     /// The first sentence said, shortened to a title: the whole sentence when it is short,
     /// otherwise its first words and "…". Lead-in words ("Okay,", "So") are left out, and a
     /// shortened title doesn't stop on a little word like "that". Nil when nothing is said.
-    public static func hookText(from words: [TimedWord]) -> String? {
+    static func hookText(from words: [TimedWord]) -> String? {
         var sentence: [String] = []
         for word in words {
             sentence.append(word.text)
@@ -133,7 +133,7 @@ public enum MagicShort {
     }
 }
 
-public extension Project {
+extension Project {
     /// The files that have someone talking in them.
     var speakingAssets: Set<MediaAsset.ID> {
         Set(transcripts.filter { !$0.value.words.isEmpty }.keys)
@@ -142,7 +142,7 @@ public extension Project {
     /// Makes a first cut of the clips on the timeline (see `MagicShort`). `levels` are the
     /// files' sound levels (for finding pauses), `music` the style's music file.
     @discardableResult
-    mutating func makeMagic(_ options: MagicOptions, levels: [MediaAsset.ID: AudioLevels], music: MediaAsset?) -> MagicReport {
+    public mutating func makeMagic(_ options: MagicOptions, levels: [MediaAsset.ID: AudioLevels], music: MediaAsset?) -> MagicReport {
         var report = MagicReport()
         let startLength = duration
         let speaking = speakingAssets
@@ -188,7 +188,7 @@ public extension Project {
 
     /// The sentences Magic Short will choose from: said after filler words and pauses are cut,
     /// as `makeMagic` cuts them. Empty when nothing needs choosing (it already fits, or no speech).
-    func magicSentences(_ options: MagicOptions, levels: [MediaAsset.ID: AudioLevels]) -> [SpokenSentence] {
+    public func magicSentences(_ options: MagicOptions, levels: [MediaAsset.ID: AudioLevels]) -> [SpokenSentence] {
         guard options.findsBestMoments, options.length != .keepAll, hasCaptions else { return [] }
         var trial = self
         var report = MagicReport()
@@ -236,7 +236,7 @@ public extension Project {
 
     /// Makes the Short no longer than `target`. With speech, it ends after the last whole sentence
     /// that fits (or the last word); without, every clip gives up the same share, keeping its middle.
-    mutating func fit(to target: CMTime) {
+    public mutating func fit(to target: CMTime) {
         let target = target.snappedToFrame()
         guard duration > target else { return }
         let words = script

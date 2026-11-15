@@ -6,18 +6,18 @@ import Foundation
 // transcript, so it follows the clips like the rest of the captions.
 
 /// A caption's text broken into words, remembering where the user put a new line.
-public enum CaptionText {
-    public struct Token: Equatable, Sendable {
-        public var text: String
-        public var lineBreakAfter: Bool
+enum CaptionText {
+    struct Token: Equatable, Sendable {
+        var text: String
+        var lineBreakAfter: Bool
 
-        public init(_ text: String, lineBreakAfter: Bool = false) {
+        init(_ text: String, lineBreakAfter: Bool = false) {
             self.text = text
             self.lineBreakAfter = lineBreakAfter
         }
     }
 
-    public static func tokens(_ text: String) -> [Token] {
+    static func tokens(_ text: String) -> [Token] {
         var tokens: [Token] = []
         var current = ""
         var sawNewline = false
@@ -43,7 +43,7 @@ public enum CaptionText {
     }
 
     /// Tokens back into text, with a new line where one was chosen.
-    public static func string(_ tokens: [Token]) -> String {
+    static func string(_ tokens: [Token]) -> String {
         var result = ""
         for (index, token) in tokens.enumerated() {
             if index > 0 { result += tokens[index - 1].lineBreakAfter ? "\n" : " " }
@@ -58,7 +58,7 @@ public enum CaptionEdge: Sendable {
     case start, end
 }
 
-public extension Project {
+extension Project {
     // MARK: Split, merge, line breaks
 
     /// Splits a caption in two at `offset` characters into `text` (what the field shows, edits
@@ -66,7 +66,7 @@ public extension Project {
     /// were. Returns the first word of the new caption, or nil when there was nothing to split
     /// (the cursor at the very start or end), in which case only the text is saved.
     @discardableResult
-    mutating func splitCaption(_ wordIDs: [Word.ID], in assetID: MediaAsset.ID, text: String, at offset: Int) -> Word.ID? {
+    public mutating func splitCaption(_ wordIDs: [Word.ID], in assetID: MediaAsset.ID, text: String, at offset: Int) -> Word.ID? {
         let offset = min(max(offset, 0), text.count)
         var left = CaptionText.tokens(String(text.prefix(offset)))
         let right = CaptionText.tokens(String(text.dropFirst(offset)))
@@ -88,7 +88,7 @@ public extension Project {
 
     /// Joins a caption to the one before it (in the same clip, starting with `previousFirst`),
     /// saving `text` first. The joined caption keeps its shape in every look.
-    mutating func mergeCaptionWithPrevious(_ wordIDs: [Word.ID], in assetID: MediaAsset.ID, text: String, previousFirst: Word.ID? = nil) {
+    public mutating func mergeCaptionWithPrevious(_ wordIDs: [Word.ID], in assetID: MediaAsset.ID, text: String, previousFirst: Word.ID? = nil) {
         let ids = replaceWords(wordIDs, in: assetID, with: text)
         guard let last = ids.last else { return }
         updateWords(Set(ids)) { $0.captionBreak = .joined }
@@ -118,7 +118,7 @@ public extension Project {
     /// Moves the start or end of a caption to `time` on the timeline, by changing when its first
     /// or last word is said. A caption whose end was moved ends exactly there. Words never cross
     /// the words next to them, and each keeps at least one frame.
-    mutating func moveCaptionEdge(_ page: CaptionPage, _ edge: CaptionEdge, to time: CMTime) {
+    public mutating func moveCaptionEdge(_ page: CaptionPage, _ edge: CaptionEdge, to time: CMTime) {
         guard let (clip, clipStart) = anyClip(page.clipID), var transcript = transcripts[page.assetID] else { return }
         let offset = (time - clipStart).clamped(.zero, clip.duration)
         let sourceTime = clip.sourceTime(atOffset: offset).snappedToFrame()
@@ -143,7 +143,7 @@ public extension Project {
     }
 
     /// Lets the captions flow again: removes every split, join and exact end the user made.
-    mutating func resetCaptionBreaks() {
+    public mutating func resetCaptionBreaks() {
         let ids = Set(transcripts.values.flatMap(\.words).map(\.id))
         updateWords(ids) { word in
             word.captionBreak = nil
@@ -153,7 +153,7 @@ public extension Project {
 
     /// The language the Short's captions are in: the one most of its heard words are in, or nil
     /// before any captions are made.
-    var captionLanguageInUse: CaptionLanguage? {
+    public var captionLanguageInUse: CaptionLanguage? {
         var counts: [CaptionLanguage: Int] = [:]
         for asset in assetsHeard() {
             guard let transcript = transcripts[asset.id] else { continue }
@@ -163,7 +163,7 @@ public extension Project {
     }
 
     /// Removes every caption, so they can be made again from scratch.
-    mutating func removeAllCaptions() {
+    public mutating func removeAllCaptions() {
         transcripts = [:]
     }
 
@@ -174,24 +174,24 @@ public extension Project {
         updateWords(Set(translations.keys)) { $0.translation = translations[$0.id] }
     }
 
-    mutating func clearTranslations() {
+    public mutating func clearTranslations() {
         let ids = Set(transcripts.values.flatMap(\.words).filter { $0.translation != nil }.map(\.id))
         updateWords(ids) { $0.translation = nil }
     }
 
     /// The captions that have no up-to-date translation yet.
-    func captionsNeedingTranslation() -> [CaptionPage] {
+    public func captionsNeedingTranslation() -> [CaptionPage] {
         CaptionLayout.pages(in: self).filter { $0.translation == nil }
     }
 
     /// The sentences (runs of captions, see `CaptionSentences`) with a caption that has no
     /// up-to-date translation. A whole sentence is translated again, so its pieces fit together.
-    func sentencesNeedingTranslation() -> [[CaptionPage]] {
+    public func sentencesNeedingTranslation() -> [[CaptionPage]] {
         CaptionSentences.groups(CaptionLayout.pages(in: self)).filter { $0.contains { $0.translation == nil } }
     }
 
     /// Stores the translation of a whole sentence, shared out over its captions.
-    mutating func setTranslation(_ translated: String, of sentence: [CaptionPage]) {
+    public mutating func setTranslation(_ translated: String, of sentence: [CaptionPage]) {
         let pieces = CaptionSentences.distribute(translated, over: sentence)
         var translations: [Word.ID: CaptionTranslation] = [:]
         for (page, piece) in zip(sentence, pieces) {
@@ -206,7 +206,7 @@ public extension Project {
     /// to what is heard at its moment (a voice-over first, then the main clip), and each cue
     /// becomes one caption ending when the cue does. Returns how many cues were placed.
     @discardableResult
-    mutating func importCaptions(_ cues: [CaptionCue], language: CaptionLanguage) -> Int {
+    public mutating func importCaptions(_ cues: [CaptionCue], language: CaptionLanguage) -> Int {
         var placed: [MediaAsset.ID: [Word]] = [:]
         var cueCount = 0
         let length = duration
@@ -283,9 +283,9 @@ public extension Project {
 
 /// One subtitle of a subtitle file: its text, on the timeline from `start` to `end`.
 public struct CaptionCue: Equatable, Sendable {
-    public var start: CMTime
-    public var end: CMTime
-    public var text: String
+    var start: CMTime
+    var end: CMTime
+    var text: String
 
     public init(start: CMTime, end: CMTime, text: String) {
         self.start = start
@@ -296,10 +296,10 @@ public struct CaptionCue: Equatable, Sendable {
 
 /// SubRip (.srt), the subtitle file YouTube and every editor read.
 public enum SRT {
-    public enum ReadError: LocalizedError, Equatable {
+    enum ReadError: LocalizedError, Equatable {
         case noSubtitles
 
-        public var errorDescription: String? {
+        var errorDescription: String? {
             "No subtitles were found in this file. It should be an .srt file, with times like 00:00:01,000 --> 00:00:02,500."
         }
     }
@@ -396,27 +396,27 @@ public struct SmartWordPicks: Equatable, Sendable {
         self.fillers = fillers
     }
 
-    public mutating func merge(_ other: SmartWordPicks) {
+    package mutating func merge(_ other: SmartWordPicks) {
         keywords.formUnion(other.keywords)
         emoji.merge(other.emoji) { $1 }
         fillers.formUnion(other.fillers)
     }
 }
 
-public enum SmartWords {
+package enum SmartWords {
     /// The script in pieces small enough for the model, each with its words numbered from 1.
-    public static func chunks(of words: [TimedWord], size: Int = 120) -> [[TimedWord]] {
+    package static func chunks(of words: [TimedWord], size: Int = 120) -> [[TimedWord]] {
         stride(from: 0, to: words.count, by: max(size, 1)).map { Array(words[$0..<min($0 + size, words.count)]) }
     }
 
     /// "1 Hello 2 everyone 3 um …", the words as the model reads them.
-    public static func numbered(_ words: [TimedWord]) -> String {
+    package static func numbered(_ words: [TimedWord]) -> String {
         words.enumerated().map { "[\($0.offset + 1)] \($0.element.text)" }.joined(separator: " ")
     }
 
     /// The model's answer for one chunk, as numbers into it, turned into picks. Numbers out of range
     /// are dropped, and so are emoji that aren't one emoji, and fillers that carry a number.
-    public static func picks(in chunk: [TimedWord], keywords: [Int], fillers: [Int], emoji: [(Int, String)]) -> SmartWordPicks {
+    package static func picks(in chunk: [TimedWord], keywords: [Int], fillers: [Int], emoji: [(Int, String)]) -> SmartWordPicks {
         func word(_ number: Int) -> TimedWord? { chunk.indices.contains(number - 1) ? chunk[number - 1] : nil }
         var picks = SmartWordPicks()
         for number in keywords {
@@ -437,7 +437,7 @@ public enum SmartWords {
     }
 }
 
-public extension EmojiSuggestions {
+extension EmojiSuggestions {
     /// Whether `text` is exactly one emoji (flags, skin tones and families included).
     static func isSingleEmoji(_ text: String) -> Bool {
         guard text.count == 1, let character = text.first else { return false }
@@ -446,10 +446,10 @@ public extension EmojiSuggestions {
     }
 }
 
-public extension Project {
+extension Project {
     /// Marks the model's key words, replacing earlier picks. Returns how many.
     @discardableResult
-    mutating func setKeywords(_ picked: Set<Word.ID>) -> Int {
+    public mutating func setKeywords(_ picked: Set<Word.ID>) -> Int {
         let ids = Set(transcripts.values.flatMap(\.words).map(\.id))
         updateWords(ids) { $0.isKeyword = picked.contains($0.id) }
         return picked.intersection(ids).count
@@ -458,7 +458,7 @@ public extension Project {
     /// Gives words the emoji in `choices`, at most one in each caption, replacing earlier ones.
     /// Returns how many.
     @discardableResult
-    mutating func setEmoji(_ choices: [Word.ID: String]) -> Int {
+    public mutating func setEmoji(_ choices: [Word.ID: String]) -> Int {
         suggestEmoji { choices[$0.wordID] }
     }
 }
@@ -467,10 +467,10 @@ public extension Project {
 
 /// How well a sample was understood in one language, for picking the spoken language. A model
 /// listening in the wrong language hears fewer words and is less sure of them.
-public enum LanguageGuess {
+package enum LanguageGuess {
     /// The speech model's confidence in each word it heard (nil when it gave none), summed and
     /// divided by at least `fewWords`, so a couple of lucky words don't win.
-    public static func score(confidences: [Double?], fewWords: Int = 8) -> Double {
+    package static func score(confidences: [Double?], fewWords: Int = 8) -> Double {
         guard !confidences.isEmpty else { return 0 }
         let sum = confidences.reduce(0) { $0 + ($1 ?? 0.5) }
         return sum / Double(max(confidences.count, fewWords))
@@ -480,15 +480,15 @@ public enum LanguageGuess {
 /// Captions are translated a sentence at a time: a short caption alone ("tipo il trucco più") is
 /// translated without what it means, so the sentence is translated whole and its translation
 /// shared out over its captions.
-public enum CaptionSentences {
+enum CaptionSentences {
     /// A sentence never spans more captions than this (long talk without full stops).
-    public static let maxPages = 8
+    static let maxPages = 8
     /// A pause this long between captions ends a sentence too.
-    public static let pause = CMTime(value: 1, timescale: 1)
+    static let pause = CMTime(value: 1, timescale: 1)
 
     /// The captions in runs that each make one sentence: a run ends after a caption that ends a
     /// sentence (. ! ? …), before a pause or a caption heard from another file, or at `maxPages`.
-    public static func groups(_ pages: [CaptionPage]) -> [[CaptionPage]] {
+    static func groups(_ pages: [CaptionPage]) -> [[CaptionPage]] {
         var groups: [[CaptionPage]] = []
         var current: [CaptionPage] = []
         for page in pages {
@@ -516,7 +516,7 @@ public enum CaptionSentences {
     /// Shares a translated sentence out over its captions, each getting a part as long as its
     /// own words are (in characters), with at least one word each when there are enough. Languages
     /// written without spaces are shared out by characters.
-    public static func distribute(_ translated: String, over pages: [CaptionPage]) -> [String] {
+    static func distribute(_ translated: String, over pages: [CaptionPage]) -> [String] {
         let text = translated.trimmingCharacters(in: .whitespacesAndNewlines)
         guard pages.count > 1 else { return pages.isEmpty ? [] : [text] }
         let words = text.split(whereSeparator: \.isWhitespace).map(String.init)

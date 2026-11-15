@@ -45,13 +45,13 @@ public struct SilenceSettings: Equatable, Sendable {
     /// The range the "Shortest pause" slider offers.
     public static let minimumPauseRange = CMTime(value: 1, timescale: 5)...CMTime(value: 2, timescale: 1)
     /// A cut shorter than this (after the room kept around words) is a jump for nothing.
-    public static let shortestCut = CMTime(value: 3, timescale: 30)
+    static let shortestCut = CMTime(value: 3, timescale: 30)
 }
 
 /// What removing pauses would cut, worked out before anything changes so it can be previewed.
 public struct SilencePlan: Equatable, Sendable {
     /// Per clip, the parts of its source to remove, in source time.
-    public var sourceCuts: [Clip.ID: [CMTimeRange]]
+    var sourceCuts: [Clip.ID: [CMTimeRange]]
     /// The same parts on the current timeline, for showing them.
     public var timelineCuts: [CMTimeRange]
 
@@ -122,10 +122,10 @@ public struct SilencePlan: Equatable, Sendable {
     }
 }
 
-public extension Project {
+extension Project {
     /// Applies a plan: each clip with cuts is replaced by the pieces between them. The first piece
     /// keeps the clip's identity, so a selection survives.
-    mutating func apply(_ plan: SilencePlan) {
+    public mutating func apply(_ plan: SilencePlan) {
         var clips: [Clip] = []
         for clip in timeline.clips {
             guard let cuts = plan.sourceCuts[clip.id] else {

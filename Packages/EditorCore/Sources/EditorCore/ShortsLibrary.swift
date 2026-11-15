@@ -75,7 +75,7 @@ public enum ShortsLibrary {
         }
     }
 
-    public static func section(for date: Date, now: Date = .now, calendar: Calendar = .current) -> Section {
+    static func section(for date: Date, now: Date = .now, calendar: Calendar = .current) -> Section {
         let today = calendar.startOfDay(for: now)
         let day = calendar.startOfDay(for: date)
         let days = calendar.dateComponents([.day], from: day, to: today).day ?? 0

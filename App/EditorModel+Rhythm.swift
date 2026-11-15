@@ -31,18 +31,17 @@ extension EditorModel {
     }
 
     private func findBeats(replacing: Bool, then: @escaping () -> Void) {
-        guard !findingBeats, let music = project.music, let song = project.asset(id: music.assetID) else { return }
+        guard !tasks.isRunning(.beats), let music = project.music, let song = project.asset(id: music.assetID) else { return }
         if replacing, music.mood != nil {
             // The app's own music: its beats are exact.
             apply("Find Beats") { $0.resetBeats() }
             then()
             return
         }
-        findingBeats = true
+        let finding = tasks.start(.beats, title: "Finding the beats of “\(song.name)”") { _ in await BeatDetector.beats(of: song.url) }
         Task {
-            let beats = await BeatDetector.beats(of: song.url)
-            findingBeats = false
-            guard project.music?.assetID == music.assetID else { return }
+            guard let beats = try? await finding.value, project.music?.assetID == music.assetID
+            else { return }
             guard !beats.isEmpty else {
                 alert = AlertMessage(
                     title: "No steady beat found",
@@ -109,7 +108,7 @@ extension EditorModel {
         apply(shape.map { "Speed Curve: \($0.displayName)" } ?? "Remove Speed Curve") { project in
             for id in clipIDs { project.setSpeedCurve(shape, for: id) }
         }
-        if shape != nil, let id = clipIDs.first, let range = project.timeline.range(of: id) { play(range) }
+        if shape != nil, let id = clipIDs.first, let range = project.timeline.range(of: id) { playback.play(range) }
     }
 
     // MARK: Smooth slow motion
@@ -131,30 +130,28 @@ extension EditorModel {
     /// Makes the smooth slow-motion copies the clips ask for and don't have yet, then rebuilds.
     func prepareMissingSmoothSlowMotion() {
         let clips = project.timeline.clips + project.overlays.map(\.clip)
-        var needed: [(clip: Clip.ID, url: URL, recipe: FrameInterpolator.Recipe)] = []
-        for clip in clips where clip.smoothSlowMotion && smoothing[clip.id] == nil {
+        var needed: [(clip: Clip.ID, url: URL, name: String, recipe: FrameInterpolator.Recipe)] = []
+        for clip in clips where clip.smoothSlowMotion && tasks.mayStart(.smoothSlowMotion(clip.id)) {
             guard let media = project.asset(id: clip.assetID), !missingAssets.contains(media.id),
                 let recipe = FrameInterpolator.recipe(for: clip, media: media),
                 FrameInterpolator.existingCopy(for: clip, media: media) == nil
             else { continue }
             let copy = FrameInterpolator.copyURL(for: media.url, recipe: recipe)
-            guard !unsmoothable.contains(copy), !needed.contains(where: { FrameInterpolator.copyURL(for: $0.url, recipe: $0.recipe) == copy }) else { continue }
-            needed.append((clip.id, media.url, recipe))
+            guard !needed.contains(where: { FrameInterpolator.copyURL(for: $0.url, recipe: $0.recipe) == copy }) else { continue }
+            needed.append((clip.id, media.url, media.name, recipe))
         }
         guard !needed.isEmpty else { return }
-        for item in needed { smoothing[item.clip] = 0 }
         Task {
-            for item in needed {
+            for item in needed where !tasks.isRunning(.smoothSlowMotion(item.clip)) {
                 do {
-                    _ = try await FrameInterpolator.makeCopy(of: item.url, recipe: item.recipe) { fraction in
-                        Task { @MainActor in if self.smoothing[item.clip] != nil { self.smoothing[item.clip] = fraction } }
+                    _ = try await tasks.run(.smoothSlowMotion(item.clip), title: "Smoothing the slow motion of “\(item.name)”") { progress in
+                        try await FrameInterpolator.makeCopy(of: item.url, recipe: item.recipe) { progress($0) }
                     }
+                } catch is CancellationError {
                 } catch {
-                    Log.audio.failure("prepareMissingSmoothSlowMotion", error)
-                    unsmoothable.insert(FrameInterpolator.copyURL(for: item.url, recipe: item.recipe))
+                    Log.render.failure("prepareMissingSmoothSlowMotion", error)
                     alert = AlertMessage(title: "The slow motion couldn't be smoothed", message: error.localizedDescription)
                 }
-                smoothing[item.clip] = nil
             }
             refreshPlayback()
         }
@@ -172,19 +169,11 @@ extension EditorModel {
         // Show it: play the clip's start or end.
         if kind != nil, let id = clipIDs.first, let start = project.timelineStart(ofClip: id), let clip = project.anyClip(id: id) {
             let length = CMTime(value: 3, timescale: 2)
-            play(
+            playback.play(
                 entering
                     ? CMTimeRange(start: start, duration: min(length, clip.duration))
                     : CMTimeRange(start: max(start, start + clip.duration - length), end: start + clip.duration))
         }
-    }
-
-    /// Plays `range` once, then stops.
-    func play(_ range: CMTimeRange) {
-        skimTime = nil
-        seek(to: range.start)
-        playRange = range
-        player.play()
     }
 
     func setAnimationLength(_ length: CMTime, entering: Bool, for clipID: Clip.ID) {

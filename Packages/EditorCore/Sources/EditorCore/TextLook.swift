@@ -39,7 +39,7 @@ public struct TextLook: Codable, Equatable, Hashable, Sendable {
     /// An outline around the letters, or nil for none.
     public var outlineColor: RGBA?
     /// Outline thickness as a percentage of the letter size.
-    public var outlineWidth: Double
+    package var outlineWidth: Double
     /// A box behind the text, or nil for none.
     public var boxColor: RGBA?
     /// One box per line (like a marker) instead of one around everything.
@@ -47,11 +47,11 @@ public struct TextLook: Codable, Equatable, Hashable, Sendable {
     public var shadow: Bool
     public var uppercase: Bool
     /// A soft coloured light around the letters (neon), or nil for none.
-    public var glowColor: RGBA? = nil
+    package var glowColor: RGBA? = nil
     /// A solid copy of the letters behind them, moved down and right, or nil for none.
-    public var popShadowColor: RGBA? = nil
+    package var popShadowColor: RGBA? = nil
     /// Extra room between letters, as a percentage of the letter size.
-    public var letterSpacing: Double = 0
+    package var letterSpacing: Double = 0
 
     public init(
         fontFamily: String? = nil, weight: Double = 0.6, size: Double = 90, textColor: RGBA = .white,
@@ -116,9 +116,9 @@ public struct TextLook: Codable, Equatable, Hashable, Sendable {
     }
 }
 
-public extension TitleStyle {
+extension TitleStyle {
     /// The look each style starts from.
-    var look: TextLook {
+    public var look: TextLook {
         switch self {
         case .bold: TextLook(weight: 0.62, size: 96, outlineColor: .black, outlineWidth: 24)
         case .label: TextLook(weight: 0.56, size: 76, textColor: .black, boxColor: .white, boxPerLine: true)

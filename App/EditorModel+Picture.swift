@@ -61,7 +61,7 @@ extension EditorModel {
     /// Takes off the part of the clip before the playhead (Q) or after it (W). Works on the
     /// selected B-roll when it is under the playhead, otherwise on the main clip there.
     func trimToPlayhead(removing edge: ClipEdge) {
-        player.pause()
+        playback.player.pause()
         let time = currentTime.snappedToFrame()
         if let overlay = selectedOverlay, overlay.range.containsTime(time), time > overlay.start {
             let delta = edge == .start ? time - overlay.start : time - overlay.end
@@ -70,7 +70,7 @@ extension EditorModel {
         }
         var playhead: CMTime?
         apply(edge == .start ? "Trim Start" : "Trim End") { playhead = $0.trimMainClip(at: time, removing: edge) }
-        if let playhead { seek(to: playhead) } else { NSSound.beep() }
+        if let playhead { playback.seek(to: playhead) } else { NSSound.beep() }
     }
 
     // MARK: Snapping
@@ -99,7 +99,7 @@ extension EditorModel {
     /// Puts a video or picture over the clips at the playhead (B-roll), and selects it.
     func addOverlay(_ assetID: MediaAsset.ID) {
         guard !project.timeline.clips.isEmpty else { return }
-        player.pause()
+        playback.player.pause()
         var id: Clip.ID?
         apply("Add Over Clips") { id = $0.addOverlay(of: assetID, at: currentTime) }
         if let id { selection = .overlay(id) }
@@ -118,8 +118,8 @@ extension EditorModel {
         selection = .overlay(id)
         guard let overlay = project.overlay(id: id), let range = overlay.visibleRange(in: project) else { return }
         if !range.containsTime(currentTime) {
-            player.pause()
-            seek(to: range.start)
+            playback.player.pause()
+            playback.seek(to: range.start)
         }
     }
 
@@ -128,7 +128,7 @@ extension EditorModel {
     /// Shows `placement` for a clip straight away while it is dragged in the viewer, without
     /// changing the Short yet. Nil goes back to what the Short has.
     func previewPlacement(_ placement: Placement?, for clipID: Clip.ID) {
-        LivePreview.set(placement, for: clipID)
+        livePreview.set(placement, for: clipID)
         redrawCurrentFrame()
     }
 
@@ -216,20 +216,20 @@ extension EditorModel {
 
     func goToKeyframe(_ keyframe: Keyframe, in clipID: Clip.ID) {
         guard let time = timelineTime(of: keyframe, in: clipID) else { return }
-        player.pause()
-        seek(to: time)
+        playback.player.pause()
+        playback.seek(to: time)
     }
 
     // MARK: Private
 
     /// Draws the frame at the playhead again (after a live placement or look change).
     func redrawCurrentFrame() {
-        guard player.currentItem != nil, !isPlaying else { return }
+        guard playback.player.currentItem != nil, !playback.isPlaying else { return }
         // A paused player may keep the frame it has for a seek to the very same time, so every
         // other redraw asks for a millisecond later: the same picture, but drawn anew.
         redrawNudged.toggle()
         let time = currentTime.snappedToFrame() + (redrawNudged ? CMTime(value: 1, timescale: 1000) : .zero)
-        player.seek(to: time, toleranceBefore: .zero, toleranceAfter: .zero)
+        playback.player.seek(to: time, toleranceBefore: .zero, toleranceAfter: .zero)
     }
 }
 

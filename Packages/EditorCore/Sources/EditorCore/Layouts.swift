@@ -72,16 +72,16 @@ public enum PictureCorner: String, CaseIterable, Identifiable, Sendable {
     }
 }
 
-public extension Placement {
+extension Placement {
     /// The transform after framing for a picture drawn inside `region` (canvas pixels, origin at
     /// the top left) instead of the whole canvas.
-    func transform(in region: CGRect) -> CGAffineTransform {
+    package func transform(in region: CGRect) -> CGAffineTransform {
         transform(canvas: region.size).concatenating(CGAffineTransform(translationX: region.minX, y: region.minY))
     }
 
     /// A small picture in `corner`, about two fifths of the screen wide, kept clear of the areas
     /// YouTube covers.
-    static func pictureInPicture(_ corner: PictureCorner, displaySize: CGSize, framing: Framing) -> Placement {
+    public static func pictureInPicture(_ corner: PictureCorner, displaySize: CGSize, framing: Framing) -> Placement {
         let canvas = Project.canvasSize
         let framed = framing.framedSize(of: displaySize)
         guard framed.width > 0, framed.height > 0 else { return .identity }
@@ -98,15 +98,15 @@ public extension Placement {
     }
 }
 
-public extension Framing {
+extension Framing {
     /// The transform that places a picture inside `region` of the canvas.
-    func transform(naturalSize: CGSize, preferredTransform: CGAffineTransform, region: CGRect) -> CGAffineTransform {
+    package func transform(naturalSize: CGSize, preferredTransform: CGAffineTransform, region: CGRect) -> CGAffineTransform {
         transform(naturalSize: naturalSize, preferredTransform: preferredTransform, canvas: region.size)
             .concatenating(CGAffineTransform(translationX: region.minX, y: region.minY))
     }
 
     /// Where a picture ends up when drawn inside `region`.
-    func placedFrame(of displaySize: CGSize, placement: Placement, region: CGRect) -> PlacedFrame {
+    public func placedFrame(of displaySize: CGSize, placement: Placement, region: CGRect) -> PlacedFrame {
         var frame = placedFrame(of: displaySize, placement: placement, canvas: region.size)
         frame.center.x += region.minX
         frame.center.y += region.minY
@@ -114,9 +114,9 @@ public extension Framing {
     }
 }
 
-public extension PlacedFrame {
+extension PlacedFrame {
     /// Whether the picture covers all of `region`.
-    func covers(_ region: CGRect) -> Bool {
+    package func covers(_ region: CGRect) -> Bool {
         var local = self
         local.center.x -= region.minX
         local.center.y -= region.minY
@@ -126,22 +126,22 @@ public extension PlacedFrame {
 
 /// Where each picture on screen is drawn at one moment.
 public struct ScreenRegions: Equatable, Sendable {
-    public var main: CGRect
-    public var overlays: [Clip.ID: CGRect]
+    package var main: CGRect
+    var overlays: [Clip.ID: CGRect]
 
     public func region(for clipID: Clip.ID, isMain: Bool) -> CGRect {
         isMain ? main : overlays[clipID] ?? CGRect(origin: .zero, size: Project.canvasSize)
     }
 }
 
-public extension Project {
+extension Project {
     /// Where the main clip and the B-roll on screen at `time` are drawn: the whole canvas, or
     /// the parts of a split screen. Each B-roll with a split layout takes its edge of the screen
     /// (top and bottom strips across the whole width, left and right ones between them) and the
     /// main clip gets the rest, so a top third and a bottom third leave it the middle. When two
     /// want the same edge, or the main clip would keep less than a quarter, the topmost wins and
     /// the other is drawn over everything.
-    func regions(at time: CMTime) -> ScreenRegions {
+    public func regions(at time: CMTime) -> ScreenRegions {
         let size = Project.canvasSize
         var regions = ScreenRegions(main: CGRect(origin: .zero, size: size), overlays: [:])
         var claims: [SplitEdge: (id: Clip.ID, fraction: CGFloat)] = [:]
@@ -178,8 +178,8 @@ public extension Project {
 public enum Reframe {
     /// The subject's middle across the picture (0 left … 1 right) at a time in the source.
     public struct Sample: Equatable, Sendable {
-        public var time: CMTime
-        public var x: Double
+        var time: CMTime
+        package var x: Double
 
         public init(time: CMTime, x: Double) {
             self.time = time

@@ -20,7 +20,7 @@ extension EditorModel {
 
     func addSticker(_ sticker: Sticker) {
         guard !project.timeline.clips.isEmpty else { return }
-        player.pause()
+        playback.player.pause()
         var id: TextOverlay.ID?
         apply("Add Sticker") { id = $0.addSticker(sticker, at: currentTime) }
         if let id { selectTitle(id) }
@@ -28,7 +28,7 @@ extension EditorModel {
 
     func addTextTemplate(_ template: TextTemplate) {
         guard !project.timeline.clips.isEmpty else { return }
-        player.pause()
+        playback.player.pause()
         var ids: [TextOverlay.ID] = []
         apply("Add \(template.displayName)") { ids = $0.addTextTemplate(template, at: currentTime) }
         guard let first = ids.first else { return }
@@ -43,32 +43,27 @@ extension EditorModel {
         let part =
             end
             ? CMTimeRange(start: max(range.start, range.end - length), end: range.end) : CMTimeRange(start: range.start, duration: min(length, range.duration))
-        skimTime = nil
-        seek(to: part.start)
-        playRange = part
-        player.play()
+        playback.play(part)
     }
 
     // MARK: Following something in the video
 
     /// Makes a title or sticker follow what is under it at its first moment.
     func followInVideo(_ id: TextOverlay.ID) {
-        guard tracking == nil, let title = project.title(id: id), let range = title.visibleRange(in: project) else { return }
-        player.pause()
-        tracking = (id, 0)
+        guard !tasks.isRunning(kind: .tracking), let title = project.title(id: id), let range = title.visibleRange(in: project) else { return }
+        playback.player.pause()
         let project = project
+        let following = tasks.start(.tracking(id), title: "Following “\(title.text)” in the video") { progress in
+            try await SubjectTracker.track(project: project, at: (title.horizontalPosition, title.verticalPosition), during: range, analysis: self.analysis) {
+                progress($0)
+            }
+        }
         Task {
-            defer { tracking = nil }
             do {
-                let path = try await SubjectTracker.track(project: project, at: (title.horizontalPosition, title.verticalPosition), during: range) { fraction in
-                    Task { @MainActor in if self.tracking?.id == id { self.tracking = (id, fraction) } }
-                }
+                let path = try await following.value
                 apply(title.isSticker ? "Follow in Video" : "Follow in Video") { $0.setTrack(path, for: id) }
                 // Show it following.
-                skimTime = nil
-                seek(to: range.start)
-                playRange = range
-                player.play()
+                playback.play(range)
             } catch is CancellationError {
             } catch {
                 Log.render.failure("followInVideo", error)
@@ -109,13 +104,14 @@ extension EditorModel {
     /// Makes the voice and places it as a voice-over (captioned when the Short has captions).
     func makeSpeech(_ request: SpeechRequest, voice: String?, rate: Double) {
         let text = request.text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !text.isEmpty, !makingSpeech else { return }
-        makingSpeech = true
+        guard !text.isEmpty, !tasks.isRunning(.speech) else { return }
+        let folder = voicesFolder
+        let making = tasks.start(.speech, title: "Making a voice from text") { _ in
+            try await MediaProbe.probe(try await SpeechMaker.makeFile(text, voice: voice, rate: rate, in: folder))
+        }
         Task {
-            defer { makingSpeech = false }
             do {
-                let url = try await SpeechMaker.makeFile(text, voice: voice, rate: rate, in: voicesFolder)
-                let media = try await MediaProbe.probe(url)
+                let media = try await making.value
                 var id: Clip.ID?
                 apply("Add Spoken Text") { project in
                     let assetID = project.addAsset(media)
@@ -124,7 +120,8 @@ extension EditorModel {
                 speechRequest = nil
                 if let id { selection = .sound(id) }
                 loadPreviewsIfNeeded(media)
-                if !project.transcripts.isEmpty { makeCaptions(quietly: true) }
+                if !project.transcripts.isEmpty { captioning.make(quietly: true) }
+            } catch is CancellationError {
             } catch {
                 Log.render.failure("makeSpeech", error)
                 alert = AlertMessage(title: "The voice couldn't be made", message: error.localizedDescription)

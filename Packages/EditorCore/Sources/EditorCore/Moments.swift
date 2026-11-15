@@ -8,14 +8,14 @@ import Foundation
 
 /// One sentence said in the main clips, where it is on the timeline.
 public struct SpokenSentence: Equatable, Sendable {
-    public var text: String
+    package var text: String
     /// From its first word's start to its last word's end.
-    public var range: CMTimeRange
+    var range: CMTimeRange
     /// Its first word, which names it across edits (see `Project.keepSentences`).
     public var firstWordID: Word.ID
-    public var wordCount: Int
+    package var wordCount: Int
 
-    public var seconds: Double { range.duration.seconds }
+    package var seconds: Double { range.duration.seconds }
 }
 
 public enum MomentPicker {
@@ -27,7 +27,7 @@ public enum MomentPicker {
     /// What makes a sentence worth keeping when no language model is at hand: questions,
     /// exclamations, numbers and long words (names, things) said quickly. Counted per second,
     /// times its length, so a window of sentences adds up.
-    public static func score(_ sentence: SpokenSentence) -> Double {
+    static func score(_ sentence: SpokenSentence) -> Double {
         let text = sentence.text
         // Plain talk counts for little, so a run of it never beats a livelier, shorter one.
         var bonus = 0.3
@@ -66,7 +66,7 @@ public enum MomentPicker {
     /// Makes sense of the sentences a language model picked: in order, each once, and dropping
     /// the weakest (never the first) until they fit `target` seconds. Nil when nothing usable
     /// is left, so the rules are used instead.
-    public static func tidy(_ picks: [Int], in sentences: [SpokenSentence], target: Double) -> [Int]? {
+    package static func tidy(_ picks: [Int], in sentences: [SpokenSentence], target: Double) -> [Int]? {
         var chosen = Array(Set(picks.filter { sentences.indices.contains($0) })).sorted()
         guard !chosen.isEmpty else { return nil }
         func length(_ list: [Int]) -> Double { list.reduce(0) { $0 + sentences[$1].seconds } }
@@ -81,7 +81,7 @@ public enum MomentPicker {
     }
 }
 
-public extension Project {
+extension Project {
     /// What is said in the main clips, sentence by sentence, in timeline order.
     var spokenSentences: [SpokenSentence] {
         let words = script.filter { $0.source == .clip }
