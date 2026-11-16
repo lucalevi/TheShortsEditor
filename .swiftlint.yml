@@ -83,7 +83,7 @@ custom_rules:
     severity: error
   no_userdefaults_string_keys:
     name: "UserDefaults keys in one place"
-    regex: 'UserDefaults\.standard\.(set|bool|object|string|array|data|integer|double|removeObject)\([^)]*forKey: "'
+    regex: '(UserDefaults\.standard|AppEnvironment\.defaults)\.(set|bool|object|string|array|data|integer|double|removeObject)\([^)]*forKey: "'
     message: "Name UserDefaults keys once (a constant), not as string literals at each use."
     included: '^.*/(App|Packages/EditorCore/Sources)/.*\.swift$'
     severity: warning

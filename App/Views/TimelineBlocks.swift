@@ -391,6 +391,8 @@ struct ClipBlock: View, Equatable {
             .accessibilityElement(children: .combine)
             .accessibilityAddTraits(isSelected ? .isSelected : [])
             .accessibilityValue(clip.isMuted ? "Muted" : "")
+            // Found by the UI tests (AppUITests).
+            .accessibilityIdentifier("timeline.clip")
     }
 }
 

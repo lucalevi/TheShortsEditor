@@ -97,8 +97,7 @@ extension EditorModel {
 
     /// The folder voices made from text are kept in.
     private var voicesFolder: URL {
-        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appending(path: "Shorts Editor/Voices", directoryHint: .isDirectory)
+        AppEnvironment.appFolder.appending(path: "Voices", directoryHint: .isDirectory)
     }
 
     /// Makes the voice and places it as a voice-over (captioned when the Short has captions).

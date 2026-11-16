@@ -110,9 +110,13 @@ extension EditorModel {
 
     /// At launch: brings older projects into the library, then shows the home window.
     func restoreLastSession() {
-        ProjectStore.moveOldProjectsIntoLibrary()
-        // Before any Short is open, so nothing an undo might need is removed.
-        ProjectStore.removeUnusedCopies()
+        // Under tests the library is a test run's own, but the made copies (Caches) are shared
+        // with the real app: cleaning them up there could remove copies the user's Shorts use.
+        if !AppEnvironment.isTesting {
+            ProjectStore.moveOldProjectsIntoLibrary()
+            // Before any Short is open, so nothing an undo might need is removed.
+            ProjectStore.removeUnusedCopies()
+        }
         ProjectStore.removeOrphanedBackups()
         showHome()
     }

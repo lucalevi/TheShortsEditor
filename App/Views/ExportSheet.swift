@@ -116,6 +116,12 @@ struct ExportSheet: View {
     }
 
     private func chooseFile() {
+        // The UI tests can't reach the save panel (a system service draws it): they export into
+        // their own run's folder instead.
+        if let folder = AppEnvironment.uiTestExportFolder {
+            model.export(to: folder.appending(path: model.suggestedExportName))
+            return
+        }
         let panel = NSSavePanel()
         panel.allowedContentTypes = [.mpeg4Movie]
         panel.nameFieldStringValue = model.suggestedExportName

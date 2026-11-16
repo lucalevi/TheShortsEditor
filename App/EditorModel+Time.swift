@@ -10,15 +10,15 @@ extension EditorModel {
 
     /// The transition last chosen, used by "Add Transition" (⌥T) and for new cuts.
     var preferredTransition: ClipTransition {
-        let kind = UserDefaults.standard.string(forKey: "transitionKind").flatMap(TransitionKind.init(rawValue:)) ?? .dissolve
-        let frames = UserDefaults.standard.integer(forKey: "transitionFrames")
+        let kind = AppEnvironment.defaults.string(forKey: "transitionKind").flatMap(TransitionKind.init(rawValue:)) ?? .dissolve
+        let frames = AppEnvironment.defaults.integer(forKey: "transitionFrames")
         return ClipTransition(
             kind: kind, duration: frames > 0 ? CMTime(value: CMTimeValue(frames), timescale: Project.frameRate) : ClipTransition.defaultDuration)
     }
 
     private func remember(_ transition: ClipTransition) {
-        UserDefaults.standard.set(transition.kind.rawValue, forKey: "transitionKind")
-        UserDefaults.standard.set(Int(transition.duration.value), forKey: "transitionFrames")
+        AppEnvironment.defaults.set(transition.kind.rawValue, forKey: "transitionKind")
+        AppEnvironment.defaults.set(Int(transition.duration.value), forKey: "transitionFrames")
     }
 
     /// The cut a transition command works on: after the selected main clip when one is selected
@@ -196,8 +196,7 @@ extension EditorModel {
     /// why) when it couldn't be made.
     private func makeBackwardsCopy(for clip: Clip) async -> MediaAsset? {
         guard let media = project.asset(id: clip.assetID), let part = project.partToReverse(for: clip) else { return nil }
-        let folder = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appending(path: "Shorts Editor/Backwards", directoryHint: .isDirectory)
+        let folder = AppEnvironment.appFolder.appending(path: "Backwards", directoryHint: .isDirectory)
         let url = folder.appending(path: "\(UUID().uuidString).mov")
         do {
             try await tasks.run(.backwards(clip.id), title: "Turning “\(media.name)” round") { progress in

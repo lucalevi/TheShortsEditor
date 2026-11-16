@@ -60,8 +60,7 @@ extension EditorModel {
                 guard voiceOver == .countdown(n) else { return }
             }
             do {
-                let folder = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-                    .appending(path: "Shorts Editor/Voice-overs", directoryHint: .isDirectory)
+                let folder = AppEnvironment.appFolder.appending(path: "Voice-overs", directoryHint: .isDirectory)
                 try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
                 let stamp = Date.now.formatted(.iso8601.year().month().day().time(includingFractionalSeconds: false)).replacingOccurrences(of: ":", with: ".")
                 let url = folder.appending(path: "Voice-over \(stamp).m4a")

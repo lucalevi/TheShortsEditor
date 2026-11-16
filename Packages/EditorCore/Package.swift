@@ -25,7 +25,8 @@ let package = Package(
         .target(name: "Transcription", dependencies: ["EditorCore"], swiftSettings: mainActorByDefault),
         // Golden/: project files saved by every earlier format version (see GoldenFileTests).
         .testTarget(name: "EditorCoreTests", dependencies: ["EditorCore"], resources: [.copy("Golden")]),
-        .testTarget(name: "RenderEngineTests", dependencies: ["RenderEngine"], swiftSettings: mainActorByDefault),
+        // Snapshots/: the saved pictures `SnapshotTests` compares with (read from the source folder).
+        .testTarget(name: "RenderEngineTests", dependencies: ["RenderEngine"], exclude: ["Snapshots"], swiftSettings: mainActorByDefault),
         .testTarget(name: "TranscriptionTests", dependencies: ["Transcription"], swiftSettings: mainActorByDefault),
     ]
 )

@@ -50,12 +50,12 @@ enum TextStyleStore {
     private static let key = "savedTextStyles"
 
     static func load() -> [SavedTextStyle] {
-        guard let data = UserDefaults.standard.data(forKey: key) else { return [] }
+        guard let data = AppEnvironment.defaults.data(forKey: key) else { return [] }
         return (try? JSONDecoder().decode([SavedTextStyle].self, from: data)) ?? []
     }
 
     static func save(_ styles: [SavedTextStyle]) {
-        UserDefaults.standard.set(try? JSONEncoder().encode(styles), forKey: key)
+        AppEnvironment.defaults.set(try? JSONEncoder().encode(styles), forKey: key)
     }
 }
 
@@ -63,8 +63,7 @@ enum TextStyleStore {
 /// it, not to the rest of the Mac) at every launch.
 enum FontLibrary {
     static var folder: URL {
-        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appending(path: "Shorts Editor/Fonts", directoryHint: .isDirectory)
+        AppEnvironment.appFolder.appending(path: "Fonts", directoryHint: .isDirectory)
     }
 
     static func registerImportedFonts() {

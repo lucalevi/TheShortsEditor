@@ -18,21 +18,21 @@ final class PlaybackController {
     /// The length of what the player shows (the Short's length), set as soon as it changes.
     var duration: CMTime = .zero
     /// Playing starts again from the beginning (or the stretch being played) at the end (⌘L).
-    var loopsPlayback = UserDefaults.standard.bool(forKey: SettingsKey.loopPlayback) {
-        didSet { UserDefaults.standard.set(loopsPlayback, forKey: SettingsKey.loopPlayback) }
+    var loopsPlayback = AppEnvironment.defaults.bool(forKey: SettingsKey.loopPlayback) {
+        didSet { AppEnvironment.defaults.set(loopsPlayback, forKey: SettingsKey.loopPlayback) }
     }
     /// Playing only this stretch (/), stopping or looping at its end.
     @ObservationIgnored private(set) var playRange: CMTimeRange?
     /// Hovering over the timeline shows that moment in the viewer (iMovie's skimming).
-    var skimsTimeline = UserDefaults.standard.object(forKey: SettingsKey.skimming) as? Bool ?? true {
+    var skimsTimeline = AppEnvironment.defaults.object(forKey: SettingsKey.skimming) as? Bool ?? true {
         didSet {
-            UserDefaults.standard.set(skimsTimeline, forKey: SettingsKey.skimming)
+            AppEnvironment.defaults.set(skimsTimeline, forKey: SettingsKey.skimming)
             if !skimsTimeline { skim(to: nil) }
         }
     }
     /// Skimming also plays a moment of sound (⇧S).
-    var skimsAudio = UserDefaults.standard.bool(forKey: SettingsKey.audioSkimming) {
-        didSet { UserDefaults.standard.set(skimsAudio, forKey: SettingsKey.audioSkimming) }
+    var skimsAudio = AppEnvironment.defaults.bool(forKey: SettingsKey.audioSkimming) {
+        didSet { AppEnvironment.defaults.set(skimsAudio, forKey: SettingsKey.audioSkimming) }
     }
     /// Where the pointer is skimming on the timeline (the white line), nil when it isn't.
     private(set) var skimTime: CMTime?
@@ -47,6 +47,9 @@ final class PlaybackController {
     @ObservationIgnored private var isSkimBlip = false
     @ObservationIgnored private var skimBlipTask: Task<Void, Never>?
     @ObservationIgnored private var timeObserver: Any?
+    /// Seeks asked for and not yet landed. Meanwhile the player still reports where it was (e.g.
+    /// 0 for an item just swapped in after an edit), which must not move the playhead back.
+    @ObservationIgnored private var seeksUnderWay = 0
     @ObservationIgnored private var statusObservation: NSKeyValueObservation?
     @ObservationIgnored private var endObserver: NSObjectProtocol?
 
@@ -148,7 +151,10 @@ final class PlaybackController {
     func seek(to time: CMTime) {
         let clamped = time.snappedToFrame().clamped(.zero, duration)
         currentTime = clamped
-        player.seek(to: clamped, toleranceBefore: .zero, toleranceAfter: .zero)
+        seeksUnderWay += 1
+        player.seek(to: clamped, toleranceBefore: .zero, toleranceAfter: .zero) { [weak self] _ in
+            Task { @MainActor in self?.seeksUnderWay -= 1 }
+        }
     }
 
     // MARK: Skimming
@@ -215,7 +221,7 @@ final class PlaybackController {
 
     private func playheadMoved(to time: CMTime) {
         // While skimming, the player shows the skimmer's moment; the playhead stays put.
-        if isSkimBlip || (skimTime != nil && !isPlaying) || isChasing { return }
+        if isSkimBlip || (skimTime != nil && !isPlaying) || isChasing || seeksUnderWay > 0 { return }
         currentTime = time
         if let range = playRange, player.rate > 0, time.snappedToFrame() >= range.end {
             playRangeEnded(range)

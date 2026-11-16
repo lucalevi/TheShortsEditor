@@ -1,12 +1,12 @@
 APP := build/Build/Products/Debug/Shorts Editor.app
-SOURCES := App Packages/EditorCore/Package.swift Packages/EditorCore/Sources Packages/EditorCore/Tests Tools
+SOURCES := App AppTests AppUITests Packages/EditorCore/Package.swift Packages/EditorCore/Sources Packages/EditorCore/Tests Tools
 XCODEBUILD := xcodebuild -project TheShortsEditor.xcodeproj -scheme TheShortsEditor -quiet
 # Warnings fail the build in `check` (and so in CI and the pre-push hook).
 STRICT := SWIFT_TREAT_WARNINGS_AS_ERRORS=YES GCC_TREAT_WARNINGS_AS_ERRORS=YES
 
 LIBRARY := $(HOME)/Library/Containers/com.lucalevi.TheShortsEditor/Data/Library/Application Support/Shorts Editor/Shorts
 
-.PHONY: project open build release run test check check-library format format-check lint lint-baseline tsan asan analyze hooks clean help
+.PHONY: project open build release run test app-test uitest coverage-raise bench nightly check check-library format format-check lint lint-baseline tsan asan analyze hooks clean help
 
 help:               ## List the targets
 	@grep -E '^[a-z-]+:.*##' $(MAKEFILE_LIST) | sed -E 's/:.*## /\t/' | expand -t 20
@@ -29,12 +29,42 @@ run: build          ## Build and launch the app
 test:               ## Run the EditorCore, RenderEngine and Transcription tests
 	cd Packages/EditorCore && swift test
 
+# The app's tests run inside the app, with a library and settings of their own (AppEnvironment).
+APP_RESULTS := build/AppTests.xcresult
+DESTINATION := -destination 'platform=macOS,arch=arm64'
+
+app-test: project   ## Run the app tests (AppTests), with coverage
+	rm -rf "$(APP_RESULTS)"
+	$(XCODEBUILD) -configuration Debug -derivedDataPath build $(DESTINATION) -resultBundlePath "$(APP_RESULTS)" $(STRICT) test
+
+# Drives the real app (AppUITests). macOS asks for Automation Mode; to run without the prompt:
+# `sudo automationmodetool enable-automationmode-without-authentication` (once per Mac).
+uitest: project     ## Run the UI tests: add, edit, undo, export, missing media, forced quit, accessibility
+	xcodebuild -project TheShortsEditor.xcodeproj -scheme AppUITests -quiet -derivedDataPath build $(DESTINATION) test
+
+coverage-raise:     ## After `make check`: save today's coverage as the new floor (it only goes up)
+	Tools/coverage/check.py package --raise
+	Tools/coverage/check.py app "$(APP_RESULTS)" --raise
+
+# Speed (F19): every measurement is added to Tools/bench/history.csv with the commit and Mac model.
+bench:              ## Performance tests; numbers added to Tools/bench/history.csv and compared
+	cd Packages/EditorCore && SHORTS_BENCH=1 SHORTS_BENCH_LOG="$(CURDIR)/Tools/bench/history.csv" \
+		SHORTS_BENCH_COMMIT="$$(git rev-parse --short HEAD)$$(git diff --quiet || echo +)" SHORTS_BENCH_MACHINE="$$(sysctl -n hw.model | tr , -)" \
+		swift test --filter PerformanceTests
+	@Tools/bench/compare.py Tools/bench/history.csv
+
+nightly:            ## The scheduled run: benchmarks, then the tests under both sanitizers
+	$(MAKE) bench
+	$(MAKE) tsan
+	$(MAKE) asan
+
 # Everything CI and the pre-push hook run. Fails on a formatting difference, a new lint violation,
-# a failing test or a compiler warning.
-check: format-check lint ## Format, lint, tests and both builds, all strict
-	cd Packages/EditorCore && swift test -Xswiftc -warnings-as-errors
-	$(MAKE) project
-	$(XCODEBUILD) -configuration Debug -derivedDataPath build $(STRICT) build
+# a failing test, coverage below its floor or a compiler warning.
+check: format-check lint ## Format, lint, all tests with coverage floors, both builds, all strict
+	cd Packages/EditorCore && swift test -Xswiftc -warnings-as-errors --enable-code-coverage
+	Tools/coverage/check.py package
+	$(MAKE) app-test
+	Tools/coverage/check.py app "$(APP_RESULTS)"
 	$(XCODEBUILD) -configuration Release -derivedDataPath build/release $(STRICT) build
 
 check-library:      ## Read every Short in this Mac's library with today's code (read-only); before changing how files are read

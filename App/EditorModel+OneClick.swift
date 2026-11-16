@@ -315,12 +315,12 @@ extension EditorModel {
 extension MagicShort {
     /// The choices made last time, offered again.
     static var lastStyle: ShortStyle {
-        get { UserDefaults.standard.string(forKey: "magicStyle").flatMap(ShortStyle.init(rawValue:)) ?? .bold }
-        set { UserDefaults.standard.set(newValue.rawValue, forKey: "magicStyle") }
+        get { AppEnvironment.defaults.string(forKey: "magicStyle").flatMap(ShortStyle.init(rawValue:)) ?? .bold }
+        set { AppEnvironment.defaults.set(newValue.rawValue, forKey: "magicStyle") }
     }
 
     static var lastLength: MagicLength {
-        get { UserDefaults.standard.string(forKey: "magicLength").flatMap(MagicLength.init(rawValue:)) ?? .keepAll }
-        set { UserDefaults.standard.set(newValue.rawValue, forKey: "magicLength") }
+        get { AppEnvironment.defaults.string(forKey: "magicLength").flatMap(MagicLength.init(rawValue:)) ?? .keepAll }
+        set { AppEnvironment.defaults.set(newValue.rawValue, forKey: "magicLength") }
     }
 }

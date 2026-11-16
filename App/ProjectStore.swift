@@ -17,7 +17,7 @@ extension UTType {
 enum ProjectStore {
     /// The app's own folder in its container.
     static var appFolder: URL {
-        let folder = URL.applicationSupportDirectory.appending(path: "Shorts Editor", directoryHint: .isDirectory)
+        let folder = AppEnvironment.appFolder
         Log.file.attempt("Making the app's folder") { try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true) }
         return folder
     }
@@ -335,7 +335,7 @@ enum ProjectStore {
     /// Once, after updating from a version without the home window: the unnamed Short and the
     /// projects opened lately become Shorts in the library.
     static func moveOldProjectsIntoLibrary() {
-        let defaults = UserDefaults.standard
+        let defaults = AppEnvironment.defaults
         guard !defaults.bool(forKey: "MovedIntoLibrary") else { return }
         defaults.set(true, forKey: "MovedIntoLibrary")
         var names = libraryEntries(in: libraryFolder).map(\.name)

@@ -24,7 +24,7 @@ extension EditorModel {
 
     /// How new clips start, from Settings.
     var newClipSettings: NewClipSettings {
-        let defaults = UserDefaults.standard
+        let defaults = AppEnvironment.defaults
         let seconds = defaults.object(forKey: SettingsKey.pictureSeconds) as? Double ?? MediaAsset.imageClipDuration.seconds
         let placement = defaults.string(forKey: SettingsKey.picturePlacement).flatMap(NewClipSettings.PicturePlacement.init(rawValue:)) ?? .automatic
         let slowMotion = defaults.object(forKey: SettingsKey.slowMotionAutomatically) as? Bool ?? true

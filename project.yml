@@ -86,3 +86,63 @@ targets:
         SWIFT_DEFAULT_ACTOR_ISOLATION: MainActor
         SWIFT_APPROACHABLE_CONCURRENCY: YES
         SWIFT_UPCOMING_FEATURE_NONISOLATED_NONSENDING_BY_DEFAULT: YES
+    # The scheme `make check` tests with: the app tests (hosted in the app), with coverage.
+    # The UI tests have their own scheme (`make uitest`): they need macOS's Automation Mode.
+    scheme:
+      testTargets:
+        - AppTests
+      gatherCoverageData: true
+      coverageTargets:
+        - TheShortsEditor
+
+  # Tests of the app's controllers (EditorModel, BackgroundTasks, LibraryModel, PlaybackController…),
+  # run inside the app. They use a library and preferences of their own (`AppEnvironment`).
+  AppTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - AppTests
+    dependencies:
+      - target: TheShortsEditor
+      - package: EditorCore
+        product: EditorCore
+      - package: EditorCore
+        product: RenderEngine
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.lucalevi.TheShortsEditor.AppTests
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/Shorts Editor.app/Contents/MacOS/Shorts Editor"
+        BUNDLE_LOADER: "$(TEST_HOST)"
+        CODE_SIGN_IDENTITY: "-"
+        CODE_SIGN_STYLE: Manual
+        GENERATE_INFOPLIST_FILE: YES
+        SWIFT_DEFAULT_ACTOR_ISOLATION: MainActor
+        SWIFT_APPROACHABLE_CONCURRENCY: YES
+        SWIFT_UPCOMING_FEATURE_NONISOLATED_NONSENDING_BY_DEFAULT: YES
+
+  # The critical paths driven through the real app (import → edit → undo/redo → export, missing
+  # media, autosave after a forced quit) and an accessibility audit. `make uitest`.
+  AppUITests:
+    type: bundle.ui-testing
+    platform: macOS
+    sources:
+      - AppUITests
+    dependencies:
+      - target: TheShortsEditor
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.lucalevi.TheShortsEditor.AppUITests
+        TEST_TARGET_NAME: TheShortsEditor
+        CODE_SIGN_IDENTITY: "-"
+        CODE_SIGN_STYLE: Manual
+        GENERATE_INFOPLIST_FILE: YES
+
+schemes:
+  AppUITests:
+    build:
+      targets:
+        TheShortsEditor: all
+        AppUITests: [test]
+    test:
+      targets:
+        - AppUITests

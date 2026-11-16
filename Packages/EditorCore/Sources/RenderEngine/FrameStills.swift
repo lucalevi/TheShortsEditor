@@ -26,16 +26,37 @@ public nonisolated enum FrameStills {
         if let cached = cache.withLock({ $0[key] }) { return cached }
         let asset = AVURLAsset(url: url)
         guard let track = try? await asset.loadTracks(withMediaType: .video).first,
-            let (size, transform, available) = try? await track.load(.naturalSize, .preferredTransform, .timeRange),
-            let reader = try? AVAssetReader(asset: asset)
+            let (size, transform, available) = try? await track.load(.naturalSize, .preferredTransform, .timeRange)
         else { return nil }
+        // See-through copies (Remove Background) keep their alpha; others keep 10 bits.
+        let hasAlpha = await Self.hasAlpha(track)
         // Start a little early and keep the last picture that begins at or before the time: that
         // is the one on screen then.
         let wanted = time.clamped(available.start, available.end)
-        let start = max(available.start, wanted - CMTime(value: 1, timescale: 2))
-        reader.timeRange = CMTimeRange(start: start, end: available.end)
-        // See-through copies (Remove Background) keep their alpha; others keep 10 bits.
-        let hasAlpha = await Self.hasAlpha(track)
+        let reading = Unchecked((asset, track))
+        // One picture is read at a time, on a thread of its own (decoding blocks it): many builds
+        // asking at once for the same picture (quick edits) read it once and share it, instead of
+        // decoding it side by side, which jammed the decoder (`CancellationStressTests`).
+        return await BlockingWork.run(on: readingQueue) {
+            if let cached = cache.withLock({ $0[key] }) { return cached }
+            let (asset, track) = reading.value
+            guard let found = Self.read(asset: asset, track: track, at: wanted, in: available, hasAlpha: hasAlpha) else { return nil }
+            let still = Still(buffer: found, naturalSize: size, preferredTransform: transform)
+            cache.withLock { cache in
+                if cache.count >= limit { cache.removeAll() }
+                cache[key] = still
+            }
+            return still
+        }
+    }
+
+    private static let readingQueue = DispatchQueue(label: "com.lucalevi.shortseditor.stills", qos: .userInitiated)
+
+    /// Reads the picture showing at `wanted`. Blocks while the file is decoded, so it runs on
+    /// `BlockingWork`'s threads, never Swift's shared ones.
+    private static func read(asset: AVAsset, track: AVAssetTrack, at wanted: CMTime, in available: CMTimeRange, hasAlpha: Bool) -> CVPixelBuffer? {
+        guard let reader = try? AVAssetReader(asset: asset) else { return nil }
+        reader.timeRange = CMTimeRange(start: max(available.start, wanted - CMTime(value: 1, timescale: 2)), end: available.end)
         let output = AVAssetReaderTrackOutput(
             track: track,
             outputSettings: [
@@ -55,13 +76,7 @@ public nonisolated enum FrameStills {
             if shown >= wanted - slack { break }
         }
         reader.cancelReading()
-        guard let found else { return nil }
-        let still = Still(buffer: found, naturalSize: size, preferredTransform: transform)
-        cache.withLock { cache in
-            if cache.count >= limit { cache.removeAll() }
-            cache[key] = still
-        }
-        return still
+        return found
     }
 
     private static func hasAlpha(_ track: AVAssetTrack) async -> Bool {

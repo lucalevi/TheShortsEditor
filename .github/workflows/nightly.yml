@@ -1,0 +1,49 @@
+# Every night on the self-hosted runner (F19, F20): the performance tests, their numbers kept as an
+# artifact and compared with the run before, then every test under the Thread and Address
+# Sanitizers (the cancellation stress tests included). Off until the repository variable
+# SELF_HOSTED_RUNNER is "true", like check.yml. See Tools/ci/README.md.
+#
+# Scheduled and manual runs only, never pull requests (the repository is public).
+name: Nightly
+
+on:
+  schedule:
+    - cron: "30 2 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nightly
+  cancel-in-progress: false
+
+jobs:
+  nightly:
+    if: vars.SELF_HOSTED_RUNNER == 'true'
+    runs-on: [self-hosted, macOS, ARM64]
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      # The numbers of earlier nights, so tonight's are compared with them.
+      - uses: actions/cache/restore@v4
+        with:
+          path: Tools/bench/history.csv
+          key: bench-history-${{ github.run_id }}
+          restore-keys: bench-history-
+      - name: Performance tests (numbers added to Tools/bench/history.csv)
+        run: make bench
+      - uses: actions/cache/save@v4
+        if: always()
+        with:
+          path: Tools/bench/history.csv
+          key: bench-history-${{ github.run_id }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: bench-history
+          path: Tools/bench/history.csv
+      - name: Tests under the Thread Sanitizer
+        run: make tsan
+      - name: Tests under the Address Sanitizer
+        run: make asan

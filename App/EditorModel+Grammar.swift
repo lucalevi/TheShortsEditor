@@ -382,13 +382,13 @@ enum EditorTip: String, CaseIterable {
     private static let key = "shownTips"
 
     static func wasShown(_ tip: EditorTip) -> Bool {
-        (UserDefaults.standard.stringArray(forKey: key) ?? []).contains(tip.rawValue)
+        (AppEnvironment.defaults.stringArray(forKey: key) ?? []).contains(tip.rawValue)
     }
 
     static func markShown(_ tip: EditorTip) {
-        var shown = UserDefaults.standard.stringArray(forKey: key) ?? []
+        var shown = AppEnvironment.defaults.stringArray(forKey: key) ?? []
         if !shown.contains(tip.rawValue) { shown.append(tip.rawValue) }
-        UserDefaults.standard.set(shown, forKey: key)
+        AppEnvironment.defaults.set(shown, forKey: key)
     }
 }
 

@@ -73,8 +73,7 @@ enum PhotosLibrary {
 
     /// Where copies of library items are kept.
     static var folder: URL {
-        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appending(path: "Shorts Editor/From Photos", directoryHint: .isDirectory)
+        AppEnvironment.appFolder.appending(path: "From Photos", directoryHint: .isDirectory)
     }
 
     /// The file to use for `asset`: the edited version if it was edited in Photos, else the original.
