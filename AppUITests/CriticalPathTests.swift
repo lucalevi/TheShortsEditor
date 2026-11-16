@@ -34,24 +34,26 @@ final class CriticalPathTests: XCTestCase {
         try begin()
         launch(fresh: true)
         app.open(try makeVideo(seconds: 3))
+        app.activate()
         let clips = timelineClips
         XCTAssertTrue(clips.firstMatch.waitForExistence(timeout: 30), "The video never reached the timeline")
         XCTAssertEqual(clips.count, 1)
 
         // A second in (30 frames), then split.
-        for _ in 0..<30 { app.typeKey(.rightArrow, modifierFlags: []) }
-        app.menuItems["Split at Playhead"].click()
+        app.activate()
+        for _ in 0..<30 { press(.rightArrow) }
+        menu("Split at Playhead")
         XCTAssertTrue(waitFor { clips.count == 2 }, "Split at Playhead didn't make two clips")
 
-        app.menuItems["Undo Split Clip"].click()
+        menu("Undo Split Clip")
         XCTAssertTrue(waitFor { clips.count == 1 }, "Undo didn't put the clip back together")
-        app.menuItems["Redo Split Clip"].click()
+        menu("Redo Split Clip")
         XCTAssertTrue(waitFor { clips.count == 2 }, "Redo didn't split it again")
 
         // Export. Under UI tests the app skips the save panel (a system service the tests can't
         // reach) and writes into its test run's own folder; the file itself is checked by
         // ExportTests (AppTests) and ExporterTests.
-        app.menuItems["Export Short…"].click()
+        menu("Export Short…")
         let chooseFile = app.buttons["Export…"]
         XCTAssertTrue(chooseFile.waitForExistence(timeout: 30), "The export checks never finished")
         chooseFile.click()
@@ -68,9 +70,11 @@ final class CriticalPathTests: XCTestCase {
         try begin()
         launch(fresh: true)
         app.open(try makeVideo(seconds: 3))
+        app.activate()
         XCTAssertTrue(timelineClips.firstMatch.waitForExistence(timeout: 30))
-        for _ in 0..<30 { app.typeKey(.rightArrow, modifierFlags: []) }
-        app.menuItems["Split at Playhead"].click()
+        app.activate()
+        for _ in 0..<30 { press(.rightArrow) }
+        menu("Split at Playhead")
         XCTAssertTrue(waitFor { self.timelineClips.count == 2 })
         // Autosave comes a second after the edit.
         Thread.sleep(forTimeInterval: 3)
@@ -86,8 +90,10 @@ final class CriticalPathTests: XCTestCase {
         launch(fresh: true)
         let video = try makeVideo(seconds: 2)
         app.open(video)
+        app.activate()
         XCTAssertTrue(timelineClips.firstMatch.waitForExistence(timeout: 30))
-        app.menuItems["All Shorts"].click()
+        app.activate()
+        menu("All Shorts")
         app.terminate()
 
         try FileManager.default.removeItem(at: video)
@@ -109,11 +115,28 @@ final class CriticalPathTests: XCTestCase {
         let audits = XCUIAccessibilityAuditType.all.subtracting(.contrast)
         try app.performAccessibilityAudit(for: audits)
         app.open(try makeVideo(seconds: 2))
+        app.activate()
         XCTAssertTrue(timelineClips.firstMatch.waitForExistence(timeout: 30))
         try app.performAccessibilityAudit(for: audits)
     }
 
     // MARK: Helpers
+
+    /// Brings the app back in front if something else took it (keys and menus reach only the
+    /// app in front; a Terminal coming forward made runs fail).
+    private func front() {
+        if app.state != .runningForeground { app.activate() }
+    }
+
+    private func press(_ key: XCUIKeyboardKey) {
+        front()
+        app.typeKey(key, modifierFlags: [])
+    }
+
+    private func menu(_ title: String) {
+        front()
+        app.menuItems[title].click()
+    }
 
     private var timelineClips: XCUIElementQuery {
         app.descendants(matching: .any).matching(identifier: "timeline.clip")
@@ -140,6 +163,7 @@ final class CriticalPathTests: XCTestCase {
     private func openFirstShort() {
         let tile = app.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH 'My Short'")).firstMatch
         XCTAssertTrue(tile.waitForExistence(timeout: 20), "The Short isn't in All Shorts")
+        app.activate()
         tile.doubleClick()
     }
 
