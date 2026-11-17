@@ -155,7 +155,7 @@ public nonisolated enum FrameInterpolator {
             lastWritten = time
         }
 
-        while let sample = output.copyNextSampleBuffer() {
+        while let sample = await output.nextSample() {
             try Task.checkCancellation()
             guard let buffer = CMSampleBufferGetImageBuffer(sample) else { continue }
             let time = CMSampleBufferGetPresentationTimeStamp(sample)

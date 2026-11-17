@@ -87,7 +87,7 @@ public nonisolated enum CutoutMaker {
         let total = max(range.duration.seconds, 0.001)
         var count = 0
         do {
-            while let sample = output.copyNextSampleBuffer() {
+            while let sample = await output.nextSample() {
                 try Task.checkCancellation()
                 guard let buffer = CMSampleBufferGetImageBuffer(sample) else { continue }
                 let time = CMSampleBufferGetPresentationTimeStamp(sample)

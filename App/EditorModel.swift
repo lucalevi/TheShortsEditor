@@ -192,13 +192,6 @@ final class EditorModel {
     var backups: [ProjectStore.Backup] = []
     /// An undo manager of its own instead of the window's (the app tests, which have no window).
     @ObservationIgnored var ownUndoManager: UndoManager?
-    /// Opening several files from Finder makes SwiftUI create extra windows that stay hidden and
-    /// report themselves too, so a hidden window is passed over for a visible one.
-    var undoManager: UndoManager? {
-        if let ownUndoManager { return ownUndoManager }
-        let candidates = [window, NSApp.mainWindow].compactMap(\.self)
-        return (candidates.first(where: \.isVisible) ?? candidates.first)?.undoManager
-    }
 
     @ObservationIgnored private var rebuildTask: Task<Void, Never>?
     /// Set while a style is being applied, so its own motion isn't taken for hand-made motion.

@@ -26,6 +26,8 @@ public enum Log {
     public static let captions = Logger(subsystem: subsystem, category: "captions")
     /// Disk clean-up and made-copy folders.
     public static let storage = Logger(subsystem: subsystem, category: "storage")
+    /// Hangs and other reports from MetricKit.
+    public static let performance = Logger(subsystem: subsystem, category: "performance")
 }
 
 extension Logger {

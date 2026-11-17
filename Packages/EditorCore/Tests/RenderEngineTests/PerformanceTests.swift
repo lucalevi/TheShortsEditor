@@ -1,4 +1,5 @@
 @preconcurrency import AVFoundation
+import BenchSupport
 import EditorCore
 import Foundation
 import Testing
@@ -80,30 +81,5 @@ struct PerformanceTests {
         Bench.record("frame plain \(size.1)p", plainMs)
         Bench.record("frame heavy \(size.1)p", heavyMs)
         #expect(heavyMs < 33)
-    }
-}
-
-/// Keeps the numbers the performance tests measure (F19): printed, and with `SHORTS_BENCH_LOG`
-/// set (`make bench`), added to that CSV file with the date, commit and Mac model, so they can be
-/// compared over time (`Tools/bench/history.csv`).
-enum Bench {
-    private static let log = ProcessInfo.processInfo.environment["SHORTS_BENCH_LOG"]
-
-    static func record(_ name: String, _ milliseconds: Double) {
-        print(String(format: "BENCH %@: %.2f ms", name, milliseconds))
-        guard let log else { return }
-        let environment = ProcessInfo.processInfo.environment
-        let date = Date.now.formatted(.iso8601)
-        let commit = environment["SHORTS_BENCH_COMMIT"] ?? "unknown"
-        let machine = environment["SHORTS_BENCH_MACHINE"] ?? "unknown"
-        let line = "\(date),\(commit),\(machine),\(name),\(String(format: "%.2f", milliseconds))\n"
-        let url = URL(filePath: log)
-        if !FileManager.default.fileExists(atPath: log) {
-            try? "date,commit,machine,measure,milliseconds\n".write(to: url, atomically: true, encoding: .utf8)
-        }
-        guard let handle = try? FileHandle(forWritingTo: url) else { return }
-        defer { try? handle.close() }
-        _ = try? handle.seekToEnd()
-        try? handle.write(contentsOf: Data(line.utf8))
     }
 }

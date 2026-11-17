@@ -24,9 +24,11 @@ let package = Package(
         // On-device speech to text (Apple's SpeechAnalyzer), for captions.
         .target(name: "Transcription", dependencies: ["EditorCore"], swiftSettings: mainActorByDefault),
         // Golden/: project files saved by every earlier format version (see GoldenFileTests).
-        .testTarget(name: "EditorCoreTests", dependencies: ["EditorCore"], resources: [.copy("Golden")]),
+        // Measuring for the performance budgets and benchmarks, shared by the test targets.
+        .target(name: "BenchSupport", dependencies: ["EditorCore"], path: "Tests/BenchSupport"),
+        .testTarget(name: "EditorCoreTests", dependencies: ["EditorCore", "BenchSupport"], resources: [.copy("Golden")]),
         // Snapshots/: the saved pictures `SnapshotTests` compares with (read from the source folder).
-        .testTarget(name: "RenderEngineTests", dependencies: ["RenderEngine"], exclude: ["Snapshots"], swiftSettings: mainActorByDefault),
+        .testTarget(name: "RenderEngineTests", dependencies: ["RenderEngine", "BenchSupport"], exclude: ["Snapshots"], swiftSettings: mainActorByDefault),
         .testTarget(name: "TranscriptionTests", dependencies: ["Transcription"], swiftSettings: mainActorByDefault),
     ]
 )

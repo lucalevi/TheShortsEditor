@@ -38,34 +38,40 @@ public nonisolated enum Stabilizer {
         let context = CIContext(options: [.workingColorSpace: NSNull(), .cacheIntermediates: false])
         let minimumGap = 1.0 / Double(Project.frameRate) - 0.002
 
-        var positions: [CGPoint] = []
-        var times: [Double] = []
-        var previous: CGImage?
-        var position = CGPoint.zero
-        let total = max(range.duration.seconds, 0.001)
-        while let sample = output.copyNextSampleBuffer() {
-            try Task.checkCancellation()
-            guard let buffer = CMSampleBufferGetImageBuffer(sample) else { continue }
-            let time = CMSampleBufferGetPresentationTimeStamp(sample).seconds
-            // High frame rates (slow-motion footage) are read at 30 a second.
-            if let last = times.last, time - last < minimumGap { continue }
-            let image = CIImage(cvPixelBuffer: buffer).transformed(by: CGAffineTransform(scaleX: scale, y: scale))
-            guard let current = context.createCGImage(image, from: CGRect(origin: .zero, size: small)) else { continue }
-            if let previous {
-                let request = VNTranslationalImageRegistrationRequest(targetedCGImage: current)
-                try VNImageRequestHandler(cgImage: previous).perform([request])
-                if let alignment = request.results?.first?.alignmentTransform {
-                    // The shift that lines this frame up with the one before is how far its
-                    // content moved, the other way round. Vision's y goes up, the path's goes
-                    // down, so y keeps its sign.
-                    position.x -= alignment.tx / small.width
-                    position.y += alignment.ty / small.height
+        // Decoding blocks its thread: on one of its own (BlockingWork), never a shared one.
+        let reading = Unchecked((output, context))
+        let (positions, times) = try await BlockingWork.run { stop -> ([CGPoint], [Double]) in
+            let (output, context) = reading.value
+            var positions: [CGPoint] = []
+            var times: [Double] = []
+            var previous: CGImage?
+            var position = CGPoint.zero
+            let total = max(range.duration.seconds, 0.001)
+            while let sample = output.copyNextSampleBuffer() {
+                try stop.check()
+                guard let buffer = CMSampleBufferGetImageBuffer(sample) else { continue }
+                let time = CMSampleBufferGetPresentationTimeStamp(sample).seconds
+                // High frame rates (slow-motion footage) are read at 30 a second.
+                if let last = times.last, time - last < minimumGap { continue }
+                let image = CIImage(cvPixelBuffer: buffer).transformed(by: CGAffineTransform(scaleX: scale, y: scale))
+                guard let current = context.createCGImage(image, from: CGRect(origin: .zero, size: small)) else { continue }
+                if let previous {
+                    let request = VNTranslationalImageRegistrationRequest(targetedCGImage: current)
+                    try VNImageRequestHandler(cgImage: previous).perform([request])
+                    if let alignment = request.results?.first?.alignmentTransform {
+                        // The shift that lines this frame up with the one before is how far its
+                        // content moved, the other way round. Vision's y goes up, the path's goes
+                        // down, so y keeps its sign.
+                        position.x -= alignment.tx / small.width
+                        position.y += alignment.ty / small.height
+                    }
                 }
+                positions.append(position)
+                times.append(time)
+                previous = current
+                if positions.count.isMultiple(of: 15) { progress(min((time - range.start.seconds) / total, 1)) }
             }
-            positions.append(position)
-            times.append(time)
-            previous = current
-            if positions.count.isMultiple(of: 15) { progress(min((time - range.start.seconds) / total, 1)) }
+            return (positions, times)
         }
         if reader.status == .failed { throw reader.error ?? AnalysisError.noPicture }
         guard let first = times.first, let last = times.last, positions.count > 1 else {

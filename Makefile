@@ -47,10 +47,10 @@ coverage-raise:     ## After `make check`: save today's coverage as the new floo
 	Tools/coverage/check.py app "$(APP_RESULTS)" --raise
 
 # Speed (F19): every measurement is added to Tools/bench/history.csv with the commit and Mac model.
-bench:              ## Performance tests; numbers added to Tools/bench/history.csv and compared
-	cd Packages/EditorCore && SHORTS_BENCH=1 SHORTS_BENCH_LOG="$(CURDIR)/Tools/bench/history.csv" \
+bench:              ## Performance tests and budgets; numbers added to Tools/bench/history.csv and compared
+	cd Packages/EditorCore && SHORTS_BENCH=1 SHORTS_BUDGETS_ALONE=1 SHORTS_BENCH_LOG="$(CURDIR)/Tools/bench/history.csv" \
 		SHORTS_BENCH_COMMIT="$$(git rev-parse --short HEAD)$$(git diff --quiet || echo +)" SHORTS_BENCH_MACHINE="$$(sysctl -n hw.model | tr , -)" \
-		swift test --filter PerformanceTests
+		swift test --filter 'PerformanceTests|BudgetTests'
 	@Tools/bench/compare.py Tools/bench/history.csv
 
 nightly:            ## The scheduled run: benchmarks, then the tests under both sanitizers
@@ -63,6 +63,8 @@ nightly:            ## The scheduled run: benchmarks, then the tests under both 
 check: format-check lint ## Format, lint, all tests with coverage floors, both builds, all strict
 	cd Packages/EditorCore && swift test -Xswiftc -warnings-as-errors --enable-code-coverage
 	Tools/coverage/check.py package
+	@# Timing budgets that need the process to themselves (same flags: nothing is rebuilt).
+	cd Packages/EditorCore && SHORTS_BUDGETS_ALONE=1 swift test -Xswiftc -warnings-as-errors --enable-code-coverage --filter RenderBudgetTests
 	$(MAKE) app-test
 	Tools/coverage/check.py app "$(APP_RESULTS)"
 	$(XCODEBUILD) -configuration Release -derivedDataPath build/release $(STRICT) build
@@ -87,10 +89,10 @@ lint-baseline:      ## Rewrite the baseline (only after fixing violations, to dr
 SLOW_TESTS := --skip ExporterTests --skip voiceCleanUpKeepsTheTiming --skip musicFileCoversTheLongestShort
 
 tsan:               ## Tests under the Thread Sanitizer
-	cd Packages/EditorCore && swift test --sanitize=thread --scratch-path .build-tsan $(SLOW_TESTS)
+	cd Packages/EditorCore && SHORTS_NO_BUDGETS=1 swift test --sanitize=thread --scratch-path .build-tsan $(SLOW_TESTS)
 
 asan:               ## Tests under the Address Sanitizer
-	cd Packages/EditorCore && swift test --sanitize=address --scratch-path .build-asan $(SLOW_TESTS)
+	cd Packages/EditorCore && SHORTS_NO_BUDGETS=1 swift test --sanitize=address --scratch-path .build-asan $(SLOW_TESTS)
 
 analyze: project    ## Xcode's static analyzer on the app
 	$(XCODEBUILD) -configuration Debug -derivedDataPath build analyze

@@ -126,10 +126,17 @@ public struct ProjectFile: Codable, Equatable, Sendable {
     }
 
     public static func decode(_ data: Data) throws -> ProjectFile {
-        try checkVersion(data)
+        // One parse when all is well (a big Short's file takes a while to parse); the version is
+        // looked at on its own only to explain a failure.
         do {
-            return try JSONDecoder().decode(ProjectFile.self, from: data)
+            let file = try JSONDecoder().decode(ProjectFile.self, from: data)
+            guard file.version <= currentVersion else { throw ReadError.newerVersion }
+            return file
+        } catch let error as ReadError {
+            throw error
         } catch let error as DecodingError {
+            // A newer file can hold values this version doesn't know: say it is newer, not damaged.
+            try checkVersion(data)
             let readError = ReadError(error)
             Log.file.error("A Short couldn't be read: \(readError.detail ?? "", privacy: .public)")
             throw readError
@@ -153,12 +160,14 @@ public struct ProjectFile: Codable, Equatable, Sendable {
 
     public static func readListing(_ data: Data) throws -> Listing {
         struct Head: Decodable {
+            var version: Int
             var name: String?
             var created: Date?
             var summary: Summary?
         }
-        try checkVersion(data)
+        // One parse: the version comes with the summary.
         if let head = try? JSONDecoder().decode(Head.self, from: data), let summary = head.summary {
+            guard head.version <= currentVersion else { throw ReadError.newerVersion }
             return Listing(name: head.name, created: head.created, summary: summary)
         }
         let file = try decode(data)

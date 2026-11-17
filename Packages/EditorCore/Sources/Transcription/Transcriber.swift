@@ -164,7 +164,7 @@ public enum Transcriber {
         reader.add(output)
         guard reader.startReading() else { throw reader.error ?? TranscriptionError.noAudio(name) }
 
-        while let sample = output.copyNextSampleBuffer() {
+        while let sample = await output.nextSample() {
             try Task.checkCancellation()
             let frames = AVAudioFrameCount(CMSampleBufferGetNumSamples(sample))
             guard frames > 0, let buffer = AVAudioPCMBuffer(pcmFormat: pcm, frameCapacity: frames) else { continue }
@@ -214,5 +214,14 @@ public enum Transcriber {
             }
         }
         return words
+    }
+}
+
+extension AVAssetReaderOutput {
+    /// `copyNextSampleBuffer()`, which blocks while it decodes, on a thread of its own
+    /// (`BlockingWork`), never one of Swift's shared ones.
+    fileprivate nonisolated func nextSample() async -> CMSampleBuffer? {
+        let output = Unchecked(self)
+        return await BlockingWork.run { Unchecked(output.value.copyNextSampleBuffer()) }.value
     }
 }

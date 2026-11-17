@@ -96,7 +96,7 @@ public nonisolated enum Reverser {
             if !videoDone, videoInput.isReadyForMoreMediaData {
                 if pending.isEmpty, chunkEnd > range.start {
                     let chunkStart = max(range.start, chunkEnd - chunkLength)
-                    pending = try frames(of: video, in: asset, from: chunkStart, to: chunkEnd, tenBit: color.tenBit)
+                    pending = try await framesOffThread(of: video, in: asset, from: chunkStart, to: chunkEnd, tenBit: color.tenBit)
                     chunkEnd = chunkStart
                     progress(min(max((range.end - chunkEnd).seconds / range.duration.seconds, 0), 1))
                 }
@@ -135,6 +135,17 @@ public nonisolated enum Reverser {
             throw writer.error ?? ReverseError.failed
         }
         progress(1)
+    }
+
+    /// `frames(of:…)` on a thread of its own (`BlockingWork`): decoding blocks its thread, which
+    /// must never be one of Swift's shared ones.
+    private static func framesOffThread(
+        of track: AVAssetTrack, in asset: AVAsset, from: CMTime, to: CMTime, tenBit: Bool
+    ) async throws -> [(time: CMTime, buffer: CVPixelBuffer)] {
+        let source = Unchecked((track, asset))
+        return try await BlockingWork.run { _ in
+            Unchecked(try frames(of: source.value.0, in: source.value.1, from: from, to: to, tenBit: tenBit))
+        }.value
     }
 
     /// The decoded pictures that start in `from ..< to`, in order.
@@ -193,13 +204,19 @@ public nonisolated enum Reverser {
         guard reader.canAdd(output) else { return nil }
         reader.add(output)
         guard reader.startReading() else { return nil }
-        var data = Data()
-        while let sample = output.copyNextSampleBuffer() {
-            guard let block = CMSampleBufferGetDataBuffer(sample) else { continue }
-            let length = CMBlockBufferGetDataLength(block)
-            var bytes = [UInt8](repeating: 0, count: length)
-            CMBlockBufferCopyDataBytes(block, atOffset: 0, dataLength: length, destination: &bytes)
-            data.append(contentsOf: bytes)
+        // Decoding blocks its thread: on one of its own (BlockingWork), never a shared one.
+        let reading = Unchecked(output)
+        let data = try await BlockingWork.run { stop -> Data in
+            var data = Data()
+            while let sample = reading.value.copyNextSampleBuffer() {
+                try stop.check()
+                guard let block = CMSampleBufferGetDataBuffer(sample) else { continue }
+                let length = CMBlockBufferGetDataLength(block)
+                var bytes = [UInt8](repeating: 0, count: length)
+                CMBlockBufferCopyDataBytes(block, atOffset: 0, dataLength: length, destination: &bytes)
+                data.append(contentsOf: bytes)
+            }
+            return data
         }
         let frames = data.count / 4
         guard frames > 0 else { return nil }

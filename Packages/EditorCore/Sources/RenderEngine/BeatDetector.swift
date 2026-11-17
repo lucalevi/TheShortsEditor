@@ -18,8 +18,12 @@ public nonisolated enum BeatDetector {
     public static func beats(of url: URL) async -> [Beat] {
         let asset = AVURLAsset(url: url)
         guard let track = try? await asset.loadTracks(withMediaType: .audio).first,
-            let duration = try? await asset.load(.duration),
-            let samples = try? readMono(asset: asset, track: track), samples.count > windowSize
+            let duration = try? await asset.load(.duration)
+        else { return [] }
+        // Decoding blocks its thread: on one of its own (BlockingWork), never a shared one.
+        let source = Unchecked((asset, track))
+        guard let samples = try? await BlockingWork.run({ _ in try readMono(asset: source.value.0, track: source.value.1) }),
+            samples.count > windowSize
         else { return [] }
         let (onsets, bass) = onsetStrength(samples)
         // A measurement is labelled by where its window starts, but it hears a sound start about

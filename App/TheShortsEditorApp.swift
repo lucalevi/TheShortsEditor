@@ -69,6 +69,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.appearance = NSAppearance(named: .darkAqua)
         // One window: no window tabs, and no "Show Tab Bar" or "Show All Tabs" in the menus.
         NSWindow.allowsAutomaticWindowTabbing = false
+        HangReports.shared.start()
     }
 
     func application(_ application: NSApplication, open urls: [URL]) {

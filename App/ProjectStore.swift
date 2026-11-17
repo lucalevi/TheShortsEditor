@@ -2,6 +2,7 @@ import CoreMedia
 import EditorCore
 import Foundation
 import ImageIO
+import Synchronization
 import UniformTypeIdentifiers
 
 extension UTType {
@@ -94,20 +95,38 @@ enum ProjectStore {
     /// Every Short in the library, newest change first, read from each file's summary (without
     /// building the project). Files that can't be read are left out (and logged).
     nonisolated static func libraryEntries(in folder: URL) -> [ShortEntry] {
-        let keys: [URLResourceKey] = [.contentModificationDateKey]
+        let keys: [URLResourceKey] = [.contentModificationDateKey, .fileSizeKey]
         let files = Log.file.attempt("Listing the library") { try FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: keys) } ?? []
         return files.compactMap { url -> ShortEntry? in
             guard url.pathExtension == ProjectFile.fileExtension,
-                let id = UUID(uuidString: url.deletingPathExtension().lastPathComponent),
-                let listing = Log.file.attempt("Reading a Short for the home window", { try ProjectFile.readListing(Data(contentsOf: url)) })
+                let id = UUID(uuidString: url.deletingPathExtension().lastPathComponent)
             else { return nil }
-            let modified = (try? url.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .now
+            let values = try? url.resourceValues(forKeys: Set(keys))
+            let modified = values?.contentModificationDate ?? .now
+            // A file unchanged since it was last listed isn't read again (a big Short's file takes
+            // milliseconds to parse, and the home window lists every Short each time it is shown).
+            let identity = "\(url.path)|\(values?.fileSize ?? 0)|\(modified.timeIntervalSince1970)"
+            let known = listings.withLock { $0[url.path] }
+            let listing: ProjectFile.Listing
+            if let known, known.identity == identity {
+                listing = known.listing
+            } else {
+                guard let read = Log.file.attempt("Reading a Short for the home window", { try ProjectFile.readListing(Data(contentsOf: url)) }) else {
+                    return nil
+                }
+                listings.withLock { $0[url.path] = (identity, read) }
+                listing = read
+            }
             return ShortEntry(
                 id: id, name: listing.name ?? ShortsLibrary.defaultName, created: listing.created ?? modified,
                 modified: modified, duration: listing.summary.duration, clipCount: listing.summary.clipCount)
         }
         .sorted { $0.modified > $1.modified }
     }
+
+    /// What `libraryEntries(in:)` last read from each file, with the file's path, size and date
+    /// then: a memo, never used for a file that has changed since.
+    nonisolated private static let listings = Mutex<[String: (identity: String, listing: ProjectFile.Listing)]>([:])
 
     /// `libraryEntries(in:)`, off the main thread and after every save waiting to be written.
     static func loadLibrary() async -> [ShortEntry] {
