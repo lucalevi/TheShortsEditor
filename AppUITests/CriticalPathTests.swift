@@ -1,4 +1,3 @@
-import AVFoundation
 import AppKit
 import XCTest
 
@@ -14,27 +13,19 @@ final class CriticalPathTests: XCTestCase {
     private var app: XCUIApplication!
     private let run = "ui-\(UUID().uuidString.prefix(8))"
     private let bundleID = "com.lucalevi.TheShortsEditor"
-    private var folder: URL!
 
-    /// Called first by every test: a folder for its files, and the app quit and the folder gone at the end.
+    /// Called first by every test: the app is quit at the end. (Its test run's folder, the
+    /// videos included, is removed by the next fresh run a day later; see `AppEnvironment`.)
     private func begin() throws {
         continueAfterFailure = false
-        folder = FileManager.default.temporaryDirectory.appending(path: "AppUITests-\(run)", directoryHint: .isDirectory)
-        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        let folder = folder!
-        addTeardownBlock { @MainActor [weak self] in
-            self?.app?.terminate()
-            try? FileManager.default.removeItem(at: folder)
-        }
+        addTeardownBlock { @MainActor [weak self] in self?.app?.terminate() }
     }
 
     // MARK: The paths
 
     func testAddEditUndoRedoAndExport() throws {
         try begin()
-        launch(fresh: true)
-        app.open(try makeVideo(seconds: 3))
-        app.activate()
+        launch(fresh: true, videoSeconds: 3)
         let clips = timelineClips
         XCTAssertTrue(clips.firstMatch.waitForExistence(timeout: 30), "The video never reached the timeline")
         XCTAssertEqual(clips.count, 1)
@@ -68,9 +59,7 @@ final class CriticalPathTests: XCTestCase {
 
     func testAnEditSurvivesAForcedQuit() throws {
         try begin()
-        launch(fresh: true)
-        app.open(try makeVideo(seconds: 3))
-        app.activate()
+        launch(fresh: true, videoSeconds: 3)
         XCTAssertTrue(timelineClips.firstMatch.waitForExistence(timeout: 30))
         app.activate()
         for _ in 0..<30 { press(.rightArrow) }
@@ -87,17 +76,13 @@ final class CriticalPathTests: XCTestCase {
 
     func testAShortWithMissingMediaOpensAndSaysSo() throws {
         try begin()
-        launch(fresh: true)
-        let video = try makeVideo(seconds: 2)
-        app.open(video)
-        app.activate()
+        launch(fresh: true, videoSeconds: 2)
         XCTAssertTrue(timelineClips.firstMatch.waitForExistence(timeout: 30))
         app.activate()
         menu("All Shorts")
         app.terminate()
 
-        try FileManager.default.removeItem(at: video)
-        launch(fresh: false)
+        launch(fresh: false, removeMedia: true)
         openFirstShort()
         XCTAssertTrue(app.staticTexts["A file can't be found"].waitForExistence(timeout: 20), "No word about the missing file")
         XCTAssertEqual(timelineClips.count, 1, "The clip of the missing file should stay on the timeline")
@@ -114,8 +99,8 @@ final class CriticalPathTests: XCTestCase {
         // left to Phase 7 (F25), with the B&W check by eye.
         let audits = XCUIAccessibilityAuditType.all.subtracting(.contrast)
         try app.performAccessibilityAudit(for: audits)
-        app.open(try makeVideo(seconds: 2))
-        app.activate()
+        app.terminate()
+        launch(fresh: true, videoSeconds: 2)
         XCTAssertTrue(timelineClips.firstMatch.waitForExistence(timeout: 30))
         try app.performAccessibilityAudit(for: audits)
     }
@@ -142,10 +127,16 @@ final class CriticalPathTests: XCTestCase {
         app.descendants(matching: .any).matching(identifier: "timeline.clip")
     }
 
-    private func launch(fresh: Bool) {
+    /// Launches the copy under test. `videoSeconds`: a video that long is added at launch, as if
+    /// opened from Finder; `removeMedia`: the videos added so far are deleted first. The app makes
+    /// and removes them itself (`UITestMedia`): the runner can't hand it a file, and
+    /// `XCUIApplication.open` started a second copy of the app with the user's own library.
+    private func launch(fresh: Bool, videoSeconds: Int? = nil, removeMedia: Bool = false) {
         app = XCUIApplication()
         app.launchEnvironment["SHORTS_TEST_RUN"] = run
         app.launchEnvironment["SHORTS_TEST_FRESH"] = fresh ? "1" : "0"
+        if let videoSeconds { app.launchEnvironment["SHORTS_TEST_IMPORT"] = String(videoSeconds) }
+        if removeMedia { app.launchEnvironment["SHORTS_TEST_REMOVE_MEDIA"] = "1" }
         app.launch()
         // Keys and menus reach only the app in front.
         app.activate()
@@ -174,34 +165,5 @@ final class CriticalPathTests: XCTestCase {
             RunLoop.current.run(until: Date.now.addingTimeInterval(0.1))
         }
         return condition()
-    }
-
-    /// A portrait test video (silent, one colour), written into this test's folder.
-    private func makeVideo(seconds: Int) throws -> URL {
-        let url = folder.appending(path: "clip-\(UUID().uuidString.prefix(6)).mov")
-        let writer = try AVAssetWriter(outputURL: url, fileType: .mov)
-        let input = AVAssetWriterInput(
-            mediaType: .video, outputSettings: [AVVideoCodecKey: AVVideoCodecType.h264, AVVideoWidthKey: 180, AVVideoHeightKey: 320])
-        input.expectsMediaDataInRealTime = false
-        let adaptor = AVAssetWriterInputPixelBufferAdaptor(assetWriterInput: input, sourcePixelBufferAttributes: nil)
-        writer.add(input)
-        XCTAssertTrue(writer.startWriting())
-        writer.startSession(atSourceTime: .zero)
-        var buffer: CVPixelBuffer?
-        CVPixelBufferCreate(kCFAllocatorDefault, 180, 320, kCVPixelFormatType_32BGRA, nil, &buffer)
-        let picture = try XCTUnwrap(buffer)
-        CVPixelBufferLockBaseAddress(picture, [])
-        memset(CVPixelBufferGetBaseAddress(picture), 0x80, CVPixelBufferGetDataSize(picture))
-        CVPixelBufferUnlockBaseAddress(picture, [])
-        for frame in 0..<(30 * seconds) {
-            while !input.isReadyForMoreMediaData { RunLoop.current.run(until: Date.now.addingTimeInterval(0.005)) }
-            XCTAssertTrue(adaptor.append(picture, withPresentationTime: CMTime(value: Int64(frame), timescale: 30)))
-        }
-        input.markAsFinished()
-        let finished = expectation(description: "written")
-        writer.finishWriting { finished.fulfill() }
-        wait(for: [finished], timeout: 30)
-        XCTAssertEqual(writer.status, .completed)
-        return url
     }
 }

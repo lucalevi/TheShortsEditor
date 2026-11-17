@@ -61,6 +61,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             model.importFiles(pending, addToTimeline: true)
             pending = []
         }
+        UITestMedia.prepare(model)
     }
 
     func applicationWillFinishLaunching(_ notification: Notification) {
