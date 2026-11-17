@@ -109,9 +109,7 @@ struct TimelineView: View {
         VStack(spacing: 0) {
             PanelHeader(title: "Timeline") {
                 HStack(spacing: 8) {
-                    Text("\(TimeFormat.string(model.duration)) of 3:00")
-                        .monospacedDigit()
-                        .foregroundStyle(model.project.isOverMaxDuration ? .red : .secondary)
+                    ShortLengthLabel(model: model)
                     Divider().frame(height: 14)
                     Toggle(isOn: $model.snapsToEdges) {
                         Label("Snapping", systemImage: "arrow.right.and.line.vertical.and.arrow.left")
@@ -353,6 +351,7 @@ struct TimelineView: View {
             }
         )
         .help("Click or drag to move the playhead")
+        .playheadAccessibility(model.playback)
     }
 
     /// A label every 1, 2, 5, 10… seconds, whichever keeps them about 60 points apart.
@@ -496,9 +495,9 @@ struct TimelineView: View {
                 let selected = model.isSelected(pin.item)
                 Rectangle()
                     .fill(selected ? Color.yellow : Color.white.opacity(0.45))
-                    .frame(width: selected ? 2 : 1, height: max(pin.bottom - pin.top, 0))
+                    .frame(width: selected ? 3 : 1, height: max(pin.bottom - pin.top, 0))
                     .overlay(alignment: pin.bottom > clipsY + trackHeight / 2 ? .bottom : .top) {
-                        Circle().fill(selected ? Color.yellow : Color.white.opacity(0.7)).frame(width: 5, height: 5)
+                        Circle().fill(selected ? Color.yellow : Color.white.opacity(0.7)).frame(width: selected ? 9 : 5, height: selected ? 9 : 5)
                     }
                     .offset(x: x(for: pin.time) + 1, y: pin.top)
             }
@@ -705,6 +704,8 @@ struct TimelineView: View {
             progress: model.tasks.progress(.backwards(clip.id))
         )
         .equatable()
+        .modifier(TimelineItemAccessibility(clip: clip, index: index, model: model))
+        .accessibilityIdentifier("timeline.clip") // found by the UI tests
         .overlay(alignment: .bottom) {
             if trim == nil, !clip.soundDetached, !clip.isFrozen, model.audioLevels[clip.assetID] != nil, slot > 16 {
                 volumeEditor(for: clip, item: .clip(clip.id))
@@ -771,52 +772,7 @@ struct TimelineView: View {
                     if target != index { model.moveClip(clip.id, to: target) }
                 }
         )
-        .contextMenu {
-            Button("Split at Playhead") { model.splitAtPlayhead() }
-            Button("Trim Start to Playhead") { model.trimToPlayhead(removing: .start) }
-            Button("Trim End to Playhead") { model.trimToPlayhead(removing: .end) }
-            Picker("Framing", selection: Binding(get: { clip.framing }, set: { model.setFraming($0, for: clip.id) })) {
-                Text("Fill Screen").tag(Framing.fill)
-                Text("Show All").tag(Framing.fit)
-            }
-            Button(model.isPunchedIn([clip]) ? "Remove Punch-In" : "Punch In") { model.togglePunchIn([clip.id]) }
-                .disabled(clip.hasMotion)
-            Divider()
-            if index + 1 < model.project.timeline.clips.count {
-                Menu("Transition into the Next Clip") {
-                    Button("None") { model.setTransition(nil, after: clip.id) }
-                    Divider()
-                    ForEach(TransitionKind.allCases) { kind in
-                        Button(kind.displayName) { model.setTransition(kind, after: clip.id) }
-                    }
-                }
-            }
-            Button("Add Freeze Frame at Playhead") { model.addFreezeFrame() }
-            Button("Instant Replay") {
-                model.selectedClipID = clip.id
-                model.addInstantReplay()
-            }
-            if model.project.canReverse(clip) {
-                Button(model.project.isReversed(clip) ? "Play Forwards" : "Play Backwards") { model.toggleBackwards(for: [clip.id]) }
-            }
-            Divider()
-            if clip.isFrozen {
-                // A freeze frame has no sound.
-            } else if clip.soundDetached {
-                Button("Bring Sound Back") { model.reattachSound(of: clip.id) }
-            } else if model.audioLevels[clip.assetID] != nil {
-                Button("Detach Sound") { model.detachSound(of: [clip.id]) }
-                if !clip.volumeKeys.isEmpty { Button("Remove Volume Points") { model.removeVolumePoints(of: [clip.id]) } }
-            }
-            Divider()
-            settingsMenuItems(for: .clip(clip.id), clipID: clip.id)
-            if model.timelineRange != nil {
-                Divider()
-                rangeMenuItems
-            }
-            Divider()
-            deleteButton(for: .clip(clip.id), single: "Delete Clip")
-        }
+        .contextMenu { clipMenu(clip, index: index) }
     }
 
     /// Where a clip dragged by `dx` lands among the others: after every clip whose middle it passed.

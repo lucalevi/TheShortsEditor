@@ -161,19 +161,13 @@ struct TitleBlock: View {
                 .padding(.trailing, 6)
             }
             .clipShape(RoundedRectangle(cornerRadius: 4))
-            .overlay {
-                RoundedRectangle(cornerRadius: 4)
-                    .strokeBorder(isSelected ? Color.yellow : Color.purple.opacity(0.8), lineWidth: isSelected ? 2 : 1)
-            }
+            .timelineBorder(isSelected: isSelected, color: .purple, opacity: 0.8, cornerRadius: 4)
             .overlay(alignment: .trailing) {
                 EdgeHandle(edge: .trailing, help: "Drag to change how long the title stays", onChange: onResize, onEnd: onResizeEnd)
             }
             .opacity(isAfterEnd ? 0.4 : 1)
             .contentShape(Rectangle())
             .help(isAfterEnd ? "After the end of your Short, so it won't be seen" : title.text)
-            .accessibilityElement(children: .combine)
-            .accessibilityLabel("Title: \(title.text)")
-            .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 }
 
@@ -214,10 +208,7 @@ struct OverlayBlock: View {
                 .padding(3)
             }
             .clipShape(RoundedRectangle(cornerRadius: 5))
-            .overlay {
-                RoundedRectangle(cornerRadius: 5)
-                    .strokeBorder(isSelected ? Color.yellow : Color.teal.opacity(0.9), lineWidth: isSelected ? 2 : 1)
-            }
+            .timelineBorder(isSelected: isSelected, color: .teal, opacity: 0.9, cornerRadius: 5)
             .opacity(isAfterEnd ? 0.4 : 1)
             .contentShape(Rectangle())
             .help(
@@ -225,9 +216,7 @@ struct OverlayBlock: View {
                     ? "After the end of your Short, so it won't be seen"
                     : "Over the clips: \(name). Drag to move, drag an edge to trim."
             )
-            .accessibilityElement(children: .combine)
-            .accessibilityLabel("Over the clips: \(name)")
-            .accessibilityAddTraits(isSelected ? .isSelected : [])
+
     }
 }
 
@@ -381,18 +370,10 @@ struct ClipBlock: View, Equatable {
                 }
             }
             .clipShape(RoundedRectangle(cornerRadius: 6))
-            .overlay {
-                RoundedRectangle(cornerRadius: 6)
-                    .strokeBorder(isSelected ? Color.yellow : Color.accentColor.opacity(0.6), lineWidth: isSelected ? 2 : 1)
-            }
+            .timelineBorder(isSelected: isSelected, color: .accentColor, opacity: 0.6, cornerRadius: 6)
             .padding(.horizontal, 1)
             .contentShape(Rectangle())
             .help("\(name). Drag to move it, drag an edge to trim.")
-            .accessibilityElement(children: .combine)
-            .accessibilityAddTraits(isSelected ? .isSelected : [])
-            .accessibilityValue(clip.isMuted ? "Muted" : "")
-            // Found by the UI tests (AppUITests).
-            .accessibilityIdentifier("timeline.clip")
     }
 }
 

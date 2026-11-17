@@ -216,6 +216,11 @@ final class BackgroundTasks {
         failed = []
     }
 
+    /// Lets the app start a job that failed again by itself (the user chose Try Again).
+    func forgetFailure(_ key: Key) {
+        failed.remove(key)
+    }
+
     func clearEnded() {
         ended = []
     }

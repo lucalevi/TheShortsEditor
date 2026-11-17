@@ -77,7 +77,7 @@ extension EditorModel {
             try text.write(to: url, atomically: true, encoding: .utf8)
         } catch {
             Log.captions.failure("exportCaptionsFile", error)
-            alert = AlertMessage(title: "The captions couldn't be saved", message: error.localizedDescription)
+            alert = AlertMessage("The captions couldn't be saved", error: error)
         }
     }
 
@@ -115,7 +115,7 @@ extension EditorModel {
             }
         } catch {
             Log.captions.failure("importCaptionsFile", error)
-            alert = AlertMessage(title: "The subtitle file couldn't be read", message: error.localizedDescription)
+            alert = AlertMessage("The subtitle file couldn't be read", error: error)
         }
     }
 

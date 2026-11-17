@@ -29,6 +29,7 @@ extension EditorModel {
     func saveNow() {
         autosaveTask?.cancel()
         autosaveTask = nil
+        rememberSession()
         guard hasUnsavedChanges, let id = openShortID else { return }
         hasUnsavedChanges = false
         if !isWorthKeeping {
@@ -47,7 +48,7 @@ extension EditorModel {
             if openShortID == id { hasUnsavedChanges = true }
             if !didReportSaveError {
                 didReportSaveError = true
-                alert = AlertMessage(title: "Your Short couldn't be saved", message: error.localizedDescription)
+                alert = AlertMessage("Your Short couldn't be saved", error: error, retry: { self.saveNow() })
             }
         }
     }
@@ -64,7 +65,7 @@ extension EditorModel {
             reverted = try ProjectStore.readFile(backup.url, media: media)
         } catch {
             Log.file.failure("Reading a backup", error)
-            alert = AlertMessage(title: "This backup can't be opened", message: error.localizedDescription)
+            alert = AlertMessage("This backup can't be opened", error: error)
             return
         }
         ProjectStore.backUp(id, when: .always) { [weak self] in
@@ -104,12 +105,15 @@ extension EditorModel {
             try ProjectStore.write(project, to: url, name: openShortName, created: openShortCreated, media: media)
         } catch {
             Log.file.failure("Saving a copy of the Short", error)
-            alert = AlertMessage(title: "The copy couldn't be saved", message: error.localizedDescription)
+            alert = AlertMessage("The copy couldn't be saved", error: error)
         }
     }
 
-    /// At launch: brings older projects into the library, then shows the home window.
-    func restoreLastSession() {
+    /// At launch: brings older projects into the library, then shows the home window, or the Short
+    /// that was open when the app was quit when `reopening` (not when files opened from Finder
+    /// launched the app: they start a new Short).
+    func restoreLastSession(reopening: Bool = true) {
+        let session = reopening ? EditingSession.saved : nil
         // Under tests the library is a test run's own, but the made copies (Caches) are shared
         // with the real app: cleaning them up there could remove copies the user's Shorts use.
         if !AppEnvironment.isTesting {
@@ -119,6 +123,7 @@ extension EditorModel {
         }
         ProjectStore.removeOrphanedBackups()
         showHome()
+        if let session { reopen(session) }
     }
 
     /// Back to the home window (the "All Shorts" button): the open Short is saved first.
@@ -132,7 +137,14 @@ extension EditorModel {
         openShortID = nil
         load(Project(), name: "", created: .now)
         screen = .home
+        rememberSession()
         library.refresh()
+    }
+
+    /// The window is closing: its Short is saved and the player stops.
+    func closeWindow() {
+        showHome()
+        playback.player.replaceCurrentItem(with: nil)
     }
 
     /// File ▸ New Short, or the New Short tile: an empty Short, open in the editor.
@@ -145,13 +157,18 @@ extension EditorModel {
 
     /// Opens a Short from the home window.
     func openShort(_ id: UUID) {
+        // Already open in another window: that window comes forward instead.
+        if let other = app?.editor(showing: id), other !== self {
+            other.window?.makeKeyAndOrderFront(nil)
+            return
+        }
         let file: ProjectFile
         let access = MediaAccess()
         do {
             file = try ProjectStore.readFile(ProjectStore.fileURL(for: id), media: access)
         } catch {
             Log.file.failure("openShort", error)
-            alert = AlertMessage(title: "This Short can't be opened", message: error.localizedDescription)
+            alert = AlertMessage("This Short can't be opened", error: error)
             return
         }
         if screen == .editor { showHome() }
@@ -185,7 +202,7 @@ extension EditorModel {
             openShort(id)
         } catch {
             Log.file.failure("openProject", error)
-            alert = AlertMessage(title: "“\(url.deletingPathExtension().lastPathComponent)” can't be opened", message: error.localizedDescription)
+            alert = AlertMessage("“\(url.deletingPathExtension().lastPathComponent)” can't be opened", error: error)
         }
     }
 
@@ -193,6 +210,10 @@ extension EditorModel {
         guard let name = ShortsLibrary.cleanedName(typed) else { return }
         if id == openShortID {
             renameOpenShort(to: name)
+        } else if let other = app?.editor(showing: id) {
+            // Open in another window: renamed there, so its next save keeps the name.
+            other.renameShort(id, to: name)
+            library.refresh()
         } else {
             library.rename(id, to: name)
         }

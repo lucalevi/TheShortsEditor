@@ -69,9 +69,9 @@ final class CriticalPathTests: XCTestCase {
         Thread.sleep(forTimeInterval: 3)
         forceQuit()
 
+        // The app reopens where it was (F27 state restoration): the Short, with its split.
         launch(fresh: false)
-        openFirstShort()
-        XCTAssertTrue(waitFor { self.timelineClips.count == 2 }, "The split was lost in the forced quit")
+        XCTAssertTrue(waitFor { self.timelineClips.count == 2 }, "The split was lost in the forced quit, or the Short didn't reopen")
     }
 
     func testAShortWithMissingMediaOpensAndSaysSo() throws {
@@ -87,6 +87,17 @@ final class CriticalPathTests: XCTestCase {
         XCTAssertTrue(app.staticTexts["A file can't be found"].waitForExistence(timeout: 20), "No word about the missing file")
         XCTAssertEqual(timelineClips.count, 1, "The clip of the missing file should stay on the timeline")
         XCTAssertTrue(app.buttons["Find Missing Files…"].exists)
+    }
+
+    /// File ▸ New Window opens a second window with All Shorts, its own editor (F27).
+    func testANewWindowOpensBesideTheFirst() throws {
+        try begin()
+        launch(fresh: true, videoSeconds: 2)
+        XCTAssertTrue(timelineClips.firstMatch.waitForExistence(timeout: 30))
+        menu("New Window")
+        XCTAssertTrue(waitFor { self.app.windows.count >= 2 }, "No second window")
+        // The first window still has its Short.
+        XCTAssertEqual(timelineClips.count, 1)
     }
 
     /// Needs Screen Recording for the test runner (the audit looks at screenshots), so it runs only

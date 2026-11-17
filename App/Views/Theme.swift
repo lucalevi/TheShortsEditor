@@ -14,3 +14,30 @@ enum Theme {
     /// Behind the clips on the timeline.
     static let timeline = Color(white: 0.12)
 }
+
+/// The border of a timeline item. Selection must show without colour (F25; the owner works with a
+/// black-and-white screen filter): the selected border is much thicker, more so with Differentiate
+/// Without Color, and Increase Contrast makes the other borders solid.
+struct TimelineBorder: ViewModifier {
+    let isSelected: Bool
+    let color: Color
+    let opacity: Double
+    let cornerRadius: CGFloat
+    @Environment(\.accessibilityDifferentiateWithoutColor) private var differentiate
+    @Environment(\.colorSchemeContrast) private var contrast
+
+    func body(content: Content) -> some View {
+        content.overlay {
+            RoundedRectangle(cornerRadius: cornerRadius)
+                .strokeBorder(
+                    isSelected ? Color.yellow : color.opacity(contrast == .increased ? 1 : opacity),
+                    lineWidth: isSelected ? (differentiate ? 4 : 3) : (contrast == .increased ? 1.5 : 1))
+        }
+    }
+}
+
+extension View {
+    func timelineBorder(isSelected: Bool, color: Color, opacity: Double, cornerRadius: CGFloat) -> some View {
+        modifier(TimelineBorder(isSelected: isSelected, color: color, opacity: opacity, cornerRadius: cornerRadius))
+    }
+}

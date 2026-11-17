@@ -50,6 +50,15 @@ extension TimelineView {
             isSelected: model.isSelected(item),
             isAfterEnd: overlay.visibleRange(in: model.project) == nil
         )
+        .timelineItemAccessibility(
+            item, label: "Over the clips, \(asset?.name ?? "missing file")",
+            details: [
+                overlay.clip.isMuted ? "no sound" : nil, overlay.clip.hasMotion ? "moves" : nil,
+                overlay.visibleRange(in: model.project) == nil ? "after the end of your Short, so it won't be seen" : nil,
+            ].compactMap(\.self),
+            start: overlay.start, duration: overlay.duration, model: model,
+            startAtPlayhead: { model.moveOverlay(overlay.id, to: model.playback.currentTime) }
+        )
         .overlay(alignment: .leading) {
             EdgeHandle(edge: .leading, help: "Drag to trim the start") { dx in
                 updateBlockDrag(item, kind: .start, points: dx, start: overlay.start, duration: overlay.duration)
@@ -121,6 +130,12 @@ extension TimelineView {
                 } onResizeEnd: {
                     endBlockDrag()
                 }
+                .timelineItemAccessibility(
+                    item, label: "\(title.isSticker ? "Sticker" : "Title"), \(title.text.replacingOccurrences(of: "\n", with: " "))",
+                    details: isAfterEnd ? ["after the end of your Short, so it won't be seen"] : [],
+                    start: title.start, duration: title.duration, model: model,
+                    startAtPlayhead: { model.moveTitle(title.id, to: model.playback.currentTime) }, canSplit: false
+                )
                 .frame(width: max(width(of: length) - 2, 6), height: titleRowHeight)
                 .offset(x: x(for: start) + 1, y: CGFloat(rows[title.id] ?? 0) * (titleRowHeight + 2))
                 .zIndex(blockDrag?.item == item ? 1 : 0)
@@ -287,10 +302,7 @@ extension TimelineView {
                 .padding(.horizontal, 4)
             }
             .clipShape(RoundedRectangle(cornerRadius: 4))
-            .overlay {
-                RoundedRectangle(cornerRadius: 4)
-                    .strokeBorder(isSelected ? Color.yellow : Color.white.opacity(0.4), lineWidth: isSelected ? 2 : 1)
-            }
+            .timelineBorder(isSelected: isSelected, color: .white, opacity: 0.4, cornerRadius: 4)
             .overlay(alignment: .bottom) {
                 if blockDrag?.item != item, model.audioLevels[sound.clip.assetID] != nil, width(of: length) > 16 {
                     volumeEditor(for: sound.clip, item: item)
@@ -336,9 +348,11 @@ extension TimelineView {
                 deleteButton(for: item, single: "Delete")
             }
             .help("\(sound.isVoiceOver ? "Voice-over" : "Sound"): \(name). Drag to move, drag an edge to trim.")
-            .accessibilityElement(children: .combine)
-            .accessibilityLabel("\(sound.isVoiceOver ? "Voice-over" : "Sound"): \(name)")
-            .accessibilityAddTraits(isSelected ? .isSelected : [])
+            .timelineItemAccessibility(
+                item, label: "\(sound.isVoiceOver ? "Voice-over" : "Sound"), \(name)", details: sound.clip.isMuted ? ["muted"] : [],
+                start: sound.start, duration: sound.duration, model: model,
+                startAtPlayhead: { model.moveSound(sound.id, to: model.playback.currentTime) }
+            )
     }
 
     /// The volume line over a clip's or sound's waveform.
@@ -464,10 +478,7 @@ extension TimelineView {
                         .padding(.top, 1)
                 }
                 .clipShape(RoundedRectangle(cornerRadius: 4))
-                .overlay {
-                    RoundedRectangle(cornerRadius: 4)
-                        .strokeBorder(isSelected ? Color.yellow : Color.green.opacity(0.8), lineWidth: isSelected ? 2 : 1)
-                }
+                .timelineBorder(isSelected: isSelected, color: .green, opacity: 0.8, cornerRadius: 4)
                 .frame(width: width, height: musicLaneHeight)
                 .contentShape(Rectangle())
                 .offset(x: x(for: range.start + shift) + 1)
@@ -496,9 +507,10 @@ extension TimelineView {
                     deleteButton(for: .music, single: "Remove Music")
                 }
                 .help("Music: \(song.name). The line shows its volume; it dips while people talk. Drag it to start the music later.")
-                .accessibilityElement(children: .combine)
-                .accessibilityLabel("Music: \(song.name)")
-                .accessibilityAddTraits(isSelected ? .isSelected : [])
+                .timelineItemAccessibility(
+                    .music, label: "Music, \(song.name)",
+                    details: model.project.music?.lowersUnderSpeech == true ? ["lowered while people talk"] : [],
+                    start: range.start, duration: range.duration, model: model, canSplit: false)
         } else if !model.project.timeline.clips.isEmpty {
             Menu {
                 MusicChoices(model: model)

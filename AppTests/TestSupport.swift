@@ -136,10 +136,12 @@ func waitUntil(
 /// crash much later.
 @MainActor
 final class TestEditor {
-    let model = EditorModel()
+    let model: EditorModel
     let undo = UndoManager()
 
-    init() {
+    /// `model`: a window's editor from an `AppState` (several windows), else one of its own.
+    init(model: EditorModel = EditorModel()) {
+        self.model = model
         undo.groupsByEvent = false
         model.ownUndoManager = undo
     }

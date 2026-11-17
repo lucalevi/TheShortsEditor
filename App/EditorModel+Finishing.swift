@@ -155,7 +155,7 @@ extension EditorModel {
                 NSWorkspace.shared.activateFileViewerSelecting([url])
             } catch {
                 Log.export.failure("saveFrame", error)
-                alert = AlertMessage(title: "The frame couldn't be saved", message: error.localizedDescription)
+                alert = AlertMessage("The frame couldn't be saved", error: error)
             }
         }
     }

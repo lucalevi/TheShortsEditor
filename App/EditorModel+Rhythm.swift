@@ -150,7 +150,12 @@ extension EditorModel {
                 } catch is CancellationError {
                 } catch {
                     Log.render.failure("prepareMissingSmoothSlowMotion", error)
-                    alert = AlertMessage(title: "The slow motion couldn't be smoothed", message: error.localizedDescription)
+                    alert = AlertMessage(
+                        "The slow motion couldn't be smoothed", error: error,
+                        retry: {
+                            self.tasks.forgetFailure(.smoothSlowMotion(item.clip))
+                            self.prepareMissingSmoothSlowMotion()
+                        })
                 }
             }
             refreshPlayback()

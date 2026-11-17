@@ -105,7 +105,7 @@ extension EditorModel {
                 try FrameExport.write(image, to: url, format: .jpeg)
             } catch {
                 Log.render.failure("saveCover", error)
-                alert = AlertMessage(title: "The cover couldn't be saved", message: error.localizedDescription)
+                alert = AlertMessage("The cover couldn't be saved", error: error)
             }
         }
     }

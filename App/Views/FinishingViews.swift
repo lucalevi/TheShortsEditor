@@ -489,6 +489,8 @@ struct SettingsView: View {
                 Text("New videos")
             }
 
+            PlaybackSettings(model: model)
+
             StorageSettings(model: model)
         }
         .formStyle(.grouped)
@@ -502,6 +504,26 @@ struct SettingsView: View {
         case .fill: "Pictures fill the screen; the edges that don't fit are cut off."
         case .fit: "Pictures are shown whole, with a blurred copy around them."
         case .slowZoom: "Pictures fill the screen and slowly zoom in."
+        }
+    }
+}
+
+/// Settings ▸ Playback and timeline: the preferences that are also in the menus, so every one can
+/// be found in Settings (F27).
+private struct PlaybackSettings: View {
+    @Bindable var model: EditorModel
+
+    var body: some View {
+        @Bindable var playback = model.playback
+        Section {
+            Toggle("Play in a loop", isOn: $playback.loopsPlayback)
+            Toggle("Skim the timeline with the pointer", isOn: $playback.skimsTimeline)
+            Toggle("Hear the sound while skimming", isOn: $playback.skimsAudio)
+                .disabled(!playback.skimsTimeline)
+            Toggle("Snap edges to cuts, items and the playhead", isOn: $model.snapsToEdges)
+            Text("Also in the Playback and View menus, and snapping in the timeline's header.").font(.caption).foregroundStyle(.secondary)
+        } header: {
+            Text("Playback and timeline")
         }
     }
 }

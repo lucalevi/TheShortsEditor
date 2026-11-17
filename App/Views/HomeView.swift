@@ -142,6 +142,7 @@ private struct ShortTile: View {
     @State private var isHovered = false
     @FocusState private var nameFocused: Bool
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.openWindow) private var openWindow
 
     private var isRenaming: Bool { renamingID == entry.id }
 
@@ -228,6 +229,7 @@ private struct ShortTile: View {
     @ViewBuilder
     private var actions: some View {
         Button("Edit") { model.openShort(entry.id) }
+        Button("Open in New Window") { openWindow(id: EditorWindow.id, value: EditorWindow.Value(shortID: entry.id)) }
         Button("Rename") { renamingID = entry.id }
         Button("Duplicate") { library.duplicate(entry.id) }
         Divider()

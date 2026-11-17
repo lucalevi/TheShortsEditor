@@ -1,7 +1,7 @@
 import SwiftUI
 @preconcurrency import Translation
 
-/// The app's one window: the home window with every Short, or the editor with one of them.
+/// A window's content: All Shorts (the home window), or the editor with one Short.
 struct ContentView: View {
     @Bindable var model: EditorModel
     @State private var keys = EditorKeys()
@@ -47,8 +47,12 @@ struct ContentView: View {
         .sheet(item: $model.speechRequest) { request in
             SpeechSheet(model: model, request: request)
         }
-        .alert(item: $model.alert) { alert in
-            Alert(title: Text(alert.title), message: Text(alert.message))
+        .alert(
+            model.alert?.title ?? "", isPresented: Binding(get: { model.alert != nil }, set: { if !$0 { model.alert = nil } }), presenting: model.alert
+        ) { problem in
+            ProblemActions(problem: problem, model: model)
+        } message: { problem in
+            Text(problem.message)
         }
         // Views that need only part of the editor take it from here (sheets too).
         .environment(model.playback)

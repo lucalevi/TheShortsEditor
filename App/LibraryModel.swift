@@ -13,9 +13,11 @@ final class LibraryModel {
     /// Posters of the Shorts, made from their first second.
     private(set) var posters: [UUID: CGImage] = [:]
     /// Says something went wrong (a title and a message), as an alert.
-    @ObservationIgnored var onProblem: ((String, String) -> Void)?
+    @ObservationIgnored var onProblem: ((String, any Error) -> Void)?
     /// The undo manager of the window, looked up at each change (see `EditorModel.undoManager`).
     @ObservationIgnored var undoManager: () -> UndoManager? = { nil }
+    /// The Shorts open in a window now: they are saved by their window, so they can't be deleted here.
+    @ObservationIgnored var openShortIDs: () -> Set<UUID> = { [] }
     @ObservationIgnored private var posterTask: Task<Void, Never>?
     /// What has been measured about media files, shared with the editor.
     @ObservationIgnored private let analysis: MediaAnalysis
@@ -68,7 +70,7 @@ final class LibraryModel {
             try ProjectStore.rename(id, to: name)
         } catch {
             Log.file.failure("renameShort", error)
-            onProblem?("The Short couldn't be renamed", error.localizedDescription)
+            onProblem?("The Short couldn't be renamed", error)
         }
         refresh()
     }
@@ -79,13 +81,21 @@ final class LibraryModel {
             _ = try ProjectStore.duplicate(id, as: ShortsLibrary.copyName(of: entry.name, existing: names))
         } catch {
             Log.file.failure("duplicateShort", error)
-            onProblem?("The Short couldn't be copied", error.localizedDescription)
+            onProblem?("The Short couldn't be copied", error)
         }
         refresh()
     }
 
     /// Asks first, then moves the Shorts to the Trash, as one undoable step.
     func delete(_ ids: Set<UUID>) {
+        let open = ids.intersection(openShortIDs())
+        guard open.isEmpty else {
+            let alert = NSAlert()
+            alert.messageText = open.count == 1 ? "This Short is open in another window" : "Some of these Shorts are open in other windows"
+            alert.informativeText = "Close the window first, then delete it."
+            alert.runModal()
+            return
+        }
         let names = shorts.filter { ids.contains($0.id) }.map(\.name)
         guard !names.isEmpty else { return }
         let alert = NSAlert()

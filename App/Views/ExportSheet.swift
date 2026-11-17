@@ -5,6 +5,7 @@ import SwiftUI
 /// Checks, then saves the Short as an MP4 with YouTube's recommended settings.
 struct ExportSheet: View {
     @Bindable var model: EditorModel
+    @Environment(\.openSettings) private var openSettings
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -68,12 +69,16 @@ struct ExportSheet: View {
                     Button("Done") { model.endExport() }
                         .keyboardShortcut(.defaultAction)
                 }
-            case .failed(let message):
-                Label(message, systemImage: "xmark.octagon.fill")
+            case .failed(let failure):
+                Label(failure.message, systemImage: "xmark.octagon.fill")
                     .foregroundStyle(.red)
                     .fixedSize(horizontal: false, vertical: true)
                     .frame(minHeight: 80)
-                buttons { Button("Close") { model.endExport() }.keyboardShortcut(.defaultAction) }
+                buttons {
+                    if failure.kind == .diskFull { Button("Free Up Space…") { openSettings() } }
+                    Button("Close") { model.endExport() }
+                    Button("Try Again") { model.export(to: failure.url) }.keyboardShortcut(.defaultAction)
+                }
             }
         }
         .padding(20)

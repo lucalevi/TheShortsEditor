@@ -52,7 +52,12 @@ extension EditorModel {
                 } catch is CancellationError {
                 } catch {
                     Log.render.failure("prepareMissingCutouts", error)
-                    alert = AlertMessage(title: "The background couldn't be removed", message: error.localizedDescription)
+                    alert = AlertMessage(
+                        "The background couldn't be removed", error: error,
+                        retry: {
+                            self.tasks.forgetFailure(job)
+                            self.prepareMissingCutouts()
+                        })
                 }
             }
             refreshPlayback()

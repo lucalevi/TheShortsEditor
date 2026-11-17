@@ -242,6 +242,9 @@ private struct PictureHandles: View {
             )
             .pointerStyle(.grabIdle)
             .help("Drag to move. Drag a corner or pinch to resize. Drag the round knob to turn it.")
+            .pictureAccessibility(
+                name: model.project.asset(id: clip.assetID)?.name ?? "missing file", placement: model.placementAtPlayhead(of: clip), model: model,
+                clipID: clip.id)
         // Corners: kept inside the viewer, so they can be grabbed even when the picture is bigger.
         ForEach(0..<4, id: \.self) { corner in
             let point = clampedInside(cornerPoint(corner, center: center, size: size, angle: angle), viewSize)
@@ -256,6 +259,8 @@ private struct PictureHandles: View {
                         .onEnded { _ in finish(clip, actionName: "Resize Picture") }
                 )
                 .pointerStyle(.frameResize(position: corner == 0 ? .topLeading : corner == 1 ? .topTrailing : corner == 2 ? .bottomTrailing : .bottomLeading))
+                // The picture's own element sizes it.
+                .accessibilityHidden(true)
         }
         // The knob for turning, above the top edge.
         let knob = clampedInside(rotated(CGPoint(x: 0, y: -size.height / 2 - 22), by: angle, around: center), viewSize)
@@ -270,6 +275,7 @@ private struct PictureHandles: View {
                     .onEnded { _ in finish(clip, actionName: "Turn Picture") }
             )
             .help("Drag to turn the picture. It sticks to straight angles.")
+            .accessibilityHidden(true)
     }
 
     // MARK: Gestures
@@ -392,44 +398,6 @@ private struct PictureHandles: View {
     }
 }
 
-/// A box around the caption on screen: drag it up or down to move all the captions. They stay
-/// clear of the areas YouTube covers.
-private struct CaptionHandle: View {
-    let model: EditorModel
-    @State private var dy: CGFloat?
-    @State private var isHovered = false
-
-    var body: some View {
-        GeometryReader { geometry in
-            let scale = geometry.size.width / Project.canvasSize.width
-            if model.project.captions.isVisible, model.currentCaption != nil,
-                let frame = CaptionPreview.frame(in: model.project, at: model.playback.currentTime)
-            {
-                let rect = frame.offsetBy(dx: 0, dy: (dy ?? 0) / scale)
-                RoundedRectangle(cornerRadius: 4)
-                    .strokeBorder(style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
-                    .foregroundStyle(Color.white.opacity(isHovered || dy != nil ? 0.9 : 0))
-                    .contentShape(Rectangle())
-                    .frame(width: rect.width * scale, height: rect.height * scale)
-                    .offset(x: rect.minX * scale, y: rect.minY * scale)
-                    .onHover { isHovered = $0 }
-                    .pointerStyle(.frameResize(position: .top, directions: [.inward, .outward]))
-                    .gesture(
-                        DragGesture(minimumDistance: 2).onChanged { value in
-                            model.playback.pause()
-                            dy = value.translation.height
-                        }.onEnded { value in
-                            dy = nil
-                            let middle = frame.midY + value.translation.height / scale
-                            model.setCaptionPositionByDragging(Double(middle / Project.canvasSize.height))
-                        }
-                    )
-                    .help("Drag up or down to move the captions")
-            }
-        }
-    }
-}
-
 /// The 3-2-1 before a voice-over, then a recording sign.
 private struct VoiceOverBadge: View {
     let model: EditorModel
@@ -520,6 +488,7 @@ private struct TitleHandles: View {
                             }
                         )
                         .help("Click to edit, drag to move. Double-click to change the words.")
+                        .titleBoxAccessibility(title, model: model)
                 }
             }
         }

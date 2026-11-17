@@ -71,6 +71,27 @@ struct VolumeLineEditor: View {
             .pointerStyle(.rowResize)
             .gesture(lineGesture(size: size))
             .help("Volume line: drag up or down. ⌥-click to add a point.")
+            // F25: the line is a slider for VoiceOver and Full Keyboard Access.
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("Volume")
+            .accessibilityValue(spokenVolume)
+            .accessibilityAdjustableAction { direction in
+                let step = direction == .increment ? 0.1 : direction == .decrement ? -0.1 : 0
+                onVolume(min(max(((clip.volume + step) * 10).rounded() / 10, 0), Clip.maxVolume))
+            }
+            .accessibilityActions {
+                Button("Silent") { onVolume(0) }
+                Button("Normal Volume") { onVolume(1) }
+            }
+    }
+
+    /// "120 percent, fades in over 0.5 seconds, 2 points".
+    private var spokenVolume: String {
+        var parts = ["\(Int((clip.volume * 100).rounded())) percent"]
+        if clip.fadeIn > .zero { parts.append("fades in over \(TimeFormat.spoken(clip.fadeIn))") }
+        if clip.fadeOut > .zero { parts.append("fades out over \(TimeFormat.spoken(clip.fadeOut))") }
+        if !clip.volumeKeys.isEmpty { parts.append(clip.volumeKeys.count == 1 ? "1 point" : "\(clip.volumeKeys.count) points") }
+        return parts.joined(separator: ", ")
     }
 
     private func pointDots(size: CGSize) -> some View {
@@ -212,7 +233,13 @@ struct VolumeLineEditor: View {
                     }
             )
             .help(edge == .start ? "Drag right to fade the sound in" : "Drag left to fade the sound out")
-            .accessibilityLabel(edge == .start ? "Fade in handle" : "Fade out handle")
+            .accessibilityLabel(edge == .start ? "Fade in" : "Fade out")
+            .accessibilityValue(TimeFormat.spoken(current))
+            .accessibilityAdjustableAction { direction in
+                let step = direction == .increment ? 0.5 : direction == .decrement ? -0.5 : 0
+                let limit = min(Clip.maxFade, clip.duration)
+                onFade(edge, CMTime(seconds: max(current.seconds + step, 0), preferredTimescale: 600).clamped(.zero, limit))
+            }
     }
 }
 

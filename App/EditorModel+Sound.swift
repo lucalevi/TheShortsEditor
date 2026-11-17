@@ -133,7 +133,7 @@ extension EditorModel {
             return false
         } catch {
             Log.audio.failure("makeProcessedSound", error)
-            alert = AlertMessage(title: "The sound effect couldn't be made", message: error.localizedDescription)
+            alert = AlertMessage("The sound effect couldn't be made", error: error)
             return false
         }
     }
@@ -179,7 +179,7 @@ extension EditorModel {
                 loadPreviewsIfNeeded(media)
             } catch {
                 Log.audio.failure("addSoundEffect", error)
-                alert = AlertMessage(title: "The sound couldn't be made", message: error.localizedDescription)
+                alert = AlertMessage("The sound couldn't be made", error: error, retry: { self.addSoundEffect(effect) })
             }
         }
     }

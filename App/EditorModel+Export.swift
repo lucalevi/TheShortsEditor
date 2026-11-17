@@ -61,7 +61,8 @@ extension EditorModel {
                 exportPhase = nil
             } catch {
                 Log.export.failure("export", error)
-                exportPhase = .failed(error.localizedDescription)
+                let problem = AlertMessage("The export failed", error: error)
+                exportPhase = .failed(ExportFailure(message: problem.message, kind: problem.kind, url: url))
             }
         }
     }

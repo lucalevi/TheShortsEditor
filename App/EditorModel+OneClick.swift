@@ -75,7 +75,8 @@ extension EditorModel {
             guard let asset = await styleMusic(mood) else {
                 alert = AlertMessage(
                     title: "The music couldn't be made",
-                    message: "Try again, or add a song from a file (Sound ▸ Add Music ▸ From a File…).")
+                    message: "Try again, or add a song from a file (Sound ▸ Add Music ▸ From a File…).",
+                    retry: { self.addMoodMusic(mood) })
                 return
             }
             apply("Add \(mood.displayName) Music") { $0.setMoodMusic(asset, mood: mood) }

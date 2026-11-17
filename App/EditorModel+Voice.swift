@@ -29,7 +29,7 @@ extension EditorModel {
                     return
                 } catch {
                     Log.audio.failure("setCleansVoice", error)
-                    alert = AlertMessage(title: "The voice couldn't be cleaned up", message: error.localizedDescription)
+                    alert = AlertMessage("The voice couldn't be cleaned up", error: error, retry: { self.setCleansVoice(on, for: clipIDs) })
                     return
                 }
             }
@@ -50,7 +50,7 @@ extension EditorModel {
             guard await AVCaptureDevice.requestAccess(for: .audio) else {
                 alert = AlertMessage(
                     title: "The microphone is off for Shorts Editor",
-                    message: "Turn it on in System Settings ▸ Privacy & Security ▸ Microphone, then try again.")
+                    message: "Turn it on in System Settings ▸ Privacy & Security ▸ Microphone, then try again.", kind: .privacy(.microphone))
                 return
             }
             if currentTime >= duration - .oneFrame { playback.seek(to: .zero) }
@@ -78,7 +78,7 @@ extension EditorModel {
             } catch {
                 Log.audio.failure("startVoiceOver", error)
                 voiceOver = nil
-                alert = AlertMessage(title: "Recording couldn't start", message: error.localizedDescription)
+                alert = AlertMessage("Recording couldn't start", error: error)
             }
         }
     }

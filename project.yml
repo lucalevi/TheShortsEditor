@@ -26,6 +26,9 @@ targets:
         product: RenderEngine
       - package: EditorCore
         product: Transcription
+      # Finder's thumbnails of saved Shorts (Quick Look).
+      - target: ShortsThumbnail
+        embed: true
     info:
       path: App/Info.plist
       properties:
@@ -86,6 +89,8 @@ targets:
         SWIFT_DEFAULT_ACTOR_ISOLATION: MainActor
         SWIFT_APPROACHABLE_CONCURRENCY: YES
         SWIFT_UPCOMING_FEATURE_NONISOLATED_NONSENDING_BY_DEFAULT: YES
+        # App/Assets.xcassets, drawn by Tools/icon/make-icon.swift.
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
     # The scheme `make check` tests with: the app tests (hosted in the app), with coverage.
     # The UI tests have their own scheme (`make uitest`): they need macOS's Automation Mode.
     scheme:
@@ -94,6 +99,40 @@ targets:
       gatherCoverageData: true
       coverageTargets:
         - TheShortsEditor
+
+  # Quick Look thumbnails of `.shortsproject` files in Finder (F27), embedded in the app.
+  ShortsThumbnail:
+    type: app-extension
+    platform: macOS
+    sources:
+      - Extensions/Thumbnail
+    dependencies:
+      - package: EditorCore
+        product: EditorCore
+      - sdk: QuickLookThumbnailing.framework
+    info:
+      path: Extensions/Thumbnail/Info.plist
+      properties:
+        CFBundleDisplayName: Shorts Editor Thumbnails
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.quicklook.thumbnail
+          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).ThumbnailProvider
+          NSExtensionAttributes:
+            QLSupportedContentTypes: [com.lucalevi.shortseditor.project]
+            QLThumbnailMinimumDimension: 0
+    entitlements:
+      path: Extensions/Thumbnail/Thumbnail.entitlements
+      properties:
+        com.apple.security.app-sandbox: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.lucalevi.TheShortsEditor.Thumbnail
+        CODE_SIGN_IDENTITY: "-"
+        CODE_SIGN_STYLE: Manual
+        ENABLE_HARDENED_RUNTIME: YES
+        SWIFT_DEFAULT_ACTOR_ISOLATION: nonisolated
 
   # Tests of the app's controllers (EditorModel, BackgroundTasks, LibraryModel, PlaybackController…),
   # run inside the app. They use a library and preferences of their own (`AppEnvironment`).

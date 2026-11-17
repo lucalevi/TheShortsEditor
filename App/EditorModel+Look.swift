@@ -282,7 +282,12 @@ extension EditorModel {
                 } catch is CancellationError {
                 } catch {
                     Log.render.failure("prepareMissingSteadiness", error)
-                    alert = AlertMessage(title: "The clip couldn't be steadied", message: error.localizedDescription)
+                    alert = AlertMessage(
+                        "The clip couldn't be steadied", error: error,
+                        retry: {
+                            self.tasks.forgetFailure(.steadying(id))
+                            self.prepareMissingSteadiness()
+                        })
                 }
             }
             refreshPlayback()

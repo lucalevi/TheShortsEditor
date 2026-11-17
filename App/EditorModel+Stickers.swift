@@ -67,7 +67,7 @@ extension EditorModel {
             } catch is CancellationError {
             } catch {
                 Log.render.failure("followInVideo", error)
-                alert = AlertMessage(title: "It couldn't follow anything there", message: error.localizedDescription)
+                alert = AlertMessage("It couldn't follow anything there", error: error, retry: { self.followInVideo(id) })
             }
         }
     }
@@ -123,7 +123,7 @@ extension EditorModel {
             } catch is CancellationError {
             } catch {
                 Log.render.failure("makeSpeech", error)
-                alert = AlertMessage(title: "The voice couldn't be made", message: error.localizedDescription)
+                alert = AlertMessage("The voice couldn't be made", error: error, retry: { self.makeSpeech(request, voice: voice, rate: rate) })
             }
         }
     }

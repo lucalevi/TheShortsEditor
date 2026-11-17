@@ -210,7 +210,7 @@ extension EditorModel {
             return nil
         } catch {
             Log.render.failure("makeBackwardsCopy", error)
-            alert = AlertMessage(title: "The clip couldn't be turned round", message: error.localizedDescription)
+            alert = AlertMessage("The clip couldn't be turned round", error: error)
             return nil
         }
     }

@@ -231,7 +231,7 @@ private struct CaptionRow: View {
                     model.playback.seek(to: page.firstFrame)
                 }
                 .buttonStyle(.plain)
-                .font(.caption.monospacedDigit())
+                .font(.caption.monospacedDigit().weight(isCurrent ? .bold : .regular))
                 .foregroundStyle(isCurrent ? Color.accentColor : .secondary)
                 .help("Go to this caption")
                 switch page.source {

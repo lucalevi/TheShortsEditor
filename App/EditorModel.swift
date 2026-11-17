@@ -226,7 +226,7 @@ final class EditorModel {
         case review([ExportIssue])
         case exporting(Double)
         case finished(URL)
-        case failed(String)
+        case failed(ExportFailure)
     }
 
     struct SilenceSession {
@@ -239,20 +239,19 @@ final class EditorModel {
         var separating: Double?
     }
 
-    struct AlertMessage: Identifiable {
-        let id = UUID()
-        let title: String
-        let message: String
-    }
-
-    init() {
-        let analysis = MediaAnalysis()
+    /// One editor per window. `app` shares the library and what was measured about media between
+    /// windows; without it (the app tests) the editor has its own.
+    init(app: AppState? = nil) {
+        let analysis = app?.analysis ?? MediaAnalysis()
         self.analysis = analysis
-        library = LibraryModel(analysis: analysis)
+        library = app?.library ?? LibraryModel(analysis: analysis)
+        self.app = app
         FontLibrary.registerImportedFonts()
         playback.onPlayheadMove = { [weak self] time in self?.playheadMoved(to: time) }
-        library.onProblem = { [weak self] title, message in self?.alert = AlertMessage(title: title, message: message) }
-        library.undoManager = { [weak self] in self?.undoManager }
+        if app == nil {
+            library.onProblem = { [weak self] title, error in self?.alert = AlertMessage(title, error: error) }
+            library.undoManager = { [weak self] in self?.undoManager }
+        }
     }
 
     // MARK: Lookups
@@ -537,6 +536,7 @@ final class EditorModel {
     let analysis: MediaAnalysis
     /// Every Short in the library, for the home window.
     let library: LibraryModel
+    @ObservationIgnored weak var app: AppState? // every window's editor (nil in the app tests)
     /// Making, laying out and translating captions.
     @ObservationIgnored lazy var captioning = CaptionsModel(editor: self)
 
@@ -613,7 +613,7 @@ final class EditorModel {
             } catch {
                 guard !Task.isCancelled else { return }
                 Log.render.failure("Building the Short for playback", error)
-                alert = AlertMessage(title: "Playback problem", message: error.localizedDescription)
+                alert = AlertMessage("Playback problem", error: error, retry: { self.refreshPlayback() })
             }
         }
     }

@@ -4,8 +4,13 @@ import SwiftUI
 
 /// Menu bar commands. Every keyboard shortcut lives here so it is also discoverable in a menu.
 struct EditorCommands: Commands {
-    let model: EditorModel
+    let app: AppState
     @Environment(\.openWindow) private var openWindow
+    @FocusedValue(\.editor) private var focused: EditorModel?
+
+    /// The editor of the window in front, else the last one in front (when Help or Background
+    /// Tasks is in front), else a stand-in before the first window shows.
+    private var model: EditorModel { focused ?? app.current ?? app.standIn }
 
     var body: some Commands {
         CommandGroup(replacing: .newItem) {
@@ -446,12 +451,6 @@ struct EditorCommands: Commands {
                 .disabled(model.project.timeline.clips.isEmpty)
         }
 
-        CommandGroup(before: .windowList) {
-            Button("Background Tasks") { openWindow(id: BackgroundTasksView.windowID) }
-                .keyboardShortcut("9")
-            Divider()
-        }
-
         CommandGroup(before: .toolbar) {
             Toggle("Show YouTube Overlay Areas", isOn: Binding(get: { model.showsSafeZone }, set: { model.showsSafeZone = $0 }))
                 .keyboardShortcut("'", modifiers: .command)
@@ -522,5 +521,26 @@ enum MusicImportPanel {
         panel.message = "Choose a song to play under your Short"
         guard panel.runModal() == .OK else { return }
         model.importFiles(panel.urls, addToTimeline: true)
+    }
+}
+
+/// The app's windows (F27): a new one, Background Tasks and Help.
+struct WindowCommands: Commands {
+    @Environment(\.openWindow) private var openWindow
+
+    var body: some Commands {
+        CommandGroup(after: .newItem) {
+            Button("New Window") { openWindow(id: EditorWindow.id, value: EditorWindow.Value()) }
+                .keyboardShortcut("n", modifiers: [.command, .shift])
+        }
+        CommandGroup(before: .windowList) {
+            Button("Background Tasks") { openWindow(id: BackgroundTasksView.windowID) }
+                .keyboardShortcut("9")
+            Divider()
+        }
+        CommandGroup(replacing: .help) {
+            Button("Shorts Editor Help") { openWindow(id: HelpView.windowID) }
+                .keyboardShortcut("?", modifiers: .command)
+        }
     }
 }

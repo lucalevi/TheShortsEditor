@@ -35,7 +35,7 @@ extension EditorModel {
             } catch is CancellationError {
             } catch {
                 Log.audio.failure("followSubject", error)
-                alert = AlertMessage(title: "The subject couldn't be found", message: error.localizedDescription)
+                alert = AlertMessage("The subject couldn't be found", error: error, retry: { self.followSubject(clipID) })
             }
         }
     }

@@ -10,7 +10,6 @@ import Transcription
 /// every change to them goes through the editor's `apply`, like any other edit.
 @Observable
 final class CaptionsModel {
-    typealias AlertMessage = EditorModel.AlertMessage
 
     /// The editor of the open Short, whose project the captions are in.
     @ObservationIgnored unowned let editor: EditorModel
@@ -151,7 +150,7 @@ final class CaptionsModel {
                 // The user stopped it; nothing changes.
             } catch {
                 Log.captions.failure("Making captions", error)
-                if !quietly { alert = AlertMessage(title: "Captions couldn't be made", message: error.localizedDescription) }
+                if !quietly { alert = AlertMessage("Captions couldn't be made", error: error, retry: { self.make() }) }
             }
         }
     }
@@ -198,7 +197,7 @@ final class CaptionsModel {
         } catch is CancellationError {
         } catch {
             Log.captions.failure("runTranslation", error)
-            alert = AlertMessage(title: "The captions couldn't be translated", message: error.localizedDescription)
+            alert = AlertMessage("The captions couldn't be translated", error: error)
         }
     }
 
@@ -296,7 +295,7 @@ final class CaptionsModel {
                 }
             } catch {
                 Log.captions.failure("findMoreFillers", error)
-                alert = AlertMessage(title: "Fillers couldn't be found", message: error.localizedDescription)
+                alert = AlertMessage("Fillers couldn't be found", error: error)
             }
         }
     }

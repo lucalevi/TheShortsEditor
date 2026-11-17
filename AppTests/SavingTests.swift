@@ -200,3 +200,45 @@ struct LibraryTests {
         #expect(!library.names.contains(editor.model.openShortName))
     }
 }
+
+/// The app reopens as it was left (F27): the Short, its playhead, the timeline zoom and the panel.
+@MainActor
+@Suite(.serialized)
+struct SessionRestorationTests {
+    @Test func theAppReopensTheShortWhereItWasLeft() async throws {
+        let editor = TestEditor.withNewShort()
+        await editor.importToTimeline([try await TestMedia.video(seconds: 3)])
+        let model = editor.model
+        let id = try #require(model.openShortID)
+        await editor.seek(to: CMTime(value: 2, timescale: 1))
+        model.timelineZoom = 120
+        model.sidebar = .captions
+        model.hasUnsavedChanges = true
+        editor.saveAndWait()
+
+        // Quit and open again.
+        let next = TestEditor()
+        next.model.restoreLastSession()
+        #expect(next.model.screen == .editor)
+        #expect(next.model.openShortID == id)
+        #expect(next.model.playback.currentTime == CMTime(value: 2, timescale: 1).snappedToFrame())
+        #expect(next.model.timelineZoom == 120)
+        #expect(next.model.sidebar == .captions)
+
+        // Back to All Shorts: the next launch starts there.
+        next.model.showHome()
+        let third = TestEditor()
+        third.model.restoreLastSession()
+        #expect(third.model.screen == .home)
+    }
+
+    @Test func filesOpenedFromFinderStartANewShortInstead() async throws {
+        let editor = TestEditor.withNewShort()
+        await editor.importToTimeline([try await TestMedia.video(seconds: 2)])
+        editor.model.hasUnsavedChanges = true
+        editor.saveAndWait()
+        let next = TestEditor()
+        next.model.restoreLastSession(reopening: false)
+        #expect(next.model.screen == .home)
+    }
+}
