@@ -82,6 +82,9 @@ final class PlaybackController {
         self.duration = item == nil ? .zero : duration
         player.replaceCurrentItem(with: item)
         seek(to: item == nil ? .zero : min(currentTime, duration))
+        // While skimming, the viewer keeps showing the skimmed moment (the title boxes over it
+        // are placed for that moment too).
+        if item != nil, let skim = skimTime { chaseSeek(to: skim.clamped(.zero, max(.zero, duration - .oneFrame))) }
     }
 
     /// Back to the start with nothing playing (another Short is opened).

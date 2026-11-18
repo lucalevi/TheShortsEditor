@@ -10,6 +10,8 @@ import RenderEngine
 final class AppState {
     let analysis = MediaAnalysis()
     let library: LibraryModel
+    /// Timeline items copied with Cut or Copy, for pasting in any window.
+    let clipboard = TimelineClipboardStore()
     /// The editor of each window, by the window's id. Not observed: windows make theirs while they
     /// are drawn.
     @ObservationIgnored private(set) var editors: [UUID: EditorModel] = [:]

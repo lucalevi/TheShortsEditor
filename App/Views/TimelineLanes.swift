@@ -93,6 +93,7 @@ extension TimelineView {
                 .onEnded { _ in endBlockDrag() }
         )
         .contextMenu {
+            clipboardButtons(for: item)
             Button("Split at Playhead") {
                 model.selection = item
                 model.splitAtPlayhead()
@@ -157,6 +158,7 @@ extension TimelineView {
                     }
                 )
                 .contextMenu {
+                    clipboardButtons(for: item)
                     Button("Start at Playhead") { model.moveTitle(title.id, to: model.playback.currentTime) }
                     Divider()
                     Button("Copy Title Design") {
@@ -189,6 +191,9 @@ extension TimelineView {
 
     func updateBlockDrag(_ item: TimelineItem, kind: BlockDrag.Kind, points: CGFloat, start: CMTime, duration: CMTime) {
         model.playback.pause()
+        // The pointer's moves aren't skimming while it drags: the viewer goes back to the playhead
+        // instead of staying on the moment where the drag began.
+        if blockDrag == nil { model.skim(to: nil) }
         if !model.isSelected(item) { model.selection = item }
         var delta = seconds(points)
         snapLine = nil
@@ -224,6 +229,11 @@ extension TimelineView {
             snapLine = nil
         }
         guard let drag = blockDrag, drag.delta != .zero else { return }
+        // ⌥-drag leaves the item where it was and puts a copy where it was dropped (as in Finder).
+        if drag.kind == .move, NSEvent.modifierFlags.contains(.option), let start = model.project.start(of: drag.item) {
+            model.duplicate(drag.item, at: start + drag.delta)
+            return
+        }
         switch (drag.item, drag.kind) {
         case (.title(let id), .move):
             if let title = model.project.title(id: id) { model.moveTitle(id, to: title.start + drag.delta) }
@@ -339,6 +349,7 @@ extension TimelineView {
                     .onEnded { _ in endBlockDrag() }
             )
             .contextMenu {
+                clipboardButtons(for: item)
                 Button("Split at Playhead") {
                     model.selection = item
                     model.splitAtPlayhead()

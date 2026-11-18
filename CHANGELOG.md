@@ -7,6 +7,30 @@ the decisions that shape the code are in `docs/adr/`.
 Moved here from `STATUS.md` on 2026-11-18 (F31); the text is as it was written at the time, so
 "next" in an entry means next *then*.
 
+## 2026-11-18: Usability, step 1 (Mac habits)
+
+- **Usability audit** (`research/usability-audit.md`): a Short made by hand, the code read where
+  the screen raised a question, web research (NN/g, Apple HIG, Nielsen's heuristics, reviews of
+  iMovie and CapCut). 21 findings, U1–U21.
+- **Cut, Copy, Paste, Duplicate** of anything on the timeline (U1, U2): `TimelineClipboard`
+  (`EditorCore/Clipboard.swift`: `Project.copy`, `paste(_:at:)`, `duplicate`) keeps every
+  setting; pasted items get new ids, groups keep their layout, main clips go in at the playhead
+  (splitting the clip there), detached sounds stay with their clip or become ordinary sounds, and
+  files missing from another Short come along (matched by place on disk). Shared by every window
+  (`TimelineClipboardStore` in `AppState`). Edit ▸ Cut/Copy/Paste act on text while typing and on
+  the timeline otherwise; Edit ▸ Duplicate ⌘D; Cut, Copy, Paste at Playhead, Duplicate at the top
+  of every right-click menu; ⌥-drag of a title, B-roll or sound drops a copy. A pasted title is
+  shown fully on screen, like a new one. `ClipboardTests` (EditorCore and app).
+- **Escape** lets go of the selection (after colour picking, the trimmer and ranges) (U3).
+- **Pinch to zoom** the timeline around the fingers (U4).
+- **Fixed (U11):** after dragging a title on the timeline its box in the viewer vanished: skimming
+  stopped during the drag but its time stayed, so the boxes were placed for that moment while the
+  rebuilt player showed the playhead. Skimming ends when a drag starts, and a rebuilt player shows
+  the skimmed moment while skimming.
+- Lint: `EditorKeys.handle`, `EditorModel`, `EditorCommands` and `TimelineView` got smaller
+  (Escape in one helper, music methods to `EditorModel+Sound`, the Edit menu to an extension, the
+  drag types and menu buttons to `TimelineClipMenu.swift`); the baseline only shrank.
+
 ## 2026-11-18: Phase 8 (ship), the shareable release (F32)
 
 - **New app icon** (asked by the user): red, a brighter red circle in a white ring and a rounded

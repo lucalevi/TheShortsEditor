@@ -30,6 +30,24 @@ final class EditorKeys {
         }
     }
 
+    /// Escape stops what is under way, one thing at a time: picking white or skin in the viewer,
+    /// the clip trimmer, a picked range, then what is selected (as in the Finder).
+    private static func handleEscape(_ model: EditorModel) -> Bool {
+        if model.colorPick != nil {
+            model.colorPick = nil
+        } else if model.trimmerClipID != nil {
+            model.trimmerClipID = nil
+        } else if model.timelineRange != nil || model.mediaRange != nil {
+            model.clearRanges()
+        } else if !model.timelineSelection.isEmpty || model.selectedAssetID != nil {
+            model.selection = nil
+            model.selectedAssetID = nil
+        } else {
+            return false
+        }
+        return true
+    }
+
     private static func handle(_ event: NSEvent, _ model: EditorModel) -> Bool {
         // The home window has no timeline: its keys go to its own views.
         guard model.screen == .editor else { return false }
@@ -95,22 +113,10 @@ final class EditorKeys {
             model.cutWords(model.scriptSelection)
             return true
         }
-        // Picking white or skin in the viewer: Escape stops.
-        if event.keyCode == 53, model.colorPick != nil {
-            model.colorPick = nil
-            return true
-        }
-        // A picked range: ⌫ deletes it, Escape lets go of it.
+        if event.keyCode == 53, handleEscape(model) { return true }
+        // A picked range: ⌫ deletes it.
         if model.timelineRange != nil, event.keyCode == 51 || event.keyCode == 117 {
             model.deleteRange()
-            return true
-        }
-        if event.keyCode == 53, model.trimmerClipID != nil {
-            model.trimmerClipID = nil
-            return true
-        }
-        if event.keyCode == 53, model.timelineRange != nil || model.mediaRange != nil {
-            model.clearRanges()
             return true
         }
         // A file selected in Media: E adds it to the end, W puts it in at the playhead.

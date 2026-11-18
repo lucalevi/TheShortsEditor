@@ -131,6 +131,8 @@ enum HelpTopic: String, CaseIterable, Identifiable {
                     "The main clips play one after another. Everything else (B-roll, titles, sounds, music) sits "
                         + "above or below and follows the clip it starts on when you edit.",
                     "Click to select and move the playhead; drag a clip to move it; drag an edge to trim it. ⌘-click selects several items.",
+                    "Copy (⌘C) and Paste (⌘V) work on anything on the timeline: the copy goes in at the playhead, with all its settings. "
+                        + "Duplicate (⌘D) puts a copy right after; ⌥-drag a title, B-roll or sound to drop a copy elsewhere. Pinch to zoom.",
                 ]),
                 Section(
                     heading: "Cutting",
@@ -243,6 +245,9 @@ private struct ShortcutTable: View {
         ("B", "Split at the playhead"),
         ("Q  W", "Trim the start, the end to the playhead"),
         ("Delete", "Delete what is selected"),
+        ("⌘X  ⌘C  ⌘V", "Cut, copy, paste at the playhead"),
+        ("⌘D", "Duplicate"),
+        ("Esc", "Deselect"),
         ("M", "Add a marker"),
         ("S", "Snapping on or off"),
         ("⌘T", "Add a title"),

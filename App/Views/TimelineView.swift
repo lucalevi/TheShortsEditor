@@ -13,6 +13,9 @@ struct TimelineView: View {
     @State var isDropTargeted = false
     /// A title or B-roll clip being dragged: moved, or one of its edges.
     @State var blockDrag: BlockDrag?
+    /// While pinching to zoom: the zoom it started at, and the moment under the fingers with how
+    /// far from the left edge of the visible timeline it was, so that moment stays put.
+    @State private var pinch: (zoom: CGFloat, time: CMTime, visibleX: CGFloat)?
     /// A main clip being dragged to a new place in the storyline.
     @State var reorder: Reorder?
     /// An edge of a main clip being dragged.
@@ -31,26 +34,6 @@ struct TimelineView: View {
     @State var captionEdgeDrag: (pageID: CaptionPage.ID, edge: CaptionEdge, time: CMTime)?
     /// While the music is dragged along the timeline: how far it has moved.
     @State var musicDrag: CMTime?
-
-    struct BlockDrag {
-        enum Kind { case move, start, end }
-        var item: TimelineItem
-        var kind: Kind
-        /// How far it moved, already stuck to an edge when close to one.
-        var delta: CMTime
-    }
-
-    struct Reorder {
-        var id: Clip.ID
-        var dx: CGFloat
-        var destination: Int
-    }
-
-    struct ClipTrim {
-        var id: Clip.ID
-        var edge: ClipEdge
-        var delta: CMTime
-    }
 
     // MARK: Layout
 
@@ -159,6 +142,7 @@ struct TimelineView: View {
                         dragLabel
                     }
                     .coordinateSpace(.named(Self.contentSpace))
+                    .simultaneousGesture(pinchToZoom)
                     .onContinuousHover { phase in
                         switch phase {
                         case .active(let point):
@@ -230,21 +214,6 @@ struct TimelineView: View {
 
     var contentWidth: CGFloat {
         x(for: model.duration) + 10 * pointsPerSecond
-    }
-
-    /// In a right-click menu: deletes all selected items when this one is among several selected,
-    /// otherwise just this one.
-    @ViewBuilder
-    func deleteButton(for item: EditorModel.Selection, single: String) -> some View {
-        let count = model.timelineSelection.count
-        if model.isSelected(item), count > 1 {
-            Button("Delete \(count) Selected Items", role: .destructive) { model.deleteSelection() }
-        } else {
-            Button(single, role: .destructive) {
-                model.selection = item
-                model.deleteSelection()
-            }
-        }
     }
 
     // MARK: Selecting with a rectangle
@@ -818,5 +787,20 @@ struct TimelineView: View {
     func aspect(of asset: MediaAsset?) -> CGFloat {
         guard let size = asset?.displaySize, size.height > 0 else { return 9 / 16 }
         return min(max(size.width / size.height, 0.5), 1.8)
+    }
+}
+
+extension TimelineView {
+    /// Pinching on the trackpad zooms the timeline around the fingers, as in iMovie.
+    var pinchToZoom: some Gesture {
+        MagnifyGesture()
+            .onChanged { value in
+                let start = pinch ?? (model.timelineZoom, time(at: value.startLocation.x), value.startLocation.x - visibleRect.minX)
+                pinch = start
+                let range = EditorModel.zoomRange
+                model.timelineZoom = min(max(start.zoom * value.magnification, range.lowerBound), range.upperBound)
+                scrollPosition.scrollTo(point: CGPoint(x: max(0, x(for: start.time) - start.visibleX), y: visibleRect.minY))
+            }
+            .onEnded { _ in pinch = nil }
     }
 }

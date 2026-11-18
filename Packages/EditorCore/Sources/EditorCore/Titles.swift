@@ -8,7 +8,7 @@ import Foundation
 /// when clips are split, deleted or moved. When the Short gets shorter than the title, the part
 /// after the end is simply not shown (see `visibleRange(in:)`).
 public struct TextOverlay: Identifiable, Codable, Equatable, Sendable {
-    public let id: UUID
+    public internal(set) var id: UUID
     public var text: String
     /// The ready-made look it started from.
     public var style: TitleStyle

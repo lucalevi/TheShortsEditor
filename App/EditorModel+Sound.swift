@@ -219,3 +219,32 @@ extension EditorModel {
         if case .sound(let id)? = selection { project.sound(id: id) } else { nil }
     }
 }
+
+// The music under the Short.
+extension EditorModel {
+    func useAsMusic(_ assetID: MediaAsset.ID) {
+        apply("Add Music") { $0.setMusic(assetID) }
+        if project.music?.assetID == assetID { selection = .music }
+    }
+
+    func removeMusic() {
+        apply("Remove Music") { $0.music = nil }
+        if selection == .music { selection = nil }
+    }
+
+    func editMusic(_ actionName: String, _ change: @escaping (inout BackgroundMusic) -> Void) {
+        apply(actionName) { project in
+            guard var music = project.music else { return }
+            change(&music)
+            project.music = music
+        }
+    }
+
+    func setMusicStart(_ start: CMTime) {
+        apply("Choose Part of Song") { $0.setMusicStart(start) }
+    }
+
+    var musicAsset: MediaAsset? {
+        project.music.flatMap { project.asset(id: $0.assetID) }
+    }
+}

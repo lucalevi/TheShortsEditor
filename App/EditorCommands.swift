@@ -1,3 +1,4 @@
+import AppKit
 import EditorCore
 import RenderEngine
 import SwiftUI
@@ -76,29 +77,7 @@ struct EditorCommands: Commands {
                 .disabled(model.project.timeline.clips.isEmpty || model.screen == .home)
         }
 
-        CommandGroup(after: .pasteboard) {
-            // ⌘A (Edit ▸ Select All) selects everything on the timeline when no text is being
-            // edited; EditorKeys handles that, since the standard item only reaches text fields.
-            Button("Deselect All") { model.selection = nil }
-                .keyboardShortcut("a", modifiers: [.command, .shift])
-                .disabled(model.timelineSelection.isEmpty)
-            Divider()
-            Button("Copy Settings") { model.copySettings() }
-                .keyboardShortcut("c", modifiers: [.command, .option])
-                .disabled(model.settingsSource.clip == nil && model.settingsSource.title == nil)
-            Menu("Paste Settings") {
-                Button("All") { model.pasteAllSettings() }
-                    .keyboardShortcut("v", modifiers: [.command, .option])
-                Divider()
-                ForEach(SettingsKind.allCases) { kind in
-                    Button(kind.displayName) { model.pasteSettings([kind]) }
-                        .disabled(model.copiedClip == nil)
-                }
-                Button("Title Design") { model.pasteTitleDesign() }
-                    .disabled(model.copiedTitle == nil)
-            }
-            .disabled(!model.canPasteSettings)
-        }
+        editMenu
 
         CommandMenu("Clip") {
             Button("Split at Playhead") { model.splitAtPlayhead() }
@@ -545,6 +524,58 @@ struct WindowCommands: Commands {
         CommandGroup(replacing: .help) {
             Button("Shorts Editor Help") { openWindow(id: HelpView.windowID) }
                 .keyboardShortcut("?", modifiers: .command)
+        }
+    }
+}
+
+// Edit menu: Cut, Copy, Paste and Duplicate, selecting, and copying settings.
+extension EditorCommands {
+    var editMenu: some Commands {
+        // Cut, Copy and Paste act on the text being typed, as everywhere on the Mac, and otherwise
+        // on the timeline's items (EditorModel+Clipboard).
+        CommandGroup(replacing: .pasteboard) {
+            Button("Cut") { perform(#selector(NSText.cut(_:))) { model.cutItems() } }
+                .keyboardShortcut("x")
+            Button("Copy") { perform(#selector(NSText.copy(_:))) { model.copyItems() } }
+                .keyboardShortcut("c")
+            Button("Paste") { perform(#selector(NSText.paste(_:))) { model.pasteItems() } }
+                .keyboardShortcut("v")
+            Button("Duplicate") { model.duplicateItems() }
+                .keyboardShortcut("d")
+                .disabled(!model.canCopyItems)
+            // ⌘A selects everything on the timeline when no text is being edited (EditorKeys).
+            Button("Select All") { perform(#selector(NSText.selectAll(_:))) { model.selectAllOnTimeline() } }
+                .keyboardShortcut("a")
+            Button("Deselect All") { model.selection = nil }
+                .keyboardShortcut("a", modifiers: [.command, .shift])
+                .disabled(model.timelineSelection.isEmpty)
+            Divider()
+            Button("Copy Settings") { model.copySettings() }
+                .keyboardShortcut("c", modifiers: [.command, .option])
+                .disabled(model.settingsSource.clip == nil && model.settingsSource.title == nil)
+            Menu("Paste Settings") {
+                Button("All") { model.pasteAllSettings() }
+                    .keyboardShortcut("v", modifiers: [.command, .option])
+                Divider()
+                ForEach(SettingsKind.allCases) { kind in
+                    Button(kind.displayName) { model.pasteSettings([kind]) }
+                        .disabled(model.copiedClip == nil)
+                }
+                Button("Title Design") { model.pasteTitleDesign() }
+                    .disabled(model.copiedTitle == nil)
+            }
+            .disabled(!model.canPasteSettings)
+        }
+    }
+
+    /// Sends a standard edit action to the text being typed; otherwise, in an editor window, does
+    /// `timelineAction` (in other windows the action goes where it always does).
+    private func perform(_ textAction: Selector, else timelineAction: () -> Void) {
+        let window = NSApp.keyWindow
+        if window?.firstResponder is NSText || window == nil || window !== model.window {
+            NSApp.sendAction(textAction, to: nil, from: nil)
+        } else {
+            timelineAction()
         }
     }
 }
