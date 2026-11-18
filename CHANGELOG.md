@@ -9,6 +9,11 @@ Moved here from `STATUS.md` on 2026-11-18 (F31); the text is as it was written a
 
 ## 2026-11-18: Phase 8 (ship), the shareable release (F32)
 
+- **New app icon** (asked by the user): red, a brighter red circle in a white ring and a rounded
+  white play sign, on the Mac's rounded-square body; a circle, not YouTube's wide rounded
+  rectangle. Drawn by `Tools/icon/make-icon.swift` (a folder as argument writes a test set and a
+  1024-pixel `preview.png` there). Checked at 16 px and as the running app's icon (macOS 26 adds
+  its glass finish). The `.dmg` isn't remade yet.
 - **Decided by the user:** no paid Developer ID (ADR 0011); the app is shared as an ad hoc signed
   `.dmg` on GitHub Releases with first-launch instructions. Report a Problem… (F21's second half)
   skipped: a one-person project can't take bug reports as they come.

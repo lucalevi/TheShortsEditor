@@ -6,7 +6,7 @@ _Last updated: 2026-11-18. The current state only: read it first when picking th
 
 Shorts Editor is feature-complete for its plan: the P0 list, roadmap features 1–12, the iMovie list (stages A–F) and the CapCut list (stages G–L) are built, tested and checked on screen. The engineering-excellence plan (`research/engineering-excellence.md`) is done for phases 1–7 (safety net, never lose work, correct pictures, architecture, tests for the app, responsiveness, platform fit), except F26 (Italian), which the user postponed. Phase 8 (ship) is under way.
 
-**Pick up here (2026-11-18):** F24 and F31 of Phase 8 are done (below), `make check` green, checked on screen, committed and pushed (cfd0389). **F32 is built** (below): `make release` makes `build/dist/Shorts-Editor-0.1.0.dmg`, checked; Check for Updates… works. **Next: the user picks the first version number and says to publish (`make publish`); then F26 (Italian) whenever wanted.** F21's second half (Report a Problem…) is skipped by the user.
+**Pick up here (2026-11-18):** F24 and F31 of Phase 8 are done (below), `make check` green, checked on screen, committed and pushed (cfd0389). **F32 is built** (below): `make release` makes `build/dist/Shorts-Editor-0.1.0.dmg`, checked (built before the new red icon: remake it before publishing); Check for Updates… works. **Version: 0.1.0 (a beta), not to be published yet (user, 2026-11-18). Next: publish when the user says (`make publish` remakes the `.dmg`); F26 (Italian) whenever wanted.** F21's second half (Report a Problem…) is skipped by the user.
 
 Repository: https://github.com/lucalevi/TheShortsEditor (public, branch `main`).
 
@@ -24,7 +24,7 @@ Phases 1–7 and their checklists: `CHANGELOG.md`. F26 (String Catalog and Itali
 - **Screen Recording for Xcode's test runner** (System Settings ▸ Privacy & Security): the accessibility audit UI test (`TEST_RUNNER_SHORTS_UI_AUDIT=1 make uitest`) fails before auditing without it.
 - **F26 (Italian):** when wanted.
 - **F21 Report a Problem…:** skipped; only if the user asks for it.
-- **First release:** which version number (0.1.0 as now, or 1.0.0), and the go-ahead to publish it on the public repo.
+- **First release:** 0.1.0 (beta), published only when the user says so.
 
 ## Open questions for the user
 

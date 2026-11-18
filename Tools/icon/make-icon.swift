@@ -1,6 +1,8 @@
 // Draws the app icon (App/Assets.xcassets/AppIcon.appiconset) with Core Graphics, so it can be
-// changed and remade: `swift Tools/icon/make-icon.swift`.
-// A vertical 9:16 frame with a play sign (a Short), over a timeline strip with a playhead.
+// changed and remade: `swift Tools/icon/make-icon.swift` (a folder as argument writes there
+// instead, plus a 1024-pixel `preview.png`).
+// Red, with a red circle and a play sign in the middle. Kept apart from YouTube's logo on purpose:
+// a circle with a white ring, not a wide rounded rectangle, on the Mac's rounded-square body.
 import AppKit
 import CoreGraphics
 
@@ -8,6 +10,8 @@ let size: CGFloat = 1024
 let space = CGColorSpace(name: CGColorSpace.sRGB)!
 
 func color(_ r: CGFloat, _ g: CGFloat, _ b: CGFloat, _ a: CGFloat = 1) -> CGColor { CGColor(colorSpace: space, components: [r / 255, g / 255, b / 255, a])! }
+
+func gradient(_ colors: [CGColor]) -> CGGradient { CGGradient(colorsSpace: space, colors: colors as CFArray, locations: nil)! }
 
 func draw() -> CGImage {
     let context = CGContext(
@@ -20,58 +24,54 @@ func draw() -> CGImage {
     context.saveGState()
     context.setShadow(offset: CGSize(width: 0, height: -12), blur: 28, color: color(0, 0, 0, 0.45))
     context.addPath(shape)
-    context.setFillColor(color(30, 31, 36))
+    context.setFillColor(color(150, 10, 18))
     context.fillPath()
     context.restoreGState()
-    // Background: dark grey, lighter at the top, like the editor.
+    // Background: deep red, lighter at the top.
     context.saveGState()
     context.addPath(shape)
     context.clip()
-    let gradient = CGGradient(colorsSpace: space, colors: [color(58, 60, 70), color(22, 23, 28)] as CFArray, locations: [0, 1])!
-    context.drawLinearGradient(gradient, start: CGPoint(x: 512, y: 924), end: CGPoint(x: 512, y: 100), options: [])
+    context.drawLinearGradient(gradient([color(236, 38, 44), color(150, 8, 18)]), start: CGPoint(x: 512, y: 924), end: CGPoint(x: 512, y: 100), options: [])
 
-    // The timeline strip: three clips and a playhead.
-    let stripY: CGFloat = 196, stripHeight: CGFloat = 92
-    let clips: [(CGFloat, CGFloat, CGColor)] = [(176, 230, color(64, 132, 255)), (414, 170, color(48, 176, 170)), (592, 256, color(142, 98, 230))]
-    for (x, width, fill) in clips {
-        let rect = CGRect(x: x, y: stripY, width: width, height: stripHeight)
-        context.addPath(CGPath(roundedRect: rect, cornerWidth: 18, cornerHeight: 18, transform: nil))
-        context.setFillColor(fill)
-        context.fillPath()
-    }
-    // Playhead.
-    context.setFillColor(color(255, 69, 58))
-    context.fill(CGRect(x: 505, y: stripY - 26, width: 14, height: stripHeight + 52))
-    context.move(to: CGPoint(x: 484, y: stripY + stripHeight + 26))
-    context.addLine(to: CGPoint(x: 540, y: stripY + stripHeight + 26))
-    context.addLine(to: CGPoint(x: 512, y: stripY + stripHeight - 4))
-    context.closePath()
-    context.fillPath()
-
-    // The Short: a vertical 9:16 frame.
-    let frameHeight: CGFloat = 520, frameWidth = frameHeight * 9 / 16
-    let frame = CGRect(x: 512 - frameWidth / 2, y: 352, width: frameWidth, height: frameHeight)
-    let framePath = CGPath(roundedRect: frame, cornerWidth: 44, cornerHeight: 44, transform: nil)
-    context.addPath(framePath)
-    context.setFillColor(color(245, 245, 247))
-    context.fillPath()
-    let screen = frame.insetBy(dx: 18, dy: 18)
-    context.addPath(CGPath(roundedRect: screen, cornerWidth: 30, cornerHeight: 30, transform: nil))
-    let screenGradient = CGGradient(colorsSpace: space, colors: [color(94, 92, 230), color(255, 55, 140)] as CFArray, locations: [0, 1])!
+    let center = CGPoint(x: 512, y: 512)
+    // The circle's shadow on the background.
     context.saveGState()
-    context.clip()
-    context.drawLinearGradient(screenGradient, start: CGPoint(x: screen.minX, y: screen.maxY), end: CGPoint(x: screen.maxX, y: screen.minY), options: [])
-    context.restoreGState()
-    // Play sign.
-    let triangle = CGMutablePath()
-    let cx = frame.midX + 12, cy = frame.midY
-    triangle.move(to: CGPoint(x: cx - 58, y: cy + 78))
-    triangle.addLine(to: CGPoint(x: cx + 74, y: cy))
-    triangle.addLine(to: CGPoint(x: cx - 58, y: cy - 78))
-    triangle.closeSubpath()
-    context.addPath(triangle)
+    context.setShadow(offset: CGSize(width: 0, height: -16), blur: 36, color: color(70, 0, 6, 0.55))
+    context.addEllipse(in: CGRect(x: center.x - 300, y: center.y - 300, width: 600, height: 600))
     context.setFillColor(color(255, 255, 255))
     context.fillPath()
+    context.restoreGState()
+    // White ring, then the red circle inside it, brighter than the background.
+    context.addEllipse(in: CGRect(x: center.x - 300, y: center.y - 300, width: 600, height: 600))
+    context.setFillColor(color(255, 255, 255))
+    context.fillPath()
+    let inner = CGRect(x: center.x - 262, y: center.y - 262, width: 524, height: 524)
+    context.saveGState()
+    context.addEllipse(in: inner)
+    context.clip()
+    context.drawLinearGradient(
+        gradient([color(255, 72, 64), color(208, 16, 30)]), start: CGPoint(x: 512, y: inner.maxY), end: CGPoint(x: 512, y: inner.minY), options: [])
+    context.restoreGState()
+
+    // Play sign: a rounded triangle, its visual centre on the circle's centre.
+    let triangle = CGMutablePath()
+    let cx = center.x + 26, cy = center.y
+    triangle.move(to: CGPoint(x: cx - 92, y: cy + 128))
+    triangle.addLine(to: CGPoint(x: cx + 128, y: cy))
+    triangle.addLine(to: CGPoint(x: cx - 92, y: cy - 128))
+    triangle.closeSubpath()
+    context.saveGState()
+    // Fill and rounded outline as one layer, so the shadow falls only outside the sign.
+    context.setShadow(offset: CGSize(width: 0, height: -6), blur: 14, color: color(90, 0, 8, 0.4))
+    context.beginTransparencyLayer(auxiliaryInfo: nil)
+    context.addPath(triangle)
+    context.setFillColor(color(255, 255, 255))
+    context.setStrokeColor(color(255, 255, 255))
+    context.setLineWidth(44)
+    context.setLineJoin(.round)
+    context.drawPath(using: .fillStroke)
+    context.endTransparencyLayer()
+    context.restoreGState()
     context.restoreGState()
     return context.makeImage()!
 }
@@ -79,6 +79,9 @@ func draw() -> CGImage {
 let folder = URL(fileURLWithPath: CommandLine.arguments.count > 1 ? CommandLine.arguments[1] : "App/Assets.xcassets/AppIcon.appiconset")
 try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
 let image = draw()
+if CommandLine.arguments.count > 1 {
+    try NSBitmapImageRep(cgImage: image).representation(using: .png, properties: [:])!.write(to: folder.appending(path: "preview.png"))
+}
 var entries: [String] = []
 for points in [16, 32, 128, 256, 512] {
     for scale in [1, 2] {
@@ -98,5 +101,7 @@ for points in [16, 32, 128, 256, 512] {
 }
 let contents = #"{"images":[\#(entries.joined(separator: ","))],"info":{"author":"xcode","version":1}}"#
 try Data(contents.utf8).write(to: folder.appending(path: "Contents.json"))
-try Data(#"{"info":{"author":"xcode","version":1}}"#.utf8).write(to: folder.deletingLastPathComponent().appending(path: "Contents.json"))
+if CommandLine.arguments.count == 1 {
+    try Data(#"{"info":{"author":"xcode","version":1}}"#.utf8).write(to: folder.deletingLastPathComponent().appending(path: "Contents.json"))
+}
 print("Wrote \(entries.count) icons to \(folder.path)")
