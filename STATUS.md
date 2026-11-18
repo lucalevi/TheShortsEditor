@@ -6,14 +6,14 @@ _Last updated: 2026-11-18. The current state only: read it first when picking th
 
 Shorts Editor is feature-complete for its plan: the P0 list, roadmap features 1–12, the iMovie list (stages A–F) and the CapCut list (stages G–L) are built, tested and checked on screen. The engineering-excellence plan (`research/engineering-excellence.md`) is done for phases 1–7 (safety net, never lose work, correct pictures, architecture, tests for the app, responsiveness, platform fit), except F26 (Italian), which the user postponed. Phase 8 (ship) is under way.
 
-**Pick up here (2026-11-18):** F24 and F31 of Phase 8 are done (below), `make check` green, checked on screen; not committed yet. **Next: F21 second half (Help ▸ Report a Problem…), then F32 once the user decides on the Developer ID, and F26 (Italian) whenever the user wants it.**
+**Pick up here (2026-11-18):** F24 and F31 of Phase 8 are done (below), `make check` green, checked on screen, committed and pushed (cfd0389). **Next: F32 without a Developer ID (decided 2026-11-18, below). F21's second half (Report a Problem…) is skipped and F26 (Italian) postponed, both by the user.**
 
 Repository: https://github.com/lucalevi/TheShortsEditor (public, branch `main`).
 
 ## Phase 8: ship
 
-- [ ] F32 Developer ID (still to be decided, 99 USD/yr), notarization + stapling, signed `.dmg`, Sparkle updates, semantic versions, privacy manifest, `make release`
-- [ ] F21 (second half) MetricKit crash/hang reports; Help ▸ Report a Problem… (log + project structure, no media)
+- [ ] F32 **without a Developer ID** (user, 2026-11-18; `docs/adr/0011-no-developer-id.md`): ad hoc signed app in a `.dmg` (drag to Applications, a "How to open" note inside) attached to a GitHub Release; first-launch instructions (macOS 15+ removed Control-click ▸ Open: open once, then System Settings ▸ Privacy & Security ▸ Open Anyway; or `xattr -dr com.apple.quarantine`); semantic versions with an automated build number; release notes from `CHANGELOG.md`; Help ▸ Check for Updates… reads the GitHub Releases page and links to the download (no Sparkle: it can't install over an unnotarized app cleanly); `make release` does it all. No notarization, no privacy manifest needed outside the App Store (optional).
+- [ ] F21 (second half) Help ▸ Report a Problem… (log + project structure, no media): **skipped by the user (2026-11-18)**: one person can't take in and fix bug reports as they come. MetricKit hang/crash reports are already kept (`App/HangReports.swift`, Phase 6), so this can be added later if wanted.
 - [x] F31 (2026-11-18) `STATUS.md` kept to the current state; history in `CHANGELOG.md`; decisions as ADRs in `docs/adr/` (10); DocC catalogs for EditorCore and RenderEngine, `make docs` (all three libraries, no new dependency: `xcodebuild docbuild`)
 - [x] F24 (2026-11-18) **Delete Generated Files…** on each Short in All Shorts (⋯ and right-click): the copies made for that Short alone, with their size, after asking; kept when another Short uses them; refused while the Short is open. Settings ▸ Storage lists each Short's own copies with Delete… Checked on screen. Found on the way: Settings was taller than a laptop's screen (Storage out of reach); it scrolls now.
 
@@ -21,9 +21,9 @@ Phases 1–7 and their checklists: `CHANGELOG.md`. F26 (String Catalog and Itali
 
 ## Waiting on the user
 
-- **Developer ID** (99 USD/yr): needed for F32 (opening the app on other Macs without warnings).
 - **Screen Recording for Xcode's test runner** (System Settings ▸ Privacy & Security): the accessibility audit UI test (`TEST_RUNNER_SHORTS_UI_AUDIT=1 make uitest`) fails before auditing without it.
 - **F26 (Italian):** when wanted.
+- **F21 Report a Problem…:** skipped; only if the user asks for it.
 
 ## Open questions for the user
 
@@ -32,7 +32,7 @@ Phases 1–7 and their checklists: `CHANGELOG.md`. F26 (String Catalog and Itali
 ## Decisions already made (don't re-ask)
 
 - macOS 26+, Apple Silicon. SwiftUI app with AppKit where needed. XcodeGen project.
-- Personal tool first; a shareable **.dmg** later. Opening it without warnings on other Macs needs a paid Apple Developer ID (99 USD/yr), which is still to be decided when sharing starts.
+- Personal tool first; a shareable **.dmg** on GitHub Releases later. **No paid Apple Developer ID (user, 2026-11-18):** the app stays ad hoc signed and people open it past the "unknown developer" warning with written instructions (ADR 0011).
 - Caption languages: **English, Italian, German, French**. All four are available in Apple's on-device `SpeechTranscriber` (checked on this Mac).
 - Support all kinds of footage, with **very friendly, intuitive UX** as the top requirement.
 - Repo is public on GitHub.

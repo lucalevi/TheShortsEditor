@@ -12,3 +12,4 @@ Short records of decisions that shape the code: why, and what follows from them.
 - [8. Transitions don't change the Short's length](0008-transitions-keep-length.md)
 - [9. Colour is decided in one place](0009-one-colour-pipeline.md)
 - [10. Blocking work never runs on Swift's shared threads](0010-no-blocking-on-shared-threads.md)
+- [11. Shared without a Developer ID: ad hoc signed .dmg on GitHub Releases](0011-no-developer-id.md)
