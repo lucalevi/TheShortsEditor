@@ -231,6 +231,8 @@ struct ClipBlock: View, Equatable {
     let tooLoud: [CMTimeRange]
     let pointsPerSecond: CGFloat
     let isSelected: Bool
+    /// The height of the sound wave at the bottom (Clip Size).
+    let waveHeight: CGFloat
     /// Plays a backwards copy of its file.
     var isReversed = false
     /// Being turned round: how far the backwards copy is.
@@ -238,13 +240,10 @@ struct ClipBlock: View, Equatable {
 
     nonisolated static func == (a: ClipBlock, b: ClipBlock) -> Bool {
         a.clip == b.clip && a.isReversed == b.isReversed && a.progress == b.progress && a.name == b.name && a.tooLoud == b.tooLoud && a.aspect == b.aspect
-            && a.pointsPerSecond == b.pointsPerSecond
+            && a.pointsPerSecond == b.pointsPerSecond && a.waveHeight == b.waveHeight
             && a.isSelected == b.isSelected && a.levels?.decibels.count == b.levels?.decibels.count
             && a.filmstrip?.images.count == b.filmstrip?.images.count
     }
-
-    static let waveHeight: CGFloat = 24
-    private var waveHeight: CGFloat { Self.waveHeight }
 
     var body: some View {
         RoundedRectangle(cornerRadius: 6)
@@ -378,24 +377,38 @@ struct ClipBlock: View, Equatable {
 }
 
 /// Files dragged over the main clips: tells where they are (for the landing marker) and hands
-/// over the files when dropped.
+/// over the files when dropped. Tiles from the browser (dragged as text) go to `onText`.
 struct ClipRowDrop: DropDelegate {
     let onUpdate: (CGFloat?) -> Void
     let onDrop: ([URL], CGFloat) -> Void
+    var onText: (([String], CGFloat) -> Void)?
 
-    func validateDrop(info: DropInfo) -> Bool { info.hasItemsConforming(to: [.fileURL]) }
+    func validateDrop(info: DropInfo) -> Bool {
+        info.hasItemsConforming(to: [.fileURL]) || (onText != nil && info.hasItemsConforming(to: [.plainText]))
+    }
 
     func dropUpdated(info: DropInfo) -> DropProposal? {
-        onUpdate(info.location.x)
+        if info.hasItemsConforming(to: [.fileURL]) { onUpdate(info.location.x) }
         return DropProposal(operation: .copy)
     }
 
     func dropExited(info: DropInfo) { onUpdate(nil) }
 
     func performDrop(info: DropInfo) -> Bool {
-        let providers = info.itemProviders(for: [.fileURL])
         let x = info.location.x
         onUpdate(nil)
+        if !info.hasItemsConforming(to: [.fileURL]), let onText {
+            let providers = info.itemProviders(for: [.plainText])
+            Task { @MainActor in
+                var texts: [String] = []
+                for provider in providers {
+                    if let text = await Self.text(from: provider) { texts.append(text) }
+                }
+                onText(texts, x)
+            }
+            return true
+        }
+        let providers = info.itemProviders(for: [.fileURL])
         Task { @MainActor in
             var urls: [URL] = []
             for provider in providers {
@@ -411,26 +424,30 @@ struct ClipRowDrop: DropDelegate {
             _ = provider.loadObject(ofClass: URL.self) { url, _ in continuation.resume(returning: url) }
         }
     }
+
+    private static func text(from provider: NSItemProvider) async -> String? {
+        await withCheckedContinuation { continuation in
+            _ = provider.loadObject(ofClass: NSString.self) { text, _ in continuation.resume(returning: text as? String) }
+        }
+    }
 }
 
-/// A one-time hint across the top of the timeline.
+/// A one-time hint in the timeline's header (the whole text shows when the pointer is over it).
 struct TipBanner: View {
     let tip: EditorTip
     let dismiss: () -> Void
 
     var body: some View {
-        HStack(spacing: 10) {
-            Image(systemName: tip.systemImage).font(.title3)
-            Text(tip.text).fixedSize(horizontal: false, vertical: true)
-            Button("Got It", action: dismiss).controlSize(.small)
+        HStack(spacing: 6) {
+            Image(systemName: tip.systemImage)
+            Text(tip.text).lineLimit(1).truncationMode(.tail)
+            Button("Got It", action: dismiss).controlSize(.mini)
         }
-        .font(.callout)
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .frame(maxWidth: 620)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 10))
-        .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(Color.white.opacity(0.3), lineWidth: 1))
-        .shadow(radius: 8)
+        .font(.caption)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 3)
+        .background(Color.accentColor.opacity(0.25), in: Capsule())
+        .help(tip.text)
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Tip: \(tip.text)")
     }

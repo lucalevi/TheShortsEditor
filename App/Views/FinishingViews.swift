@@ -195,7 +195,8 @@ struct ClipTrimmerView: View {
     /// How far the drag has moved, in the file's time.
     @State private var dragDelta: Double = 0
 
-    private let stripHeight: CGFloat = 54
+    private let pictureHeight: CGFloat = 54
+    private let waveHeight: CGFloat = 26
 
     var body: some View {
         if let clip = model.project.anyClip(id: clipID), let media = model.project.asset(id: clip.assetID), media.duration > .zero {
@@ -205,6 +206,8 @@ struct ClipTrimmerView: View {
 
     private func content(_ clip: Clip, _ media: MediaAsset) -> some View {
         let fileSeconds = media.duration.seconds
+        // The pictures, with the sound wave under them when the file has sound.
+        let stripHeight = pictureHeight + (media.hasAudio && !media.isImage ? waveHeight : 0)
         let (start, end) = shownRange(clip)
         return VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 10) {
@@ -238,9 +241,9 @@ struct ClipTrimmerView: View {
                         .offset(x: x(start))
                         .gesture(dragGesture(.slide, clip: clip, width: width, fileSeconds: fileSeconds))
                         .help("Drag to show another part of the video at the same length")
-                    handle(.start).offset(x: x(start) - 4)
+                    handle(.start, height: stripHeight).offset(x: x(start) - 4)
                         .gesture(dragGesture(.start, clip: clip, width: width, fileSeconds: fileSeconds))
-                    handle(.end).offset(x: x(end) - 6)
+                    handle(.end, height: stripHeight).offset(x: x(end) - 6)
                         .gesture(dragGesture(.end, clip: clip, width: width, fileSeconds: fileSeconds))
                 }
             }
@@ -265,10 +268,10 @@ struct ClipTrimmerView: View {
         }
     }
 
-    private func handle(_ edge: ClipEdge) -> some View {
+    private func handle(_ edge: ClipEdge, height: CGFloat) -> some View {
         RoundedRectangle(cornerRadius: 2)
             .fill(Color.yellow)
-            .frame(width: 10, height: stripHeight)
+            .frame(width: 10, height: height)
             .overlay(Capsule().fill(.black.opacity(0.6)).frame(width: 2, height: 18))
             .contentShape(Rectangle().inset(by: -4))
             .onHover { inside in if inside { NSCursor.resizeLeftRight.push() } else { NSCursor.pop() } }
@@ -311,8 +314,24 @@ struct ClipTrimmerView: View {
         }
     }
 
-    /// Pictures along the whole file.
+    /// Pictures along the whole file, and its sound wave under them.
     private func strip(_ media: MediaAsset, width: CGFloat) -> some View {
+        VStack(spacing: 0) {
+            pictures(media, width: width)
+            if media.hasAudio, !media.isImage {
+                ZStack {
+                    if let levels = model.audioLevels[media.id], media.duration > .zero {
+                        WaveformView(levels: levels, sourceStart: .zero, pointsPerSecond: width / CGFloat(media.duration.seconds))
+                    }
+                }
+                .frame(width: width, height: waveHeight)
+                .background(Color.black.opacity(0.85))
+            }
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 3))
+    }
+
+    private func pictures(_ media: MediaAsset, width: CGFloat) -> some View {
         Canvas { context, size in
             guard let strip = model.filmstrips[media.id], let first = strip.images.first else { return }
             let tileWidth = size.height * CGFloat(first.width) / CGFloat(max(first.height, 1))
@@ -325,9 +344,8 @@ struct ClipTrimmerView: View {
                 x += tileWidth
             }
         }
-        .frame(width: width, height: stripHeight)
+        .frame(width: width, height: pictureHeight)
         .background(Color.black)
-        .clipShape(RoundedRectangle(cornerRadius: 3))
     }
 }
 

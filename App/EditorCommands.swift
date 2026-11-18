@@ -293,7 +293,7 @@ struct EditorCommands: Commands {
                     }
                 }
                 Divider()
-                Button("Show All Stickers…") { model.showsStickerPicker = true }
+                Button("Show All Stickers") { model.sidebar = .text }
             }
             .disabled(model.project.timeline.clips.isEmpty)
             Button("Follow Something in the Video") { if let id = model.selectedTitleID { model.followInVideo(id) } }
@@ -430,27 +430,16 @@ struct EditorCommands: Commands {
                 .disabled(model.project.timeline.clips.isEmpty)
         }
 
-        CommandGroup(before: .toolbar) {
-            Toggle("Show YouTube Overlay Areas", isOn: Binding(get: { model.showsSafeZone }, set: { model.showsSafeZone = $0 }))
-                .keyboardShortcut("'", modifiers: .command)
-            Toggle("Snapping", isOn: Binding(get: { model.snapsToEdges }, set: { model.snapsToEdges = $0 }))
-                .keyboardShortcut("s", modifiers: [])
-            Toggle("Skimming", isOn: Binding(get: { model.playback.skimsTimeline }, set: { model.playback.skimsTimeline = $0 }))
-            Toggle("Audio Skimming", isOn: Binding(get: { model.playback.skimsAudio }, set: { model.playback.skimsAudio = $0 }))
-                .keyboardShortcut("s", modifiers: .shift)
-                .disabled(!model.playback.skimsTimeline)
-            Button("Zoom In Timeline") { model.zoom(by: 1.5) }
-                .keyboardShortcut("+", modifiers: .command)
-            Button("Zoom Out Timeline") { model.zoom(by: 1 / 1.5) }
-                .keyboardShortcut("-", modifiers: .command)
-            Divider()
-        }
+        viewMenu
     }
 }
 
 /// The standard Open panel, filtered to videos, pictures and sound files.
 enum MediaImportPanel {
+    /// One rule everywhere: files always go into Media; while the Short has no clips yet they also
+    /// go onto the timeline, in order (`addToTimeline` puts them there anyway).
     static func run(model: EditorModel, addToTimeline: Bool) {
+        let addToTimeline = addToTimeline || model.project.timeline.clips.isEmpty
         let panel = NSOpenPanel()
         panel.allowedContentTypes = [.movie, .image, .audio]
         panel.allowsMultipleSelection = true
@@ -530,6 +519,28 @@ struct WindowCommands: Commands {
 
 // Edit menu: Cut, Copy, Paste and Duplicate, selecting, and copying settings.
 extension EditorCommands {
+    /// View: preview, zoom, playback options.
+    var viewMenu: some Commands {
+        CommandGroup(before: .toolbar) {
+            Toggle("Show YouTube Overlay Areas", isOn: Binding(get: { model.showsSafeZone }, set: { model.showsSafeZone = $0 }))
+                .keyboardShortcut("'", modifiers: .command)
+            Toggle("Snapping", isOn: Binding(get: { model.snapsToEdges }, set: { model.snapsToEdges = $0 }))
+                .keyboardShortcut("s", modifiers: [])
+            Toggle("Skimming", isOn: Binding(get: { model.playback.skimsTimeline }, set: { model.playback.skimsTimeline = $0 }))
+            Toggle("Audio Skimming", isOn: Binding(get: { model.playback.skimsAudio }, set: { model.playback.skimsAudio = $0 }))
+                .keyboardShortcut("s", modifiers: .shift)
+                .disabled(!model.playback.skimsTimeline)
+            Button("Zoom In Timeline") { model.zoom(by: 1.5) }
+                .keyboardShortcut("+", modifiers: .command)
+            Button("Zoom Out Timeline") { model.zoom(by: 1 / 1.5) }
+                .keyboardShortcut("-", modifiers: .command)
+            Button("Zoom to Fit") { model.zoomToFit() }
+                .keyboardShortcut("z", modifiers: .shift)
+                .disabled(model.project.timeline.clips.isEmpty)
+            Divider()
+        }
+    }
+
     var editMenu: some Commands {
         // Cut, Copy and Paste act on the text being typed, as everywhere on the Mac, and otherwise
         // on the timeline's items (EditorModel+Clipboard).

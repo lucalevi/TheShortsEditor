@@ -92,7 +92,7 @@ Captions from start to finish (make, edit a word, style, move), voice-over recor
 
 ## 5. Suggested order of work
 
-**Done (2026-11-18):** step 1: U1, U2, U3, U4 (pinch; ⌘+/⌘− were already there) and U11. ⇧Z "Zoom to Fit" is still to do.
+**Done (2026-11-18):** step 1: U1, U2, U3, U4 (pinch; ⌘+/⌘− were already there) and U11. Step 5: U5, U6 (already safe: selecting on the timeline clears the Media selection), U19, U20, U21, ⇧Z. Step 4: U14, U15, U16, U17 (pinned ruler), U18. Step 3: U10, U12, U13 (2026-11-18). Step 2: U7, U8 (Clip Size; the green/yellow/red colours were left out: red already marks sound that may crackle), U9.
 
 1. **Mac habits (U1–U4, U11):** clipboard, Duplicate, ⌥-drag, Escape, pinch zoom, the title-box bug. Small, everywhere, the user asked for it first.
 2. **See the sound (U7–U9):** waves on the music, bigger waves, clip size.

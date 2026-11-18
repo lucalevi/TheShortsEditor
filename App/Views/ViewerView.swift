@@ -47,7 +47,10 @@ struct ViewerView: View {
             } isTargeted: {
                 isDropTargeted = $0
             }
-            TransportBar(hasClips: !model.project.timeline.clips.isEmpty) { model.toggleFullScreenPreview() }
+            TransportBar(
+                hasClips: !model.project.timeline.clips.isEmpty,
+                showsSafeZone: Binding(get: { model.showsSafeZone }, set: { model.showsSafeZone = $0 })
+            ) { model.toggleFullScreenPreview() }
         }
     }
 
@@ -124,6 +127,7 @@ private struct MissingMediaBar: View {
 private struct TransportBar: View {
     @Environment(PlaybackController.self) private var playback
     let hasClips: Bool
+    @Binding var showsSafeZone: Bool
     let toggleFullScreen: () -> Void
 
     var body: some View {
@@ -149,6 +153,9 @@ private struct TransportBar: View {
                 )
             Button("Play Full Screen", systemImage: "arrow.up.left.and.arrow.down.right", action: toggleFullScreen)
                 .help("Watch it full screen on a phone, with YouTube's buttons over it (⇧⌘F)")
+            Toggle("YouTube Overlay Areas", systemImage: "rectangle.dashed", isOn: $showsSafeZone)
+                .toggleStyle(.button)
+                .help("Show where YouTube's buttons and captions cover your video (⌘')")
         }
         .labelStyle(.iconOnly)
         .buttonStyle(.borderless)
@@ -446,7 +453,7 @@ private struct TitleHandles: View {
             let scale = geometry.size.width / Project.canvasSize.width
             // The moment the viewer shows: the skimmed frame while skimming, else the playhead.
             let time = model.playback.skimTime ?? model.playback.currentTime
-            ForEach(model.project.titlesOnScreen(at: time).map(model.withTypedText)) { title in
+            ForEach(titles(at: time)) { title in
                 if let frame = TitlePreview.frame(of: title), let shown = TitlePreview.frame(of: title, at: time) {
                     let isSelected = model.selectedTitleID == title.id
                     let offset = drag?.id == title.id ? drag!.offset : .zero
@@ -462,7 +469,7 @@ private struct TitleHandles: View {
                         .pointerStyle(.grabIdle)
                         .onTapGesture(count: 2) {
                             model.selectedTitleID = title.id
-                            if !title.isSticker { model.wantsTitleTextFocus = true }
+                            if !title.isSticker { model.titleEditedInViewer = title.id }
                         }
                         .onTapGesture { model.selectedTitleID = title.id }
                         .gesture(
@@ -489,9 +496,25 @@ private struct TitleHandles: View {
                         )
                         .help("Click to edit, drag to move. Double-click to change the words.")
                         .titleBoxAccessibility(title, model: model)
+                    if model.titleEditedInViewer == title.id {
+                        ViewerTitleEditor(
+                            model: model, title: title,
+                            box: CGRect(x: rect.minX * scale, y: rect.minY * scale, width: rect.width * scale, height: rect.height * scale),
+                            viewer: geometry.size)
+                    }
                 }
             }
         }
+    }
+
+    /// The titles on screen at `time` with what is being typed in them; the title being typed on
+    /// the picture stays even when the pointer skims away from it.
+    private func titles(at time: CMTime) -> [TextOverlay] {
+        var titles = model.project.titlesOnScreen(at: time)
+        if let id = model.titleEditedInViewer, !titles.contains(where: { $0.id == id }), let edited = model.project.title(id: id) {
+            titles.append(edited)
+        }
+        return titles.map(model.withTypedText)
     }
 
     /// Keeps a title's box on the canvas, as the renderer does.

@@ -102,6 +102,15 @@ enum HelpTopic: String, CaseIterable, Identifiable {
                         "5. Export (⌘E). The file is ready to upload.",
                     ]),
                 Section(
+                    heading: "Where things are",
+                    lines: [
+                        "On the left, a tab for everything you can put in your Short: Media, Audio (music, voice-overs, sound effects), "
+                            + "Text (titles, stickers), Transitions, Effects (and filters) and Captions. Click a tile to add it at the playhead, "
+                            + "or drag it onto the timeline.",
+                        "On the right, the details of what is selected, in tabs: Picture, Colour, Speed, Sound and Effects.",
+                        "Drag the line above the timeline to give it more room.",
+                    ]),
+                Section(
                     heading: "Saving",
                     lines: [
                         "Your Short is saved by itself a second after every change. There is nothing to remember to do. "
@@ -112,7 +121,7 @@ enum HelpTopic: String, CaseIterable, Identifiable {
             [
                 Section(lines: [
                     "Drag files from Finder onto the timeline or into Media, use File ▸ Import Media… (⌘I), "
-                        + "or pick from your Photos library in the Photos tab.",
+                        + "or pick from your Photos library in Media ▸ Photos Library.",
                     "Videos, pictures and sound files all work. Wide videos are shown whole over a blurred copy of themselves; "
                         + "choose Fill Screen in the clip's details to fill the screen instead.",
                     "Double-click something in Media to add it to the end, or drag it onto a clip to put it in "
@@ -133,6 +142,7 @@ enum HelpTopic: String, CaseIterable, Identifiable {
                     "Click to select and move the playhead; drag a clip to move it; drag an edge to trim it. ⌘-click selects several items.",
                     "Copy (⌘C) and Paste (⌘V) work on anything on the timeline: the copy goes in at the playhead, with all its settings. "
                         + "Duplicate (⌘D) puts a copy right after; ⌥-drag a title, B-roll or sound to drop a copy elsewhere. Pinch to zoom.",
+                    "View ▸ Clip Size (or the menu above the timeline) makes clips taller, with bigger pictures and sound waves.",
                 ]),
                 Section(
                     heading: "Cutting",
@@ -151,7 +161,7 @@ enum HelpTopic: String, CaseIterable, Identifiable {
         case .text:
             [
                 Section(lines: [
-                    "⌘T adds a title at the playhead. Type the words in the details on the right, choose a "
+                    "⌘T adds a title at the playhead. Type the words on the picture (double-click a title, or press Return, to change them), choose a "
                         + "look, and drag the title in the viewer to place it.",
                     "Keep titles inside the dotted lines in the viewer: outside them, YouTube's buttons cover them.",
                     "Stickers (emoji and symbols) and ready-made texts such as Subscribe are in the Text menu. A "
@@ -173,7 +183,7 @@ enum HelpTopic: String, CaseIterable, Identifiable {
                 Section(lines: [
                     "Drag the yellow line on a clip's waveform up or down to change its volume; drag the dots at its top corners to fade in and out.",
                     "Sound ▸ Add Music adds a song under the whole Short. It is lowered by itself while people talk.",
-                    "Record a voice-over with Sound ▸ Record Voice-Over (or in the Sounds panel): a "
+                    "Record a voice-over with Sound ▸ Record Voice-Over (or in the Audio tab on the left): a "
                         + "countdown starts, then speak while the Short plays.",
                     "Voice clean-up takes away background noise and music from what people say.",
                     "When you export, the sound is brought to the loudness YouTube plays Shorts at, so yours is neither too quiet nor turned down.",
@@ -182,8 +192,8 @@ enum HelpTopic: String, CaseIterable, Identifiable {
         case .looks:
             [
                 Section(lines: [
-                    "Select a clip to see its details on the right: filters and colour, speed, effects, steadying, "
-                        + "removing the background, and how the picture is placed and moves.",
+                    "Select a clip to see its details on the right, in tabs: Picture (placing, steadying, removing the background), "
+                        + "Colour (filters and sliders), Speed, Sound and Effects (how it comes in and goes out, effects, the transition after it).",
                     "Drag the picture in the viewer to move it, drag a corner to resize it, and drag the round knob to turn it.",
                     "Transitions go on the cuts between clips (⌥T adds one at the nearest cut). They never change how long your Short is.",
                 ])

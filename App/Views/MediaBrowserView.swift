@@ -71,25 +71,21 @@ struct MediaBrowserView: View {
     }
 }
 
-/// The left panel: imported media, or the captions.
+/// The browser on the left: a tab for each kind of thing that can be put in a Short.
 struct SidebarView: View {
     @Bindable var model: EditorModel
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack {
-                Picker("Show", selection: $model.sidebar) {
-                    ForEach(EditorModel.Sidebar.allCases.filter { $0 != .storyboard }) { Text($0.rawValue).tag($0) }
-                }
-                .pickerStyle(.segmented)
-                .labelsHidden()
-                // Five tabs: the small size keeps them inside the panel.
-                .controlSize(.small)
-                if model.isImporting { ProgressView().controlSize(.small) }
+            HStack(spacing: 0) {
+                DetailsTabBar(
+                    tabs: BrowserTab.allCases, selection: BrowserTab(model.sidebar), onSelect: { model.sidebar = $0.sidebar },
+                    name: \.displayName, systemImage: \.systemImage, help: \.help)
+                if model.isImporting { ProgressView().controlSize(.small).padding(.leading, 4) }
             }
-            .padding(.horizontal, 10)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 4)
             .frame(maxWidth: .infinity)
-            .frame(height: 32)
             .background(Theme.header)
             .overlay(alignment: .bottom) { Divider() }
 
@@ -114,17 +110,22 @@ struct SidebarView: View {
                 .help("What to film for each shot, and which clip fills it")
             }
 
-            Group {
+            VStack(spacing: 0) {
                 switch model.sidebar {
-                case .media: MediaBrowserView(model: model)
-                case .photos: PhotosView(model: model)
-                case .captions: CaptionsView(model: model)
-                case .script: ScriptView(model: model)
-                case .sounds: SoundsView(model: model)
+                case .media, .photos:
+                    BrowserSubPicker(model: model, choices: [(.media, "Your Media"), (.photos, "Photos Library")])
+                    if model.sidebar == .media { MediaBrowserView(model: model) } else { PhotosView(model: model) }
+                case .audio: AudioBrowser(model: model)
+                case .text: TextBrowser(model: model)
+                case .transitions: TransitionsBrowser(model: model)
+                case .effects: EffectsBrowser(model: model)
+                case .captions, .script:
+                    BrowserSubPicker(model: model, choices: [(.captions, "Captions"), (.script, "Script")])
+                    if model.sidebar == .captions { CaptionsView(model: model) } else { ScriptView(model: model) }
                 case .storyboard: StoryboardView(model: model)
                 }
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         }
         .background(Theme.panel)
     }

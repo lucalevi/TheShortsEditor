@@ -25,8 +25,23 @@ final class EditorKeys {
         }
         // R is held while dragging a range: notice when it is let go.
         upMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyUp) { [weak model] event in
-            if event.keyCode == 15 { model?.isRangeKeyDown = false }
+            if event.charactersIgnoringModifiers?.lowercased() == "r" { model?.isRangeKeyDown = false }
             return event
+        }
+    }
+
+    /// Escape (below), or Return with a title selected: type its words on the picture, as Return
+    /// renames a file in the Finder.
+    private static func handleEscapeOrReturn(_ keyCode: UInt16, _ model: EditorModel) -> Bool {
+        switch keyCode {
+        case 53:
+            return handleEscape(model)
+        case 36, 76:
+            guard let title = model.selectedTitle, !title.isSticker else { return false }
+            model.editTitleTextInViewer()
+            return true
+        default:
+            return false
         }
     }
 
@@ -47,6 +62,22 @@ final class EditorKeys {
         }
         return true
     }
+
+    /// The single letters, as in iMovie: J K L play, B splits, Q W trim to the playhead, S snapping,
+    /// R (held) picks a range, X picks a clip's range, M a marker. E does nothing without a file.
+    private static let letterKeys: [String: (EditorModel) -> Void] = [
+        "j": { $0.playback.shuttle(forward: false) },
+        "k": { $0.playback.pause() },
+        "l": { $0.playback.shuttle(forward: true) },
+        "b": { $0.splitAtPlayhead() },
+        "q": { $0.trimToPlayhead(removing: .start) },
+        "w": { $0.trimToPlayhead(removing: .end) },
+        "s": { $0.snapsToEdges.toggle() },
+        "r": { $0.isRangeKeyDown = true },
+        "x": { $0.selectClipRange() },
+        "m": { $0.addMarker() },
+        "e": { _ in },
+    ]
 
     private static func handle(_ event: NSEvent, _ model: EditorModel) -> Bool {
         // The home window has no timeline: its keys go to its own views.
@@ -113,15 +144,17 @@ final class EditorKeys {
             model.cutWords(model.scriptSelection)
             return true
         }
-        if event.keyCode == 53, handleEscape(model) { return true }
+        if handleEscapeOrReturn(event.keyCode, model) { return true }
         // A picked range: ⌫ deletes it.
         if model.timelineRange != nil, event.keyCode == 51 || event.keyCode == 117 {
             model.deleteRange()
             return true
         }
+        // Letters are matched by what the key types, so they work on every keyboard layout.
+        let letter = event.charactersIgnoringModifiers?.lowercased() ?? ""
         // A file selected in Media: E adds it to the end, W puts it in at the playhead.
-        if model.selectedAssetID != nil, model.sidebar == .media, event.keyCode == 14 || event.keyCode == 13 {
-            if event.keyCode == 14 { model.appendSelectedMedia() } else { model.insertSelectedMedia() }
+        if model.selectedAssetID != nil, model.sidebar == .media, letter == "e" || letter == "w" {
+            if letter == "e" { model.appendSelectedMedia() } else { model.insertSelectedMedia() }
             return true
         }
         // In the Media panel, ⌫ removes the selected file.
@@ -129,19 +162,13 @@ final class EditorKeys {
             model.removeAssets([id])
             return true
         }
+        // With ⇧ a letter is a menu's (⇧S audio skimming, ⇧Z zoom to fit), not the plain key's.
+        if !event.modifierFlags.contains(.shift), let action = letterKeys[letter] {
+            action(model)
+            return true
+        }
         switch event.keyCode {
         case 49: model.playback.togglePlayback() // Space
-        case 38: model.playback.shuttle(forward: false) // J
-        case 40: model.playback.pause() // K
-        case 37: model.playback.shuttle(forward: true) // L
-        case 11: model.splitAtPlayhead() // B
-        case 12: model.trimToPlayhead(removing: .start) // Q
-        case 13: model.trimToPlayhead(removing: .end) // W
-        case 1: model.snapsToEdges.toggle() // S
-        case 15: model.isRangeKeyDown = true // R (held while dragging a range)
-        case 7: model.selectClipRange() // X
-        case 46: model.addMarker() // M
-        case 14: break // E without a file selected
         case 123: model.playback.step(frames: -1) // ←
         case 124: model.playback.step(frames: 1) // →
         case 51, 117: model.deleteSelection() // ⌫, ⌦

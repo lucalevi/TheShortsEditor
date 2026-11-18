@@ -211,7 +211,7 @@ extension Project {
     }
 
     /// Where each pass of the song plays: (timeline start, song part). One pass unless it loops.
-    package var musicPasses: [(start: CMTime, source: CMTimeRange)] { musicPasses(through: duration) }
+    public var musicPasses: [(start: CMTime, source: CMTimeRange)] { musicPasses(through: duration) }
 
     /// The same if the Short lasted until `end`.
     package func musicPasses(through end: CMTime) -> [(start: CMTime, source: CMTimeRange)] {

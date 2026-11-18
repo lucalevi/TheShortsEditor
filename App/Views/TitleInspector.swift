@@ -8,11 +8,6 @@ struct TitleInspector: View {
     let model: EditorModel
     let title: TextOverlay
 
-    /// What the user is typing. Saved once, when editing ends. Only written while editing: as focus
-    /// leaves, the field hands back the project's text, which must not replace what was typed.
-    @State private var draft = ""
-    @FocusState private var isEditing: Bool
-
     private var isCovered: Bool {
         TitlePreview.frame(of: title).map(SafeZone.covers) ?? false
     }
@@ -40,34 +35,16 @@ struct TitleInspector: View {
 
             Button(title.isSticker ? "Delete Sticker" : "Delete Title", systemImage: "trash", role: .destructive) { model.deleteSelection() }
         }
-        .onAppear(perform: focusTextIfAsked)
-        .onChange(of: model.wantsTitleTextFocus) { focusTextIfAsked() }
-        .onDisappear { if isEditing { save() } }
     }
 
     @ViewBuilder
     private var textSections: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text("Text").font(.subheadline.weight(.semibold))
-            TextField("Your title", text: Binding(get: { isEditing ? draft : title.text }, set: { if isEditing { draft = $0 } }), axis: .vertical)
+            TitleTextField(model: model, title: title, answersFocusRequests: true)
                 .lineLimit(1...5)
                 .textFieldStyle(.roundedBorder)
-                .focused($isEditing)
-                .onSubmit { isEditing = false }
-                .onChange(of: draft) { _, typed in
-                    // Shown in the viewer as it is typed; saved when editing ends.
-                    guard isEditing else { return }
-                    let text = typed.trimmingCharacters(in: .whitespacesAndNewlines)
-                    model.previewTitleText(text.isEmpty ? nil : text, for: title.id)
-                }
-                .onChange(of: isEditing) { _, editing in
-                    if editing {
-                        draft = title.text
-                    } else {
-                        save()
-                    }
-                }
-            Text("The viewer shows it as you type. Press Return when done. Long titles wrap onto more lines by themselves.")
+            Text("Or double-click the title in the viewer and type there. Long titles wrap onto more lines by themselves.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -77,11 +54,13 @@ struct TitleInspector: View {
             Text("Style").font(.subheadline.weight(.semibold))
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 72), spacing: 6)], spacing: 6) {
                 // Each look shown with the title's own first words.
-                let sample = String(title.text.split(separator: "\n").first?.prefix(10) ?? "Hook")
+                let sample = TitleStyleSample.text(from: title.text)
                 ForEach(TitleStyle.allCases) { style in
-                    StyleChip(name: style.displayName, isSelected: title.style == style, makeImage: { TitlePreview.image(for: style.look, text: sample) }) {
-                        model.editTitle(title.id, "Change Title Style") { $0.applyStyle(style) }
-                    }
+                    StyleChip(
+                        name: style.displayName, isSelected: title.style == style, sample: sample,
+                        makeImage: { TitlePreview.image(for: style.look, text: sample) },
+                        action: { model.editTitle(title.id, "Change Title Style") { $0.applyStyle(style) } }
+                    )
                 }
             }
         }
@@ -147,23 +126,6 @@ struct TitleInspector: View {
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
-    }
-
-    private func focusTextIfAsked() {
-        guard model.wantsTitleTextFocus else { return }
-        model.wantsTitleTextFocus = false
-        draft = title.text
-        isEditing = true
-    }
-
-    private func save() {
-        let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !text.isEmpty, text != title.text else {
-            model.previewTitleText(nil, for: title.id)
-            return
-        }
-        // The typed text stays shown until the rebuilt Short (which has it) arrives.
-        model.editTitle(title.id, "Edit Title") { $0.text = text }
     }
 }
 

@@ -17,16 +17,18 @@ extension TimelineView {
                 .frame(width: max(contentWidth, 1), height: overlaysHeight)
                 .contentShape(Rectangle())
                 .gesture(emptySpaceGesture)
-                .dropDestination(for: URL.self) { urls, location in
-                    model.importFiles(urls, to: .overlay(at: time(at: location.x)))
-                    return true
-                }
+                .onDrop(
+                    of: [.fileURL, .plainText],
+                    delegate: ClipRowDrop(
+                        onUpdate: { _ in }, onDrop: { urls, x in model.importFiles(urls, to: .overlay(at: time(at: x))) },
+                        onText: { dropBrowserTiles($0, at: $1) })
+                )
                 .allowsHitTesting(true)
             if model.project.overlays.isEmpty {
                 Label("Drop B-roll or pictures here to show them over your clips", systemImage: "rectangle.on.rectangle")
-                    .font(.caption)
+                    .font(.caption2)
                     .foregroundStyle(.secondary)
-                    .frame(height: overlayRowHeight)
+                    .frame(height: emptyLaneHeight)
                     .offset(x: leadingInset + 4)
                     .allowsHitTesting(false)
             }
@@ -266,15 +268,16 @@ extension TimelineView {
                 .frame(width: max(contentWidth, 1), height: soundsHeight)
                 .contentShape(Rectangle())
                 .gesture(emptySpaceGesture)
-                .dropDestination(for: URL.self) { urls, location in
-                    model.importFiles(urls, to: .sound(at: time(at: location.x)))
-                    return true
-                }
+                .onDrop(
+                    of: [.fileURL, .plainText],
+                    delegate: ClipRowDrop(
+                        onUpdate: { _ in }, onDrop: { urls, x in model.importFiles(urls, to: .sound(at: time(at: x))) },
+                        onText: { dropBrowserTiles($0, at: $1) }))
             if model.project.sounds.isEmpty, !model.project.timeline.clips.isEmpty {
-                Label("Sound effects and voice-overs go here (Sounds panel, or drop a sound file)", systemImage: "waveform")
+                Label("Sound effects and voice-overs go here (Audio tab, or drop a sound file)", systemImage: "waveform")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
-                    .frame(height: soundRowHeight)
+                    .frame(height: emptyLaneHeight)
                     .offset(x: leadingInset + 4)
                     .allowsHitTesting(false)
             }
@@ -460,6 +463,27 @@ extension TimelineView {
             .help(edge == .start ? "Drag to change when this caption starts" : "Drag to change when this caption ends")
     }
 
+    /// The song's sound wave, pass by pass (a song that starts later in itself or plays again
+    /// from its start is drawn as it plays). Measured when first shown, e.g. for music the app made.
+    func musicWaveform(_ song: MediaAsset, from origin: CMTime) -> some View {
+        ZStack(alignment: .topLeading) {
+            if let levels = model.audioLevels[song.id] {
+                ForEach(Array(model.project.musicPasses.enumerated()), id: \.offset) { _, pass in
+                    WaveformView(levels: levels, sourceStart: pass.source.start, pointsPerSecond: pointsPerSecond)
+                        .frame(width: max(width(of: pass.source.duration) - 2, 1))
+                        .offset(x: width(of: pass.start - origin))
+                }
+            }
+        }
+        .frame(height: musicLaneHeight - 16)
+        .padding(.bottom, 2)
+        .opacity(0.8)
+        .allowsHitTesting(false)
+        .task(id: song.id) {
+            if model.audioLevelsMissing(song.id) { model.loadPreviews(for: song) }
+        }
+    }
+
     /// The song, under everything else, with a line showing its volume (it dips where people talk).
     @ViewBuilder
     var musicLane: some View {
@@ -469,6 +493,7 @@ extension TimelineView {
             let shift = musicDrag ?? .zero
             RoundedRectangle(cornerRadius: 4)
                 .fill(Color.green.opacity(isSelected ? 0.45 : 0.25))
+                .overlay(alignment: .bottomLeading) { musicWaveform(song, from: range.start) }
                 .overlay {
                     VolumeLine(points: model.musicEnvelope, origin: range.start, fullVolume: model.project.music?.volume ?? 1, pointsPerSecond: pointsPerSecond)
                         .stroke(Color.primary.opacity(0.75), lineWidth: 1.5)

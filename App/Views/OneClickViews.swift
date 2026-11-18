@@ -527,6 +527,8 @@ private struct ShotRow: View {
 struct StartTile: View {
     let title: String
     let systemImage: String
+    /// What it makes, in a few words, under the title.
+    var summary = ""
     let help: String
     let action: () -> Void
     @State private var isHovered = false
@@ -541,6 +543,11 @@ struct StartTile: View {
                             .font(.system(size: 34, weight: .light))
                         Text(title)
                             .font(.headline)
+                        Text(summary)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 10)
                     }
                     .foregroundStyle(.primary)
                 }

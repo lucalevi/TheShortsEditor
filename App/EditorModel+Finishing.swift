@@ -15,6 +15,8 @@ enum SettingsKey {
     static let loopPlayback = "loopPlayback"
     static let skimming = "skimming"
     static let audioSkimming = "audioSkimming"
+    /// How tall clips are on the timeline (`TimelineClipSize`).
+    static let clipSize = "timelineClipSize"
 }
 
 /// Media and finishing: settings for new clips, markers, the clip trimmer, saving a frame,

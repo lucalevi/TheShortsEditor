@@ -9,57 +9,64 @@ import SwiftUI
 /// Ready-made texts, emoji and symbols, added at the playhead with one click.
 struct StickerPicker: View {
     let model: EditorModel
+    /// In the browser's Text tab (no scrolling or size of its own) rather than a pop-up.
+    var isPanel = false
     @Environment(\.dismiss) private var dismiss
 
     private let columns = [GridItem(.adaptive(minimum: 44), spacing: 6)]
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 14) {
-                Text("Ready-made texts").font(.subheadline.weight(.semibold))
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 110), spacing: 6)], alignment: .leading, spacing: 6) {
-                    ForEach(TextTemplate.allCases) { template in
-                        Button {
-                            model.addTextTemplate(template)
-                            dismiss()
-                        } label: {
-                            Text(template.displayName)
-                                .font(.callout.weight(.medium))
-                                .frame(maxWidth: .infinity, minHeight: 32)
-                                .background(Color.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 6))
-                                .overlay { RoundedRectangle(cornerRadius: 6).strokeBorder(Color.white.opacity(0.15)) }
-                                .contentShape(Rectangle())
-                        }
-                        .buttonStyle(.plain)
-                        .help(template.hint)
-                    }
-                }
-
-                Text("Emoji").font(.subheadline.weight(.semibold))
-                LazyVGrid(columns: columns, alignment: .leading, spacing: 6) {
-                    ForEach(StickerCatalog.emoji, id: \.self) { emoji in
-                        tile(Sticker(.emoji(emoji))) { Text(emoji).font(.system(size: 26)) }
-                    }
-                }
-
-                ForEach(StickerCatalog.groups) { group in
-                    Text(group.name).font(.subheadline.weight(.semibold))
-                    LazyVGrid(columns: columns, alignment: .leading, spacing: 6) {
-                        ForEach(group.symbols) { symbol in
-                            tile(Sticker(.symbol(symbol.name), color: symbol.name == "bell.fill" ? .yellow : .white)) {
-                                Image(systemName: symbol.name).font(.system(size: 22, weight: .bold))
-                            }
-                            .help(symbol.displayName)
-                        }
-                    }
-                }
-                Text("Added at the playhead for two seconds. Drag it in the viewer; change it on the right.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-            .padding(14)
+        if isPanel {
+            content
+        } else {
+            ScrollView { content.padding(14) }
+                .frame(width: 360, height: 520)
         }
-        .frame(width: 360, height: 520)
+    }
+
+    private var content: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("Ready-made texts").font(.subheadline.weight(.semibold))
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 110), spacing: 6)], alignment: .leading, spacing: 6) {
+                ForEach(TextTemplate.allCases) { template in
+                    Button {
+                        model.addTextTemplate(template)
+                        dismiss()
+                    } label: {
+                        Text(template.displayName)
+                            .font(.callout.weight(.medium))
+                            .frame(maxWidth: .infinity, minHeight: 32)
+                            .background(Color.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 6))
+                            .overlay { RoundedRectangle(cornerRadius: 6).strokeBorder(Color.white.opacity(0.15)) }
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .help(template.hint)
+                }
+            }
+
+            Text("Emoji").font(.subheadline.weight(.semibold))
+            LazyVGrid(columns: columns, alignment: .leading, spacing: 6) {
+                ForEach(StickerCatalog.emoji, id: \.self) { emoji in
+                    tile(Sticker(.emoji(emoji))) { Text(emoji).font(.system(size: 26)) }
+                }
+            }
+
+            ForEach(StickerCatalog.groups) { group in
+                Text(group.name).font(.subheadline.weight(.semibold))
+                LazyVGrid(columns: columns, alignment: .leading, spacing: 6) {
+                    ForEach(group.symbols) { symbol in
+                        tile(Sticker(.symbol(symbol.name), color: symbol.name == "bell.fill" ? .yellow : .white)) {
+                            Image(systemName: symbol.name).font(.system(size: 22, weight: .bold))
+                        }
+                        .help(symbol.displayName)
+                    }
+                }
+            }
+            Text("Added at the playhead for two seconds. Drag it in the viewer; change it on the right.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
     }
 
     private func tile<Icon: View>(_ sticker: Sticker, @ViewBuilder icon: () -> Icon) -> some View {

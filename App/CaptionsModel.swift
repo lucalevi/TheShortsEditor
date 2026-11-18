@@ -240,7 +240,7 @@ final class CaptionsModel {
             count = project.pickKeywords()
             project.captions.showsKeywords = true
         }
-        if count == 0 { alert = AlertMessage(title: "No key words found", message: "Click a word in the Script panel to highlight it yourself.") }
+        if count == 0 { alert = AlertMessage(title: "No key words found", message: "Click a word in Captions ▸ Script to highlight it yourself.") }
     }
 
     /// Adds emoji to captions whose words call for one: chosen by Apple Intelligence when it is
@@ -272,7 +272,7 @@ final class CaptionsModel {
             count = project.suggestEmoji()
             project.captions.showsEmoji = true
         }
-        if count == 0 { alert = AlertMessage(title: "No emoji found", message: "None of the words call for one. Add one to a word in the Script panel.") }
+        if count == 0 { alert = AlertMessage(title: "No emoji found", message: "None of the words call for one. Add one to a word in Captions ▸ Script.") }
     }
 
     /// Asks Apple Intelligence for real words used as fillers ("like", "tipo", "allora"); they join

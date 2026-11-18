@@ -151,6 +151,8 @@ private struct CaptionSettingsForm: View {
 struct StyleChip: View {
     let name: String
     let isSelected: Bool
+    /// What the picture shows (e.g. the title's words): it is drawn again when this changes.
+    var sample = ""
     let makeImage: () -> CGImage?
     let action: () -> Void
 
@@ -180,7 +182,7 @@ struct StyleChip: View {
         .buttonStyle(.plain)
         .accessibilityLabel(name)
         .accessibilityAddTraits(isSelected ? .isSelected : [])
-        .task { image = makeImage() }
+        .task(id: sample) { image = makeImage() }
     }
 }
 
@@ -525,7 +527,7 @@ private struct CaptionDesign: View {
                     Button("Clear") { model.clearEmoji() }
                 }
                 .controlSize(.small)
-                Text("Pick single words yourself in the Script panel.").font(.caption).foregroundStyle(.secondary)
+                Text("Pick single words yourself in Script (next to Captions above).").font(.caption).foregroundStyle(.secondary)
             }
             .padding(.top, 6)
         }

@@ -285,3 +285,22 @@ extension TextOverlay {
         try c.encodeIfPresent(track, forKey: .track)
     }
 }
+
+/// The words shown on the style tiles of a title: its own first words, whole, as many as fit a
+/// tile (a word cut in half reads like a typo).
+public enum TitleStyleSample {
+    /// The longest sample, in characters.
+    static let maxLength = 12
+
+    public static func text(from titleText: String) -> String {
+        let firstLine = titleText.split(whereSeparator: \.isNewline).first.map(String.init) ?? ""
+        var sample = ""
+        for word in firstLine.split(whereSeparator: \.isWhitespace) {
+            let longer = sample.isEmpty ? String(word) : sample + " " + word
+            guard longer.count <= maxLength else { break }
+            sample = longer
+        }
+        if !sample.isEmpty { return sample }
+        return firstLine.trimmingCharacters(in: .whitespaces).isEmpty ? "Hook" : "Title"
+    }
+}

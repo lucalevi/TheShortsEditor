@@ -323,11 +323,19 @@ extension EditorModel {
         }
     }
 
+    /// ⇧Z: the whole Short across the timeline, as in iMovie (the timeline is as wide as the window).
+    func zoomToFit() {
+        let seconds = duration.seconds
+        guard seconds > 0, let width = window?.contentView?.bounds.width else { return }
+        let range = Self.zoomRange
+        timelineZoom = min(max((width - 60) / CGFloat(seconds), range.lowerBound), range.upperBound)
+    }
+
     // MARK: Tips
 
     /// Shows a tip the first time its moment comes (never again after).
     func showTip(_ tip: EditorTip) {
-        guard screen == .editor, self.tip == nil, !EditorTip.wasShown(tip) else { return }
+        guard screen == .editor, self.tip == nil, !EditorTip.wasShown(tip), !EditorTip.oneWasShownLately else { return }
         EditorTip.markShown(tip)
         self.tip = tip
         tipTask?.cancel()
@@ -353,7 +361,8 @@ enum EditorTip: String, CaseIterable {
         case .skimming: "Move the pointer over the timeline to look through your Short. Press Space to play from the pointer."
         case .range: "Hold R and drag across your clips to pick part of them. Then delete it, keep only it, speed it up or change its volume."
         case .mediaKeys: "Press E to add this file to the end, or W to put it in at the playhead. Drag across the bar under it to use only part of it."
-        case .follow: "Titles, B-roll and sounds move with the clip under their start (the thin line shows which one). You can turn this off in the inspector."
+        case .follow:
+            "Titles, B-roll and sounds move with the clip under their start (the thin line shows which one). You can turn this off in the details on the right."
         case .dropOnClip: "Drop on a cut to put it in there. Drop on a clip to replace it, or to show it over the clip."
         case .transitions:
             "The white square on the cut is the transition. Click it to choose another kind or change its length. Move the pointer across it to see it."
@@ -380,6 +389,15 @@ enum EditorTip: String, CaseIterable {
     }
 
     private static let key = "shownTips"
+    private static let lastShownKey = "lastTipShown"
+    /// How long after one tip the next may show: hints one after another feel like nagging.
+    static let quietTime: TimeInterval = 10 * 60
+
+    /// A tip was shown less than `quietTime` ago.
+    static var oneWasShownLately: Bool {
+        guard let last = AppEnvironment.defaults.object(forKey: lastShownKey) as? Date else { return false }
+        return Date.now.timeIntervalSince(last) < quietTime
+    }
 
     static func wasShown(_ tip: EditorTip) -> Bool {
         (AppEnvironment.defaults.stringArray(forKey: key) ?? []).contains(tip.rawValue)
@@ -389,6 +407,7 @@ enum EditorTip: String, CaseIterable {
         var shown = AppEnvironment.defaults.stringArray(forKey: key) ?? []
         if !shown.contains(tip.rawValue) { shown.append(tip.rawValue) }
         AppEnvironment.defaults.set(shown, forKey: key)
+        AppEnvironment.defaults.set(Date.now, forKey: lastShownKey)
     }
 }
 

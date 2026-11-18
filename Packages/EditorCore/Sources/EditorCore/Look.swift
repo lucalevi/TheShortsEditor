@@ -343,7 +343,7 @@ public struct FilterChoice: Codable, Equatable, Hashable, Sendable {
         self.strength = strength.clamped(0, 1)
     }
 
-    package func apply(_ c: RGB) -> RGB {
+    public func apply(_ c: RGB) -> RGB {
         strength >= 1 ? filter.apply(c) : c.mixed(with: filter.apply(c), strength)
     }
 

@@ -76,10 +76,10 @@ struct EditorView: View {
                 InspectorView(model: model)
                     .frame(minWidth: 220, idealWidth: 260, maxWidth: 320)
             }
-            .frame(minHeight: 380, maxHeight: .infinity)
-            // A single storyline needs little height; the viewer gets the rest.
+            .frame(minHeight: 280, maxHeight: .infinity)
+            // Drag the divider to give the timeline more room (bigger clips, more lanes).
             TimelineView(model: model)
-                .frame(minHeight: 230, idealHeight: 255, maxHeight: 330)
+                .frame(minHeight: 200, idealHeight: 280, maxHeight: .infinity)
         }
         // Captions in a second language, translated on this Mac (it asks to download languages once).
         .translationTask(model.captioning.translationRequest) { session in
@@ -95,75 +95,34 @@ struct EditorView: View {
                 ShortNameField(model: model)
             }
             ToolbarSpacer(.flexible)
+            // Actions only, each with its name: what can be added (titles, music, transitions…)
+            // is in the browser on the left.
             ToolbarItemGroup {
                 Button("Import", systemImage: "square.and.arrow.down") {
                     MediaImportPanel.run(model: model, addToTimeline: false)
                 }
-                .help("Import videos and pictures into Media (⌘I)")
+                .labelStyle(.titleAndIcon)
+                .help("Import videos, pictures and music into Media (⌘I)")
                 Button("Split", systemImage: "scissors") { model.splitAtPlayhead() }
+                    .labelStyle(.titleAndIcon)
                     .help("Cut the clip at the playhead (B)")
                     .disabled(model.project.timeline.clips.isEmpty)
                 Button("Delete", systemImage: "trash") { model.deleteSelection() }
-                    .help("Remove the selected clips, titles or music (⌫)")
+                    .labelStyle(.titleAndIcon)
+                    .help("Remove what is selected on the timeline (⌫)")
                     .disabled(model.timelineSelection.isEmpty)
             }
             ToolbarItem {
-                Button("B-roll", systemImage: "rectangle.on.rectangle") { OverlayImportPanel.run(model: model) }
-                    .help("Show videos or pictures over your clips, starting at the playhead")
-                    .disabled(model.project.timeline.clips.isEmpty)
-            }
-            ToolbarItem {
-                Button("Transition", systemImage: "circle.lefthalf.filled") {
-                    model.chooseTransition()
-                }
-                .help("Put a transition on the cut nearest the playhead (⌥T), then choose its kind")
-                .disabled(model.project.timeline.clips.count < 2)
-            }
-            ToolbarItem {
                 Button("Remove Pauses", systemImage: "waveform.path.badge.minus") { model.beginRemovingSilences() }
+                    .labelStyle(.titleAndIcon)
                     .help("Cut out the quiet parts between sentences")
                     .disabled(model.project.timeline.clips.isEmpty || model.silenceSession != nil)
             }
-            ToolbarItem {
-                Button("Title", systemImage: "textformat") { model.addTitle() }
-                    .help("Add text over the video at the playhead, like a hook (⌘T)")
-                    .disabled(model.project.timeline.clips.isEmpty)
-            }
-            ToolbarItem {
-                Button("Stickers", systemImage: "face.smiling") { model.showsStickerPicker = true }
-                    .help("Add a sticker (emoji, arrow, shape) or a ready-made text at the playhead")
-                    .disabled(model.project.timeline.clips.isEmpty)
-                    .popover(isPresented: $model.showsStickerPicker, arrowEdge: .bottom) {
-                        StickerPicker(model: model)
-                    }
-            }
-            ToolbarItem {
-                Group {
-                    if model.project.music != nil {
-                        Button("Music", systemImage: "music.note") { model.selection = .music }
-                            .help("Change the music's volume and settings")
-                    } else {
-                        Menu {
-                            MusicChoices(model: model)
-                        } label: {
-                            Label("Music", systemImage: "music.note")
-                        }
-                        .menuIndicator(.hidden)
-                        .help("Add music to play under your Short: the app's own, or a song from a file")
-                    }
-                }
-                .disabled(model.project.timeline.clips.isEmpty)
-            }
-            ToolbarItem {
-                Button("Captions", systemImage: "captions.bubble") { model.sidebar = .captions }
-                    .help("Make captions from what is said, and change how they look")
-            }
-            ToolbarItem {
-                Toggle("Overlay Areas", systemImage: "rectangle.dashed", isOn: $model.showsSafeZone)
-                    .help("Show where YouTube's buttons and captions cover your video (⌘')")
-            }
+            ToolbarSpacer(.fixed)
             ToolbarItem {
                 Button("Export", systemImage: "square.and.arrow.up") { model.beginExport() }
+                    .labelStyle(.titleAndIcon)
+                    .buttonStyle(.borderedProminent)
                     .help("Save your Short as a video file, ready for YouTube (⌘E)")
                     .disabled(model.project.timeline.clips.isEmpty)
             }

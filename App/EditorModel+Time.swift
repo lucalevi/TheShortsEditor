@@ -67,7 +67,7 @@ extension EditorModel {
         showTip(.transitions)
     }
 
-    /// The toolbar button: a transition on the nearest cut if it has none yet, then its picker.
+    /// A transition on the nearest cut if it has none yet, then its picker.
     func chooseTransition() {
         guard let cut = transitionCut else {
             addTransition()

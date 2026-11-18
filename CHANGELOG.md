@@ -7,6 +7,65 @@ the decisions that shape the code are in `docs/adr/`.
 Moved here from `STATUS.md` on 2026-11-18 (F31); the text is as it was written at the time, so
 "next" in an entry means next *then*.
 
+## 2026-11-18: Usability, step 5 (polish)
+
+- **Single-letter shortcuts by letter** (U5): J K L B Q W S R X M E are matched by what the key
+  types (`EditorKeys.letterKeys`), so they work on French and German keyboards too. **Fixed on
+  the way:** with ⇧ held the plain key still acted, so ⇧S (Audio Skimming) toggled snapping.
+- **⇧Z Zoom to Fit** (View menu), as in iMovie.
+- **Tips** (U19): one line in the timeline's header (the whole text on hover) instead of a banner
+  over the lanes, and at most one every 10 minutes (`EditorTip.quietTime`).
+- **Home** (U20): each start tile says what it makes; the + button is a menu with the same four.
+- **Importing** (U21): one rule: files go into Media, and onto the timeline too while the Short
+  has no clips yet.
+- U6 needed nothing: selecting on the timeline already clears the Media selection, so Delete
+  never removes a file by surprise.
+
+## 2026-11-18: Usability, step 4 (one place for each kind of thing)
+
+The user chose the full layout from a sketch.
+- **Toolbar** (U14): only actions, each with its name: Import, Split, Delete, Remove Pauses and
+  Export (prominent). "YouTube Overlay Areas" moved to the bar under the viewer.
+- **Browser on the left** (U15): a tab for each kind of thing, icon and name (`BrowserTab`):
+  Media (Your Media / Photos Library), Audio (music moods, a song from a file, voice-over, sound
+  effects), Text (every title style, ready-made texts, stickers), Transitions (also on every cut,
+  or none), Effects (effects and filters, shown as colour swatches) and Captions (Captions /
+  Script). A tile is added with a click (at the playhead, or on the selected clip) or dragged
+  onto the timeline (`BrowserDrop`, plain text; `EditorModel.dropBrowserItem`): a title starts
+  where it lands, a transition goes on the nearest cut, an effect or filter on the clip under it.
+  The sticker pop-up is now the Text tab (View ▸ … ▸ Show All Stickers opens it).
+  `addTitle(style:)` adds a styled title in one undo step.
+- **Clip details in tabs** (U16, `ClipDetailsTab`): Picture, Colour, Speed, Sound, Effects, for
+  main clips and B-roll, remembered per window; the name, length and the Split/Delete/settings
+  buttons stay on every tab.
+- **Timeline** (U17, U18): the divider above it goes much further (the viewer keeps at least
+  280 pt), the ruler stays at the top while scrolling down, empty B-roll and sound lanes are a
+  thin line with their hint.
+- Help: "Where things are". `BrowserTests` (app). `FilterChoice.apply` is public (swatches).
+
+## 2026-11-18: Usability, step 3 (text on the picture)
+
+- **Typing on the picture** (U10): ⌘T, a double-click on a title in the viewer, or Return with a
+  title selected (the Finder's rename key) opens a text box just under the title (above it near
+  the bottom), so the title stays in sight and changes as it is typed; Return, Escape or a click
+  elsewhere finishes. `ViewerTitleEditor` and the inspector share one field (`TitleTextField`).
+  The title being typed stays in the viewer even when the pointer skims away.
+- **Nothing lost while typing** (U13): the words are saved 0.8 s after each pause and when editing
+  ends; the whole round of typing is one "Edit Title" undo step (`apply(_:registersUndo:_:)`).
+- **Style tiles show whole words** (U12, `TitleStyleSample`: up to 12 characters of the first
+  line) and are drawn again when the words change.
+- `TitleTextTests` (app), `TitleStyleSampleTests`.
+
+## 2026-11-18: Usability, step 2 (see the sound)
+
+- **The music has its sound wave** (U7): drawn under the volume line, pass by pass where the song
+  plays (starting later in the song, looping); measured when first shown, so music made by the
+  app gets one too. The music lane is taller (44 pt).
+- **Clip Size** (U8), as in iMovie: View ▸ Clip Size and a menu in the timeline's header, Small,
+  Medium (default) or Large, remembered; clips 56/76/112 pt tall with waves of 20/30/48 pt
+  (before: 72 and 24).
+- **The clip trimmer shows the file's sound wave** under its pictures (U9).
+
 ## 2026-11-18: Usability, step 1 (Mac habits)
 
 - **Usability audit** (`research/usability-audit.md`): a Short made by hand, the code read where

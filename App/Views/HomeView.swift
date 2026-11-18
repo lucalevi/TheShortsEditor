@@ -25,15 +25,15 @@ struct HomeView: View {
                     LazyVGrid(columns: columns, alignment: .leading, spacing: 22) {
                         NewShortTile { model.newShort() }
                         StartTile(
-                            title: "Magic Short", systemImage: "wand.and.stars",
+                            title: "Magic Short", systemImage: "wand.and.stars", summary: "A first cut made for you from your clips",
                             help: "Choose clips and get a first cut: pauses out, captions, a hook title and music"
                         ) { model.newMagicShort() }
                         StartTile(
-                            title: "Storyboard", systemImage: "list.bullet.rectangle.portrait",
+                            title: "Storyboard", systemImage: "list.bullet.rectangle.portrait", summary: "A list of the shots to film, filled in as you go",
                             help: "Start from a shot list that tells you what to film (how-to, review, top 3…)"
                         ) { model.choosesStoryboard = true }
                         StartTile(
-                            title: "Template", systemImage: "square.grid.3x3.square",
+                            title: "Template", systemImage: "square.grid.3x3.square", summary: "Your clips cut to the beat of the music",
                             help: "Choose clips and get a Short cut on the beat, with text and transitions (montage, top 5, recipe…)"
                         ) { model.choosesTemplate = true }
                     }
@@ -76,8 +76,13 @@ struct HomeView: View {
         }
         .toolbar {
             ToolbarItem {
-                Button("New Short", systemImage: "plus") { model.newShort() }
-                    .help("Start a new Short (⌘N)")
+                Menu("New", systemImage: "plus") {
+                    Button("New Short") { model.newShort() }
+                    Button("Magic Short…") { model.newMagicShort() }
+                    Button("From a Storyboard…") { model.choosesStoryboard = true }
+                    Button("From a Template…") { model.choosesTemplate = true }
+                }
+                .help("Start a new Short (⌘N)")
             }
         }
         .navigationTitle("Shorts")
@@ -118,6 +123,11 @@ private struct NewShortTile: View {
                                 .font(.system(size: 38, weight: .light))
                             Text("New Short")
                                 .font(.headline)
+                            Text("Start from nothing and add your videos")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .multilineTextAlignment(.center)
+                                .padding(.horizontal, 10)
                         }
                         .foregroundStyle(.primary)
                     }

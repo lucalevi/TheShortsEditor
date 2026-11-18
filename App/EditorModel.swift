@@ -71,8 +71,10 @@ final class EditorModel {
     private(set) var musicEnvelope: [VolumePoint] = []
     /// The Export sheet's choices (loudness, HDR).
     var exportOptions = ExportOptions()
-    /// Asks the title inspector to put the cursor in the text (after adding a title). It resets it.
+    /// Asks the title inspector to put the cursor in the text. It resets it.
     var wantsTitleTextFocus = false
+    /// The title whose words are being typed on the picture (`ViewerTitleEditor`).
+    var titleEditedInViewer: TextOverlay.ID?
     var selectedAssetID: MediaAsset.ID? {
         didSet { if selectedAssetID != nil { showTip(.mediaKeys) } }
     }
@@ -131,8 +133,6 @@ final class EditorModel {
             refreshPlayback()
         }
     }
-    /// The sticker and ready-made text picker is open.
-    var showsStickerPicker = false
     /// The text-to-speech sheet, when open.
     var speechRequest: SpeechRequest?
     /// The marker whose name is being typed (its pop-up on the ruler is open).
@@ -210,10 +210,15 @@ final class EditorModel {
 
     enum Sidebar: String, CaseIterable, Identifiable {
         case media = "Media"
+        /// Inside the Media tab: the Photos library.
         case photos = "Photos"
+        case audio = "Audio"
+        case text = "Text"
+        case transitions = "Transitions"
+        case effects = "Effects"
         case captions = "Captions"
+        /// Inside the Captions tab: edit by text.
         case script = "Script"
-        case sounds = "Sounds"
         /// Only while the Short has a storyboard.
         case storyboard = "Shots"
         var id: String { rawValue }
@@ -270,7 +275,8 @@ final class EditorModel {
     // MARK: Editing
 
     /// Applies an edit as one undoable step.
-    func apply(_ actionName: String, _ edit: (inout Project) -> Void) {
+    /// `registersUndo: false` folds the change into the last undo step (more typing in a title).
+    func apply(_ actionName: String, registersUndo: Bool = true, _ edit: (inout Project) -> Void) {
         var updated = project
         // New clips start as Settings say (picture length and placement, slow motion).
         NewClipSettings.$current.withValue(newClipSettings) { edit(&updated) }
@@ -280,19 +286,21 @@ final class EditorModel {
         if !isRestyling { updated.claimHandMadeMotion(from: project) }
         updated.fitMoodMusic()
         if updated.timeline != project.timeline { timelineRange = nil }
-        replaceProject(with: updated, actionName: actionName)
+        replaceProject(with: updated, actionName: actionName, registersUndo: registersUndo)
     }
 
     /// Replaces the project as one undoable step, as it is (no following of clips): `apply`, and
     /// reverting to a backup.
-    func replaceProject(with new: Project, actionName: String) {
+    func replaceProject(with new: Project, actionName: String, registersUndo: Bool = true) {
         guard new != project else { return }
         let old = project
         project = new
-        undoManager?.registerUndo(withTarget: self) { model in
-            MainActor.assumeIsolated { model.replaceProject(with: old, actionName: actionName) }
+        if registersUndo {
+            undoManager?.registerUndo(withTarget: self) { model in
+                MainActor.assumeIsolated { model.replaceProject(with: old, actionName: actionName) }
+            }
+            undoManager?.setActionName(actionName)
         }
-        undoManager?.setActionName(actionName)
         projectDidChange()
     }
 
@@ -400,17 +408,6 @@ final class EditorModel {
 
     // MARK: Titles
 
-    /// Adds a title at the playhead, selects it and puts the cursor in its text.
-    func addTitle() {
-        guard !project.timeline.clips.isEmpty else { return }
-        playback.player.pause()
-        var id: TextOverlay.ID?
-        apply("Add Title") { id = $0.addTitle(at: currentTime, text: "Your title") }
-        guard let id else { return }
-        selectTitle(id)
-        wantsTitleTextFocus = true
-    }
-
     /// Selects a title and moves the playhead to where it is fully on screen.
     func selectTitle(_ id: TextOverlay.ID) {
         selectedTitleID = id
@@ -418,25 +415,6 @@ final class EditorModel {
         playback.player.pause()
         let settled = range.start + min(CMTime(value: 1, timescale: 2), CMTimeMultiplyByRatio(range.duration, multiplier: 1, divisor: 2))
         if !range.containsTime(currentTime) || currentTime < settled { playback.seek(to: settled) }
-    }
-
-    func editTitle(_ id: TextOverlay.ID, _ actionName: String, _ change: @escaping (inout TextOverlay) -> Void) {
-        apply(actionName) { $0.updateTitle(id, change) }
-    }
-
-    /// Shows a title's text in the viewer while it is typed, before it is saved (nil: its own).
-    func previewTitleText(_ text: String?, for id: TextOverlay.ID) {
-        livePreview.setTitleText(text, for: id)
-        typedTitle = text.map { (id, $0) }
-        redrawCurrentFrame()
-    }
-
-    /// The title with the text being typed in it, if any (for the viewer's box around it).
-    func withTypedText(_ title: TextOverlay) -> TextOverlay {
-        guard let typedTitle, typedTitle.id == title.id else { return title }
-        var typed = title
-        typed.text = typedTitle.text
-        return typed
     }
 
     func moveTitle(_ id: TextOverlay.ID, to start: CMTime) {

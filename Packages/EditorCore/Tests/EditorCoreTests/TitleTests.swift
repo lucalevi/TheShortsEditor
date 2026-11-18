@@ -112,3 +112,13 @@ struct TitleTests {
         #expect(p.titles.isEmpty)
     }
 }
+
+struct TitleStyleSampleTests {
+    @Test func tilesShowWholeWords() {
+        #expect(TitleStyleSample.text(from: "Hello world") == "Hello world")
+        #expect(TitleStyleSample.text(from: "Three tips to edit faster") == "Three tips")
+        #expect(TitleStyleSample.text(from: "First line\nsecond line") == "First line")
+        #expect(TitleStyleSample.text(from: "Supercalifragilistic") == "Title")
+        #expect(TitleStyleSample.text(from: "  ") == "Hook")
+    }
+}
