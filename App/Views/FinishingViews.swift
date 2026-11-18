@@ -494,8 +494,10 @@ struct SettingsView: View {
             StorageSettings(model: model)
         }
         .formStyle(.grouped)
+        // Scrolls rather than growing past the screen: all of it is taller than a laptop's screen,
+        // which left Storage out of reach. The window can be made taller.
         .frame(width: 460)
-        .fixedSize(horizontal: false, vertical: true)
+        .frame(minHeight: 360, idealHeight: 640, maxHeight: .infinity)
     }
 
     private var placementHelp: String {

@@ -86,6 +86,39 @@ final class LibraryModel {
         refresh()
     }
 
+    /// Delete Generated Files… (like Final Cut's): asks first, then deletes the copies the app
+    /// made for this Short alone (cleaned voices, processed sound, smooth slow motion, cut-outs,
+    /// shake measurements). They are made again when the Short is next opened, so it isn't undoable.
+    /// Returns the bytes freed.
+    @discardableResult
+    func deleteGeneratedFiles(of id: UUID) -> Int64 {
+        let name = shorts.first { $0.id == id }?.name ?? "this Short"
+        guard !openShortIDs().contains(id) else {
+            let alert = NSAlert()
+            alert.messageText = "“\(name)” is open in a window"
+            alert.informativeText = "Close it or go back to All Shorts first: while it is open, the app would make its files again straight away."
+            alert.runModal()
+            return 0
+        }
+        let files = ProjectStore.generatedFilesByShort()[id] ?? []
+        let alert = NSAlert()
+        guard !files.isEmpty else {
+            alert.messageText = "“\(name)” has no generated files"
+            alert.informativeText = "Nothing the app made for it alone is taking up space."
+            alert.runModal()
+            return 0
+        }
+        let size = ByteCountFormatter.string(fromByteCount: StorageCleaner.size(of: files), countStyle: .file)
+        alert.messageText = "Delete \(size) of generated files for “\(name)”?"
+        alert.informativeText =
+            "Cleaned-up voices, slowed-down and cut-out copies the app made for this Short. Your own videos, pictures and sounds aren't touched. "
+            + "They are made again the next time you open it, which can take a while."
+        alert.addButton(withTitle: "Delete").hasDestructiveAction = true
+        alert.addButton(withTitle: "Cancel")
+        guard alert.runModal() == .alertFirstButtonReturn else { return 0 }
+        return StorageCleaner.remove(files)
+    }
+
     /// Asks first, then moves the Shorts to the Trash, as one undoable step.
     func delete(_ ids: Set<UUID>) {
         let open = ids.intersection(openShortIDs())

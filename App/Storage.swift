@@ -16,14 +16,31 @@ extension ProjectStore {
     /// Calls `body` with every Short in the library, its media reachable through the saved
     /// bookmarks for as long as `body` runs (so copies named after a file's size and date match).
     static func withLibraryProjects<T>(_ body: ([Project]) -> T) -> T {
+        withLibraryShorts { shorts in body(shorts.map(\.project)) }
+    }
+
+    /// `withLibraryProjects` with each Short's id (its file's name).
+    static func withLibraryShorts<T>(_ body: ([(id: UUID, project: Project)]) -> T) -> T {
         let files = (try? FileManager.default.contentsOfDirectory(at: libraryFolder, includingPropertiesForKeys: nil)) ?? []
         let media = MediaAccess()
         defer { media.close() }
-        let projects = files.filter { $0.pathExtension == ProjectFile.fileExtension }.compactMap { url -> Project? in
-            guard let file = Log.file.attempt("Reading a Short for clean-up", { try ProjectFile.decode(Data(contentsOf: url)) }) else { return nil }
-            return media.resolve(file).project
+        let shorts = files.filter { $0.pathExtension == ProjectFile.fileExtension }.compactMap { url -> (id: UUID, project: Project)? in
+            guard let id = UUID(uuidString: url.deletingPathExtension().lastPathComponent),
+                let file = Log.file.attempt("Reading a Short for clean-up", { try ProjectFile.decode(Data(contentsOf: url)) })
+            else { return nil }
+            return (id, media.resolve(file).project)
         }
-        return body(projects)
+        return body(shorts)
+    }
+
+    /// For every Short in the library that has some: the copies the app made for it alone
+    /// (Delete Generated Files removes them; they are made again when the Short is opened).
+    static func generatedFilesByShort() -> [UUID: [URL]] {
+        finishSaving()
+        return withLibraryShorts { shorts in
+            let files = StorageCleaner.generatedFiles(of: shorts.map(\.project))
+            return Dictionary(uniqueKeysWithValues: zip(shorts.map(\.id), files).filter { !$0.1.isEmpty })
+        }
     }
 
     /// At launch, before a Short is open: removes made copies no Short has used for a week.
@@ -47,14 +64,31 @@ struct StorageSettings: View {
     @State private var media: Int64 = 0
     @State private var unused: [URL] = []
     @State private var result: String?
+    /// The copies the app made for each Short alone, largest first.
+    @State private var perShort: [(id: UUID, bytes: Int64)] = []
 
     var body: some View {
         Section {
             LabeledContent("Copies the app made", value: format(copies))
             Text(
-                "Cleaned-up voices, slowed-down and cut-out copies of your videos. They are made again when needed; ones no Short has used for a week are removed by themselves."
+                "Cleaned-up voices, slowed-down and cut-out copies of your videos. They are made again when needed; ones no Short has used for a week "
+                    + "are removed by themselves. Below, what each Short's own copies take."
             )
             .font(.caption).foregroundStyle(.secondary)
+            ForEach(perShort, id: \.id) { short in
+                LabeledContent {
+                    HStack {
+                        Text(format(short.bytes)).monospacedDigit()
+                        Button("Delete…") {
+                            if model.library.deleteGeneratedFiles(of: short.id) > 0 { measure() }
+                        }
+                        .help("Delete Generated Files: they are made again the next time you open this Short")
+                        .accessibilityLabel("Delete generated files of \(name(of: short.id))")
+                    }
+                } label: {
+                    Text(name(of: short.id)).lineLimit(1).truncationMode(.middle).padding(.leading, 12)
+                }
+            }
             LabeledContent("Recordings and copied media", value: format(media))
             LabeledContent(
                 "Not used by any Short",
@@ -81,6 +115,13 @@ struct StorageSettings: View {
         copies = StorageCleaner.size(of: StorageCleaner.cacheFolders)
         media = StorageCleaner.size(of: ProjectStore.madeMediaFolders)
         unused = ProjectStore.unusedMadeMedia()
+        perShort = ProjectStore.generatedFilesByShort()
+            .map { (id: $0.key, bytes: StorageCleaner.size(of: $0.value)) }
+            .sorted { $0.bytes > $1.bytes }
+    }
+
+    private func name(of id: UUID) -> String {
+        model.library.shorts.first { $0.id == id }?.name ?? "A Short"
     }
 
     private func moveToTrash() {

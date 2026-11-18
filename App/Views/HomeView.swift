@@ -233,6 +233,7 @@ private struct ShortTile: View {
         Button("Rename") { renamingID = entry.id }
         Button("Duplicate") { library.duplicate(entry.id) }
         Divider()
+        Button("Delete Generated Files…") { library.deleteGeneratedFiles(of: entry.id) }
         Button("Delete…", role: .destructive) { library.delete([entry.id]) }
     }
 

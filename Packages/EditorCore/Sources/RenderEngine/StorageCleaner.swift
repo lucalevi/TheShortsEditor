@@ -40,6 +40,38 @@ public enum StorageCleaner {
         return Set(used.map(\.standardizedFileURL))
     }
 
+    /// The made copies `project` uses that exist now and that no Short in `others` uses: what
+    /// Delete Generated Files removes for that Short, like Final Cut's. All of them are made again
+    /// when the Short is next opened. Call while the media can be read (names depend on it).
+    public static func generatedFiles(of project: Project, others: [Project]) -> [URL] {
+        generatedFiles(of: [project] + others)[0]
+    }
+
+    /// `generatedFiles(of:others:)` for each of `projects` against all the others, in the same
+    /// order. Reads each project's copies once.
+    public static func generatedFiles(of projects: [Project]) -> [[URL]] {
+        let folders = Set(cacheFolders.map(\.standardizedFileURL.path))
+        let used = projects.map { project in
+            filesInUse(by: [project]).filter { folders.contains($0.deletingLastPathComponent().standardizedFileURL.path) }
+        }
+        var users: [URL: Int] = [:]
+        for files in used { for file in files { users[file, default: 0] += 1 } }
+        return used.map { files in
+            files.filter { users[$0] == 1 && FileManager.default.fileExists(atPath: $0.path) }.sorted { $0.path < $1.path }
+        }
+    }
+
+    /// Removes `files` (from `generatedFiles(of:others:)`); returns the bytes freed.
+    @discardableResult
+    public static func remove(_ files: [URL]) -> Int64 {
+        var freed: Int64 = 0
+        for file in files {
+            let bytes = size(of: [file])
+            if Log.storage.attempt("Deleting a generated file", { try FileManager.default.removeItem(at: file) }) != nil { freed += bytes }
+        }
+        return freed
+    }
+
     /// Files directly in `folders` that aren't in `inUse` and haven't changed since `before`.
     public static func unusedFiles(in folders: [URL], inUse: Set<URL>, before: Date) -> [URL] {
         let keys: [URLResourceKey] = [.contentModificationDateKey, .isRegularFileKey]

@@ -6,7 +6,7 @@ STRICT := SWIFT_TREAT_WARNINGS_AS_ERRORS=YES GCC_TREAT_WARNINGS_AS_ERRORS=YES
 
 LIBRARY := $(HOME)/Library/Containers/com.lucalevi.TheShortsEditor/Data/Library/Application Support/Shorts Editor/Shorts
 
-.PHONY: project open build release run test app-test uitest coverage-raise bench nightly check check-library format format-check lint lint-baseline tsan asan analyze hooks clean help
+.PHONY: project open build release run test app-test uitest coverage-raise bench nightly check check-library docs format format-check lint lint-baseline tsan asan analyze hooks clean help
 
 help:               ## List the targets
 	@grep -E '^[a-z-]+:.*##' $(MAKEFILE_LIST) | sed -E 's/:.*## /\t/' | expand -t 20
@@ -71,6 +71,14 @@ check: format-check lint ## Format, lint, all tests with coverage floors, both b
 
 check-library:      ## Read every Short in this Mac's library with today's code (read-only); before changing how files are read
 	cd Packages/EditorCore && SHORTS_LIBRARY="$(LIBRARY)" swift test --filter LibraryCompatibilityTests
+
+docs:               ## API documentation (DocC) of EditorCore, RenderEngine and Transcription into build/docs
+	rm -rf build/docs && mkdir -p build/docs
+	cd Packages/EditorCore && for lib in EditorCore RenderEngine Transcription; do \
+		xcodebuild docbuild -scheme $$lib -destination 'generic/platform=macOS' -derivedDataPath ../../build/docs-dd -quiet || exit 1; \
+		cp -R ../../build/docs-dd/Build/Products/Debug/$$lib.doccarchive ../../build/docs/; \
+	done
+	@echo "Open with: open build/docs/EditorCore.doccarchive (Xcode's documentation window)"
 
 format:             ## Format every Swift file in place (.swift-format)
 	swift format --in-place --parallel --recursive $(SOURCES)

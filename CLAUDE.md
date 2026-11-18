@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-TheShortsEditor ("Shorts Editor") is a native macOS 26+ video editor for **YouTube Shorts only**: a CapCut-like app with the ~20% of features that make ~80% of a good Short. Being very friendly and intuitive is the top requirement. Research is in `research/shorts-editor-research.md`. The engineering standard (audit, phases 1–8, definition of done for every change) is `research/engineering-excellence.md`. **`STATUS.md` holds the current state: what's done, what's next, open questions, and how to test on screen.** Read it at the start of a session and update it at the end.
+TheShortsEditor ("Shorts Editor") is a native macOS 26+ video editor for **YouTube Shorts only**: a CapCut-like app with the ~20% of features that make ~80% of a good Short. Being very friendly and intuitive is the top requirement. Research is in `research/shorts-editor-research.md`. The engineering standard (audit, phases 1–8, definition of done for every change) is `research/engineering-excellence.md`. **`STATUS.md` holds the current state: what's done, what's next, open questions, and how to test on screen.** Read it at the start of a session and update it at the end; keep it to the current state. History goes in `CHANGELOG.md`, decisions that shape the code in `docs/adr/` (one short record each), API docs come from the `///` comments (`make docs`, DocC).
 
 ## Building
 
@@ -18,6 +18,7 @@ make uitest   # UI tests driving the real app (AppUITests)
 make bench    # performance tests, numbers added to Tools/bench/history.csv
 make build    # xcodegen + xcodebuild Debug into ./build (no tests)
 make run      # build, then launch build/Build/Products/Debug/Shorts Editor.app
+make docs     # DocC archives of EditorCore, RenderEngine, Transcription into build/docs
 make format   # swift-format every Swift file in place (.swift-format)
 make lint     # SwiftLint; only violations not in .swiftlint-baseline.json fail
 make tsan     # tests under the Thread Sanitizer (also: asan, analyze)
