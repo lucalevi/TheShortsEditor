@@ -78,11 +78,13 @@ targets:
         com.apple.security.device.audio-input: true
         # The Photos tab (reading the library, with the user's permission).
         com.apple.security.personal-information.photos-library: true
+        # Check for Updates… asks GitHub for the newest release, only when the user chooses it (ADR 0011).
+        com.apple.security.network.client: true
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.lucalevi.TheShortsEditor
         PRODUCT_NAME: Shorts Editor
-        # Signed locally ("Sign to Run Locally") until there is a Developer ID for the .dmg.
+        # Signed ad hoc ("Sign to Run Locally"), also in the shared .dmg: no Developer ID (ADR 0011).
         CODE_SIGN_IDENTITY: "-"
         CODE_SIGN_STYLE: Manual
         ENABLE_HARDENED_RUNTIME: YES

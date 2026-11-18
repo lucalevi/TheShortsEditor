@@ -7,6 +7,29 @@ the decisions that shape the code are in `docs/adr/`.
 Moved here from `STATUS.md` on 2026-11-18 (F31); the text is as it was written at the time, so
 "next" in an entry means next *then*.
 
+## 2026-11-18: Phase 8 (ship), the shareable release (F32)
+
+- **Decided by the user:** no paid Developer ID (ADR 0011); the app is shared as an ad hoc signed
+  `.dmg` on GitHub Releases with first-launch instructions. Report a Problem… (F21's second half)
+  skipped: a one-person project can't take bug reports as they come.
+- `make release` (`Tools/release/release.sh`): the Release app (arm64, warnings as errors, build
+  number = commit count, no `get-task-allow`), checked (version, signature, sandbox), in an APFS
+  `.dmg` with an Applications link and "How to open.txt" (`Tools/release/how-to-open.txt`), plus
+  its SHA-256, in `build/dist`. `make publish` also tags `v<version>` and makes the GitHub
+  Release with `docs/releases/<version>.md` (only from a clean, pushed `main`).
+- **Shorts Editor ▸ Check for Updates…** (`App/UpdateChecker.swift`): asks GitHub's API for the
+  newest release only when chosen, compares semantic versions (`Version`), offers the download
+  page; no release yet (404) counts as up to date. New `network.client` entitlement, `Log.updates`.
+  `UpdateTests`.
+- README: what the app is, Download, opening it the first time (Open Anyway / `xattr`).
+- Checked: the `.dmg` mounted read-only holds the app, the link and the note; the app is
+  `adhoc,runtime`, sandboxed, arm64, build 58 also in its Quick Look extension; a copy marked as
+  downloaded is rejected by Gatekeeper (`spctl`: the warning people will see) and runs after
+  `xattr -dr com.apple.quarantine`; in it, Check for Updates… said "Shorts Editor is up to date,
+  Version 0.1.0 is the newest" (GitHub: no release yet). **Found and fixed:** the first build
+  allowed debuggers to attach (`get-task-allow`, Xcode adds it outside archives) and the `.dmg`'s
+  top folder was readable by its owner only.
+
 ## 2026-11-18: Phase 8 (ship), first part
 
 - F24 **Delete Generated Files…** per Short (All Shorts ▸ a Short's ⋯ or right-click menu), like

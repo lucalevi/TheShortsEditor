@@ -28,6 +28,8 @@ public enum Log {
     public static let storage = Logger(subsystem: subsystem, category: "storage")
     /// Hangs and other reports from MetricKit.
     public static let performance = Logger(subsystem: subsystem, category: "performance")
+    /// Check for Updates… (asking GitHub for the newest release).
+    public static let updates = Logger(subsystem: subsystem, category: "updates")
 }
 
 extension Logger {

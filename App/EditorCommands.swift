@@ -529,6 +529,10 @@ struct WindowCommands: Commands {
     @Environment(\.openWindow) private var openWindow
 
     var body: some Commands {
+        CommandGroup(after: .appInfo) {
+            Button("Check for Updates…") { UpdateChecker.shared.check() }
+                .disabled(UpdateChecker.shared.isChecking)
+        }
         CommandGroup(after: .newItem) {
             Button("New Window") { openWindow(id: EditorWindow.id, value: EditorWindow.Value()) }
                 .keyboardShortcut("n", modifiers: [.command, .shift])

@@ -1,0 +1,29 @@
+Shorts Editor {{VERSION}}: how to open it
+
+Shorts Editor is free and isn't sold through Apple, so macOS can't check it for you
+and warns you the first time. These steps tell your Mac you trust it. You do them
+once for each version you download.
+
+1. Drag "Shorts Editor" onto "Applications" in this window.
+
+2. Open your Applications folder and double-click Shorts Editor.
+   macOS says it could not verify that the app is free of malware.
+   Click "Done" (not "Move to Trash").
+
+3. Open System Settings ▸ Privacy & Security and scroll down to Security.
+   Next to "Shorts Editor" was blocked…, click "Open Anyway",
+   then enter your Mac's password.
+
+4. Click "Open Anyway" once more. From now on Shorts Editor opens like any other app.
+
+Prefer Terminal? After step 1, this does the same as steps 2–4:
+
+    xattr -dr com.apple.quarantine "/Applications/Shorts Editor.app"
+
+Needs: a Mac with Apple silicon (M1 or later) and macOS 26 or later.
+
+Help ▸ Shorts Editor Help explains how to make a Short.
+Shorts Editor ▸ Check for Updates… tells you when there is a new version.
+
+Source code, new versions and the licence:
+https://github.com/lucalevi/TheShortsEditor

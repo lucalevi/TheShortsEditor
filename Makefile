@@ -6,7 +6,7 @@ STRICT := SWIFT_TREAT_WARNINGS_AS_ERRORS=YES GCC_TREAT_WARNINGS_AS_ERRORS=YES
 
 LIBRARY := $(HOME)/Library/Containers/com.lucalevi.TheShortsEditor/Data/Library/Application Support/Shorts Editor/Shorts
 
-.PHONY: project open build release run test app-test uitest coverage-raise bench nightly check check-library docs format format-check lint lint-baseline tsan asan analyze hooks clean help
+.PHONY: project open build release run test app-test uitest coverage-raise bench nightly check check-library publish docs format format-check lint lint-baseline tsan asan analyze hooks clean help
 
 help:               ## List the targets
 	@grep -E '^[a-z-]+:.*##' $(MAKEFILE_LIST) | sed -E 's/:.*## /\t/' | expand -t 20
@@ -20,8 +20,13 @@ open: project       ## Open the project in Xcode
 build: project      ## Build the Debug app into ./build
 	$(XCODEBUILD) -configuration Debug -derivedDataPath build build
 
-release: project    ## Build the Release app into ./build/release, warnings as errors
-	$(XCODEBUILD) -configuration Release -derivedDataPath build/release $(STRICT) build
+# Sharing (F32, ADR 0011): ad hoc signed, no Developer ID. Version: MARKETING_VERSION in project.yml;
+# release notes: docs/releases/<version>.md.
+release:            ## The shareable .dmg (and its SHA-256) of the Release app into build/dist
+	Tools/release/release.sh
+
+publish:            ## `release`, then tag v<version> and make the GitHub Release with the .dmg (main pushed, tree clean)
+	Tools/release/release.sh --publish
 
 run: build          ## Build and launch the app
 	open "$(APP)"

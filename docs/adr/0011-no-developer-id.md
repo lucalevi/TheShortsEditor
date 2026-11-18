@@ -9,7 +9,7 @@ Opening an app on another Mac without a warning needs a paid Apple Developer ID 
 
 ## Decision
 
-Releases are ad hoc signed (`CODE_SIGN_IDENTITY: "-"`, as today) and packaged as a `.dmg` attached to a GitHub Release, with instructions for the first launch. Since macOS 15, Control-click ▸ Open no longer gets past Gatekeeper: the user opens the app once, then chooses Open Anyway in System Settings ▸ Privacy & Security (or removes the quarantine flag with `xattr -dr com.apple.quarantine`). Updates are announced, not installed: the app checks the GitHub Releases page and links to the new `.dmg`.
+Releases are ad hoc signed (`CODE_SIGN_IDENTITY: "-"`, as today) and packaged as a `.dmg` attached to a GitHub Release, with instructions for the first launch. Since macOS 15, Control-click ▸ Open no longer gets past Gatekeeper: the user opens the app once, then chooses Open Anyway in System Settings ▸ Privacy & Security (or removes the quarantine flag with `xattr -dr com.apple.quarantine`). Updates are announced, not installed: Shorts Editor ▸ Check for Updates… asks GitHub's API for the newest release, only when chosen (the app's only network request, hence the `network.client` entitlement), and links to its page. `make release` / `make publish` (`Tools/release/release.sh`) build and publish it.
 
 ## Consequences
 

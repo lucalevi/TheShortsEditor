@@ -6,13 +6,13 @@ _Last updated: 2026-11-18. The current state only: read it first when picking th
 
 Shorts Editor is feature-complete for its plan: the P0 list, roadmap features 1–12, the iMovie list (stages A–F) and the CapCut list (stages G–L) are built, tested and checked on screen. The engineering-excellence plan (`research/engineering-excellence.md`) is done for phases 1–7 (safety net, never lose work, correct pictures, architecture, tests for the app, responsiveness, platform fit), except F26 (Italian), which the user postponed. Phase 8 (ship) is under way.
 
-**Pick up here (2026-11-18):** F24 and F31 of Phase 8 are done (below), `make check` green, checked on screen, committed and pushed (cfd0389). **Next: F32 without a Developer ID (decided 2026-11-18, below). F21's second half (Report a Problem…) is skipped and F26 (Italian) postponed, both by the user.**
+**Pick up here (2026-11-18):** F24 and F31 of Phase 8 are done (below), `make check` green, checked on screen, committed and pushed (cfd0389). **F32 is built** (below): `make release` makes `build/dist/Shorts-Editor-0.1.0.dmg`, checked; Check for Updates… works. **Next: the user picks the first version number and says to publish (`make publish`); then F26 (Italian) whenever wanted.** F21's second half (Report a Problem…) is skipped by the user.
 
 Repository: https://github.com/lucalevi/TheShortsEditor (public, branch `main`).
 
 ## Phase 8: ship
 
-- [ ] F32 **without a Developer ID** (user, 2026-11-18; `docs/adr/0011-no-developer-id.md`): ad hoc signed app in a `.dmg` (drag to Applications, a "How to open" note inside) attached to a GitHub Release; first-launch instructions (macOS 15+ removed Control-click ▸ Open: open once, then System Settings ▸ Privacy & Security ▸ Open Anyway; or `xattr -dr com.apple.quarantine`); semantic versions with an automated build number; release notes from `CHANGELOG.md`; Help ▸ Check for Updates… reads the GitHub Releases page and links to the download (no Sparkle: it can't install over an unnotarized app cleanly); `make release` does it all. No notarization, no privacy manifest needed outside the App Store (optional).
+- [x] F32 (2026-11-18, not yet published) **without a Developer ID** (user, 2026-11-18; `docs/adr/0011-no-developer-id.md`): ad hoc signed app in a `.dmg` (drag to Applications, a "How to open" note inside) attached to a GitHub Release; first-launch instructions (macOS 15+ removed Control-click ▸ Open: open once, then System Settings ▸ Privacy & Security ▸ Open Anyway; or `xattr -dr com.apple.quarantine`); semantic versions with an automated build number; release notes from `CHANGELOG.md`; Shorts Editor ▸ Check for Updates… (`App/UpdateChecker.swift`) asks GitHub's API, only when chosen, and links to the download (no Sparkle); `make release` builds the `.dmg`, `make publish` also tags and makes the GitHub Release. No notarization, no privacy manifest (only the App Store needs one). Release notes for the first version: `docs/releases/0.1.0.md`.
 - [ ] F21 (second half) Help ▸ Report a Problem… (log + project structure, no media): **skipped by the user (2026-11-18)**: one person can't take in and fix bug reports as they come. MetricKit hang/crash reports are already kept (`App/HangReports.swift`, Phase 6), so this can be added later if wanted.
 - [x] F31 (2026-11-18) `STATUS.md` kept to the current state; history in `CHANGELOG.md`; decisions as ADRs in `docs/adr/` (10); DocC catalogs for EditorCore and RenderEngine, `make docs` (all three libraries, no new dependency: `xcodebuild docbuild`)
 - [x] F24 (2026-11-18) **Delete Generated Files…** on each Short in All Shorts (⋯ and right-click): the copies made for that Short alone, with their size, after asking; kept when another Short uses them; refused while the Short is open. Settings ▸ Storage lists each Short's own copies with Delete… Checked on screen. Found on the way: Settings was taller than a laptop's screen (Storage out of reach); it scrolls now.
@@ -24,6 +24,7 @@ Phases 1–7 and their checklists: `CHANGELOG.md`. F26 (String Catalog and Itali
 - **Screen Recording for Xcode's test runner** (System Settings ▸ Privacy & Security): the accessibility audit UI test (`TEST_RUNNER_SHORTS_UI_AUDIT=1 make uitest`) fails before auditing without it.
 - **F26 (Italian):** when wanted.
 - **F21 Report a Problem…:** skipped; only if the user asks for it.
+- **First release:** which version number (0.1.0 as now, or 1.0.0), and the go-ahead to publish it on the public repo.
 
 ## Open questions for the user
 
