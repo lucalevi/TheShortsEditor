@@ -1,6 +1,6 @@
 # Project status
 
-_Last updated: 2026-11-18. The current state only: read it first when picking the project back up, and update it at the end of each session. What was done and found, session by session, is in `CHANGELOG.md`; why the code is the way it is, in `docs/adr/`._
+_Last updated: 2026-11-18 (evening). The current state only: read it first when picking the project back up, and update it at the end of each session. What was done and found, session by session, is in `CHANGELOG.md`; why the code is the way it is, in `docs/adr/`._
 
 ## Where we are
 
@@ -8,7 +8,20 @@ Shorts Editor is feature-complete for its plan: the P0 list, roadmap features 1�
 
 **New direction (2026-11-18, later):** the user wants the app to be as easy as iMovie with no learning. Usability audit: `research/usability-audit.md` (findings U1–U21, rules R1–R8 from web research, order of work in §5). **Steps 1–5 of §5 are built, checked on screen, `make check` and `make uitest` green, committed and pushed (2026-11-18):** Mac habits (clipboard, Duplicate, ⌥-drag, Escape, pinch), seeing the sound (music wave, Clip Size, trimmer wave), typing titles on the picture, one place per kind of thing (labelled toolbar, a browser tab per kind of thing with tiles to click or drag, clip details in tabs, taller timeline with a fixed ruler), and polish (letters by character, ⇧Z Zoom to Fit, tips in the timeline header at most every 10 minutes, home tiles say what they make, one import rule). The details are in `CHANGELOG.md`.
 
-Pinch to zoom still needs a real trackpad to try. **Next: the second audit pass (`research/usability-audit.md` §4: captions start to finish, voice-over, Magic Short, reordering, multiple selection, a 13" window), then a session with someone who has never seen the app.**
+Pinch to zoom still needs a real trackpad to try.
+
+**Next (agreed 2026-11-18, to do another day): the second audit pass**, task-based this time. For each area: write one realistic task first, do it in the real app as a newcomer would (no menus or shortcuts unless something on screen points to them), note clicks, dead ends, surprises and errors, compare with iMovie/CapCut, fix in small steps with tests, then turn the task into an `AppUITests` test. Suggested start: voice-over and selecting several things.
+
+| Area | What "great" looks like | Suspected gaps (to check) |
+|---|---|---|
+| Captions | One click with progress, then fix a word on the picture (as titles now) | Captions edited only in the list; wrong language fails without saying why; accuracy on real speech unknown (synthetic test voice) |
+| Voice-over | iMovie iPhone: countdown, record, then Keep / Retake / Listen | Countdown exists (`EditorModel+Voice.swift`) but no retake or review; no microphone level while recording |
+| Magic Short | Pick clips, preview, tweak; always clear what was changed | Does it say what it cut? Does one undo revert it all? |
+| Reordering clips | Others slide aside live while dragging; clear landing marker | Only a yellow line marks the drop point; no keyboard move left/right |
+| Several things at once | Change speed, colour, volume, effects or delete for all selected | `MultipleInspector` offers only framing and mute; its summary forgets selected sounds |
+| 13" window | Everything reachable on a MacBook Air screen | Window minimum 1000×680; three columns plus timeline are tight; clip details likely need much scrolling |
+
+**Waiting on the user for this pass:** two or three real phone recordings of the user talking (the only footage I can't make), and ideally one 20-minute session with someone who has never seen the app (five tasks, no help).
 
 **Before that (2026-11-18):** F24 and F31 of Phase 8 are done (below), `make check` green, checked on screen, committed and pushed (cfd0389). **F32 is built** (below): `make release` makes `build/dist/Shorts-Editor-0.1.0.dmg`, checked (built before the new red icon: remake it before publishing); Check for Updates… works. **Version: 0.1.0 (a beta), not to be published yet (user, 2026-11-18). Next: publish when the user says (`make publish` remakes the `.dmg`); F26 (Italian) whenever wanted.** F21's second half (Report a Problem…) is skipped by the user.
 
@@ -25,6 +38,7 @@ Phases 1–7 and their checklists: `CHANGELOG.md`. F26 (String Catalog and Itali
 
 ## Waiting on the user
 
+- **Second usability pass:** two or three real phone recordings of the user talking; ideally a 20-minute session with a newcomer; and a quick try of pinch to zoom on a real trackpad.
 - **Screen Recording for Xcode's test runner** (System Settings ▸ Privacy & Security): the accessibility audit UI test (`TEST_RUNNER_SHORTS_UI_AUDIT=1 make uitest`) fails before auditing without it.
 - **F26 (Italian):** when wanted.
 - **F21 Report a Problem…:** skipped; only if the user asks for it.
