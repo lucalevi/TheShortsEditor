@@ -12,7 +12,7 @@ Pinch to zoom still needs a real trackpad to try.
 
 **Now: the second audit pass**, task-based. For each area: write one realistic task first, do it in the real app as a newcomer would (no menus or shortcuts unless something on screen points to them), note clicks, dead ends, surprises and errors, compare with iMovie/CapCut, fix in small steps with tests, then turn the task into an `AppUITests` test.
 
-**Done 2026-11-19 (not yet committed: waiting for the user's "commit and push"):** voice-over (microphone under the viewer, level and time while recording, Listen / Retake / Delete / Keep, a warning for a silent take, "Voice-over 1, 2…") and several things at once (one volume for clips and sounds, Light / Colour / Warmth for several, an Effects pointer, sounds counted). Three older bugs found and fixed on the way: File ▸ All Shorts crashed; files opened from Finder were often lost when they launched the app; a 286-frame clip at 2× played black. Details in `CHANGELOG.md`.
+**Done 2026-11-19 (committed and pushed, 26c5377):** voice-over (microphone under the viewer, level and time while recording, Listen / Retake / Delete / Keep, a warning for a silent take, "Voice-over 1, 2…") and several things at once (one volume for clips and sounds, Light / Colour / Warmth for several, an Effects pointer, sounds counted). Three older bugs found and fixed on the way: File ▸ All Shorts crashed; files opened from Finder were often lost when they launched the app; a 286-frame clip at 2× played black. Details in `CHANGELOG.md`.
 
 | Area | What "great" looks like | Suspected gaps (to check) |
 |---|---|---|
