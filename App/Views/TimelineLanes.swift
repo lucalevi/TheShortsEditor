@@ -274,7 +274,7 @@ extension TimelineView {
                         onUpdate: { _ in }, onDrop: { urls, x in model.importFiles(urls, to: .sound(at: time(at: x))) },
                         onText: { dropBrowserTiles($0, at: $1) }))
             if model.project.sounds.isEmpty, !model.project.timeline.clips.isEmpty {
-                Label("Sound effects and voice-overs go here (Audio tab, or drop a sound file)", systemImage: "waveform")
+                Label("Sound effects and voice-overs go here (the microphone under the viewer, the Audio tab, or drop a sound file)", systemImage: "waveform")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
                     .frame(height: emptyLaneHeight)
@@ -283,6 +283,19 @@ extension TimelineView {
             }
             ForEach(model.project.sounds) { sound in
                 soundView(sound, row: rows[sound.id] ?? 0)
+                    .opacity(model.isRecordingVoiceOver && model.retakeOf == sound.id ? 0.35 : 1)
+            }
+            if case .recording(let start) = model.voiceOver {
+                // What is being recorded grows with the playhead, as in iMovie.
+                RoundedRectangle(cornerRadius: 4)
+                    .fill(Color.red.opacity(0.55))
+                    .overlay(alignment: .topLeading) {
+                        Label("Recording", systemImage: "mic.fill").font(.caption2.weight(.medium)).padding(.horizontal, 4)
+                    }
+                    .frame(width: max(width(of: model.currentTime - start), 2), height: min(soundRowHeight, max(soundsHeight, emptyLaneHeight)))
+                    .offset(x: x(for: start))
+                    .allowsHitTesting(false)
+                    .accessibilityHidden(true)
             }
         }
     }

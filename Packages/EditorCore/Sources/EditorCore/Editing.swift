@@ -432,6 +432,23 @@ extension Project {
         return clip.id
     }
 
+    /// "Voice-over 1", "Voice-over 2"…: the name for a new recording, one more than the highest
+    /// number already used.
+    public var nextVoiceOverName: String {
+        let numbers = assets.compactMap { asset -> Int? in
+            guard asset.name.hasPrefix("Voice-over ") else { return nil }
+            return Int(asset.name.dropFirst("Voice-over ".count))
+        }
+        return "Voice-over \((numbers.max() ?? 0) + 1)"
+    }
+
+    /// Takes a recorded voice-over off the timeline, and its file out of the Short when nothing
+    /// else uses it (a take that was thrown away shouldn't linger in Media).
+    public mutating func removeTake(_ id: Clip.ID, assetID: MediaAsset.ID) {
+        removeSound(id)
+        if usageCount(of: assetID) == 0 { assets.removeAll { $0.id == assetID } }
+    }
+
     public mutating func updateSound(_ id: Clip.ID, _ change: (inout SoundClip) -> Void) {
         guard let index = sounds.firstIndex(where: { $0.id == id }) else { return }
         change(&sounds[index])

@@ -71,12 +71,33 @@ struct WindowsTests {
         #expect(FileManager.default.fileExists(atPath: ProjectStore.fileURL(for: id).path))
     }
 
+    /// Launched by opening files, SwiftUI takes the window's content down and puts it back: the
+    /// window stays, and its editor must be known again once it is in front (files opened from
+    /// Finder were lost when it wasn't).
+    @Test func aWindowWhoseContentCameBackIsKnownAgain() {
+        let app = AppState()
+        let windowID = UUID()
+        let editor = app.editor(for: windowID)
+        app.didFocus(editor, window: windowID)
+        app.close(windowID)
+        #expect(app.current == nil && app.allEditors.isEmpty)
+
+        app.didFocus(editor, window: windowID)
+        #expect(app.current === editor)
+        #expect(app.allEditors.count == 1)
+        // A throwaway second window that comes and goes leaves the first one in front.
+        let other = UUID()
+        app.didFocus(app.editor(for: other), window: other)
+        app.close(other)
+        #expect(app.current === editor)
+    }
+
     /// Quitting closes the windows; the app must still reopen the Short that was in front.
     @Test func quittingKeepsWhereTheUserWas() async throws {
         let app = AppState()
         let windowID = UUID()
         let editor = app.editor(for: windowID)
-        app.didFocus(editor)
+        app.didFocus(editor, window: windowID)
         let test = TestEditor(model: editor)
         editor.newShort()
         await test.importToTimeline([try await TestMedia.video(seconds: 2)])

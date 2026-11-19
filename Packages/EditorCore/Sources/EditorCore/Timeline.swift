@@ -132,6 +132,17 @@ public struct Clip: Identifiable, Codable, Equatable, Sendable {
     }
 
     /// A stretch of the source as it lasts on the timeline.
+    /// How long `source` (a stretch of the clip's sound, placed at `at`) lasts on the timeline at
+    /// the clip's speed, for a clip starting at `start`. Sound that reaches the end of the clip ends
+    /// exactly where its picture does (a whole frame): the speed maths gives nanoseconds, and
+    /// 9.533 s at 2× ended a third of a nanosecond after the picture, which left the player
+    /// showing nothing.
+    package func soundLength(_ source: CMTimeRange, at: CMTime, from start: CMTime) -> CMTime {
+        let scaled = timelineDuration(ofSource: source.duration)
+        let end = start + duration
+        return source.end >= sourceRange.end || at + scaled >= end ? max(end - at, .zero) : scaled
+    }
+
     public func timelineDuration(ofSource duration: CMTime) -> CMTime {
         if speedCurve != nil, !isFrozen {
             let source = sourceDuration.seconds
@@ -172,8 +183,11 @@ public struct Timeline: Codable, Equatable, Sendable {
         clips.firstIndex { $0.id == id }
     }
 
+    /// Where the clip at `index` starts. An index past the end gives the end of the timeline:
+    /// SwiftUI can draw a clip once more with its old position while clips are being removed
+    /// (going back to All Shorts crashed the app that way).
     public func startTime(ofClipAt index: Int) -> CMTime {
-        clips[..<index].reduce(.zero) { $0 + $1.duration }
+        clips.prefix(max(index, 0)).reduce(.zero) { $0 + $1.duration }
     }
 
     /// Where the clip sits on the timeline.

@@ -37,8 +37,12 @@ final class AppState {
     /// the value of one that is still open).
     func editor(showingWindow id: UUID) -> EditorModel? { editors[id] }
 
-    /// The window in front is showing `editor`.
-    func didFocus(_ editor: EditorModel) {
+    /// The window `id` in front is showing `editor`. SwiftUI can take a window's content down and
+    /// put it back while the window stays (it does when the app is launched by opening files):
+    /// the editor was let go by `close`, so it is taken back here, or the window on screen would
+    /// have no editor that menus, opened files and quitting know of.
+    func didFocus(_ editor: EditorModel, window id: UUID) {
+        if editors[id] !== editor { editors[id] = editor }
         if current !== editor { current = editor }
     }
 

@@ -52,6 +52,22 @@ struct SpeedAndSoundRenderTests {
         #expect(built.makePlayerItem().audioTimePitchAlgorithm == .spectral)
     }
 
+    /// 286 frames at 2× (9.533 s became 4.766666667 s of sound for 143/30 s of
+    /// picture): the sound must end exactly with the picture, or the player shows nothing.
+    @Test func aFastClipsSoundEndsExactlyWithItsPicture() async throws {
+        let url = try await Fixture.video(width: 180, height: 320, seconds: 10, bgra: red, toneFrom: 0)
+        var project = try await oneClip(url)
+        project.timeline.clips[0].duration = CMTime(value: 286, timescale: 30)
+        project.setSpeed(2, for: project.timeline.clips[0].id)
+        let built = try await CompositionBuilder.build(project)
+        let video = try #require(try await built.composition.loadTracks(withMediaType: .video).first)
+        let audio = try #require(try await built.composition.loadTracks(withMediaType: .audio).first)
+        let pictureEnd = try await video.load(.timeRange).end
+        let soundEnd = try await audio.load(.timeRange).end
+        #expect(soundEnd <= pictureEnd, "sound ends at \(soundEnd.value)/\(soundEnd.timescale), picture at \(pictureEnd.value)/\(pictureEnd.timescale)")
+        #expect(abs((pictureEnd - soundEnd).seconds) < 0.02)
+    }
+
     // MARK: Sounds
 
     @Test func builtInEffectsAreMadeOnce() async throws {

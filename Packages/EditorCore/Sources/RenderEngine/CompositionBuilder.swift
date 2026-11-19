@@ -111,7 +111,7 @@ public enum CompositionBuilder {
                     try audioTrack.insertTimeRange(range, of: sourceAudio, at: insertAt)
                     if clip.speed != 1 {
                         audioTrack.scaleTimeRange(
-                            CMTimeRange(start: insertAt, duration: range.duration), toDuration: clip.timelineDuration(ofSource: range.duration))
+                            CMTimeRange(start: insertAt, duration: range.duration), toDuration: clip.soundLength(range, at: insertAt, from: cursor))
                     }
                 }
             }
@@ -202,7 +202,7 @@ public enum CompositionBuilder {
             let at = overlay.start + clip.timelineOffset(ofSourceTime: source.start)
             try audio.track.insertTimeRange(source, of: sourceAudio, at: at)
             if clip.speed != 1 {
-                audio.track.scaleTimeRange(CMTimeRange(start: at, duration: source.duration), toDuration: clip.timelineDuration(ofSource: source.duration))
+                audio.track.scaleTimeRange(CMTimeRange(start: at, duration: source.duration), toDuration: clip.soundLength(source, at: at, from: overlay.start))
             }
             apply(overlay.clip.soundEnvelope(), at: overlay.start, gain: gain, to: audio.parameters, within: range)
         }
@@ -233,7 +233,7 @@ public enum CompositionBuilder {
             let at = sound.start + clip.timelineOffset(ofSourceTime: source.start)
             try target.track.insertTimeRange(source, of: sourceAudio, at: at)
             if clip.speed != 1 {
-                target.track.scaleTimeRange(CMTimeRange(start: at, duration: source.duration), toDuration: clip.timelineDuration(ofSource: source.duration))
+                target.track.scaleTimeRange(CMTimeRange(start: at, duration: source.duration), toDuration: clip.soundLength(source, at: at, from: sound.start))
             }
             var envelope = sound.clip.soundEnvelope()
             if sound.lowersUnderSpeech, sound.canLowerUnderSpeech {

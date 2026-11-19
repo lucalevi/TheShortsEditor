@@ -44,6 +44,18 @@ extension EditorModel {
         }
     }
 
+    /// While a slider for several clips is dragged: shows each with one colour setting changed
+    /// (nil: back to their own).
+    func previewColor(_ keyPath: WritableKeyPath<ColorAdjustments, Double>, _ value: Double?, for clipIDs: [Clip.ID]) {
+        for id in clipIDs {
+            guard let clip = project.anyClip(id: id) else { continue }
+            var look = clip.look
+            if let value { look.color[keyPath: keyPath] = value }
+            livePreview.setLook(value == nil ? nil : look, for: id)
+        }
+        redrawCurrentFrame()
+    }
+
     /// Shows `look` on a clip straight away while a slider is dragged (nil: back to its own).
     func previewLook(_ look: ClipLook?, for clipID: Clip.ID) {
         livePreview.setLook(look, for: clipID)

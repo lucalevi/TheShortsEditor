@@ -1,3 +1,4 @@
+import CoreMedia
 import EditorCore
 import RenderEngine
 
@@ -44,5 +45,26 @@ extension EditorModel {
         guard let title = selectedTitle, !title.isSticker else { return }
         selectTitle(title.id)
         titleEditedInViewer = title.id
+    }
+}
+
+extension EditorModel {
+    // MARK: Titles
+
+    /// Selects a title and moves the playhead to where it is fully on screen.
+    func selectTitle(_ id: TextOverlay.ID) {
+        selectedTitleID = id
+        guard let title = project.title(id: id), let range = title.visibleRange(in: project) else { return }
+        playback.player.pause()
+        let settled = range.start + min(CMTime(value: 1, timescale: 2), CMTimeMultiplyByRatio(range.duration, multiplier: 1, divisor: 2))
+        if !range.containsTime(currentTime) || currentTime < settled { playback.seek(to: settled) }
+    }
+
+    func moveTitle(_ id: TextOverlay.ID, to start: CMTime) {
+        apply("Move Title") { $0.moveTitle(id, to: start) }
+    }
+
+    func setTitleDuration(_ id: TextOverlay.ID, _ duration: CMTime) {
+        apply("Change Title Length") { $0.setTitleDuration(id, duration) }
     }
 }

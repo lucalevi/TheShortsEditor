@@ -71,37 +71,44 @@ private struct MultipleInspector: View {
         clips.filter { model.project.timeline.index(of: $0.id) != nil }
     }
 
+    /// Selected sound effects and voice-overs.
+    private var sounds: [SoundClip] {
+        model.project.sounds.filter { model.isSelected(.sound($0.id)) }
+    }
+
     private var summary: [String] {
         let items = model.timelineSelection.items
         let titles = items.filter { if case .title = $0 { true } else { false } }.count
         let overlays = clips.count - mainClips.count
+        let voiceOvers = sounds.filter(\.isVoiceOver).count
+        let otherSounds = sounds.count - voiceOvers
         var parts: [String] = []
         if !mainClips.isEmpty { parts.append(mainClips.count == 1 ? "1 clip" : "\(mainClips.count) clips") }
         if overlays > 0 { parts.append(overlays == 1 ? "1 clip over the others" : "\(overlays) clips over the others") }
         if titles > 0 { parts.append(titles == 1 ? "1 title" : "\(titles) titles") }
+        if voiceOvers > 0 { parts.append(voiceOvers == 1 ? "1 voice-over" : "\(voiceOvers) voice-overs") }
+        if otherSounds > 0 { parts.append(otherSounds == 1 ? "1 sound" : "\(otherSounds) sounds") }
         if items.contains(.music) { parts.append("the music") }
         return parts
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text(summary.formatted(.list(type: .and)).capitalizedFirst + " selected.")
+            Text(summary.formatted(.list(type: .and)).capitalizedFirst + " selected. Changes here apply to all of them.")
                 .fixedSize(horizontal: false, vertical: true)
 
+            let heard = clips + sounds.map(\.clip)
+            if !heard.isEmpty {
+                MultipleVolumeSlider(model: model, clips: heard)
+            }
+
             if !clips.isEmpty {
-                let allMuted = clips.allSatisfy(\.isMuted)
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("Framing").font(.subheadline.weight(.semibold))
+                    Text("Picture").font(.subheadline.weight(.semibold))
                     HStack {
                         Button("Fill Screen") { model.setFraming(.fill, for: clips.map(\.id)) }
                         Button("Show All") { model.setFraming(.fit, for: clips.map(\.id)) }
                     }
-                    Text("Sets every selected clip at once.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Zoom").font(.subheadline.weight(.semibold))
                     Button(model.isPunchedIn(clips) ? "Remove Punch-In" : "Punch In", systemImage: "plus.magnifyingglass") {
                         model.togglePunchIn(clips.map(\.id))
                     }
@@ -109,16 +116,13 @@ private struct MultipleInspector: View {
                         Button("Punch In on Every Other Cut") { model.punchInOnAlternateCuts() }
                             .help("Zoom in on every other clip from the same recording, so jump cuts look like a change of camera")
                     }
-                }
-                if !mainClips.isEmpty {
-                    let allBlack = mainClips.allSatisfy { $0.background == .black }
-                    Button(allBlack ? "Blurred Background" : "Black Background") {
-                        model.setBackground(allBlack ? .blur : .black, for: mainClips.map(\.id))
+                    if !mainClips.isEmpty {
+                        let allBlack = mainClips.allSatisfy { $0.background == .black }
+                        Button(allBlack ? "Blurred Background" : "Black Background") {
+                            model.setBackground(allBlack ? .blur : .black, for: mainClips.map(\.id))
+                        }
+                        .help("What fills the screen around pictures that don't cover it")
                     }
-                    .help("What fills the screen around pictures that don't cover it")
-                }
-                Button(allMuted ? "Unmute Clips" : "Mute Clips", systemImage: allMuted ? "speaker.wave.2" : "speaker.slash") {
-                    model.setClipsMuted(clips.map(\.id), !allMuted)
                 }
             }
 
@@ -130,6 +134,18 @@ private struct MultipleInspector: View {
             let videoClips = clips.filter { model.project.asset(id: $0.assetID)?.isImage != true }
             if !videoClips.isEmpty {
                 SpeedSection(model: model, clips: videoClips)
+            }
+
+            if !pictureClips.isEmpty {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Effects").font(.subheadline.weight(.semibold))
+                    Button("Choose an Effect…", systemImage: "sparkles") { model.sidebar = .effects }
+                        .help("Opens the Effects tab: click an effect there to add it to every selected clip")
+                    Text("Click an effect in the Effects tab to add it to every selected clip.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
 
             Button("Delete All Selected", systemImage: "trash", role: .destructive) { model.deleteSelection() }

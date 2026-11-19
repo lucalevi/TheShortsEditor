@@ -6,6 +6,36 @@ import SwiftUI
 /// Sound like iMovie's: the volume line and its points, fades, detaching a clip's sound, voice
 /// effects and EQ.
 extension EditorModel {
+    // MARK: Volume and mute
+
+    func setClipsMuted(_ clipIDs: [Clip.ID], _ muted: Bool) {
+        apply(muted ? "Mute Clips" : "Unmute Clips") { project in
+            for id in clipIDs { project.updateAnyClip(id) { $0.isMuted = muted } }
+        }
+    }
+
+    func setClipVolume(_ clipID: Clip.ID, _ volume: Double) {
+        setClipsVolume([clipID], volume)
+    }
+
+    /// Gives clips and sounds the same volume (and unmutes them), in one undo step.
+    func setClipsVolume(_ clipIDs: [Clip.ID], _ volume: Double) {
+        apply("Change Volume") { project in
+            for id in clipIDs {
+                project.updateAnyClip(id) { clip in
+                    clip.volume = min(max(volume, 0), Clip.maxVolume)
+                    clip.isMuted = false
+                }
+            }
+        }
+    }
+
+    func setClipMuted(_ clipID: Clip.ID, _ muted: Bool) {
+        apply(muted ? "Mute Clip" : "Unmute Clip") { project in
+            project.updateAnyClip(clipID) { $0.isMuted = muted }
+        }
+    }
+
     // MARK: Volume line and fades
 
     /// Sets how long a clip's sound fades in (`.start`) or out (`.end`).

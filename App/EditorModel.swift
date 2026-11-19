@@ -141,6 +141,8 @@ final class EditorModel {
     var trimmerClipID: Clip.ID?
     /// While recording a voice-over: counting down, then recording from a time.
     var voiceOver: VoiceOverState?
+    /// The voice-over just recorded, offered for Listen / Retake / Delete / Keep while it is selected.
+    var voiceOverTake: VoiceOverTake?
     /// The style whose music is being made, while it is.
     var styleBeingMade: ShortStyle? {
         tasks.jobs.lazy.compactMap { job -> ShortStyle? in if case .style(let style) = job.key { style } else { nil } }.first
@@ -158,6 +160,8 @@ final class EditorModel {
     @ObservationIgnored var effectPlayer: AVAudioPlayer?
     @ObservationIgnored var recorder: AVAudioRecorder?
     @ObservationIgnored var voiceOverURL: URL?
+    /// Set while recording a retake: the take it replaces once the new one is made.
+    @ObservationIgnored var retakeOf: Clip.ID?
     /// Set while the Export sheet is open.
     var exportPhase: ExportPhase?
     /// Set while the user is choosing which pauses to remove.
@@ -202,11 +206,6 @@ final class EditorModel {
     @ObservationIgnored var exportTask: Task<Void, Never>?
 
     static let zoomRange: ClosedRange<CGFloat> = 15...400
-
-    enum VoiceOverState: Equatable {
-        case countdown(Int)
-        case recording(from: CMTime)
-    }
 
     enum Sidebar: String, CaseIterable, Identifiable {
         case media = "Media"
@@ -379,75 +378,8 @@ final class EditorModel {
         }
     }
 
-    func setClipsMuted(_ clipIDs: [Clip.ID], _ muted: Bool) {
-        apply(muted ? "Mute Clips" : "Unmute Clips") { project in
-            for id in clipIDs { project.updateAnyClip(id) { $0.isMuted = muted } }
-        }
-    }
-
     func moveClip(_ clipID: Clip.ID, to index: Int) {
         apply("Move Clip") { $0.timeline.move(clipID, to: index) }
-    }
-
-    // MARK: Sound
-
-    func setClipVolume(_ clipID: Clip.ID, _ volume: Double) {
-        apply("Change Volume") { project in
-            project.updateAnyClip(clipID) { clip in
-                clip.volume = min(max(volume, 0), Clip.maxVolume)
-                clip.isMuted = false
-            }
-        }
-    }
-
-    func setClipMuted(_ clipID: Clip.ID, _ muted: Bool) {
-        apply(muted ? "Mute Clip" : "Unmute Clip") { project in
-            project.updateAnyClip(clipID) { $0.isMuted = muted }
-        }
-    }
-
-    // MARK: Titles
-
-    /// Selects a title and moves the playhead to where it is fully on screen.
-    func selectTitle(_ id: TextOverlay.ID) {
-        selectedTitleID = id
-        guard let title = project.title(id: id), let range = title.visibleRange(in: project) else { return }
-        playback.player.pause()
-        let settled = range.start + min(CMTime(value: 1, timescale: 2), CMTimeMultiplyByRatio(range.duration, multiplier: 1, divisor: 2))
-        if !range.containsTime(currentTime) || currentTime < settled { playback.seek(to: settled) }
-    }
-
-    func moveTitle(_ id: TextOverlay.ID, to start: CMTime) {
-        apply("Move Title") { $0.moveTitle(id, to: start) }
-    }
-
-    func setTitleDuration(_ id: TextOverlay.ID, _ duration: CMTime) {
-        apply("Change Title Length") { $0.setTitleDuration(id, duration) }
-    }
-
-    // MARK: Captions
-
-    func setCaptionsVisible(_ visible: Bool) {
-        apply(visible ? "Show Captions" : "Hide Captions") { $0.captions.isVisible = visible }
-    }
-
-    func setCaptionStyle(_ style: CaptionStyle) {
-        apply("Change Caption Style") { $0.captions.style = style }
-    }
-
-    func setCaptionPosition(_ position: Double) {
-        apply("Move Captions") { $0.captions.verticalPosition = position }
-    }
-
-    /// Replaces the words of a caption with what the user typed.
-    func editCaption(_ page: CaptionPage, text: String) {
-        guard text != page.text else { return }
-        apply("Edit Caption") { $0.replaceWords(page.words.map(\.wordID), in: page.assetID, with: text) }
-    }
-
-    /// The caption on screen at the playhead.
-    var currentCaption: CaptionPage? {
-        CaptionLayout.page(at: currentTime, in: captioning.pages)
     }
 
     // MARK: Playback

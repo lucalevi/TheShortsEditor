@@ -47,10 +47,17 @@ struct ViewerView: View {
             } isTargeted: {
                 isDropTargeted = $0
             }
+            if case .recording(let start) = model.voiceOver {
+                RecordingBar(model: model, start: start)
+            } else if let review = model.reviewedVoiceOver {
+                TakeBar(model: model, take: review.take, sound: review.sound)
+            }
             TransportBar(
                 hasClips: !model.project.timeline.clips.isEmpty,
-                showsSafeZone: Binding(get: { model.showsSafeZone }, set: { model.showsSafeZone = $0 })
-            ) { model.toggleFullScreenPreview() }
+                showsSafeZone: Binding(get: { model.showsSafeZone }, set: { model.showsSafeZone = $0 }),
+                isRecording: model.isRecordingVoiceOver,
+                toggleRecording: { model.isRecordingVoiceOver ? model.stopVoiceOver() : model.startVoiceOver() },
+                toggleFullScreen: { model.toggleFullScreenPreview() })
         }
     }
 
@@ -128,6 +135,8 @@ private struct TransportBar: View {
     @Environment(PlaybackController.self) private var playback
     let hasClips: Bool
     @Binding var showsSafeZone: Bool
+    let isRecording: Bool
+    let toggleRecording: () -> Void
     let toggleFullScreen: () -> Void
 
     var body: some View {
@@ -156,6 +165,8 @@ private struct TransportBar: View {
             Toggle("YouTube Overlay Areas", systemImage: "rectangle.dashed", isOn: $showsSafeZone)
                 .toggleStyle(.button)
                 .help("Show where YouTube's buttons and captions cover your video (⌘')")
+            Button(isRecording ? "Stop Recording" : "Record Voice-Over", systemImage: isRecording ? "stop.circle.fill" : "mic.fill", action: toggleRecording)
+                .help(isRecording ? "Stop recording (Space)" : "Record your voice over the Short, from the playhead (⌥⌘R)")
         }
         .labelStyle(.iconOnly)
         .buttonStyle(.borderless)
@@ -402,42 +413,6 @@ private struct PictureHandles: View {
 
     private func clampedInside(_ point: CGPoint, _ size: CGSize) -> CGPoint {
         CGPoint(x: min(max(point.x, 8), size.width - 8), y: min(max(point.y, 8), size.height - 8))
-    }
-}
-
-/// The 3-2-1 before a voice-over, then a recording sign.
-private struct VoiceOverBadge: View {
-    let model: EditorModel
-
-    var body: some View {
-        switch model.voiceOver {
-        case .countdown(let n)?:
-            Text("\(n)")
-                .font(.system(size: 96, weight: .bold, design: .rounded))
-                .foregroundStyle(.white)
-                .shadow(radius: 8)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(Color.black.opacity(0.35))
-                .allowsHitTesting(false)
-        case .recording?:
-            VStack {
-                Button {
-                    model.stopVoiceOver()
-                } label: {
-                    Label("Recording — click or press Space to stop", systemImage: "record.circle")
-                        .font(.callout.weight(.semibold))
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 6)
-                        .background(Color.red.opacity(0.85), in: Capsule())
-                        .foregroundStyle(.white)
-                }
-                .buttonStyle(.plain)
-                .padding(.top, 10)
-                Spacer()
-            }
-        case nil:
-            EmptyView()
-        }
     }
 }
 

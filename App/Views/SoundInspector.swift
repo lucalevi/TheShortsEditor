@@ -93,6 +93,43 @@ struct SoundInspector: View {
     }
 }
 
+/// One volume for several clips and sounds, with Mute; shows "Mixed" until they are set alike.
+struct MultipleVolumeSlider: View {
+    let model: EditorModel
+    let clips: [Clip]
+    @State private var dragging: Double?
+
+    var body: some View {
+        let allMuted = clips.allSatisfy(\.isMuted)
+        let common = Set(clips.map(\.volume)).count == 1 ? clips.first?.volume : nil
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Volume").font(.subheadline.weight(.semibold))
+            HStack {
+                Button(allMuted ? "Unmute All" : "Mute All", systemImage: allMuted ? "speaker.slash.fill" : "speaker.wave.2.fill") {
+                    model.setClipsMuted(clips.map(\.id), !allMuted)
+                }
+                .labelStyle(.iconOnly)
+                .buttonStyle(.borderless)
+                .help(allMuted ? "Turn their sound back on" : "Silence all of them")
+                Slider(value: Binding(get: { dragging ?? common ?? 1 }, set: { dragging = $0 }), in: 0...Clip.maxVolume) { editing in
+                    if !editing, let value = dragging {
+                        dragging = nil
+                        model.setClipsVolume(clips.map(\.id), (value * 20).rounded() / 20)
+                    }
+                }
+                .disabled(allMuted)
+                .accessibilityLabel("Volume of all selected")
+                Text(allMuted ? "Off" : (dragging ?? common).map { "\(Int(($0 * 100).rounded()))%" } ?? "Mixed")
+                    .monospacedDigit()
+                    .frame(width: 44, alignment: .trailing)
+            }
+            Text("Sets every selected clip and sound to the same volume.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+    }
+}
+
 /// Volume with a live value while dragging, saved when let go.
 struct LiveVolumeSlider: View {
     let model: EditorModel

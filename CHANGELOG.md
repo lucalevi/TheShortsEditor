@@ -7,6 +7,59 @@ the decisions that shape the code are in `docs/adr/`.
 Moved here from `STATUS.md` on 2026-11-18 (F31); the text is as it was written at the time, so
 "next" in an entry means next *then*.
 
+## 2026-11-19: Usability pass 2 (task-based): voice-over, several things at once
+
+Each area was done first as a newcomer would in the real app, then fixed, then turned into an
+`AppUITests` test.
+
+**Voice-over** (task: record over the second half of a clip, listen, redo it). Found: Record was
+only in the Audio tab, half below the fold; while recording nothing showed the level or the time;
+after stopping there was no way to listen or redo (a retake meant deleting and finding the start
+again); a silent take was added without a word; takes were named by date and time.
+- A **microphone button** in the bar under the viewer (⌥⌘R as before).
+- While recording, a bar under the picture: **elapsed time, a live microphone level** and Stop; a
+  red block grows on the sounds lane.
+- After a take, while it is selected: **Listen · Retake · Delete · Keep** (as iMovie on iPhone).
+  Retake records again from the same start; the old take stays until the new one exists and is
+  then replaced in one undo step ("Retake Voice-Over"), keeping its name. Delete also takes the
+  file out of Media (`Project.removeTake`). Clicking anything else keeps the take.
+- "**Almost nothing was heard**" on the bar when even the loudest moments are under −45 dBFS
+  (`AudioLevels.isNearlySilent`).
+- Takes are named **Voice-over 1, 2…** (`Project.nextVoiceOverName`); Media says "Voice-over" or
+  "Sound" for a sound file instead of always "Music".
+
+**Several things at once** (task: three clips quieter, faster, warmer, then delete two). Already
+there: framing, punch-in, background, mute, Enhance/Filter/Steady, speed, Delete. Missing:
+- **One volume** for every selected clip and sound (`setClipsVolume`, "Mixed" until they match).
+- **Light, Colour and Warmth** sliders for several clips, shown live while dragged
+  (`previewColor`).
+- An **Effects** pointer: the Effects tab's tiles already go onto every selected clip; now the
+  inspector says so, with a button to open the tab.
+- Selected **sounds and voice-overs** are counted in the summary and get the volume.
+
+**Bugs found on the way:**
+- **File ▸ All Shorts crashed the app** (index out of range in `Timeline.startTime(ofClipAt:)`):
+  SwiftUI drew a clip once more with its old position while the timeline emptied. The start of a
+  position past the end is now the end.
+- **Files opened from Finder were often lost when they launched the app** (about half the time):
+  SwiftUI makes the window, takes its content down and makes it again; the editor was let go
+  while its window stayed, and a throwaway second window came and went, so the files had no
+  editor to go to. A window coming to the front now takes its editor back (`AppState.didFocus`),
+  and files that arrive with no editor wait and go to the window in front.
+- **A clip of 286 frames at 2× played black**: its sound ended a third of a nanosecond after its
+  picture (nanosecond maths of the speed), which stalls AVPlayer. Sound that reaches the end of
+  its clip now ends exactly with the picture (`Clip.soundLength`), for main clips, B-roll and
+  sounds.
+- The time under the viewer could show a moment past the end after clips were deleted under the
+  pointer (a stale skimming time).
+
+Tests: `VoiceOverTests`, `SeveralAtOnceTests`, `WindowsTests.aWindowWhoseContentCameBackIsKnownAgain`
+(app); `SoundTests` (names, removing a take, silence), `TimelineTests.startOfAClipPastTheEndIsTheEnd`,
+`SpeedAndSoundRenderTests.aFastClipsSoundEndsExactlyWithItsPicture` (fails without the fix);
+UI tests `testRecordRetakeAndDeleteAVoiceOver` (really records; skipped when the microphone is
+off) and `testChangeSeveralClipsAtOnce`. `EditorModel.swift` got back under SwiftLint's limits
+(titles and captions moved to their extension files), and its two baseline entries were dropped.
+
 ## 2026-11-18: Usability, step 5 (polish)
 
 - **Single-letter shortcuts by letter** (U5): J K L B Q W S R X M E are matched by what the key

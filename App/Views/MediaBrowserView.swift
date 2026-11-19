@@ -172,7 +172,10 @@ private struct MediaRow: View {
                             Image(systemName: asset.displaySize.height > asset.displaySize.width ? "rectangle.portrait" : "rectangle")
                                 .help(asset.displaySize.height > asset.displaySize.width ? "Vertical video" : "Horizontal video")
                         } else {
-                            Text("Music")
+                            // A sound file: what it is used as, if anything (a recording isn't music).
+                            Text(
+                                model.project.music?.assetID == asset.id
+                                    ? "Music" : model.project.sounds.contains { $0.clip.assetID == asset.id && $0.isVoiceOver } ? "Voice-over" : "Sound")
                         }
                         if !asset.hasAudio, !asset.isImage {
                             Image(systemName: "speaker.slash").help("No sound")

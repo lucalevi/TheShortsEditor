@@ -16,7 +16,11 @@ final class PlaybackController {
     private(set) var currentTime: CMTime = .zero
     private(set) var isPlaying = false
     /// The length of what the player shows (the Short's length), set as soon as it changes.
-    var duration: CMTime = .zero
+    var duration: CMTime = .zero {
+        // A shorter Short (clips deleted while the pointer was over the timeline) mustn't keep
+        // showing a moment past its end.
+        didSet { if let skim = skimTime, skim >= duration { skimTime = nil } }
+    }
     /// Playing starts again from the beginning (or the stretch being played) at the end (⌘L).
     var loopsPlayback = AppEnvironment.defaults.bool(forKey: SettingsKey.loopPlayback) {
         didSet { AppEnvironment.defaults.set(loopsPlayback, forKey: SettingsKey.loopPlayback) }

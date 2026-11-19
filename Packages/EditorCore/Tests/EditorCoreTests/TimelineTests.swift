@@ -11,6 +11,14 @@ private func clip(_ length: Double, from start: Double = 0) -> Clip {
 }
 
 struct TimelineTests {
+    /// SwiftUI may ask for a clip's start with its old position while clips are removed.
+    @Test func startOfAClipPastTheEndIsTheEnd() {
+        let timeline = Timeline(clips: [clip(2), clip(3)])
+        #expect(timeline.startTime(ofClipAt: 1) == seconds(2))
+        #expect(timeline.startTime(ofClipAt: 5) == seconds(5))
+        #expect(Timeline(clips: []).startTime(ofClipAt: 2) == .zero)
+    }
+
     @Test func durationIsSumOfClips() {
         let timeline = Timeline(clips: [clip(2), clip(3.5)])
         #expect(timeline.duration == seconds(5.5))

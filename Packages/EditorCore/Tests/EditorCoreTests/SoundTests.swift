@@ -32,6 +32,39 @@ private func talking(words: [String]? = nil) -> (Project, MediaAsset.ID) {
 }
 
 struct SoundTests {
+    @Test func voiceOversAreNumbered() {
+        var (p, _) = talking()
+        #expect(p.nextVoiceOverName == "Voice-over 1")
+        _ = p.addAsset(sound("Voice-over 1.m4a"))
+        p.assets[p.assets.count - 1].name = "Voice-over 1"
+        _ = p.addAsset(sound("Voice-over 7.m4a"))
+        p.assets[p.assets.count - 1].name = "Voice-over 7"
+        _ = p.addAsset(sound("Voice-over notes.m4a"))
+        p.assets[p.assets.count - 1].name = "Voice-over notes"
+        #expect(p.nextVoiceOverName == "Voice-over 8")
+    }
+
+    @Test func aThrownAwayTakeLeavesMediaToo() throws {
+        var (p, _) = talking()
+        let assetID = p.addAsset(sound("take.m4a"))
+        let firstAdded = p.addSound(of: assetID, at: seconds(1), isVoiceOver: true)
+        let secondAdded = p.addSound(of: assetID, at: seconds(5), isVoiceOver: true)
+        let first = try #require(firstAdded)
+        let second = try #require(secondAdded)
+        p.removeTake(first, assetID: assetID)
+        // Still used by the second sound: the file stays.
+        #expect(p.asset(id: assetID) != nil && p.sounds.count == 1)
+        p.removeTake(second, assetID: assetID)
+        #expect(p.asset(id: assetID) == nil && p.sounds.isEmpty)
+    }
+
+    @Test func aTakeWithNoVoiceIsNearlySilent() {
+        #expect(AudioLevels(decibels: Array(repeating: -60, count: 300)).isNearlySilent)
+        #expect(AudioLevels(decibels: []).isNearlySilent)
+        // Mostly pauses, but some speech: not silent.
+        #expect(!AudioLevels(decibels: Array(repeating: -60, count: 240) + Array(repeating: -22, count: 60)).isNearlySilent)
+    }
+
     @Test func aSoundIsAddedWholeAtThePlayhead() throws {
         var (p, _) = talking()
         let added = p.addSound(of: p.addAsset(sound()), at: seconds(2))

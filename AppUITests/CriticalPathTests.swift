@@ -74,6 +74,70 @@ final class CriticalPathTests: XCTestCase {
         XCTAssertTrue(waitFor { self.timelineClips.count == 2 }, "The split was lost in the forced quit, or the Short didn't reopen")
     }
 
+    /// The voice-over task (usability pass 2): the microphone under the viewer, a take, a retake
+    /// that replaces it, and throwing it away. It really records, so it needs the microphone
+    /// allowed for the app (skipped when the app says it is off).
+    func testRecordRetakeAndDeleteAVoiceOver() throws {
+        try begin()
+        launch(fresh: true, videoSeconds: 8)
+        XCTAssertTrue(timelineClips.firstMatch.waitForExistence(timeout: 30))
+        front()
+        app.buttons["Record Voice-Over"].firstMatch.click()
+        if app.staticTexts["The microphone is off for Shorts Editor"].waitForExistence(timeout: 3) {
+            throw XCTSkip("The microphone isn't allowed for Shorts Editor on this Mac")
+        }
+        let stop = app.buttons["Stop"]
+        XCTAssertTrue(stop.waitForExistence(timeout: 10), "Recording never started (no recording bar)")
+        Thread.sleep(forTimeInterval: 1.5)
+        stop.click()
+        let retake = app.buttons["Retake"]
+        XCTAssertTrue(retake.waitForExistence(timeout: 10), "No Listen / Retake / Delete / Keep after recording")
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "value BEGINSWITH 'Voice-over 1,' OR label BEGINSWITH 'Voice-over 1,'")).firstMatch.exists)
+
+        retake.click()
+        XCTAssertTrue(stop.waitForExistence(timeout: 10), "The retake never started recording")
+        Thread.sleep(forTimeInterval: 1.5)
+        stop.click()
+        XCTAssertTrue(retake.waitForExistence(timeout: 10))
+        XCTAssertTrue(app.menuItems["Undo Retake Voice-Over"].waitForExistence(timeout: 10), "A retake isn't one undo step")
+
+        app.buttons["Delete Take"].click()
+        XCTAssertTrue(waitFor { !retake.exists }, "Delete didn't end the review")
+        XCTAssertTrue(app.menuItems["Undo Delete Voice-Over"].waitForExistence(timeout: 10))
+    }
+
+    /// The "several things at once" task (usability pass 2): select every clip, give them one
+    /// volume and a speed, then delete them, each one undo step.
+    func testChangeSeveralClipsAtOnce() throws {
+        try begin()
+        launch(fresh: true, videoSeconds: 6)
+        let clips = timelineClips
+        XCTAssertTrue(clips.firstMatch.waitForExistence(timeout: 30))
+        front()
+        for _ in 0..<2 {
+            for _ in 0..<45 { press(.rightArrow) }
+            menu("Split at Playhead")
+        }
+        XCTAssertTrue(waitFor { clips.count == 3 }, "Two splits didn't make three clips")
+
+        menu("Select All")
+        let volume = app.sliders["Volume of all selected"]
+        XCTAssertTrue(volume.waitForExistence(timeout: 10), "No shared volume for several clips")
+        volume.adjust(toNormalizedSliderPosition: 0.25)
+        XCTAssertTrue(app.menuItems["Undo Change Volume"].waitForExistence(timeout: 10), "The shared volume wasn't one undo step")
+
+        front()
+        let clipMenu = app.menuBars.menuBarItems["Clip"]
+        clipMenu.click()
+        let speed = clipMenu.menus.menuItems["Speed"]
+        speed.hover()
+        speed.menus.menuItems["2×"].click()
+        XCTAssertTrue(app.menuItems["Undo Change Speed"].waitForExistence(timeout: 10))
+
+        app.buttons["Delete All Selected"].click()
+        XCTAssertTrue(waitFor { clips.count == 0 }, "Delete All Selected left clips")
+    }
+
     func testAShortWithMissingMediaOpensAndSaysSo() throws {
         try begin()
         launch(fresh: true, videoSeconds: 2)

@@ -1,6 +1,6 @@
 # Project status
 
-_Last updated: 2026-11-18 (evening). The current state only: read it first when picking the project back up, and update it at the end of each session. What was done and found, session by session, is in `CHANGELOG.md`; why the code is the way it is, in `docs/adr/`._
+_Last updated: 2026-11-19 (morning). The current state only: read it first when picking the project back up, and update it at the end of each session. What was done and found, session by session, is in `CHANGELOG.md`; why the code is the way it is, in `docs/adr/`._
 
 ## Where we are
 
@@ -10,16 +10,20 @@ Shorts Editor is feature-complete for its plan: the P0 list, roadmap features 1�
 
 Pinch to zoom still needs a real trackpad to try.
 
-**Next (agreed 2026-11-18, to do another day): the second audit pass**, task-based this time. For each area: write one realistic task first, do it in the real app as a newcomer would (no menus or shortcuts unless something on screen points to them), note clicks, dead ends, surprises and errors, compare with iMovie/CapCut, fix in small steps with tests, then turn the task into an `AppUITests` test. Suggested start: voice-over and selecting several things.
+**Now: the second audit pass**, task-based. For each area: write one realistic task first, do it in the real app as a newcomer would (no menus or shortcuts unless something on screen points to them), note clicks, dead ends, surprises and errors, compare with iMovie/CapCut, fix in small steps with tests, then turn the task into an `AppUITests` test.
+
+**Done 2026-11-19 (not yet committed: waiting for the user's "commit and push"):** voice-over (microphone under the viewer, level and time while recording, Listen / Retake / Delete / Keep, a warning for a silent take, "Voice-over 1, 2…") and several things at once (one volume for clips and sounds, Light / Colour / Warmth for several, an Effects pointer, sounds counted). Three older bugs found and fixed on the way: File ▸ All Shorts crashed; files opened from Finder were often lost when they launched the app; a 286-frame clip at 2× played black. Details in `CHANGELOG.md`.
 
 | Area | What "great" looks like | Suspected gaps (to check) |
 |---|---|---|
+| ~~Voice-over~~ | done 2026-11-19 | |
+| ~~Several things at once~~ | done 2026-11-19 | (still not for several: effects settings, colour sliders beyond the three, transitions) |
 | Captions | One click with progress, then fix a word on the picture (as titles now) | Captions edited only in the list; wrong language fails without saying why; accuracy on real speech unknown (synthetic test voice) |
-| Voice-over | iMovie iPhone: countdown, record, then Keep / Retake / Listen | Countdown exists (`EditorModel+Voice.swift`) but no retake or review; no microphone level while recording |
 | Magic Short | Pick clips, preview, tweak; always clear what was changed | Does it say what it cut? Does one undo revert it all? |
 | Reordering clips | Others slide aside live while dragging; clear landing marker | Only a yellow line marks the drop point; no keyboard move left/right |
-| Several things at once | Change speed, colour, volume, effects or delete for all selected | `MultipleInspector` offers only framing and mute; its summary forgets selected sounds |
-| 13" window | Everything reachable on a MacBook Air screen | Window minimum 1000×680; three columns plus timeline are tight; clip details likely need much scrolling |
+| 13" window | Everything reachable on a MacBook Air screen | Window minimum 1000×680; three columns plus timeline are tight; clip details likely need much scrolling (the inspector for several clips already scrolls at 1280×770) |
+
+Suggested next: reordering clips (needs no footage), then the 13" window, then Captions and Magic Short once there are real recordings.
 
 **Waiting on the user for this pass:** two or three real phone recordings of the user talking (the only footage I can't make), and ideally one 20-minute session with someone who has never seen the app (five tasks, no help).
 
@@ -64,6 +68,7 @@ Phases 1–7 and their checklists: `CHANGELOG.md`. F26 (String Catalog and Itali
 - **Open bug (cosmetic):** in the B-roll inspector the whole page sometimes shifts ~7 pt left (the right edge clipped, the Effects grid gets a 4th column) after a layout change, e.g. choosing a shape or switching an effect between Whole clip and At the start/end; selecting the item again lays it out correctly. Seen with a landscape B-roll (`broll-sample`). Tried and dropped: pinning the scroll content's width, letting the sliders shrink, drawing tile pictures as overlays. Next idea: find which row reports ~306 pt (temporary `onGeometryChange` logging per section).
 - **Not yet verified on screen:** Stage C length slider/freeze buttons/right-click menus, Stage E trimmer and slow-motion switch and its Photos tab, Stage F Use Selected and dropping on a shot, Library Save a Copy…/Open…, deleting several media files (each stage's list is in `CHANGELOG.md`). Then whole-Short "golden" export tests.
 - Exports aren't yet confirmed by an actual YouTube upload.
+- **Driving the app on screen:** always launch the test copy with `open -n --env SHORTS_TEST_RUN=<name> --env SHORTS_TEST_FRESH=1 -a …`, and never `open -a` files at it unless it is running: if it has quit, `open -a` starts the app on the user's real library (happened 2026-11-19; the stray Short was moved to the Trash).
 - `make app-test` once failed with "The test runner hung before establishing connection" (2026-11-18) while the app itself launched fine: `killall testmanagerd` fixed it.
 
 ## Known limitations / tech debt

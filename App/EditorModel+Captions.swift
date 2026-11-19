@@ -176,3 +176,30 @@ extension EditorModel {
         apply("Move Captions") { $0.captions.verticalPosition = min(max(position, range.lowerBound), range.upperBound) }
     }
 }
+
+extension EditorModel {
+    // MARK: Captions
+
+    func setCaptionsVisible(_ visible: Bool) {
+        apply(visible ? "Show Captions" : "Hide Captions") { $0.captions.isVisible = visible }
+    }
+
+    func setCaptionStyle(_ style: CaptionStyle) {
+        apply("Change Caption Style") { $0.captions.style = style }
+    }
+
+    func setCaptionPosition(_ position: Double) {
+        apply("Move Captions") { $0.captions.verticalPosition = position }
+    }
+
+    /// Replaces the words of a caption with what the user typed.
+    func editCaption(_ page: CaptionPage, text: String) {
+        guard text != page.text else { return }
+        apply("Edit Caption") { $0.replaceWords(page.words.map(\.wordID), in: page.assetID, with: text) }
+    }
+
+    /// The caption on screen at the playhead.
+    var currentCaption: CaptionPage? {
+        CaptionLayout.page(at: currentTime, in: captioning.pages)
+    }
+}

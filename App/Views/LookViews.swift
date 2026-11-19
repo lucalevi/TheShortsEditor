@@ -359,6 +359,9 @@ struct MultipleLookSection: View {
                 .fixedSize()
             }
             .controlSize(.small)
+            ForEach(Self.sliders, id: \.title) { slider in
+                MultipleColorSlider(model: model, clips: clips, title: slider.title, keyPath: slider.keyPath, help: slider.help)
+            }
             let steadiable = clips.filter(model.canStabilize)
             if !steadiable.isEmpty {
                 let allSteady = steadiable.allSatisfy { $0.steadiness > 0 }
@@ -368,6 +371,59 @@ struct MultipleLookSection: View {
                 .controlSize(.small)
             }
         }
+    }
+}
+
+extension MultipleLookSection {
+    /// The colour sliders offered for several clips at once: the three most used.
+    fileprivate static let sliders: [(title: String, keyPath: WritableKeyPath<ColorAdjustments, Double>, help: String)] = [
+        ("Light", \.exposure, "Brighter or darker overall"),
+        ("Colour", \.saturation, "Less colour, down to black and white (left), or more (right)"),
+        ("Warmth", \.warmth, "Cooler and bluer (left) or warmer and more orange (right)"),
+    ]
+}
+
+/// One colour slider for several clips: sets them all to the same value (shown live while dragged).
+private struct MultipleColorSlider: View {
+    let model: EditorModel
+    let clips: [Clip]
+    let title: String
+    let keyPath: WritableKeyPath<ColorAdjustments, Double>
+    let help: String
+    @State private var dragging: Double?
+
+    var body: some View {
+        let values = Set(clips.map { $0.look.color[keyPath: keyPath] })
+        let common = values.count == 1 ? values.first : nil
+        HStack {
+            Text(title).frame(width: 64, alignment: .leading)
+            Slider(
+                value: Binding(
+                    get: { dragging ?? common ?? 0 },
+                    set: { value in
+                        // Sticks to the middle.
+                        let value = abs(value) < 0.04 ? 0 : value
+                        dragging = value
+                        model.previewColor(keyPath, value, for: clips.map(\.id))
+                    }), in: ColorAdjustments.range
+            ) { editing in
+                if !editing, let value = dragging {
+                    dragging = nil
+                    model.editColor(of: clips.map(\.id), title) { $0[keyPath: keyPath] = value }
+                }
+            }
+            .accessibilityLabel("\(title) of all selected")
+            Text((dragging ?? common).map(label) ?? "Mixed")
+                .monospacedDigit()
+                .frame(width: 44, alignment: .trailing)
+        }
+        .controlSize(.small)
+        .help(help)
+    }
+
+    private func label(_ value: Double) -> String {
+        let v = Int((value * 100).rounded())
+        return v == 0 ? "0" : v > 0 ? "+\(v)" : "\(v)"
     }
 }
 

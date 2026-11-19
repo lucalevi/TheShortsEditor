@@ -77,7 +77,7 @@ struct EditorWindow: View {
     var body: some View {
         Group {
             if let editor {
-                window(editor.model)
+                window(editor.model, id: editor.id)
                     .onDisappear { app.close(editor.id) }
             } else {
                 Color.clear
@@ -85,7 +85,7 @@ struct EditorWindow: View {
                         let id = app.editor(showingWindow: value.id) == nil ? value.id : UUID()
                         let model = app.editor(for: id)
                         editor = (id, model)
-                        app.didFocus(model)
+                        app.didFocus(model, window: id)
                         delegate.connect(app, window: model)
                         if let short = value.shortID, model.openShortID == nil { model.openShort(short) }
                     }
@@ -94,12 +94,15 @@ struct EditorWindow: View {
         .frame(minWidth: 1000, minHeight: 680)
     }
 
-    private func window(_ model: EditorModel) -> some View {
+    private func window(_ model: EditorModel, id: UUID) -> some View {
         ContentView(model: model)
             .defaultAppStorage(AppEnvironment.defaults)
             .focusedSceneValue(\.editor, model)
             .onReceive(NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)) { note in
-                if let window = note.object as? NSWindow, window === model.window { app.didFocus(model) }
+                if let window = note.object as? NSWindow, window === model.window {
+                    app.didFocus(model, window: id)
+                    delegate.deliverWaitingFiles(to: model)
+                }
             }
             .navigationTitle(model.screen == .editor ? model.openShortName : "Shorts Editor")
     }
@@ -143,11 +146,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func application(_ application: NSApplication, open urls: [URL]) {
-        if let editor = app?.current {
-            editor.importFiles(urls, addToTimeline: true)
-        } else {
-            pending += urls
+        Log.file.info("Opening \(urls.count, privacy: .public) file(s) from outside")
+        pending += urls
+        if let editor = app?.current { deliverWaitingFiles(to: editor) }
+        // Launched by opening files, SwiftUI makes the window, takes it down and makes it again:
+        // the files may arrive while there is no window to take them, or for an editor about to
+        // go. They wait, and go to the window in front once things settle.
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .milliseconds(600))
+            if let self, let editor = self.app?.current { self.deliverWaitingFiles(to: editor) }
         }
+    }
+
+    /// Files opened from outside that no window has taken yet go to `editor`.
+    func deliverWaitingFiles(to editor: EditorModel) {
+        guard !pending.isEmpty else { return }
+        let urls = pending
+        pending = []
+        editor.importFiles(urls, addToTimeline: true)
     }
 
     /// Before any window closes for the quit (SwiftUI closes them, which would otherwise take each

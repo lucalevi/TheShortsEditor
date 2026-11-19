@@ -12,6 +12,14 @@ public struct AudioLevels: Equatable, Sendable {
 
     public static let silence: Float = -100
 
+    /// Almost nothing was heard: even the loudest moments (the top 5%) are below −45 dBFS, far
+    /// under speech close to a microphone (about −30 to −15).
+    public var isNearlySilent: Bool {
+        guard !decibels.isEmpty else { return true }
+        let sorted = decibels.sorted()
+        return sorted[min(sorted.count * 95 / 100, sorted.count - 1)] < -45
+    }
+
     /// A sensible starting point for "quiet": a third of the way from the background noise up
     /// to the speech, so it adapts to quiet rooms and noisy ones.
     public var suggestedThreshold: Float {
