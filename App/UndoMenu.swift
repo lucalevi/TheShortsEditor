@@ -34,6 +34,20 @@ final class UndoMenu {
         (NSApp.keyWindow ?? NSApp.mainWindow)?.undoManager
     }
 
+    @ObservationIgnored private var refreshIsScheduled = false
+
+    /// After an edit: refresh once the current work is done. An edit made by a task (a
+    /// voice-over take placed after recording) closes its undo group only at the next mouse or key
+    /// event, so the notifications above came late and Undo kept the previous name (2026-11-19).
+    func refreshSoon() {
+        guard !refreshIsScheduled else { return }
+        refreshIsScheduled = true
+        DispatchQueue.main.async {
+            self.refreshIsScheduled = false
+            self.refresh()
+        }
+    }
+
     func refresh() {
         let manager = undoManager
         let undo = manager?.canUndo == true ? manager!.undoMenuItemTitle : "Undo"

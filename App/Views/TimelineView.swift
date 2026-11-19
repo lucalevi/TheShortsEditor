@@ -461,10 +461,8 @@ struct TimelineView: View {
             let edge = trim.edge == .start ? range.start + trim.delta : range.end + trim.delta
             return ("Length \(TimeFormat.string(length))  \(signed(trim.edge == .start ? -trim.delta : trim.delta))", edge)
         }
-        if let reorder {
-            let others = model.project.timeline.clips.filter { $0.id != reorder.id }
-            let boundary = others.prefix(reorder.destination).reduce(CMTime.zero) { $0 + $1.duration }
-            return ("Goes at \(TimeFormat.string(boundary))", boundary)
+        if let slot = reorderSlot {
+            return ("Goes at \(TimeFormat.string(slot.start))", slot.start)
         }
         if let drag = blockDrag, let start = model.project.start(of: drag.item), let length = duration(of: drag.item) {
             switch drag.kind {
@@ -580,10 +578,20 @@ struct TimelineView: View {
                 .frame(height: trackHeight)
                 .padding(.leading, leadingInset)
         } else {
+            let shifts = reorderShifts
             ZStack(alignment: .topLeading) {
+                if let slot = reorderSlot {
+                    // Where the dragged clips will land, behind them.
+                    RoundedRectangle(cornerRadius: 5)
+                        .fill(Color.yellow.opacity(0.15))
+                        .strokeBorder(Color.yellow, style: StrokeStyle(lineWidth: 2, dash: [6, 4]))
+                        .frame(width: max(width(of: slot.duration), 6), height: trackHeight)
+                        .offset(x: width(of: slot.start))
+                        .allowsHitTesting(false)
+                }
                 HStack(spacing: 0) {
                     ForEach(Array(clips.enumerated()), id: \.element.id) { index, clip in
-                        clipView(clip, index: index)
+                        clipView(clip, index: index, shift: shifts[clip.id] ?? 0)
                     }
                 }
                 if reorder == nil, clipTrim == nil {
@@ -601,34 +609,9 @@ struct TimelineView: View {
                             .offset(x: width(of: span.cut) - 10, y: (trackHeight - waveHeight) / 2 - 10)
                     }
                 }
-                if let reorder {
-                    // Where the dragged clip will go.
-                    let others = clips.filter { $0.id != reorder.id }
-                    let boundary = others.prefix(reorder.destination).reduce(CMTime.zero) { $0 + $1.duration }
-                    Capsule()
-                        .fill(Color.yellow)
-                        .frame(width: 4, height: trackHeight + 8)
-                        .offset(x: width(of: boundary) - 2, y: -4)
-                        .allowsHitTesting(false)
-                }
             }
             .padding(.leading, leadingInset)
         }
-    }
-
-    /// Where a clip dragged by `dx` lands among the others: after every clip whose middle it passed.
-    func destination(for clip: Clip, index: Int, dx: CGFloat) -> Int {
-        let clips = model.project.timeline.clips
-        let start = width(of: model.project.timeline.startTime(ofClipAt: index))
-        let middle = start + width(of: clip.duration) / 2 + dx
-        var position = CGFloat.zero
-        var count = 0
-        for other in clips {
-            let w = width(of: other.duration)
-            if other.id != clip.id, position + w / 2 < middle { count += 1 }
-            position += w
-        }
-        return count
     }
 
     func updateClipTrim(_ clip: Clip, edge: ClipEdge, points: CGFloat) {

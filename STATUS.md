@@ -4,7 +4,7 @@ _Last updated: 2026-11-19 (morning). The current state only: read it first when 
 
 ## Where we are
 
-Shorts Editor is feature-complete for its plan: the P0 list, roadmap features 1–12, the iMovie list (stages A–F) and the CapCut list (stages G–L) are built, tested and checked on screen. The engineering-excellence plan (`research/engineering-excellence.md`) is done for phases 1–7 (safety net, never lose work, correct pictures, architecture, tests for the app, responsiveness, platform fit), except F26 (Italian), which the user postponed. Phase 8 (ship) is under way.
+Shorts Editor is feature-complete for its plan: the P0 list, roadmap features 1–12, the iMovie list (stages A–F) and the CapCut list (stages G–L) are built, tested and checked on screen. The engineering-excellence plan (`research/engineering-excellence.md`) is done for phases 1–7 (safety net, never lose work, correct pictures, architecture, tests for the app, responsiveness, platform fit). Phase 8 (ship) is under way.
 
 **New direction (2026-11-18, later):** the user wants the app to be as easy as iMovie with no learning. Usability audit: `research/usability-audit.md` (findings U1–U21, rules R1–R8 from web research, order of work in §5). **Steps 1–5 of §5 are built, checked on screen, `make check` and `make uitest` green, committed and pushed (2026-11-18):** Mac habits (clipboard, Duplicate, ⌥-drag, Escape, pinch), seeing the sound (music wave, Clip Size, trimmer wave), typing titles on the picture, one place per kind of thing (labelled toolbar, a browser tab per kind of thing with tiles to click or drag, clip details in tabs, taller timeline with a fixed ruler), and polish (letters by character, ⇧Z Zoom to Fit, tips in the timeline header at most every 10 minutes, home tiles say what they make, one import rule). The details are in `CHANGELOG.md`.
 
@@ -20,14 +20,16 @@ Pinch to zoom still needs a real trackpad to try.
 | ~~Several things at once~~ | done 2026-11-19 | (still not for several: effects settings, colour sliders beyond the three, transitions) |
 | Captions | One click with progress, then fix a word on the picture (as titles now) | Captions edited only in the list; wrong language fails without saying why; accuracy on real speech unknown (synthetic test voice) |
 | Magic Short | Pick clips, preview, tweak; always clear what was changed | Does it say what it cut? Does one undo revert it all? |
-| Reordering clips | Others slide aside live while dragging; clear landing marker | Only a yellow line marks the drop point; no keyboard move left/right |
+| ~~Reordering clips~~ | done 2026-11-19  | |
 | 13" window | Everything reachable on a MacBook Air screen | Window minimum 1000×680; three columns plus timeline are tight; clip details likely need much scrolling (the inspector for several clips already scrolls at 1280×770) |
 
-Suggested next: reordering clips (needs no footage), then the 13" window, then Captions and Magic Short once there are real recordings.
+**Reordering clips, done 2026-11-19 :** a long clip dragged to the start landed second (its middle decided, not the pointer) and the dragged clip hid the yellow line. Now the pointer decides, the other clips slide aside live, a dashed yellow slot shows where it lands, several selected clips move together, Escape cancels, the timeline scrolls at its edges, and Clip ▸ Move Clip Earlier / Later (⌥⌘← / ⌥⌘→, also in the right-click menu). Checked on screen; `ReorderingTests`, `TimelineTests` and the UI test `testDragTheLastClipToTheStart`.
+
+Suggested next: the 13" window (needs no footage), then Captions and Magic Short once there are real recordings.
 
 **Waiting on the user for this pass:** two or three real phone recordings of the user talking (the only footage I can't make), and ideally one 20-minute session with someone who has never seen the app (five tasks, no help).
 
-**Before that (2026-11-18):** F24 and F31 of Phase 8 are done (below), `make check` green, checked on screen, committed and pushed (cfd0389). **F32 is built** (below): `make release` makes `build/dist/Shorts-Editor-0.1.0.dmg`, checked (built before the new red icon: remake it before publishing); Check for Updates… works. **Version: 0.1.0 (a beta), not to be published yet (user, 2026-11-18). Next: publish when the user says (`make publish` remakes the `.dmg`); F26 (Italian) whenever wanted.** F21's second half (Report a Problem…) is skipped by the user.
+**Before that (2026-11-18):** F24 and F31 of Phase 8 are done (below), `make check` green, checked on screen, committed and pushed (cfd0389). **F32 is built** (below): `make release` makes `build/dist/Shorts-Editor-0.1.0.dmg`, checked (built before the new red icon: remake it before publishing); Check for Updates… works. **Version: 0.1.0 (a beta), not to be published yet (user, 2026-11-18). Next: publish when the user says (`make publish` remakes the `.dmg`).** F21's second half (Report a Problem…) is skipped by the user.
 
 Repository: https://github.com/lucalevi/TheShortsEditor (public, branch `main`).
 
@@ -38,13 +40,12 @@ Repository: https://github.com/lucalevi/TheShortsEditor (public, branch `main`).
 - [x] F31 (2026-11-18) `STATUS.md` kept to the current state; history in `CHANGELOG.md`; decisions as ADRs in `docs/adr/` (10); DocC catalogs for EditorCore and RenderEngine, `make docs` (all three libraries, no new dependency: `xcodebuild docbuild`)
 - [x] F24 (2026-11-18) **Delete Generated Files…** on each Short in All Shorts (⋯ and right-click): the copies made for that Short alone, with their size, after asking; kept when another Short uses them; refused while the Short is open. Settings ▸ Storage lists each Short's own copies with Delete… Checked on screen. Found on the way: Settings was taller than a laptop's screen (Storage out of reach); it scrolls now.
 
-Phases 1–7 and their checklists: `CHANGELOG.md`. F26 (String Catalog and Italian), postponed by the user on 2026-11-17, is sized and planned there (Phase 7 checklist).
+Phases 1–7 and their checklists: `CHANGELOG.md`. F26 (String Catalog and app translations) is off the list (user, 2026-11-19): translations only if and when the user asks.
 
 ## Waiting on the user
 
 - **Second usability pass:** two or three real phone recordings of the user talking; ideally a 20-minute session with a newcomer; and a quick try of pinch to zoom on a real trackpad.
 - **Screen Recording for Xcode's test runner** (System Settings ▸ Privacy & Security): the accessibility audit UI test (`TEST_RUNNER_SHORTS_UI_AUDIT=1 make uitest`) fails before auditing without it.
-- **F26 (Italian):** when wanted.
 - **F21 Report a Problem…:** skipped; only if the user asks for it.
 - **First release:** 0.1.0 (beta), published only when the user says so.
 

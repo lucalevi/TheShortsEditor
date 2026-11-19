@@ -16,6 +16,11 @@ extension TimelineView {
         }
         Button(model.isPunchedIn([clip]) ? "Remove Punch-In" : "Punch In") { model.togglePunchIn([clip.id]) }
             .disabled(clip.hasMotion)
+        let moving = model.clipsMovedWith(clip.id)
+        Button(moving.count > 1 ? "Move Clips Earlier" : "Move Earlier") { model.moveClips(moving, by: -1) }
+            .disabled(!model.canMoveClips(moving, by: -1))
+        Button(moving.count > 1 ? "Move Clips Later" : "Move Later") { model.moveClips(moving, by: 1) }
+            .disabled(!model.canMoveClips(moving, by: 1))
         Divider()
         if index + 1 < model.project.timeline.clips.count {
             Menu("Transition into the Next Clip") {
@@ -104,9 +109,17 @@ extension TimelineView {
     }
 
     struct Reorder {
-        var id: Clip.ID
-        var dx: CGFloat
+        /// The main clips being moved.
+        var ids: Set<Clip.ID>
+        /// Where the drag started and where the pointer was last reported, in content coordinates.
+        var startX: CGFloat
+        var pointerX: CGFloat
+        /// Where the timeline was scrolled when `pointerX` was reported.
+        var scrollX: CGFloat
+        /// Where they land: an index among the other clips.
         var destination: Int
+        /// Escape was pressed: nothing happens when the mouse is let go.
+        var isCancelled = false
     }
 
     struct ClipTrim {

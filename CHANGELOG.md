@@ -7,6 +7,37 @@ the decisions that shape the code are in `docs/adr/`.
 Moved here from `STATUS.md` on 2026-11-18 (F31); the text is as it was written at the time, so
 "next" in an entry means next *then*.
 
+## 2026-11-19: Usability pass 2: reordering clips
+
+Task: three clips; move the last (and longest) one to the start by dragging. Found: dropped with
+its left edge at the very start, it landed **second**: the drop place was decided by the dragged
+clip's middle, so a long clip had to travel far past where the pointer was. While dragging, the
+clip covered the others and most of the yellow line that marked the drop point; nothing moved
+aside. Only one clip could be dragged at a time, and there was no menu or key to move a clip.
+- **The pointer decides** where clips land (`Timeline.dropIndex`: after every other clip whose
+  middle is before the pointer, on the timeline as it is).
+- **The other clips slide aside live** (animated) to open a gap, shown as a **dashed yellow slot**
+  behind the dragged clip, which is slightly see-through; "Goes at 0:06.0" as before.
+- **Several selected clips move together** when one of them is dragged, in their order
+  (`Timeline.move(_: Set, to:)`, "Move Clips").
+- **Escape cancels** the drag. Key presses don't reach the app while the mouse button is down
+  (SwiftUI's drag tracking keeps them), so Escape is read with `CGEventSource.keyState` from the
+  loop that also **scrolls the timeline** when the pointer is near its left or right edge.
+- **Clip ▸ Move Clip Earlier / Later** (⌥⌘← / ⌥⌘→) and the same in the right-click menu
+  (`Timeline.stepDestination`; clips spread apart are first gathered where the first one is).
+- Tests: `TimelineTests` (moving several, drop index, step), `ReorderingTests` (one undo step,
+  what a drag moves, Move Earlier/Later), UI test `testDragTheLastClipToTheStart`. In XCUITest on
+  macOS, `press(forDuration:thenDragTo:)` sends no drag; `click(forDuration:thenDragTo:)` does.
+- **Found on the way (older bug):** after an edit made by a task rather than a click (a
+  voice-over retake placed once recording stops), Edit ▸ Undo kept the previous name until the
+  next mouse or key event: the undo group closes only then. It had been hidden by chance: other
+  menus were rebuilt at the same moment, and moving the Playback menu out of the menu bar's body
+  made the voice-over UI test fail. Every edit now asks the Undo menu to look again once the
+  current work is done (`UndoMenu.refreshSoon`, coalesced: refreshing on each undo checkpoint
+  instead kept the main thread busy).
+- To keep within the size limits: `EditorModel+Reorder.swift`, the Playback menu as
+  `EditorCommands.playbackMenu`, `WindowCommands` in its own file.
+
 ## 2026-11-19: Usability pass 2 (task-based): voice-over, several things at once
 
 Each area was done first as a newcomer would in the real app, then fixed, then turned into an

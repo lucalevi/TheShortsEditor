@@ -138,6 +138,37 @@ final class CriticalPathTests: XCTestCase {
         XCTAssertTrue(waitFor { clips.count == 0 }, "Delete All Selected left clips")
     }
 
+    /// The "reordering clips" task (usability pass 2): drag the last clip to the very start (it
+    /// landed second before, as its middle decided), then move it back with Clip ▸ Move Clip Later.
+    func testDragTheLastClipToTheStart() throws {
+        try begin()
+        launch(fresh: true, videoSeconds: 6)
+        let clips = timelineClips
+        XCTAssertTrue(clips.firstMatch.waitForExistence(timeout: 30))
+        front()
+        for _ in 0..<2 {
+            for _ in 0..<45 { press(.rightArrow) }
+            menu("Split at Playhead")
+        }
+        XCTAssertTrue(waitFor { clips.count == 3 }, "Two splits didn't make three clips")
+        // The clips are 1.5 s, 1.5 s and 3 s long: the last one is told apart by its length.
+        let length = { (clip: XCUIElement) in (clip.value as? String)?.components(separatedBy: " long").first ?? "" }
+        let last = clips.element(boundBy: 2)
+        let lastLength = length(last)
+        XCTAssertNotEqual(lastLength, length(clips.element(boundBy: 0)))
+
+        front()
+        let start = last.coordinate(withNormalizedOffset: CGVector(dx: 0.7, dy: 0.3))
+        let target = clips.element(boundBy: 0).coordinate(withNormalizedOffset: CGVector(dx: 0.1, dy: 0.3))
+        // `press(forDuration:thenDragTo:)` sends no drag on macOS; `click(forDuration:thenDragTo:)` does.
+        start.click(forDuration: 0.2, thenDragTo: target, withVelocity: .slow, thenHoldForDuration: 0.3)
+        XCTAssertTrue(app.menuItems["Undo Move Clip"].waitForExistence(timeout: 10), "The drag didn't move the clip")
+        XCTAssertTrue(waitFor { length(clips.element(boundBy: 0)) == lastLength }, "The clip didn't land first")
+
+        menu("Move Clip Later")
+        XCTAssertTrue(waitFor { length(clips.element(boundBy: 1)) == lastLength }, "Move Clip Later didn't move it one place")
+    }
+
     func testAShortWithMissingMediaOpensAndSaysSo() throws {
         try begin()
         launch(fresh: true, videoSeconds: 2)

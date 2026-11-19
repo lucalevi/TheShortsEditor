@@ -5,12 +5,13 @@ import SwiftUI
 
 // A main clip on the timeline: its block, trimming by its edges, clicking and dragging it.
 extension TimelineView {
-    func clipView(_ clip: Clip, index: Int) -> some View {
+    /// `shift`: how far the clip slides aside while others are dragged past it.
+    func clipView(_ clip: Clip, index: Int, shift: CGFloat) -> some View {
         let slot = max(width(of: clip.duration), 2)
         let trim = clipTrim?.id == clip.id ? clipTrim : nil
         let delta = trim.map { width(of: $0.delta) } ?? 0
         let shown = trim?.edge == .start ? slot - delta : trim?.edge == .end ? slot + delta : slot
-        let isDragged = reorder?.id == clip.id
+        let isDragged = reorder.map { !$0.isCancelled && $0.ids.contains(clip.id) } ?? false
         let asset = model.project.asset(id: clip.assetID)
         return ClipBlock(
             clip: clip,
@@ -51,7 +52,8 @@ extension TimelineView {
         }
         .frame(width: max(shown, 4), height: trackHeight)
         .offset(x: trim?.edge == .start ? delta : 0)
-        .offset(x: isDragged ? reorder!.dx : 0, y: isDragged ? -6 : 0)
+        .opacity(isDragged ? 0.8 : 1)
+        .offset(x: isDragged ? reorderDX : shift, y: isDragged ? -6 : 0)
         .shadow(color: .black.opacity(isDragged ? 0.5 : 0), radius: 6, y: 3)
         .zIndex(isDragged || trim != nil ? 1 : 0)
         .frame(width: slot, height: trackHeight, alignment: .leading)
@@ -65,35 +67,137 @@ extension TimelineView {
             model.playback.pause()
             model.playback.seek(to: start + seconds(location.x))
         }
-        .gesture(
-            DragGesture(minimumDistance: 4, coordinateSpace: .named(Self.contentSpace))
-                .onChanged { value in
-                    // With R held, dragging picks a range instead of moving the clip.
-                    if rangeAnchor != nil || (reorder == nil && model.isRangeKeyDown) {
-                        if rangeAnchor == nil {
-                            model.playback.pause()
-                            rangeAnchor = time(at: value.startLocation.x)
-                        }
-                        model.setTimelineRange(from: rangeAnchor!, to: time(at: value.location.x))
-                        return
-                    }
-                    if reorder == nil {
-                        model.playback.pause()
-                        if !model.isSelected(.clip(clip.id)) { model.selectedClipID = clip.id }
-                    }
-                    reorder = Reorder(id: clip.id, dx: value.translation.width, destination: destination(for: clip, index: index, dx: value.translation.width))
-                }
-                .onEnded { value in
-                    if rangeAnchor != nil {
-                        rangeAnchor = nil
-                        return
-                    }
-                    let target = destination(for: clip, index: index, dx: value.translation.width)
-                    reorder = nil
-                    if target != index { model.moveClip(clip.id, to: target) }
-                }
-        )
+        .gesture(clipDragGesture(clip))
         .contextMenu { clipMenu(clip, index: index) }
+    }
+}
+
+// Dragging main clips to a new place: the others slide aside to show where they land.
+extension TimelineView {
+    /// Dragging a main clip moves it (with the other selected clips); with R held it picks a range.
+    func clipDragGesture(_ clip: Clip) -> some Gesture {
+        DragGesture(minimumDistance: 4, coordinateSpace: .named(Self.contentSpace))
+            .onChanged { value in
+                // With R held, dragging picks a range instead of moving the clip.
+                if rangeAnchor != nil || (reorder == nil && model.isRangeKeyDown) {
+                    if rangeAnchor == nil {
+                        model.playback.pause()
+                        rangeAnchor = time(at: value.startLocation.x)
+                    }
+                    model.setTimelineRange(from: rangeAnchor!, to: time(at: value.location.x))
+                    return
+                }
+                if reorder == nil {
+                    model.playback.pause()
+                    if !model.isSelected(.clip(clip.id)) { model.selectedClipID = clip.id }
+                    let ids = model.clipsMovedWith(clip.id)
+                    reorder = Reorder(
+                        ids: ids, startX: value.startLocation.x, pointerX: value.location.x, scrollX: visibleRect.minX,
+                        destination: model.project.timeline.dropIndex(moving: ids, at: time(at: value.location.x)))
+                    watchReorder()
+                }
+                guard reorder?.isCancelled == false else { return }
+                reorder?.pointerX = value.location.x
+                reorder?.scrollX = visibleRect.minX
+                updateReorderDestination()
+            }
+            .onEnded { _ in
+                if rangeAnchor != nil {
+                    rangeAnchor = nil
+                    return
+                }
+                endReorder()
+            }
+    }
+
+    /// Where the pointer is now, in content coordinates, also while the timeline scrolls by itself.
+    var reorderPointerX: CGFloat {
+        guard let reorder else { return 0 }
+        return reorder.pointerX + visibleRect.minX - reorder.scrollX
+    }
+
+    /// How far the dragged clips have moved from where they were.
+    var reorderDX: CGFloat {
+        guard let reorder else { return 0 }
+        return reorderPointerX - reorder.startX
+    }
+
+    /// The clips as they will be if the drag ends here.
+    var reorderPreview: [Clip]? {
+        guard let reorder, !reorder.isCancelled else { return nil }
+        return model.project.timeline.reordered(moving: reorder.ids, to: reorder.destination)
+    }
+
+    /// How far each clip not being dragged slides to open the gap.
+    var reorderShifts: [Clip.ID: CGFloat] {
+        guard let preview = reorderPreview else { return [:] }
+        var shifts: [Clip.ID: CGFloat] = [:]
+        var now = CMTime.zero, then = CMTime.zero
+        let newStarts = Dictionary(
+            uniqueKeysWithValues: preview.map { clip in
+                defer { then = then + clip.duration }
+                return (clip.id, then)
+            })
+        for clip in model.project.timeline.clips {
+            shifts[clip.id] = width(of: (newStarts[clip.id] ?? now) - now)
+            now = now + clip.duration
+        }
+        return shifts
+    }
+
+    /// The gap the dragged clips will fill: its start and length.
+    var reorderSlot: (start: CMTime, duration: CMTime)? {
+        guard let reorder, let preview = reorderPreview, let first = preview.firstIndex(where: { reorder.ids.contains($0.id) }) else { return nil }
+        let start = preview[..<first].reduce(CMTime.zero) { $0 + $1.duration }
+        let length = preview.filter { reorder.ids.contains($0.id) }.reduce(CMTime.zero) { $0 + $1.duration }
+        return (start, length)
+    }
+
+    func updateReorderDestination() {
+        guard let reorder, !reorder.isCancelled else { return }
+        let destination = model.project.timeline.dropIndex(moving: reorder.ids, at: time(at: reorderPointerX))
+        if destination != reorder.destination {
+            withAnimation(.snappy(duration: 0.2)) { self.reorder?.destination = destination }
+        }
+    }
+
+    func endReorder() {
+        guard let reorder else { return }
+        self.reorder = nil
+        if !reorder.isCancelled { model.moveClips(reorder.ids, to: reorder.destination) }
+    }
+
+    /// Escape: the clips go back where they were; the drag does nothing more until the mouse is let go.
+    func cancelReorder() {
+        guard reorder != nil else { return }
+        withAnimation(.snappy(duration: 0.2)) { reorder?.isCancelled = true }
+    }
+
+    /// While clips are dragged: the timeline scrolls when they are near its left or right edge, and
+    /// Escape cancels. (Key presses don't arrive while the mouse button is down, so Escape is
+    /// looked at here.)
+    func watchReorder() {
+        Task { @MainActor in
+            while let reorder, !reorder.isCancelled {
+                if CGEventSource.keyState(.combinedSessionState, key: 53) {
+                    cancelReorder()
+                    return
+                }
+                let x = reorderPointerX
+                let edge: CGFloat = 40
+                var step: CGFloat = 0
+                if x > visibleRect.maxX - edge, visibleRect.maxX < contentWidth {
+                    step = min(16, (x - (visibleRect.maxX - edge)) / 2 + 2)
+                } else if x < visibleRect.minX + edge, visibleRect.minX > 0 {
+                    step = -min(16, ((visibleRect.minX + edge) - x) / 2 + 2)
+                }
+                if step != 0 {
+                    scrollPosition.scrollTo(point: CGPoint(x: max(0, visibleRect.minX + step), y: visibleRect.minY))
+                    updateReorderDestination()
+                }
+                try? await Task.sleep(for: .milliseconds(16))
+            }
+        }
     }
 }
 

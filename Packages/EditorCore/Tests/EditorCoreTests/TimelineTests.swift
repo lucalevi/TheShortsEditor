@@ -80,6 +80,54 @@ struct TimelineTests {
         #expect(timeline.clips.map(\.id) == [a.id, b.id, c.id])
     }
 
+    @Test func severalClipsMoveTogetherInTheirOrder() {
+        let a = clip(1), b = clip(1), c = clip(1), d = clip(1), e = clip(1)
+        var timeline = Timeline(clips: [a, b, c, d, e])
+        timeline.move([d.id, b.id], to: 0)
+        #expect(timeline.clips.map(\.id) == [b.id, d.id, a.id, c.id, e.id])
+        timeline.move([b.id, d.id], to: 99)
+        #expect(timeline.clips.map(\.id) == [a.id, c.id, e.id, b.id, d.id])
+        // Nothing to move: unchanged.
+        timeline.move([UUID()], to: 0)
+        #expect(timeline.clips.map(\.id) == [a.id, c.id, e.id, b.id, d.id])
+    }
+
+    /// The pointer decides where a drag lands: a long clip dragged to the very start goes first,
+    /// even though its middle is still far to the right (it landed second before).
+    @Test func dropIndexFollowsThePointer() {
+        let a = clip(6), b = clip(5), c = clip(11.6)
+        let timeline = Timeline(clips: [a, b, c])
+        #expect(timeline.dropIndex(moving: [c.id], at: seconds(2)) == 0)
+        #expect(timeline.dropIndex(moving: [c.id], at: seconds(4)) == 1)
+        #expect(timeline.dropIndex(moving: [c.id], at: seconds(9)) == 2)
+        #expect(timeline.dropIndex(moving: [c.id], at: seconds(20)) == 2)
+        // Dragging the first clip to the end.
+        #expect(timeline.dropIndex(moving: [a.id], at: seconds(21)) == 2)
+        #expect(timeline.dropIndex(moving: [a.id], at: seconds(1)) == 0)
+        // Several: counted among the others only.
+        #expect(timeline.dropIndex(moving: [a.id, c.id], at: seconds(9)) == 1)
+    }
+
+    @Test func stepDestinationMovesOnePlace() {
+        let a = clip(1), b = clip(1), c = clip(1), d = clip(1)
+        let timeline = Timeline(clips: [a, b, c, d])
+        #expect(timeline.stepDestination(moving: [c.id], by: -1) == 1)
+        #expect(timeline.stepDestination(moving: [c.id], by: 1) == 3)
+        #expect(timeline.stepDestination(moving: [a.id], by: -1) == nil)
+        #expect(timeline.stepDestination(moving: [d.id], by: 1) == nil)
+        // A block of two moves past one neighbour.
+        #expect(timeline.stepDestination(moving: [b.id, c.id], by: -1) == 0)
+        #expect(timeline.stepDestination(moving: [b.id, c.id], by: 1) == 2)
+        #expect(timeline.stepDestination(moving: [a.id, b.id, c.id, d.id], by: 1) == nil)
+        // Spread apart: Move Later first gathers them where the first one is, Move Earlier one before it.
+        #expect(timeline.stepDestination(moving: [a.id, c.id], by: 1) == 0)
+        #expect(timeline.stepDestination(moving: [a.id, c.id], by: -1) == nil)
+        #expect(timeline.stepDestination(moving: [b.id, d.id], by: -1) == 0)
+        var moved = timeline
+        moved.move([b.id, c.id], to: 2)
+        #expect(moved.clips.map(\.id) == [a.id, d.id, b.id, c.id])
+    }
+
     @Test func projectRoundTripsThroughJSON() throws {
         var project = Project()
         let asset = MediaAsset(

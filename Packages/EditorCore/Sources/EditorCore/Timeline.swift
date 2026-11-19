@@ -216,9 +216,49 @@ public struct Timeline: Codable, Equatable, Sendable {
 
     /// Moves a clip so it ends up at `destination` (an index into the timeline after removal).
     public mutating func move(_ id: Clip.ID, to destination: Int) {
-        guard let from = index(of: id) else { return }
-        let clip = clips.remove(at: from)
-        clips.insert(clip, at: min(max(destination, 0), clips.count))
+        move([id], to: destination)
+    }
+
+    /// Moves several clips together, in their timeline order, so the first of them ends up at
+    /// `destination`: an index among the clips that are left once they are taken out.
+    public mutating func move(_ ids: Set<Clip.ID>, to destination: Int) {
+        clips = reordered(moving: ids, to: destination)
+    }
+
+    /// The clips as they would be after `move(ids, to: destination)`, for showing a drag before it ends.
+    public func reordered(moving ids: Set<Clip.ID>, to destination: Int) -> [Clip] {
+        let moved = clips.filter { ids.contains($0.id) }
+        guard !moved.isEmpty else { return clips }
+        var others = clips.filter { !ids.contains($0.id) }
+        others.insert(contentsOf: moved, at: min(max(destination, 0), others.count))
+        return others
+    }
+
+    /// Where clips dragged to `time` land: the index among the other clips. They go after every
+    /// other clip whose middle is before `time`, measured on the timeline as it is now (so the
+    /// pointer decides, not the length of what is dragged).
+    public func dropIndex(moving ids: Set<Clip.ID>, at time: CMTime) -> Int {
+        var start = CMTime.zero
+        var count = 0
+        for clip in clips {
+            let middle = start + CMTimeMultiplyByRatio(clip.duration, multiplier: 1, divisor: 2)
+            if !ids.contains(clip.id), middle < time { count += 1 }
+            start = start + clip.duration
+        }
+        return count
+    }
+
+    /// Where Move Earlier (`by: -1`) or Move Later (`by: 1`) puts `ids`: one place before the first
+    /// of them, or after the clip that follows them. Nil when they can't go any further.
+    public func stepDestination(moving ids: Set<Clip.ID>, by step: Int) -> Int? {
+        guard let first = clips.firstIndex(where: { ids.contains($0.id) }) else { return nil }
+        let othersBefore = clips[..<first].count { !ids.contains($0.id) }
+        let othersCount = clips.count { !ids.contains($0.id) }
+        let isTogether = clips[first...].prefix(while: { ids.contains($0.id) }).count == clips.count { ids.contains($0.id) }
+        // Clips spread apart are first gathered where the first of them is.
+        let destination = isTogether || step < 0 ? othersBefore + step : othersBefore
+        guard (0...othersCount).contains(destination), destination != othersBefore || !isTogether else { return nil }
+        return destination
     }
 
     /// Cuts the clip under `time` in two, at the nearest frame. Returns the id of the new second

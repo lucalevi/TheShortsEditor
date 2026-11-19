@@ -299,6 +299,7 @@ final class EditorModel {
                 MainActor.assumeIsolated { model.replaceProject(with: old, actionName: actionName) }
             }
             undoManager?.setActionName(actionName)
+            UndoMenu.shared.refreshSoon()
         }
         projectDidChange()
     }
@@ -376,10 +377,6 @@ final class EditorModel {
         apply("Change Framing") { project in
             for id in clipIDs { project.updateAnyClip(id) { $0.framing = framing } }
         }
-    }
-
-    func moveClip(_ clipID: Clip.ID, to index: Int) {
-        apply("Move Clip") { $0.timeline.move(clipID, to: index) }
     }
 
     // MARK: Playback

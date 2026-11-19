@@ -96,6 +96,12 @@ struct EditorCommands: Commands {
             ) { model.deleteSelection() }
             .keyboardShortcut(.delete, modifiers: [])
             .disabled(model.timelineSelection.isEmpty)
+            Button(model.selectedMainClipIDs.count > 1 ? "Move Clips Earlier" : "Move Clip Earlier") { model.moveSelectedClips(by: -1) }
+                .keyboardShortcut(.leftArrow, modifiers: [.command, .option])
+                .disabled(!model.canMoveSelectedClips(by: -1))
+            Button(model.selectedMainClipIDs.count > 1 ? "Move Clips Later" : "Move Clip Later") { model.moveSelectedClips(by: 1) }
+                .keyboardShortcut(.rightArrow, modifiers: [.command, .option])
+                .disabled(!model.canMoveSelectedClips(by: 1))
             Divider()
             Button("Select Clip Range") { model.selectClipRange() }
                 .keyboardShortcut("x", modifiers: [])
@@ -381,55 +387,7 @@ struct EditorCommands: Commands {
             .disabled(model.selectedClips.isEmpty)
         }
 
-        CommandMenu("Playback") {
-            Button(model.playback.isPlaying ? "Pause" : "Play") { model.playback.togglePlayback() }
-                .keyboardShortcut(.space, modifiers: [])
-            Divider()
-            Button("Play Backwards / Faster Backwards") { model.playback.shuttle(forward: false) }
-                .keyboardShortcut("j", modifiers: [])
-            Button("Stop") { model.playback.pause() }
-                .keyboardShortcut("k", modifiers: [])
-            Button("Play Forwards / Faster Forwards") { model.playback.shuttle(forward: true) }
-                .keyboardShortcut("l", modifiers: [])
-            Divider()
-            Button("Previous Frame") { model.playback.step(frames: -1) }
-                .keyboardShortcut(.leftArrow, modifiers: [])
-            Button("Next Frame") { model.playback.step(frames: 1) }
-                .keyboardShortcut(.rightArrow, modifiers: [])
-            Button("Go to Start") { model.playback.seek(to: .zero) }
-                .keyboardShortcut(.home, modifiers: [])
-            Button("Go to End") { model.playback.seek(to: model.duration) }
-                .keyboardShortcut(.end, modifiers: [])
-            Button("Previous Edit") { model.goToEdit(forward: false) }
-                .keyboardShortcut(";", modifiers: [])
-            Button("Next Edit") { model.goToEdit(forward: true) }
-                .keyboardShortcut("'", modifiers: [])
-            Divider()
-            Button("Add Marker") { model.addMarker() }
-                .keyboardShortcut("m", modifiers: [])
-                .disabled(model.project.timeline.clips.isEmpty)
-            Button("Previous Marker") { model.goToMarker(forward: false) }
-                .keyboardShortcut(";", modifiers: .control)
-                .disabled(model.project.markers.isEmpty)
-            Button("Next Marker") { model.goToMarker(forward: true) }
-                .keyboardShortcut("'", modifiers: .control)
-                .disabled(model.project.markers.isEmpty)
-            Button("Rename Marker at Playhead…") { if let marker = model.markerAtPlayhead { model.markerBeingRenamed = marker.id } }
-                .disabled(model.markerAtPlayhead == nil)
-            Button("Delete Marker at Playhead") { if let marker = model.markerAtPlayhead { model.deleteMarker(marker.id) } }
-                .disabled(model.markerAtPlayhead == nil)
-            Divider()
-            Button("Play Selection") { model.playSelection() }
-                .keyboardShortcut("/", modifiers: [])
-            Button("Play from Start") { model.playback.playFromStart() }
-                .keyboardShortcut("\\", modifiers: [])
-            Toggle("Loop Playback", isOn: Binding(get: { model.playback.loopsPlayback }, set: { model.playback.loopsPlayback = $0 }))
-                .keyboardShortcut("l", modifiers: .command)
-            Button(model.isFullScreenPreview ? "Leave Full Screen" : "Play Full Screen") { model.toggleFullScreenPreview() }
-                .keyboardShortcut("f", modifiers: [.command, .shift])
-                .disabled(model.project.timeline.clips.isEmpty)
-        }
-
+        playbackMenu
         viewMenu
     }
 }
@@ -492,33 +450,60 @@ enum MusicImportPanel {
     }
 }
 
-/// The app's windows (F27): a new one, Background Tasks and Help.
-struct WindowCommands: Commands {
-    @Environment(\.openWindow) private var openWindow
-
-    var body: some Commands {
-        CommandGroup(after: .appInfo) {
-            Button("Check for Updates…") { UpdateChecker.shared.check() }
-                .disabled(UpdateChecker.shared.isChecking)
-        }
-        CommandGroup(after: .newItem) {
-            Button("New Window") { openWindow(id: EditorWindow.id, value: EditorWindow.Value()) }
-                .keyboardShortcut("n", modifiers: [.command, .shift])
-        }
-        CommandGroup(before: .windowList) {
-            Button("Background Tasks") { openWindow(id: BackgroundTasksView.windowID) }
-                .keyboardShortcut("9")
-            Divider()
-        }
-        CommandGroup(replacing: .help) {
-            Button("Shorts Editor Help") { openWindow(id: HelpView.windowID) }
-                .keyboardShortcut("?", modifiers: .command)
-        }
-    }
-}
-
 // Edit menu: Cut, Copy, Paste and Duplicate, selecting, and copying settings.
 extension EditorCommands {
+    /// Playback: play, J/K/L, frames, markers, full screen.
+    var playbackMenu: some Commands {
+        CommandMenu("Playback") {
+            Button(model.playback.isPlaying ? "Pause" : "Play") { model.playback.togglePlayback() }
+                .keyboardShortcut(.space, modifiers: [])
+            Divider()
+            Button("Play Backwards / Faster Backwards") { model.playback.shuttle(forward: false) }
+                .keyboardShortcut("j", modifiers: [])
+            Button("Stop") { model.playback.pause() }
+                .keyboardShortcut("k", modifiers: [])
+            Button("Play Forwards / Faster Forwards") { model.playback.shuttle(forward: true) }
+                .keyboardShortcut("l", modifiers: [])
+            Divider()
+            Button("Previous Frame") { model.playback.step(frames: -1) }
+                .keyboardShortcut(.leftArrow, modifiers: [])
+            Button("Next Frame") { model.playback.step(frames: 1) }
+                .keyboardShortcut(.rightArrow, modifiers: [])
+            Button("Go to Start") { model.playback.seek(to: .zero) }
+                .keyboardShortcut(.home, modifiers: [])
+            Button("Go to End") { model.playback.seek(to: model.duration) }
+                .keyboardShortcut(.end, modifiers: [])
+            Button("Previous Edit") { model.goToEdit(forward: false) }
+                .keyboardShortcut(";", modifiers: [])
+            Button("Next Edit") { model.goToEdit(forward: true) }
+                .keyboardShortcut("'", modifiers: [])
+            Divider()
+            Button("Add Marker") { model.addMarker() }
+                .keyboardShortcut("m", modifiers: [])
+                .disabled(model.project.timeline.clips.isEmpty)
+            Button("Previous Marker") { model.goToMarker(forward: false) }
+                .keyboardShortcut(";", modifiers: .control)
+                .disabled(model.project.markers.isEmpty)
+            Button("Next Marker") { model.goToMarker(forward: true) }
+                .keyboardShortcut("'", modifiers: .control)
+                .disabled(model.project.markers.isEmpty)
+            Button("Rename Marker at Playhead…") { if let marker = model.markerAtPlayhead { model.markerBeingRenamed = marker.id } }
+                .disabled(model.markerAtPlayhead == nil)
+            Button("Delete Marker at Playhead") { if let marker = model.markerAtPlayhead { model.deleteMarker(marker.id) } }
+                .disabled(model.markerAtPlayhead == nil)
+            Divider()
+            Button("Play Selection") { model.playSelection() }
+                .keyboardShortcut("/", modifiers: [])
+            Button("Play from Start") { model.playback.playFromStart() }
+                .keyboardShortcut("\\", modifiers: [])
+            Toggle("Loop Playback", isOn: Binding(get: { model.playback.loopsPlayback }, set: { model.playback.loopsPlayback = $0 }))
+                .keyboardShortcut("l", modifiers: .command)
+            Button(model.isFullScreenPreview ? "Leave Full Screen" : "Play Full Screen") { model.toggleFullScreenPreview() }
+                .keyboardShortcut("f", modifiers: [.command, .shift])
+                .disabled(model.project.timeline.clips.isEmpty)
+        }
+    }
+
     /// View: preview, zoom, playback options.
     var viewMenu: some Commands {
         CommandGroup(before: .toolbar) {
