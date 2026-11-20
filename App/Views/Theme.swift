@@ -9,6 +9,8 @@ enum Theme {
     static let panel = Color(white: 0.165)
     /// The strip at the top of each panel and under the viewer.
     static let header = Color(white: 0.205)
+    /// The height of that strip (`PanelHeader`).
+    static let headerHeight: CGFloat = 32
     /// Behind the video in the viewer.
     static let viewer = Color(white: 0.085)
     /// Behind the clips on the timeline.

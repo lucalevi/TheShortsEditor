@@ -1,6 +1,6 @@
 # Project status
 
-_Last updated: 2026-11-19 (morning). The current state only: read it first when picking the project back up, and update it at the end of each session. What was done and found, session by session, is in `CHANGELOG.md`; why the code is the way it is, in `docs/adr/`._
+_Last updated: 2026-11-20. The current state only: read it first when picking the project back up, and update it at the end of each session. What was done and found, session by session, is in `CHANGELOG.md`; why the code is the way it is, in `docs/adr/`._
 
 ## Where we are
 
@@ -21,11 +21,13 @@ Pinch to zoom still needs a real trackpad to try.
 | Captions | One click with progress, then fix a word on the picture (as titles now) | Captions edited only in the list; wrong language fails without saying why; accuracy on real speech unknown (synthetic test voice) |
 | Magic Short | Pick clips, preview, tweak; always clear what was changed | Does it say what it cut? Does one undo revert it all? |
 | ~~Reordering clips~~ | done 2026-11-19  | |
-| 13" window | Everything reachable on a MacBook Air screen | Window minimum 1000×680; three columns plus timeline are tight; clip details likely need much scrolling (the inspector for several clips already scrolls at 1280×770) |
+| ~~13" window~~ | done 2026-11-20 | (the details panel still scrolls for Colour and Effects) |
 
 **Reordering clips, done 2026-11-19 :** a long clip dragged to the start landed second (its middle decided, not the pointer) and the dragged clip hid the yellow line. Now the pointer decides, the other clips slide aside live, a dashed yellow slot shows where it lands, several selected clips move together, Escape cancels, the timeline scrolls at its edges, and Clip ▸ Move Clip Earlier / Later (⌥⌘← / ⌥⌘→, also in the right-click menu). Checked on screen; `ReorderingTests`, `TimelineTests` and the UI test `testDragTheLastClipToTheStart`.
 
-Suggested next: the 13" window (needs no footage), then Captions and Magic Short once there are real recordings.
+**13" window, done 2026-11-20 (not yet committed):** the timeline is as tall as its lanes (up to half the window) instead of half the window whatever is on it, so at 1280×770 the viewer's picture went from ~290 to ~400 pt; drag the divider to choose a height, double-click it to fit again; empty captions and music lanes shrink. Toolbar, columns, export sheet and All Shorts already fitted at 1280×770 and 1000×680. `SplitLayoutTests`, UI test `testTheTimelineFitsA13InchScreen` (`SHORTS_TEST_WINDOW` sets the window size).
+
+Suggested next: Captions and Magic Short once there are real recordings; without them, the caption-editing parts that the synthetic voice can test (fix a word on the picture, a clear message for the wrong language).
 
 **Waiting on the user for this pass:** two or three real phone recordings of the user talking (the only footage I can't make), and ideally one 20-minute session with someone who has never seen the app (five tasks, no help).
 

@@ -7,6 +7,30 @@ the decisions that shape the code are in `docs/adr/`.
 Moved here from `STATUS.md` on 2026-11-18 (F31); the text is as it was written at the time, so
 "next" in an entry means next *then*.
 
+## 2026-11-20: Usability pass 2: the 13" window
+
+Task: edit a Short on a 13" MacBook Air (this Mac's own screen is 1280×800: window 1280×770), and
+at the window's minimum, 1000×680. Found: everything fits across (toolbar, three columns, export
+sheet, All Shorts), but the editor's split view gave the timeline **half the height whatever was
+on it** (~360 of 718 pt, ~80 pt of it empty under Add Music), so the viewer's picture was ~290 pt
+tall and the clip details showed about six rows. Empty lanes also kept their full height (the
+captions lane with no captions, the music lane with no song).
+- **The timeline is as tall as its lanes** (`EditorSplit`, replacing `VSplitView`): it reports
+  the height that shows every lane (`TimelineView.fittingHeight`), takes that up to half the
+  window (then scrolls), and the viewer and details get the rest; it grows when a row is added
+  (B-roll, titles, sounds). At 13" the viewer's picture went from ~290 to ~400 pt tall.
+- **Dragging the divider** sets the timeline's height (kept across launches, `timelineHeight`
+  setting); **double-clicking it** fits it again. The viewer keeps 280 pt, the timeline 170 pt.
+  The divider is 9 pt tall to the pointer and 1 pt in the layout, adjustable with VoiceOver.
+- **Empty lanes shrink**: the captions lane takes no room until there are captions; the music
+  lane is only as tall as Add Music until there is a song.
+- Tests: `SplitLayoutTests`; UI test `testTheTimelineFitsA13InchScreen` (launched at 1280×770
+  with the new `SHORTS_TEST_WINDOW`: every lane shows, the timeline is under 300 pt, drag and
+  double-click). A preference key didn't carry the timeline's height out of the split view's
+  child, so it is passed back through a binding.
+- Still tight at 13": the details panel scrolls for Colour (filters first, sliders below) and
+  Effects; acceptable, as everything is reachable.
+
 ## 2026-11-19: Usability pass 2: reordering clips
 
 Task: three clips; move the last (and longest) one to the start by dragging. Found: dropped with

@@ -17,6 +17,8 @@ enum SettingsKey {
     static let audioSkimming = "audioSkimming"
     /// How tall clips are on the timeline (`TimelineClipSize`).
     static let clipSize = "timelineClipSize"
+    /// How tall the timeline was dragged (`EditorSplit`); 0 or missing fits it to its lanes.
+    static let timelineHeight = "timelineHeight"
 }
 
 /// Media and finishing: settings for new clips, markers, the clip trimmer, saving a frame,

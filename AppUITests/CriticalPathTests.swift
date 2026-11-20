@@ -184,6 +184,34 @@ final class CriticalPathTests: XCTestCase {
         XCTAssertTrue(app.buttons["Find Missing Files…"].exists)
     }
 
+    /// On a 13" MacBook Air the timeline is as tall as its lanes, so the viewer gets the rest;
+    /// dragging the divider makes it taller and double-clicking it fits it again.
+    func testTheTimelineFitsA13InchScreen() throws {
+        try begin()
+        launch(fresh: true, videoSeconds: 2, windowSize: "1280x770")
+        XCTAssertTrue(timelineClips.firstMatch.waitForExistence(timeout: 30))
+        let window = app.windows.firstMatch.frame
+        XCTAssertEqual(window.height, 770, accuracy: 1, "The window isn't 13\" sized")
+        let divider = app.descendants(matching: .any)["timelineDivider"]
+        XCTAssertTrue(divider.waitForExistence(timeout: 10))
+        let fitted = divider.frame.midY
+        // Every lane shows without scrolling: Add Music, the last one, is inside the window…
+        let addMusic = app.menuButtons["Add Music"]
+        XCTAssertTrue(addMusic.waitForExistence(timeout: 10))
+        XCTAssertLessThanOrEqual(addMusic.frame.maxY, window.maxY)
+        // …and the timeline takes well under half of it (a split view gave it ~360 of 718 pt).
+        XCTAssertLessThan(window.maxY - fitted, 300, "The timeline is taller than its lanes")
+
+        front()
+        divider.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+            .click(
+                forDuration: 0.2, thenDragTo: divider.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: -80)), withVelocity: .slow,
+                thenHoldForDuration: 0.2)
+        XCTAssertTrue(waitFor { divider.frame.midY < fitted - 40 }, "Dragging the divider didn't make the timeline taller")
+        divider.doubleClick()
+        XCTAssertTrue(waitFor { abs(divider.frame.midY - fitted) < 2 }, "Double-clicking the divider didn't fit the timeline again")
+    }
+
     /// File ▸ New Window opens a second window with All Shorts, its own editor (F27).
     func testANewWindowOpensBesideTheFirst() throws {
         try begin()
@@ -237,12 +265,13 @@ final class CriticalPathTests: XCTestCase {
     /// opened from Finder; `removeMedia`: the videos added so far are deleted first. The app makes
     /// and removes them itself (`UITestMedia`): the runner can't hand it a file, and
     /// `XCUIApplication.open` started a second copy of the app with the user's own library.
-    private func launch(fresh: Bool, videoSeconds: Int? = nil, removeMedia: Bool = false) {
+    private func launch(fresh: Bool, videoSeconds: Int? = nil, removeMedia: Bool = false, windowSize: String? = nil) {
         app = XCUIApplication()
         app.launchEnvironment["SHORTS_TEST_RUN"] = run
         app.launchEnvironment["SHORTS_TEST_FRESH"] = fresh ? "1" : "0"
         if let videoSeconds { app.launchEnvironment["SHORTS_TEST_IMPORT"] = String(videoSeconds) }
         if removeMedia { app.launchEnvironment["SHORTS_TEST_REMOVE_MEDIA"] = "1" }
+        if let windowSize { app.launchEnvironment["SHORTS_TEST_WINDOW"] = windowSize }
         app.launch()
         // Keys and menus reach only the app in front.
         app.activate()

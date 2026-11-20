@@ -572,7 +572,7 @@ extension TimelineView {
             .controlSize(.small)
             .fixedSize()
             .foregroundStyle(.secondary)
-            .frame(height: musicLaneHeight)
+            .frame(height: musicHeight)
             .offset(x: leadingInset + 4)
             .help("Add music to play under your Short: the app's own, or a song from a file. You can also drop a sound file here.")
         }

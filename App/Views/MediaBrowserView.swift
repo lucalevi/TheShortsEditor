@@ -316,7 +316,7 @@ struct PanelHeader<Accessory: View>: View {
             accessory
         }
         .padding(.horizontal, 12)
-        .frame(height: 32)
+        .frame(height: Theme.headerHeight)
         .background(Theme.header)
         .overlay(alignment: .bottom) { Divider() }
     }

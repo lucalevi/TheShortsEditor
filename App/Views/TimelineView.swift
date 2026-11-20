@@ -8,6 +8,8 @@ import UniformTypeIdentifiers
 /// with a ruler for scrubbing and the playhead.
 struct TimelineView: View {
     @Bindable var model: EditorModel
+    /// Where to report the height that shows every lane without scrolling (`EditorSplit`).
+    @Binding var fittingHeight: CGFloat
     @State var scrollPosition = ScrollPosition(edge: .leading)
     @State var visibleRect: CGRect = .zero
     @State var isDropTargeted = false
@@ -35,58 +37,6 @@ struct TimelineView: View {
     @State var captionEdgeDrag: (pageID: CaptionPage.ID, edge: CaptionEdge, time: CMTime)?
     /// While the music is dragged along the timeline: how far it has moved.
     @State var musicDrag: CMTime?
-
-    // MARK: Layout
-
-    let rulerHeight: CGFloat = 24
-    let captionLaneHeight: CGFloat = 22
-    let titleRowHeight: CGFloat = 22
-    let overlayRowHeight: CGFloat = 40
-    let musicLaneHeight: CGFloat = 44
-    let soundRowHeight: CGFloat = 34
-    let rowGap: CGFloat = 3
-    let leadingInset: CGFloat = 12
-
-    var titleRows: [TextOverlay.ID: Int] {
-        LanePacking.rows(model.project.titles.map { (id: $0.id, range: $0.range) })
-    }
-    var overlayRows: [Clip.ID: Int] {
-        LanePacking.rows(model.project.overlays.map { (id: $0.id, range: $0.range) })
-    }
-    var soundRows: [Clip.ID: Int] {
-        LanePacking.rows(model.project.sounds.map { (id: $0.id, range: $0.range) })
-    }
-    var titleRowCount: Int { LanePacking.count(titleRows) }
-    var overlayRowCount: Int { LanePacking.count(overlayRows) }
-
-    var titlesY: CGFloat { rulerHeight + 6 }
-    var titlesHeight: CGFloat { CGFloat(titleRowCount) * (titleRowHeight + 2) }
-    var overlaysY: CGFloat { titlesY + titlesHeight + rowGap }
-    var overlaysHeight: CGFloat { model.project.overlays.isEmpty ? emptyLaneHeight : CGFloat(overlayRowCount) * (overlayRowHeight + rowGap) }
-    var clipsY: CGFloat { overlaysY + overlaysHeight + 2 }
-    var captionsY: CGFloat { clipsY + trackHeight + 6 }
-    var soundsY: CGFloat { captionsY + captionLaneHeight + 4 }
-    var soundsHeight: CGFloat { model.project.sounds.isEmpty ? emptyLaneHeight : CGFloat(LanePacking.count(soundRows)) * (soundRowHeight + 2) }
-    var musicY: CGFloat { soundsY + soundsHeight + 2 }
-    var contentHeight: CGFloat { musicY + musicLaneHeight + 12 }
-
-    var pointsPerSecond: CGFloat { model.timelineZoom }
-
-    func x(for time: CMTime) -> CGFloat {
-        leadingInset + CGFloat(time.seconds) * pointsPerSecond
-    }
-
-    func width(of duration: CMTime) -> CGFloat {
-        CGFloat(duration.seconds) * pointsPerSecond
-    }
-
-    func time(at x: CGFloat) -> CMTime {
-        CMTime(seconds: max(0, Double((x - leadingInset) / pointsPerSecond)), preferredTimescale: 600)
-    }
-
-    func seconds(_ points: CGFloat) -> CMTime {
-        CMTime(seconds: Double(points / pointsPerSecond), preferredTimescale: 600)
-    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -182,6 +132,9 @@ struct TimelineView: View {
                 isDropTargeted = $0
             }
         }
+        .onChange(of: Theme.headerHeight + contentHeight, initial: true) { _, height in
+            if fittingHeight != height { fittingHeight = height }
+        }
         .onChange(of: model.project.timeline.clips.isEmpty, initial: true) {
             if !model.project.timeline.clips.isEmpty { model.showTip(.skimming) }
         }
@@ -206,86 +159,6 @@ struct TimelineView: View {
             model.playback.pause()
             model.playback.seek(to: time(at: value.location.x))
         }
-    }
-
-    // MARK: Selecting with a rectangle
-
-    /// The empty space behind everything: click to deselect, drag to select with a rectangle
-    /// (holding ⌘ or ⇧ adds to what is already selected).
-    var marqueeArea: some View {
-        Color.clear
-            .contentShape(Rectangle())
-            .gesture(emptySpaceGesture)
-    }
-
-    /// Click: deselect and move the playhead. Drag: select with a rectangle.
-    var emptySpaceGesture: some Gesture {
-        DragGesture(minimumDistance: 0, coordinateSpace: .named(Self.contentSpace))
-            .onChanged { value in
-                if rangeAnchor != nil || (marquee == nil && model.isRangeKeyDown && abs(value.translation.width) > 3) {
-                    if rangeAnchor == nil {
-                        model.playback.pause()
-                        rangeAnchor = time(at: value.startLocation.x)
-                    }
-                    model.setTimelineRange(from: rangeAnchor!, to: time(at: value.location.x))
-                    return
-                }
-                let rect = CGRect(
-                    x: min(value.startLocation.x, value.location.x),
-                    y: min(value.startLocation.y, value.location.y),
-                    width: abs(value.location.x - value.startLocation.x),
-                    height: abs(value.location.y - value.startLocation.y))
-                guard rect.width > 3 || rect.height > 3 || marquee != nil else { return }
-                if marqueeBase == nil { marqueeBase = model.timelineSelection }
-                marquee = rect
-                var selection = marqueeBase ?? TimelineSelection()
-                let adding = !NSEvent.modifierFlags.isDisjoint(with: [.command, .shift])
-                selection.select(items(in: rect), adding: adding)
-                model.timelineSelection = selection
-            }
-            .onEnded { value in
-                if rangeAnchor != nil {
-                    rangeAnchor = nil
-                    return
-                }
-                if marquee == nil, NSEvent.modifierFlags.isDisjoint(with: [.command, .shift]) {
-                    model.selection = nil // a plain click on empty space
-                    model.selectedAssetID = nil
-                    model.timelineRange = nil
-                    model.playback.pause() // ...also moves the playhead there
-                    model.playback.seek(to: time(at: value.location.x))
-                }
-                marquee = nil
-                marqueeBase = nil
-            }
-    }
-
-    @ViewBuilder
-    var marqueeRectangle: some View {
-        if let marquee {
-            Rectangle()
-                .fill(Color.accentColor.opacity(0.15))
-                .overlay(Rectangle().strokeBorder(Color.accentColor.opacity(0.9), lineWidth: 1))
-                .frame(width: marquee.width, height: marquee.height)
-                .offset(x: marquee.minX, y: marquee.minY)
-                .allowsHitTesting(false)
-                .accessibilityHidden(true)
-        }
-    }
-
-    /// The clips, overlays, titles and music a rectangle on the timeline touches.
-    func items(in rect: CGRect) -> Set<EditorModel.Selection> {
-        let lanes: [(TimelineLane, CGFloat, CGFloat)] = [
-            (.titles, titlesY, titlesHeight),
-            (.overlays, overlaysY, overlaysHeight),
-            (.clips, clipsY, trackHeight),
-            (.sounds, soundsY, soundsHeight),
-            (.music, musicY, musicLaneHeight),
-        ]
-        let covered = Set(lanes.filter { _, y, height in rect.minY < y + height && rect.maxY > y }.map(\.0))
-        guard !covered.isEmpty else { return [] }
-        let range = CMTimeRange(start: time(at: rect.minX), end: time(at: rect.maxX))
-        return model.project.timelineItems(overlapping: range, in: covered)
     }
 
     // MARK: Ruler, playhead, markers

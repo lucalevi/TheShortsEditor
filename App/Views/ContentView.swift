@@ -67,7 +67,8 @@ struct EditorView: View {
     @Bindable var model: EditorModel
 
     var body: some View {
-        VSplitView {
+        // The timeline is as tall as its lanes need; drag the divider for more room.
+        EditorSplit {
             HSplitView {
                 SidebarView(model: model)
                     .frame(minWidth: 220, idealWidth: 260, maxWidth: 340)
@@ -76,10 +77,8 @@ struct EditorView: View {
                 InspectorView(model: model)
                     .frame(minWidth: 220, idealWidth: 260, maxWidth: 320)
             }
-            .frame(minHeight: 280, maxHeight: .infinity)
-            // Drag the divider to give the timeline more room (bigger clips, more lanes).
-            TimelineView(model: model)
-                .frame(minHeight: 200, idealHeight: 280, maxHeight: .infinity)
+        } bottom: { fittingHeight in
+            TimelineView(model: model, fittingHeight: fittingHeight)
         }
         // Captions in a second language, translated on this Mac (it asks to download languages once).
         .translationTask(model.captioning.translationRequest) { session in
@@ -195,6 +194,9 @@ private struct WindowReader: NSViewRepresentable {
             if let observer { NotificationCenter.default.removeObserver(observer) }
             observer = nil
             guard let window else { return }
+            if let size = AppEnvironment.uiTestWindowSize, window.frame.size != size {
+                window.setFrame(NSRect(origin: window.frame.origin, size: size), display: true)
+            }
             onWindow(window)
             observer = NotificationCenter.default.addObserver(forName: NSWindow.didBecomeKeyNotification, object: window, queue: .main) { [weak self] _ in
                 MainActor.assumeIsolated {

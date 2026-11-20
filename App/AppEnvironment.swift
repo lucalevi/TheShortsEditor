@@ -62,6 +62,16 @@ nonisolated enum AppEnvironment {
         return folder
     }
 
+    /// The window size a UI test asked for with `SHORTS_TEST_WINDOW=<width>x<height>` (e.g. a
+    /// 13" MacBook Air's), so layout tests don't depend on the Mac's screen; nil otherwise.
+    static var uiTestWindowSize: CGSize? {
+        let environment = ProcessInfo.processInfo.environment
+        guard environment["SHORTS_TEST_RUN"] != nil, let value = environment["SHORTS_TEST_WINDOW"] else { return nil }
+        let parts = value.split(separator: "x").compactMap { Double($0) }
+        guard parts.count == 2 else { return nil }
+        return CGSize(width: parts[0], height: parts[1])
+    }
+
     /// The app tests always start from nothing; a UI test run when it asks.
     private static var startsFresh: Bool {
         let environment = ProcessInfo.processInfo.environment
